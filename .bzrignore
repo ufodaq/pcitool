@@ -1,0 +1,9 @@
+*.cmd
+pciDriver.ko
+pciDriver.mod.c
+pci.d
+tools.d
+modules.order
+Module.symvers
+./pci
+.tmp_versions
