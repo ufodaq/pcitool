@@ -461,7 +461,7 @@ int WriteData(int handle, int bar, unsigned long addr, int n, int access, char *
     Read(check, handle, bar, addr, size);
     
     if (memcmp(buf, check, size)) {
-	printf("Write failed: the data written and read differ, the foolowing is read back:");
+	printf("Write failed: the data written and read differ, the foolowing is read back:\n");
 	ReadData(handle, bar, addr, n, access);
 	exit(-1);
     }
