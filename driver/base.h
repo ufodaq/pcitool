@@ -52,6 +52,7 @@ static const __devinitdata struct pci_device_id pcidriver_ids[] = {
 	{ PCI_DEVICE( PCIXPG4_VENDOR_ID , PCIXPG4_DEVICE_ID ) },		// PCI-X PROGRAPE 4
 	{ PCI_DEVICE( PCI64PG4_VENDOR_ID , PCI64PG4_DEVICE_ID ) },		// PCI-64 PROGRAPE 4
 	{ PCI_DEVICE( PCIE_XILINX_VENDOR_ID, PCIE_ML605_DEVICE_ID ) },          // PCI-E Xilinx ML605
+	{ PCI_DEVICE( PCIE_XILINX_VENDOR_ID, PCIE_IPECAMERA_DEVICE_ID ) },      // PCI-E IPE Camera
 	{0,0,0,0},
 };
 

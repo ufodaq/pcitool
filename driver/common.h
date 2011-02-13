@@ -87,6 +87,9 @@ typedef struct  {
 #define PCIE_XILINX_VENDOR_ID 0x10ee
 #define PCIE_ML605_DEVICE_ID 0x04a0
 
+/* Identifies the PCI-E IPE Camera */
+#define PCIE_IPECAMERA_DEVICE_ID 0x6018
+
 /*************************************************************************/
 /* Some nice defines that make code more readable */
 /* This is to print nice info in the log */

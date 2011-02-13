@@ -345,6 +345,12 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
                 /* It is a PCI-E Xilinx ML605 evaluation board */
 		mod_info("Found ML605 board at %s\n", dev_name(&pdev->dev));
 	}
+	else if ((id->vendor == PCIE_XILINX_VENDOR_ID) &&
+		(id->device == PCIE_IPECAMERA_DEVICE_ID))
+	{
+                /* It is a PCI-E IPECamera based on Xilinx ML605 evaluation board */
+		mod_info("Found IPE Camera at %s\n", dev_name(&pdev->dev));
+	}
 	else
 	{
 		/* It is something else */
