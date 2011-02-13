@@ -30,8 +30,10 @@
 
 #include <getopt.h>
 
+
 #include "driver/pciDriver.h"
 
+#include "kernel.h"
 #include "tools.h"
 
 /* defines */
@@ -160,7 +162,19 @@ void List(int handle) {
 
     for (i = 0; i < MAX_BANKS; i++) {
 	if (board_info.bar_length[i] > 0) {
-	    printf(" BAR %d - Start: 0x%x, Length: 0x%x\n", i, board_info.bar_start[i], board_info.bar_length[i] );
+	    printf(" BAR %d - ", i);
+
+	    switch ( board_info.bar_flags[i]&IORESOURCE_TYPE_BITS) {
+		case IORESOURCE_IO:  printf(" IO"); break;
+		case IORESOURCE_MEM: printf("MEM"); break;
+		case IORESOURCE_IRQ: printf("IRQ"); break;
+		case IORESOURCE_DMA: printf("DMA"); break;
+	    }
+	    
+	    if (board_info.bar_flags[i]&IORESOURCE_MEM_64) printf("64");
+	    else printf("32");
+	    
+	    printf(", Start: 0x%08lx, Length: 0x% 8lx, Flags: 0x%08lx\n", board_info.bar_start[i], board_info.bar_length[i], board_info.bar_flags[i] );
 	}
     }
 }
@@ -168,7 +182,7 @@ void List(int handle) {
 void Info(int handle) {
     GetBoardInfo(handle);
 
-    printf("Vendor: %lx, Device: %lx, Interrupt Pin: %i, Interrupt Line: %i\n", board_info.vendor_id, board_info.device_id, board_info.interrupt_pin, board_info.interrupt_line);
+    printf("Vendor: %x, Device: %x, Interrupt Pin: %i, Interrupt Line: %i\n", board_info.vendor_id, board_info.device_id, board_info.interrupt_pin, board_info.interrupt_line);
     List(handle);
 }
 
@@ -281,7 +295,7 @@ int Write(void *buf, int handle, int bar, unsigned long addr, int size) {
 
 
 int Benchmark(int handle, int bar) {
-    int i;
+    int i, errors;
     void *data, *buf, *check;
     struct timeval start, end;
     unsigned long time;
@@ -358,15 +372,17 @@ int Benchmark(int handle, int bar) {
 	printf(", write: %8.2lf MB/s", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024 * 1024));
 
 	gettimeofday(&start,NULL);
-	for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
+	for (i = 0, errors = 0; i < BENCHMARK_ITERATIONS; i++) {
 	    Write(buf, handle, bar, 0, size);
 	    Read(check, handle, bar, 0, size);
-	    memcmp(buf, check, size);
+	    if (memcmp(buf, check, size)) ++errors;
 	}
 	gettimeofday(&end,NULL);
 
 	time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	printf(", write-verify: %8.2lf MB/s\n", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024 * 1024));
+	printf(", write-verify: %8.2lf MB/s", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024 * 1024));
+	if (errors) printf(", errors: %u of %u", errors, BENCHMARK_ITERATIONS);
+	printf("\n");
     }
     
     printf("\n\n");
@@ -397,16 +413,21 @@ int ReadData(int handle, int bar, unsigned long addr, int n, int access) {
     Read(buf, handle, bar, addr, size);
 
     for (i = 0; i < n; i++) {
-	if ((i)&&(i%numbers_per_line == 0)) printf("\n");
-	else if ((i)&&(i%numbers_per_block == 0)) printf("%*s", BLOCK_SEPARATOR_WIDTH, "");
-
-	if (i%numbers_per_line == 0) printf("%8lx: ", addr + i * abs(access));
+	if (i) {
+	    if (i%numbers_per_line == 0) printf("\n");
+	    else {
+		printf("%*s", SEPARATOR_WIDTH, "");
+		if (i%numbers_per_block == 0) printf("%*s", BLOCK_SEPARATOR_WIDTH, "");
+	    }
+	}
+	    
+	if (i%numbers_per_line == 0) printf("%8lx:  ", addr + i * abs(access));
 
 	switch (access) {
-	    case 1: printf("% *hhx", access * 2 +  SEPARATOR_WIDTH, ((uint8_t*)buf)[i]); break;
-	    case 2: printf("% *hx", access * 2 +  SEPARATOR_WIDTH, ((uint16_t*)buf)[i]); break;
-	    case 4: printf("% *x", access * 2 +  SEPARATOR_WIDTH, ((uint32_t*)buf)[i]); break;
-	    case 8: printf("% *lx", access * 2 +  SEPARATOR_WIDTH, ((uint64_t*)buf)[i]); break;
+	    case 1: printf("%0*hhx", access * 2, ((uint8_t*)buf)[i]); break;
+	    case 2: printf("%0*hx", access * 2, ((uint16_t*)buf)[i]); break;
+	    case 4: printf("%0*x", access * 2, ((uint32_t*)buf)[i]); break;
+	    case 8: printf("%0*lx", access * 2, ((uint64_t*)buf)[i]); break;
 	}
     }
     printf("\n\n");
@@ -439,7 +460,11 @@ int WriteData(int handle, int bar, unsigned long addr, int n, int access, char *
 //    ReadData(handle, bar, addr, n, access);
     Read(check, handle, bar, addr, size);
     
-    if (memcmp(buf, check, size)) Error("Write failed, the data written and read differ");
+    if (memcmp(buf, check, size)) {
+	printf("Write failed: the data written and read differ, the foolowing is read back:");
+	ReadData(handle, bar, addr, n, access);
+	exit(-1);
+    }
 
     free(check);
     free(buf);

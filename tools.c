@@ -29,6 +29,25 @@ void *memcpy32(void * dst, void const * src, size_t len) {
     return (dst);
 } 
 
+void *memcpy64(void * dst, void const * src, size_t len) {
+    uint64_t * plDst = (uint64_t *) dst;
+    uint64_t const * plSrc = (uint64_t const *) src;
+
+    while (len >= 8) {
+        *plDst++ = *plSrc++;
+        len -= 4;
+    }
+
+    char * pcDst = (char *) plDst;
+    char const * pcSrc = (char const *) plSrc;
+
+    while (len--) {
+        *pcDst++ = *pcSrc++;
+    }
+
+    return (dst);
+} 
+
 
 int get_page_mask() {
     int pagesize,pagemask,temp;

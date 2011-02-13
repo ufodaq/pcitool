@@ -2,4 +2,5 @@
 
 void * memcpy8(void * dst, void const * src, size_t len);
 void * memcpy32(void * dst, void const * src, size_t len);
+void * memcpy64(void * dst, void const * src, size_t len);
 int get_page_mask();

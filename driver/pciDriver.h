@@ -142,6 +142,7 @@ typedef struct {
 	unsigned int irq;
 	unsigned long bar_start[6];
 	unsigned long bar_length[6];
+	unsigned long bar_flags[6];
 } pci_board_info;
 
 
