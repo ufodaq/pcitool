@@ -58,6 +58,38 @@
 
 #include <linux/ioctl.h>
 
+/* Identifies the mpRACE-1 boards */
+#define MPRACE1_VENDOR_ID 0x10b5
+#define MPRACE1_DEVICE_ID 0x9656
+
+/* Identifies the PCI-X Test boards */
+#define PCIXTEST_VENDOR_ID 0x10dc
+#define PCIXTEST_DEVICE_ID 0x0156
+
+/* Identifies the PCIe-PLDA Test board */
+#define PCIEPLDA_VENDOR_ID 0x1556
+#define PCIEPLDA_DEVICE_ID 0x1100
+
+/* Identifies the PCIe-ABB Test board */
+#define PCIEABB_VENDOR_ID 0x10dc
+#define PCIEABB_DEVICE_ID 0x0153
+
+/* Identifies the PCI-X PROGRAPE4 */
+#define PCIXPG4_VENDOR_ID 0x1679
+#define PCIXPG4_DEVICE_ID 0x0001
+
+/* Identifies the PCI-64 PROGRAPE4 */
+#define PCI64PG4_VENDOR_ID 0x1679
+#define PCI64PG4_DEVICE_ID 0x0005
+
+/* Identifies the PCI-E Xilinx ML605 */
+#define PCIE_XILINX_VENDOR_ID 0x10ee
+#define PCIE_ML605_DEVICE_ID 0x04a0
+
+/* Identifies the PCI-E IPE Camera */
+#define PCIE_IPECAMERA_DEVICE_ID 0x6018
+
+
 /* Possible values for ioctl commands */
 
 /* PCI mmap areas */

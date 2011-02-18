@@ -12,8 +12,8 @@ LIBDIR ?= $(ROOTDIR)
 OBJDIR ?= $(ROOTDIR)
 DEPENDDIR ?= $(ROOTDIR)
 
-CXXFLAGS += $(addprefix -I ,$(INCDIR))
-CFLAGS += $(addprefix -I ,$(INCDIR))
+CXXFLAGS += $(addprefix -I ,$(INCDIR)) -fPIC
+CFLAGS += $(addprefix -I ,$(INCDIR)) -fPIC
 
 # Source files in this directory
 SRC = $(wildcard *.cpp)
