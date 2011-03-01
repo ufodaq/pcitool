@@ -376,8 +376,11 @@ int WriteData(int handle, int bar, unsigned long addr, int n, int access, char *
     int size = n * abs(access);
     
     err = posix_memalign( (void**)&buf, 256, size );
-    if (!err) err = posix_memalign( (void**)&check, 256, size );
-    if ((!err)||(!buf)||(!check)) Error("Allocation of %i bytes of memory have failed", size);
+    if (!err) {
+        err = posix_memalign( (void**)&check, 256, size );
+    }
+    if ((err)||(!buf)||(!check)) 
+        Error("Allocation of %i bytes of memory have failed", size);
 
     for (i = 0; i < n; i++) {
 	switch (access) {

@@ -15,7 +15,13 @@ void *memcpy32(void * dst, void const * src, size_t len) {
     uint32_t const * plSrc = (uint32_t const *) src;
 
     while (len >= 4) {
-        *plDst++ = *plSrc++;
+        uint32_t a = (*plSrc & 0xFF) << 24;
+        a |= (*plSrc & 0xFF00) << 8;
+        a |= (*plSrc & 0xFF0000) >> 8;
+        a |= (*plSrc & 0xFF000000) >> 24;
+        *plDst = a;
+        plSrc++;
+        plDst++;
         len -= 4;
     }
 
