@@ -2,24 +2,72 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <assert.h>
+#include <arpa/inet.h>
 
-void *memcpy8(void * dst, void const * src, size_t len) {
+#include "tools.h"
+
+uint16_t pcilib_swap16(uint16_t x) {
+    return (((x<<8)&0xFFFF) | ((x>>8)&0xFFFF));
+}
+
+uint32_t pcilib_swap32(uint32_t x) {
+    return ((x & 0xFF) << 24) | \
+	((x & 0xFF00) << 8) | \
+	((x & 0xFF0000) >> 8) | \
+        ((x & 0xFF000000) >> 24); 
+}
+ 
+uint64_t pcilib_swap64(uint64_t x) {
+    return (((uint64_t)(x) << 56) | \
+        (((uint64_t)(x) << 40) & 0xff000000000000ULL) | \
+        (((uint64_t)(x) << 24) & 0xff0000000000ULL) | \
+        (((uint64_t)(x) << 8)  & 0xff00000000ULL) | \
+        (((uint64_t)(x) >> 8)  & 0xff000000ULL) | \
+        (((uint64_t)(x) >> 24) & 0xff0000ULL) | \
+        (((uint64_t)(x) >> 40) & 0xff00ULL) | \
+        ((uint64_t)(x)  >> 56));
+}
+
+void pcilib_swap(void *dst, void *src, size_t size, size_t n) {
+    int i;
+    switch (size) {
+	case 1:
+	    if (src != dst) memcpy(dst, src, n);
+	break;
+	case 2:
+	    for (i = 0; i < n; i++) {
+		((uint16_t*)dst)[i] = pcilib_swap16(((uint16_t*)src)[i]);
+	    }    
+	break;
+	case 4:
+	    for (i = 0; i < n; i++) {
+		((uint32_t*)dst)[i] = pcilib_swap32(((uint32_t*)src)[i]);
+	    }    
+	break;
+	case 8:
+	    for (i = 0; i < n; i++) {
+		((uint64_t*)dst)[i] = pcilib_swap64(((uint64_t*)src)[i]);
+	    }    
+	break;
+	default:
+	    pcilib_error("Invalid word size: %i", size);
+    }
+}
+
+void *pcilib_memcpy8(void * dst, void const * src, size_t len) {
     int i;
     for (i = 0; i < len; i++) ((char*)dst)[i] = ((char*)src)[i];
     return dst;
 }
 
-
-void *memcpy32(void * dst, void const * src, size_t len) {
+void *pcilib_memcpy32(void * dst, void const * src, size_t len) {
     uint32_t * plDst = (uint32_t *) dst;
     uint32_t const * plSrc = (uint32_t const *) src;
 
     while (len >= 4) {
-        uint32_t a = (*plSrc & 0xFF) << 24;
-        a |= (*plSrc & 0xFF00) << 8;
-        a |= (*plSrc & 0xFF0000) >> 8;
-        a |= (*plSrc & 0xFF000000) >> 24;
-        *plDst = a;
+//        *plDst = ntohl(*plSrc);
+	*plDst = *plSrc;
         plSrc++;
         plDst++;
         len -= 4;
@@ -35,7 +83,8 @@ void *memcpy32(void * dst, void const * src, size_t len) {
     return (dst);
 } 
 
-void *memcpy64(void * dst, void const * src, size_t len) {
+
+void *pcilib_memcpy64(void * dst, void const * src, size_t len) {
     uint64_t * plDst = (uint64_t *) dst;
     uint64_t const * plSrc = (uint64_t const *) src;
 
@@ -123,11 +172,30 @@ void *memcpy128(void * dst, void const * src, size_t len) {
 } 
 */
 
+void *pcilib_datacpy32(void * dst, void const * src, uint8_t size, size_t n, pcilib_endianess_t endianess) {
+    uint32_t * plDst = (uint32_t *) dst;
+    uint32_t const * plSrc = (uint32_t const *) src;
 
-int get_page_mask() {
+    int swap = (endianess == PCILIB_BIG_ENDIAN)?(ntohs(1)!=1):(ntohs(1)==1);
+
+    assert(size == 4);	// only 32 bit at the moment
+
+    while (n > 0) {
+	if (swap) *plDst = ntohl(*plSrc);
+	else *plDst = *plSrc;
+
+        ++plSrc;
+        ++plDst;
+
+        --n;
+    }
+} 
+
+
+int pcilib_get_page_mask() {
     int pagesize,pagemask,temp;
 
-    pagesize = getpagesize();
+    pagesize = sysconf(_SC_PAGESIZE);
 
     for( pagemask=0, temp = pagesize; temp != 1; ) {
 	temp = (temp >> 1);
