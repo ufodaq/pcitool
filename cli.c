@@ -442,10 +442,10 @@ int WriteData(pcilib_t *handle, pcilib_bar_t bar, uintptr_t addr, size_t n, acce
     if (endianess) pcilib_swap(buf, buf, abs(access), n);
     pcilib_write(handle, bar, addr, size, buf);
     pcilib_read(handle, bar, addr, size, check);
-    if (endianess) pcilib_swap(check, check, abs(access), n);
     
     if (memcmp(buf, check, size)) {
 	printf("Write failed: the data written and read differ, the foolowing is read back:\n");
+        if (endianess) pcilib_swap(check, check, abs(access), n);
 	ReadData(handle, bar, addr, n, access, endianess);
 	exit(-1);
     }
