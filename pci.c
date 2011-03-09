@@ -226,6 +226,12 @@ pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, const char *bank) {
     pcilib_register_bank_t res;
     unsigned long addr;
     
+    if (!bank) {
+	pcilib_register_bank_description_t *banks = pcilib_model[ctx->model].banks;
+	if ((banks)&&(banks[0].access)) return (pcilib_register_bank_t)0;
+	return -1;
+    }
+    
     if (sscanf(bank,"%lx", &addr) == 1) {
 	res = pcilib_find_bank_by_addr(ctx, addr);
 	if (res != PCILIB_REGISTER_BANK_INVALID) return res;
@@ -351,9 +357,15 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
     return err;
 }
 
-int pcilib_read_register_space(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, pcilib_register_value_t *buf) {
-//    pcilib_register_bank_t bank = pcilib_find_bank(ctx, bank_addr);
-    return pcilib_read_register_space_internal(ctx, bank, addr, n, 0, buf);
+int pcilib_read_register_space(pcilib_t *ctx, const char *bank, pcilib_register_addr_t addr, size_t n, pcilib_register_value_t *buf) {
+    pcilib_register_bank_t bank_id = pcilib_find_bank(ctx, bank);
+    if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
+	if (bank) pcilib_error("Invalid register bank is specified (%s)", bank);
+	else pcilib_error("Register bank should be specified");
+	return PCILIB_ERROR_INVALID_BANK;
+    }
+    
+    return pcilib_read_register_space_internal(ctx, bank_id, addr, n, 0, buf);
 }
 
 int pcilib_read_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_register_value_t *value) {
@@ -438,6 +450,18 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
     
     return err;
 }
+
+int pcilib_write_register_space(pcilib_t *ctx, const char *bank, pcilib_register_addr_t addr, size_t n, pcilib_register_value_t *buf) {
+    pcilib_register_bank_t bank_id = pcilib_find_bank(ctx, bank);
+    if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
+	if (bank) pcilib_error("Invalid register bank is specified (%s)", bank);
+	else pcilib_error("Register bank should be specified");
+	return PCILIB_ERROR_INVALID_BANK;
+    }
+    
+    return pcilib_write_register_space_internal(ctx, bank_id, addr, n, 0, buf);
+}
+
 
 int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_register_value_t value) {
     int err;

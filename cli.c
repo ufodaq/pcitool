@@ -411,12 +411,48 @@ int ReadRegister(pcilib_t *handle, pcilib_model_t model, const char *bank, const
 }
 
 int ReadRegisterRange(pcilib_t *handle, pcilib_model_t model, const char *bank, uintptr_t addr, size_t n) {
-/*    int err;
-    
-    pcilib_register_bank_t bank = pcilib_find_bank(handle, bank_addr);    
-    pcilib_register_value_t buf[n];
+    int err;
+    int i;
 
-    err = pcilib_read_register_space(handle, bank, addr, n, buf);*/
+    pcilib_register_bank_description_t *banks = pcilib_model[model].banks;
+    pcilib_register_bank_t bank_id = pcilib_find_bank(handle, bank);
+
+    if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
+	if (bank) Error("Invalid register bank is specified (%s)", bank);
+	else Error("Register bank should be specified");
+    }
+
+    int access = banks[bank_id].access / 8;
+    int size = n * abs(access);
+    int block_width, blocks_per_line;
+    int numbers_per_block, numbers_per_line; 
+    
+    numbers_per_block = BLOCK_SIZE / access;
+
+    block_width = numbers_per_block * ((access * 2) +  SEPARATOR_WIDTH);
+    blocks_per_line = (LINE_WIDTH - 6) / (block_width +  BLOCK_SEPARATOR_WIDTH);
+    if ((blocks_per_line > 1)&&(blocks_per_line % 2)) --blocks_per_line;
+    numbers_per_line = blocks_per_line * numbers_per_block;
+
+
+    pcilib_register_value_t buf[n];
+    err = pcilib_read_register_space(handle, bank, addr, n, buf);
+    if (err) Error("Error reading register space for bank \"%s\" at address %lx, size %lu", bank?bank:"default", addr, n);
+
+
+    for (i = 0; i < n; i++) {
+	if (i) {
+	    if (i%numbers_per_line == 0) printf("\n");
+	    else {
+		printf("%*s", SEPARATOR_WIDTH, "");
+		if (i%numbers_per_block == 0) printf("%*s", BLOCK_SEPARATOR_WIDTH, "");
+	    }
+	}
+	    
+	if (i%numbers_per_line == 0) printf("%4lx:  ", addr + i);
+	printf("%0*lx", access * 2, buf[i]);
+    }
+    printf("\n\n");
 }
 
 int WriteData(pcilib_t *handle, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, char ** data) {
@@ -455,6 +491,36 @@ int WriteData(pcilib_t *handle, pcilib_bar_t bar, uintptr_t addr, size_t n, acce
 }
 
 int WriteRegisterRange(pcilib_t *handle, pcilib_model_t model, const char *bank, uintptr_t addr, size_t n, char ** data) {
+    pcilib_register_value_t *buf, *check;
+    int res, i, err;
+    unsigned long value;
+    int size = n * sizeof(pcilib_register_value_t);
+
+    err = posix_memalign( (void**)&buf, 256, size );
+    if (!err) err = posix_memalign( (void**)&check, 256, size );
+    if ((err)||(!buf)||(!check)) Error("Allocation of %i bytes of memory have failed", size);
+
+    for (i = 0; i < n; i++) {
+	res = sscanf(data[i], "%lx", &value);
+	if (res != 1) Error("Can't parse data value at poition %i, (%s) is not valid hex number", i, data[i]);
+	buf[i] = value;
+    }
+
+    err = pcilib_write_register_space(handle, bank, addr, n, buf);
+    if (err) Error("Error writting register space for bank \"%s\" at address %lx, size %lu", bank?bank:"default", addr, n);
+    
+    err = pcilib_read_register_space(handle, bank, addr, n, check);
+    if (err) Error("Error reading register space for bank \"%s\" at address %lx, size %lu", bank?bank:"default", addr, n);
+
+    if (memcmp(buf, check, size)) {
+	printf("Write failed: the data written and read differ, the foolowing is read back:\n");
+	ReadRegisterRange(handle, model, bank, addr, n);
+	exit(-1);
+    }
+
+    free(check);
+    free(buf);
+
 }
 
 int WriteRegister(pcilib_t *handle, pcilib_model_t model, const char *bank, const char *reg, char ** data) {
