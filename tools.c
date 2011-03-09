@@ -3,9 +3,25 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <assert.h>
+#include <ctype.h>
 #include <arpa/inet.h>
 
 #include "tools.h"
+
+int pcilib_isnumber(const char *str) {
+    int i = 0;
+    for (i = 0; str[i]; i++) 
+	if (!isdigit(str[i])) return 0;
+    return 1;
+}
+
+int pcilib_isxnumber(const char *str) {
+    int i = 0;
+    for (i = 0; str[i]; i++) 
+	if (!isxdigit(str[i])) return 0;
+    return 1;
+}
+
 
 uint16_t pcilib_swap16(uint16_t x) {
     return (((x<<8)&0xFFFF) | ((x>>8)&0xFFFF));

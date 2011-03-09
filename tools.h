@@ -6,6 +6,9 @@
 
 #include "pci.h"
 
+int pcilib_isnumber(const char *str);
+int pcilib_isxnumber(const char *str);
+
 uint16_t pcilib_swap16(uint16_t x);
 uint32_t pcilib_swap32(uint32_t x);
 uint64_t pcilib_swap64(uint64_t x);

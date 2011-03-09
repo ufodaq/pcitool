@@ -11,3 +11,4 @@ cli.d
 ipecamera.d
 pci.d
 tools.d
+*.d

@@ -9,6 +9,7 @@
 #include "driver/pciDriver.h"
 #include "kernel.h"
 
+
 #define pcilib_memcpy pcilib_memcpy32
 #define pcilib_datacpy pcilib_datacpy32
 
@@ -41,6 +42,7 @@ typedef enum {
 
 
 typedef enum {
+    PCILIB_DEFAULT_PROTOCOL,
     IPECAMERA_REGISTER_PROTOCOL
 } pcilib_register_protocol_t;
 
@@ -49,6 +51,9 @@ typedef enum {
 #define PCILIB_ADDRESS_INVALID		((uintptr_t)-1)
 #define PCILIB_REGISTER_BANK_INVALID	((pcilib_register_bank_t)-1)
 #define PCILIB_REGISTER_BANK0 		0
+#define PCILIB_REGISTER_BANK1 		1
+#define PCILIB_REGISTER_BANK2 		2
+#define PCILIB_REGISTER_BANK3 		3
 
 typedef struct {
     pcilib_register_bank_addr_t addr;
@@ -102,13 +107,17 @@ typedef struct {
 } pcilib_model_description_t;
 
 #ifdef _PCILIB_PCI_C
+# include "ipecamera.h"
+# include "default.h"
+
 pcilib_model_description_t pcilib_model[3] = {
     { NULL, NULL, NULL },
     { NULL, NULL, NULL },
     { ipecamera_registers, ipecamera_register_banks, ipecamera_register_ranges }
 };
 
-pcilib_protocol_description_t pcilib_protocol[2] = {
+pcilib_protocol_description_t pcilib_protocol[3] = {
+    { pcilib_default_read, pcilib_default_write },
     { ipecamera_read, ipecamera_write },
     { NULL, NULL }
 };

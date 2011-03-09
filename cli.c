@@ -36,6 +36,8 @@
 #define BLOCK_SIZE 8
 #define BENCHMARK_ITERATIONS 128
 
+#define isnumber pcilib_isnumber
+#define isxnumber pcilib_isxnumber
 
 
 typedef uint8_t access_t;
@@ -471,8 +473,7 @@ int WriteData(pcilib_t *handle, pcilib_bar_t bar, uintptr_t addr, size_t n, acce
 	    case 4: res = sscanf(data[i], "%x", ((uint32_t*)buf)+i); break;
 	    case 8: res = sscanf(data[i], "%lx", ((uint64_t*)buf)+i); break;
 	}
-	
-	if (res != 1) Error("Can't parse data value at poition %i, (%s) is not valid hex number", i, data[i]);
+	if ((res != 1)||(!isxnumber(data[i]))) Error("Can't parse data value at poition %i, (%s) is not valid hex number", i, data[i]);
     }
 
     if (endianess) pcilib_swap(buf, buf, abs(access), n);
@@ -502,7 +503,7 @@ int WriteRegisterRange(pcilib_t *handle, pcilib_model_t model, const char *bank,
 
     for (i = 0; i < n; i++) {
 	res = sscanf(data[i], "%lx", &value);
-	if (res != 1) Error("Can't parse data value at poition %i, (%s) is not valid hex number", i, data[i]);
+	if ((res != 1)||(!isxnumber(data[i]))) Error("Can't parse data value at poition %i, (%s) is not valid hex number", i, data[i]);
 	buf[i] = value;
     }
 
@@ -530,7 +531,7 @@ int WriteRegister(pcilib_t *handle, pcilib_model_t model, const char *bank, cons
     unsigned long val;
     pcilib_register_value_t value;
     
-    if (sscanf(*data, "%li", &val) != 1) {
+    if ((!isnumber(*data))||(sscanf(*data, "%li", &val) != 1)) {
 	Error("Can't parse data value (%s) is not valid decimal number", data[i]);
     }
 
@@ -621,7 +622,7 @@ int main(int argc, char **argv) {
 //		else bar = itmp;
 	    break;
 	    case OPT_ACCESS:
-		if (sscanf(optarg, "%li", &itmp) != 1) access = 0;
+		if ((!isnumber(optarg))||(sscanf(optarg, "%li", &itmp) != 1)) access = 0;
 		switch (itmp) {
 		    case 8: access = 1; break;
 		    case 16: access = 2; break;
@@ -631,7 +632,7 @@ int main(int argc, char **argv) {
 		}	
 	    break;
 	    case OPT_SIZE:
-		if (sscanf(optarg, "%zu", &size) != 1)
+		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &size) != 1))
 		    Usage(argc, argv, "Invalid size is specified (%s)", optarg);
 	    break;
 	    case OPT_ENDIANESS:
@@ -678,7 +679,7 @@ int main(int argc, char **argv) {
     }
 
     if (addr) {
-	if (sscanf(addr, "%lx", &start) == 1) {
+	if ((isxnumber(addr))&&(sscanf(addr, "%lx", &start) == 1)) {
 		// check if the address in the register range
 	    pcilib_register_range_t *ranges =  pcilib_model[model].ranges;
 
@@ -702,7 +703,7 @@ int main(int argc, char **argv) {
 	    case MODE_BENCHMARK:
 	    case MODE_READ:
 	    case MODE_WRITE:
-		if ((sscanf(bank,"%li", &itmp) != 1)||(itmp < 0)||(itmp >= PCILIB_MAX_BANKS)) 
+		if ((!isnumber(bank))||(sscanf(bank,"%li", &itmp) != 1)||(itmp < 0)||(itmp >= PCILIB_MAX_BANKS)) 
 		    Usage(argc, argv, "Invalid data bank (%s) is specified", bank);
 		else bar = itmp;
 	    break;

@@ -22,7 +22,7 @@
 #include "ipecamera.h"
 #include "error.h"
 
-#define BIT_MASK(bits) ((1 << (bits)) - 1)
+#define BIT_MASK(bits) ((1l << (bits)) - 1)
 
 
 //#define PCILIB_FILE_IO
@@ -232,7 +232,7 @@ pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, const char *bank) {
 	return -1;
     }
     
-    if (sscanf(bank,"%lx", &addr) == 1) {
+    if (pcilib_isxnumber(bank)&&(sscanf(bank,"%lx", &addr) == 1)) {
 	res = pcilib_find_bank_by_addr(ctx, addr);
 	if (res != PCILIB_REGISTER_BANK_INVALID) return res;
     }

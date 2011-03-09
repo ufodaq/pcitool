@@ -15,24 +15,6 @@
 
 #define ipecamera_datacpy(dst, src, bank)   pcilib_datacpy(dst, src, 4, 1, bank->raw_endianess)
 
-/*
-int ipecamera_read_register_space(int handle, pcilib_model_t model, pcilib_register_t addr, pcilib_register_value_t *value) {
-    //ipelib_write_
-    //(void *buf, int handle, pcilib_bar_t bar, uintptr_t addr, size_t size);
-    
-}
-
-int ipecamera_write_register_space(int handle, pcilib_model_t model, pcilib_register_t addr, pcilib_register_value_t value) {
-}
-
-
-static int ipecamera_read_byte(int handle, int reg, int bits, uint8_t *value) {
-}
-
-static int ipecamera_write_byte(int handle, int reg, int bits, uint8_t value) {
-}
-*/
-
 static pcilib_register_value_t ipecamera_bit_mask[9] = { 0, 1, 3, 7, 15, 31, 63, 127, 255 };
 
 int ipecamera_read(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, uint8_t bits, pcilib_register_value_t *value) {

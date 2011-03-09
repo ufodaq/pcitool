@@ -9,11 +9,11 @@
 #define IPECAMERA_REGISTER_WRITE (IPECAMERA_REGISTER_SPACE + 0)
 #define IPECAMERA_REGISTER_READ (IPECAMERA_REGISTER_WRITE + 4)
 
-
 #ifdef _IPECAMERA_C
 pcilib_register_bank_description_t ipecamera_register_banks[] = {
-    { PCILIB_REGISTER_BANK0, 128, IPECAMERA_REGISTER_PROTOCOL, IPECAMERA_REGISTER_READ, IPECAMERA_REGISTER_WRITE,  PCILIB_BIG_ENDIAN, 8, PCILIB_LITTLE_ENDIAN, "cmosis", "CMOSIS CMV2000 Registers" },
-    { 0, 0, 0, 0, 0, 0, NULL, NULL }
+    { PCILIB_REGISTER_BANK0, 128, IPECAMERA_REGISTER_PROTOCOL, IPECAMERA_REGISTER_READ,	IPECAMERA_REGISTER_WRITE, PCILIB_BIG_ENDIAN, 8, PCILIB_LITTLE_ENDIAN, "cmosis", "CMOSIS CMV2000 Registers" },
+    { PCILIB_REGISTER_BANK1, 64, PCILIB_DEFAULT_PROTOCOL, IPECAMERA_REGISTER_SPACE, IPECAMERA_REGISTER_SPACE, PCILIB_BIG_ENDIAN, 32, PCILIB_LITTLE_ENDIAN, "fpga", "IPECamera Registers" },
+    { 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL }
 };
 
 pcilib_register_description_t ipecamera_registers[] = {
@@ -61,6 +61,12 @@ pcilib_register_description_t ipecamera_registers[] = {
 {111, 	1, 	1, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "bit_mode", ""},
 {112, 	2, 	0, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "adc_resolution", ""},
 {126, 	16, 	0, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "temp", ""},
+{0,	32,	0,	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK1, "spi_conf_input", ""},
+{1,	32,	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "spi_conf_output", ""},
+{2,	32,	0,	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK1, "spi_clk_speed", ""},
+{3,	32,	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "firmware_version", ""},
+{6,	16,	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "cmosis_temperature", ""},
+{7,	32,	0,	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK1, "temperature_sample_timing", ""},
 {0,	0,	0,	0,                  0,                     NULL, NULL}
 };
 
@@ -73,7 +79,6 @@ extern pcilib_register_description_t ipecamera_registers[];
 extern pcilib_register_bank_description_t ipecamera_register_banks[];
 extern pcilib_register_range_t ipecamera_register_ranges[];
 #endif 
-
 
 int ipecamera_read(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, uint8_t bits, pcilib_register_value_t *value);
 int ipecamera_write(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, uint8_t bits, pcilib_register_value_t value);
