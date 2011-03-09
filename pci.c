@@ -13,8 +13,6 @@
 #include <errno.h>
 #include <assert.h>
 
-#include "driver/pciDriver.h"
-
 #include "kernel.h"
 #include "tools.h"
 

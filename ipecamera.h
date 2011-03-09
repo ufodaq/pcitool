@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#include "pci.h"
+#include "pcilib.h"
 
 #define IPECAMERA_REGISTER_SPACE 0xfeaffc00
 #define IPECAMERA_REGISTER_WRITE (IPECAMERA_REGISTER_SPACE + 0)

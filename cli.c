@@ -20,7 +20,7 @@
 #include "pci.h"
 #include "ipecamera.h"
 #include "tools.h"
-
+#include "kernel.h"
 
 /* defines */
 #define MAX_KBUF 14
