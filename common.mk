@@ -13,7 +13,7 @@ OBJDIR ?= $(ROOTDIR)
 DEPENDDIR ?= $(ROOTDIR)
 
 CXXFLAGS += $(addprefix -I ,$(INCDIR)) -fPIC
-CFLAGS += $(addprefix -I ,$(INCDIR)) -fPIC
+CFLAGS += $(addprefix -I ,$(INCDIR)) -fPIC -std=c99
 
 # Source files in this directory
 SRC = $(wildcard *.cpp)

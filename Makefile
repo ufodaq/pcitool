@@ -13,7 +13,7 @@ include common.mk
 ###############################################################
 # Target definitions
 
-OBJECTS = pci.o ipecamera.o tools.o
+OBJECTS = pci.o ipecamera.o default.o tools.o
 
 libpcilib.so: $(OBJECTS)
 	echo -e "LD \t$@"
