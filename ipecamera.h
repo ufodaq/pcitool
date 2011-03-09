@@ -12,8 +12,8 @@
 
 #ifdef _IPECAMERA_C
 pcilib_register_bank_description_t ipecamera_register_banks[] = {
-    { PCILIB_REGISTER_BANK0, IPECAMERA_REGISTER_PROTOCOL, IPECAMERA_REGISTER_READ, IPECAMERA_REGISTER_WRITE,  PCILIB_BIG_ENDIAN, 8, PCILIB_LITTLE_ENDIAN },
-    { 0, 0, 0, 0, 0 }
+    { PCILIB_REGISTER_BANK0, 128, IPECAMERA_REGISTER_PROTOCOL, IPECAMERA_REGISTER_READ, IPECAMERA_REGISTER_WRITE,  PCILIB_BIG_ENDIAN, 8, PCILIB_LITTLE_ENDIAN, "cmosis", "CMOSIS CMV2000 Registers" },
+    { 0, 0, 0, 0, 0, 0, NULL, NULL }
 };
 
 pcilib_register_description_t ipecamera_registers[] = {

@@ -202,22 +202,7 @@ int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, v
 }
 
 
-    // FIXME create hash during map_register space
-pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *reg) {
-    pcilib_register_t i;
-    
-    pcilib_model_t model = pcilib_get_model(ctx);
-    
-    pcilib_register_description_t *registers =  pcilib_model[model].registers;
-    
-    for (i = 0; registers[i].bits; i++) {
-	if (!strcasecmp(registers[i].name, reg)) return i;
-    }
-    
-    return -1;
-};
-
-static pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, pcilib_register_bank_addr_t bank) {
+static pcilib_register_bank_t pcilib_find_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank) {
     pcilib_register_bank_t i;
     pcilib_register_bank_description_t *banks = pcilib_model[ctx->model].banks;
 
@@ -226,6 +211,56 @@ static pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, pcilib_register_ba
 	
     return -1;
 }
+
+static pcilib_register_bank_t pcilib_find_bank_by_name(pcilib_t *ctx, const char *bankname) {
+    pcilib_register_bank_t i;
+    pcilib_register_bank_description_t *banks = pcilib_model[ctx->model].banks;
+
+    for (i = 0; banks[i].access; i++)
+	if (!strcasecmp(banks[i].name, bankname)) return i;
+	
+    return -1;
+}
+
+pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, const char *bank) {
+    pcilib_register_bank_t res;
+    unsigned long addr;
+    
+    if (sscanf(bank,"%lx", &addr) == 1) {
+	res = pcilib_find_bank_by_addr(ctx, addr);
+	if (res != PCILIB_REGISTER_BANK_INVALID) return res;
+    }
+    
+    return pcilib_find_bank_by_name(ctx, bank);
+}
+
+    // FIXME create hash during map_register space
+pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const char *reg) {
+    pcilib_register_t i;
+    pcilib_register_bank_t bank_id;
+    pcilib_register_bank_addr_t bank_addr;
+    
+    pcilib_model_t model = pcilib_get_model(ctx);
+    
+    pcilib_register_description_t *registers =  pcilib_model[model].registers;
+    
+    if (bank) {
+	bank_id = pcilib_find_bank(ctx, bank);
+	if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
+	    pcilib_error("Invalid bank (%s) is specified", bank);
+	    return -1;
+	}
+	
+	bank_addr = pcilib_model[ctx->model].banks[bank_id].addr;
+    }
+    
+    for (i = 0; registers[i].bits; i++) {
+	if ((!strcasecmp(registers[i].name, reg))&&((!bank)||(registers[i].bank == bank_addr))) return i;
+    }
+    
+    return -1;
+};
+
 
 
 static int pcilib_map_register_space(pcilib_t *ctx) {
@@ -283,9 +318,6 @@ void pcilib_close(pcilib_t *ctx) {
     }
 }
 
-
-
-
 static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, uint8_t bits, pcilib_register_value_t *buf) {
     int err;
     int rest;
@@ -294,6 +326,11 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
     pcilib_register_bank_description_t *b = pcilib_model[ctx->model].banks + bank;
 
     assert(bits < 8 * sizeof(pcilib_register_value_t));
+    
+    if (((addr + n) > b->size)||(((addr + n) == b->size)&&(bits))) {
+	pcilib_error("Accessing sregister (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
+	return PCILIB_ERROR_OUTOFRANGE;
+    }
 
     err = pcilib_map_register_space(ctx);
     if (err) {
@@ -314,8 +351,8 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
     return err;
 }
 
-int pcilib_read_register_space(pcilib_t *ctx, pcilib_register_bank_addr_t bank_addr, pcilib_register_addr_t addr, size_t n, pcilib_register_value_t *buf) {
-    pcilib_register_bank_t bank = pcilib_find_bank(ctx, bank_addr);
+int pcilib_read_register_space(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, pcilib_register_value_t *buf) {
+//    pcilib_register_bank_t bank = pcilib_find_bank(ctx, bank_addr);
     return pcilib_read_register_space_internal(ctx, bank, addr, n, 0, buf);
 }
 
@@ -352,11 +389,11 @@ int pcilib_read_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_regi
 }
 
 
-int pcilib_read_register(pcilib_t *ctx, const char *regname, pcilib_register_value_t *value) {
+int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t *value) {
     int err;
     int reg;
     
-    reg = pcilib_find_register(ctx, regname);
+    reg = pcilib_find_register(ctx, bank, regname);
     if (reg < 0) {
 	pcilib_error("Register (%s) is not found", regname);
 	return PCILIB_ERROR_NOTFOUND;
@@ -377,6 +414,11 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
     pcilib_register_bank_description_t *b = pcilib_model[ctx->model].banks + bank;
 
     assert(bits < 8 * sizeof(pcilib_register_value_t));
+
+    if (((addr + n) > b->size)||(((addr + n) == b->size)&&(bits))) {
+	pcilib_error("Accessing sregister (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
+	return PCILIB_ERROR_OUTOFRANGE;
+    }
 
     err = pcilib_map_register_space(ctx);
     if (err) {
@@ -432,11 +474,11 @@ int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_reg
     return err;
 }
 
-int pcilib_write_register(pcilib_t *ctx, const char *regname, pcilib_register_value_t value) {
+int pcilib_write_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t value) {
     int err;
     int reg;
     
-    reg = pcilib_find_register(ctx, regname);
+    reg = pcilib_find_register(ctx, bank, regname);
     if (reg < 0) pcilib_error("Register (%s) is not found", regname);
 
     return pcilib_write_register_by_id(ctx, reg, value);

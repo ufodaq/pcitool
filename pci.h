@@ -47,10 +47,12 @@ typedef enum {
 #define PCILIB_BAR_DETECT 		((pcilib_bar_t)-1)
 #define PCILIB_REGISTER_INVALID		((pcilib_register_t)-1)
 #define PCILIB_ADDRESS_INVALID		((uintptr_t)-1)
+#define PCILIB_REGISTER_BANK_INVALID	((pcilib_register_bank_t)-1)
 #define PCILIB_REGISTER_BANK0 		0
 
 typedef struct {
     pcilib_register_bank_addr_t addr;
+    size_t size;
     
     pcilib_register_protocol_t protocol;
 
@@ -60,6 +62,9 @@ typedef struct {
 
     uint8_t access;
     uint8_t endianess;
+    
+    const char *name;
+    const char *description;
 } pcilib_register_bank_description_t;
 
 typedef struct {
@@ -126,12 +131,18 @@ pcilib_model_t pcilib_get_model(pcilib_t *ctx);
 
 void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar);
 void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data);
-
-pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *reg);
 char  *pcilib_resolve_register_address(pcilib_t *ctx, uintptr_t addr);
+
+pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, const char *bank);
+pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const char *reg);
 
 int pcilib_read(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf);
 int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf);
 
+int pcilib_read_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_register_value_t *value);
+int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_register_value_t value);
+
+int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t *value);
+int pcilib_write_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t value);
 
 #endif /* _PCITOOL_PCI_H */
