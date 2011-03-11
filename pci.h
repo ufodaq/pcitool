@@ -29,7 +29,6 @@ pcilib_protocol_description_t pcilib_protocol[3] = {
 extern void (*pcilib_error)(const char *msg, ...);
 extern void (*pcilib_warning)(const char *msg, ...);
 
-extern pcilib_model_description_t pcilib_model[];
 extern pcilib_protocol_description_t pcilib_protocol[];
 #endif /* _PCILIB_PCI_C */
 
