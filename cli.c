@@ -452,7 +452,7 @@ int ReadRegisterRange(pcilib_t *handle, pcilib_model_t model, const char *bank, 
 	}
 	    
 	if (i%numbers_per_line == 0) printf("%4lx:  ", addr + i);
-	printf("%0*lx", access * 2, buf[i]);
+	printf("%0*lx", access * 2, (unsigned long)buf[i]);
     }
     printf("\n\n");
 }
