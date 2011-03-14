@@ -103,7 +103,7 @@ typedef struct {
 extern pcilib_model_description_t pcilib_model[];
 #endif /* ! _PCILIB_PCI_C */
 
-int pcilib_set_error_handler(void (*err)(const char *msg, ...));
+int pcilib_set_error_handler(void (*err)(const char *msg, ...), void (*warn)(const char *msg, ...));
 
 pcilib_model_t pcilib_get_model(pcilib_t *ctx);
 

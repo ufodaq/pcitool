@@ -52,8 +52,9 @@ static void pcilib_print_error(const char *msg, ...) {
 void (*pcilib_error)(const char *msg, ...) = pcilib_print_error;
 void (*pcilib_warning)(const char *msg, ...) = pcilib_print_error;
 
-int pcilib_set_error_handler(void (*err)(const char *msg, ...)) {
+int pcilib_set_error_handler(void (*err)(const char *msg, ...), void (*warn)(const char *msg, ...)) {
     pcilib_error = err;
+    pcilib_warning = warn;
 }
 
 pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {

@@ -655,7 +655,7 @@ int main(int argc, char **argv) {
 	else Usage(argc, argv, NULL);
     }
 
-    pcilib_set_error_handler(&Error);
+    pcilib_set_error_handler(&Error, &Error);
 
     handle = pcilib_open(fpga_device, model);
     if (handle < 0) Error("Failed to open FPGA device: %s", fpga_device);
