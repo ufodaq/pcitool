@@ -202,7 +202,8 @@ int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, v
 
 static pcilib_register_bank_t pcilib_find_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank) {
     pcilib_register_bank_t i;
-    pcilib_register_bank_description_t *banks = pcilib_model[ctx->model].banks;
+    pcilib_model_t model = pcilib_get_model(ctx);
+    pcilib_register_bank_description_t *banks = pcilib_model[model].banks;
 
     for (i = 0; banks[i].access; i++)
 	if (banks[i].addr == bank) return i;
@@ -225,7 +226,8 @@ pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, const char *bank) {
     unsigned long addr;
     
     if (!bank) {
-	pcilib_register_bank_description_t *banks = pcilib_model[ctx->model].banks;
+	pcilib_model_t model = pcilib_get_model(ctx);
+	pcilib_register_bank_description_t *banks = pcilib_model[model].banks;
 	if ((banks)&&(banks[0].access)) return (pcilib_register_bank_t)0;
 	return -1;
     }
@@ -255,7 +257,7 @@ pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const ch
 	    return -1;
 	}
 	
-	bank_addr = pcilib_model[ctx->model].banks[bank_id].addr;
+	bank_addr = pcilib_model[model].banks[bank_id].addr;
     }
     
     for (i = 0; registers[i].bits; i++) {
@@ -269,7 +271,8 @@ pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const ch
 
 static int pcilib_map_register_space(pcilib_t *ctx) {
     if (!ctx->reg_space)  {
-	pcilib_register_bank_description_t *banks = pcilib_model[ctx->model].banks;
+	pcilib_model_t model = pcilib_get_model(ctx);
+	pcilib_register_bank_description_t *banks = pcilib_model[model].banks;
 
 	if ((banks)&&(banks[0].access)) {
 	    void *reg_space;
@@ -327,7 +330,8 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
     int rest;
     size_t i;
     
-    pcilib_register_bank_description_t *b = pcilib_model[ctx->model].banks + bank;
+    pcilib_model_t model = pcilib_get_model(ctx);
+    pcilib_register_bank_description_t *b = pcilib_model[model].banks + bank;
 
     assert(bits < 8 * sizeof(pcilib_register_value_t));
     
@@ -372,9 +376,10 @@ int pcilib_read_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_regi
     pcilib_register_value_t res;
     pcilib_register_description_t *r;
     pcilib_register_bank_description_t *b;
+    pcilib_model_t model = pcilib_get_model(ctx);
 
-    r = pcilib_model[ctx->model].registers + reg;
-    b = pcilib_model[ctx->model].banks + r->bank;
+    r = pcilib_model[model].registers + reg;
+    b = pcilib_model[model].banks + r->bank;
     
     n = r->bits / b->access;
     bits = r->bits % b->access; 
@@ -412,7 +417,7 @@ int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, p
     return pcilib_read_register_by_id(ctx, reg, value);
 
 //    registers[reg].bank
-//    printf("%li %li", sizeof(pcilib_model[ctx->model].banks), sizeof(pcilib_register_bank_description_t));
+//    printf("%li %li", sizeof(pcilib_model[model].banks), sizeof(pcilib_register_bank_description_t));
 }
 
 
@@ -421,7 +426,8 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
     int rest;
     size_t i;
     
-    pcilib_register_bank_description_t *b = pcilib_model[ctx->model].banks + bank;
+    pcilib_model_t model = pcilib_get_model(ctx);
+    pcilib_register_bank_description_t *b = pcilib_model[model].banks + bank;
 
     assert(bits < 8 * sizeof(pcilib_register_value_t));
 
@@ -467,9 +473,10 @@ int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_reg
     pcilib_register_value_t res;
     pcilib_register_description_t *r;
     pcilib_register_bank_description_t *b;
+    pcilib_model_t model = pcilib_get_model(ctx);
 
-    r = pcilib_model[ctx->model].registers + reg;
-    b = pcilib_model[ctx->model].banks + r->bank;
+    r = pcilib_model[model].registers + reg;
+    b = pcilib_model[model].banks + r->bank;
     
     n = r->bits / b->access;
     bits = r->bits % b->access; 
