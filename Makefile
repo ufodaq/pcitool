@@ -3,6 +3,7 @@ BINARIES += pci
 INCDIR += 
 LDINC += $(addprefix -L ,$(LIBDIR))
 LDFLAGS += 
+DESTDIR ?= /usr/local
 
 all: $(BINARIES)
 
@@ -22,6 +23,12 @@ libpcilib.so: $(OBJECTS)
 pci: cli.o libpcilib.so
 	echo -e "LD \t$@"
 	$(Q)$(CC) $(LDINC) $(LDFLAGS) $(CFLAGS) -L. -lpcilib -o $@ $<
+
+install: pci
+	install -m 644 pcilib.h $(DESTDIR)/include
+	if [ -d $(DESTDIR)/lib64 ]; then install -m 755 libpcilib.so $(DESTDIR)/lib64; else install -m 755 libpcilib.so $(DESTDIR)/lib; fi
+	install -m 755 pci $(DESTDIR)/bin
+	ldconfig
 
 clean:
 	@echo -e "CLEAN \t$(shell pwd)"
