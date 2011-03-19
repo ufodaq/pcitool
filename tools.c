@@ -17,8 +17,12 @@ int pcilib_isnumber(const char *str) {
 
 int pcilib_isxnumber(const char *str) {
     int i = 0;
-    for (i = 0; str[i]; i++) 
+    
+    if ((str[0] == '0')&&((str[1] == 'x')||(str[1] == 'X'))) i += 2;
+    
+    for (; str[i]; i++) 
 	if (!isxdigit(str[i])) return 0;
+
     return 1;
 }
 
