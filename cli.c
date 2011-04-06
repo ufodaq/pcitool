@@ -121,6 +121,11 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "	-s <size>	- Number of words (default: 1)\n"
 "	-a <bitness>	- Bits per word (default: 32)\n"
 "	-e <l|b>	- Endianess Little/Big (default: host)\n"
+"\n"
+"  Data:\n"
+"	Data can be specified as sequence of hexdecimal number or\n"
+"	a single value prefixed with '*'. In this case it will be\n"
+"	replicated the specified amount of times\n"
 "\n\n",
 argv[0]);
 
@@ -565,6 +570,8 @@ int main(int argc, char **argv) {
     const char *addr = NULL;
     const char *reg = NULL;
     const char *bank = NULL;
+    char **data = NULL;
+    
     uintptr_t start = -1;
     size_t size = 1;
     access_t access = 4;
@@ -665,7 +672,16 @@ int main(int argc, char **argv) {
     switch (mode) {
      case MODE_WRITE:
         if (!addr) Usage(argc, argv, "The address is not specified");
-        if ((argc - optind) != size) Usage(argc, argv, "The %i data values is specified, but %i required", argc - optind, size);
+        if (((argc - optind) == 1)&&(*argv[optind] == '*')) {
+    	    int vallen = strlen(argv[optind]);
+	    data = (char**)malloc(size * (vallen + sizeof(char*)));
+	    if (!data) Error("Error allocating memory for data array");
+	    for (i = 0; i < size; i++) {
+		data[i] = ((char*)data) + size * sizeof(char*) + i * vallen;
+		strcpy(data[i], argv[optind] + 1);
+	    }
+        } else if ((argc - optind) == size) data = argv + optind;
+        else Usage(argc, argv, "The %i data values is specified, but %i required", argc - optind, size);
      break;
      case MODE_READ:
         if (!addr) {
@@ -735,13 +751,15 @@ int main(int argc, char **argv) {
 	else ReadRegisterRange(handle, model, bank, start, size);
      break;
      case MODE_WRITE:
-	WriteData(handle, bar, start, size, access, endianess, argv + optind);
+	WriteData(handle, bar, start, size, access, endianess, data);
      break;
      case MODE_WRITE_REGISTER:
-        if (reg) WriteRegister(handle, model, bank, reg, argv + optind);
-	else WriteRegisterRange(handle, model, bank, start, size, argv + optind);
+        if (reg) WriteRegister(handle, model, bank, reg, data);
+	else WriteRegisterRange(handle, model, bank, start, size, data);
      break;
     }
 
     pcilib_close(handle);
+    
+    if (data != argv + optind) free(data);
 }
