@@ -6,8 +6,6 @@
 #include "ipecamera.h"
 #include "pcilib.h"
 
-typedef struct ipecamera_s ipecamera_t;
-
 void *ipecamera_init(pcilib_t *pcilib);
 void ipecamera_free(void *ctx);
 

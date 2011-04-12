@@ -155,6 +155,7 @@ extern pcilib_model_description_t pcilib_model[];
 int pcilib_set_error_handler(void (*err)(const char *msg, ...), void (*warn)(const char *msg, ...));
 
 pcilib_model_t pcilib_get_model(pcilib_t *ctx);
+void *pcilib_get_implementation_context(pcilib_t *ctx);
 
 pcilib_t *pcilib_open(const char *device, pcilib_model_t model);
 void pcilib_close(pcilib_t *ctx);

@@ -1,6 +1,8 @@
 #ifndef _IPECAMERA_H
 #define _IPECAMERA_H
 
+typedef struct ipecamera_s ipecamera_t;
+
 typedef  struct {
     int bpp;			/*<< Bits per pixel (8, 16, or 32) as returned by IPECAMERA_IMAGE_DATA */
     int real_bpp;		/*<< Bits per pixel as returned by camera and IPECAMERA_PACKED_IMAGE */
@@ -19,5 +21,8 @@ typedef enum {
 
 typedef uint16_t ipecamera_change_mask_t;
 typedef uint16_t ipecamera_pixel_t;
+
+
+int ipecamera_set_buffer_size(ipecamera_t *ctx, int size);
 
 #endif /* _IPECAMERA_H */

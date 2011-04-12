@@ -38,6 +38,7 @@ struct ipecamera_s {
     pcilib_register_t n_lines_reg, line_reg;
     pcilib_register_t exposure_reg;
 
+    int started;
     int buffer_size;
     int buf_ptr;
     
@@ -140,6 +141,23 @@ void ipecamera_free(void *vctx) {
     }
 }
 
+int ipecamera_set_buffer_size(ipecamera_t *ctx, int size) {
+    if (ctx->started) {
+	pcilib_error("Can't change buffer size while grabbing");
+	return PCILIB_ERROR_INVALID_REQUEST;
+    }
+    
+    if (ctx->size < 1) {
+	pcilib_error("The buffer size is too small");
+	return PCILIB_ERROR_INVALID_REQUEST;
+    }
+
+    ctx->buffer_size = size;
+    
+    return 0;
+}
+
+
 int ipecamera_reset(void *vctx) {
     int err;
     pcilib_t *pcilib;
@@ -220,6 +238,11 @@ int ipecamera_start(void *vctx, pcilib_event_t event_mask, pcilib_callback_t cb,
     if (!ctx) {
 	pcilib_error("IPECamera imaging is not initialized");
 	return PCILIB_ERROR_NOTINITIALIZED;
+    }
+    
+    if (ctx->started) {
+	pcilib_error("IPECamera grabbing is already started");
+	return PCILIB_ERROR_INVALID_REQUEST;
     }
     
     ctx->cb = cb;
@@ -428,6 +451,11 @@ int ipecamera_trigger(void *vctx, pcilib_event_t event, size_t trigger_size, voi
     if (!ctx) {
 	pcilib_error("IPECamera imaging is not initialized");
 	return PCILIB_ERROR_NOTINITIALIZED;
+    }
+
+    if (!ctx->started) {
+	pcilib_error("Can't trigger while not grabbing is not started");
+	return PCILIB_ERROR_INVALID_REQUEST;
     }
     
     err = ipecamera_get_image(ctx);
