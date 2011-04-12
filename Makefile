@@ -1,6 +1,6 @@
 BINARIES += pci
 
-INCDIR += 
+INCDIR += ./
 LDINC += $(addprefix -L ,$(LIBDIR))
 LDFLAGS += 
 DESTDIR ?= /usr/local
