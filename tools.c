@@ -196,7 +196,9 @@ void *pcilib_datacpy32(void * dst, void const * src, uint8_t size, size_t n, pci
     uint32_t * plDst = (uint32_t *) dst;
     uint32_t const * plSrc = (uint32_t const *) src;
 
-    int swap = (endianess == PCILIB_BIG_ENDIAN)?(ntohs(1)!=1):(ntohs(1)==1);
+    int swap = 0;
+    
+    if (endianess) swap = (endianess == PCILIB_BIG_ENDIAN)?(ntohs(1)!=1):(ntohs(1)==1);
 
     assert(size == 4);	// only 32 bit at the moment
 

@@ -79,7 +79,7 @@ static struct option long_options[] = {
     {"access",			required_argument, 0, OPT_ACCESS },
     {"endianess",		required_argument, 0, OPT_ENDIANESS },
     {"size",			required_argument, 0, OPT_SIZE },
-    {"size",			required_argument, 0, OPT_OUTPUT },
+    {"output",			required_argument, 0, OPT_OUTPUT },
     {"info",			no_argument, 0, OPT_INFO },
     {"list",			no_argument, 0, OPT_LIST },
     {"reset",			no_argument, 0, OPT_RESET },
@@ -567,7 +567,7 @@ int WriteRegister(pcilib_t *handle, pcilib_model_t model, const char *bank, cons
     return 0;
 }
 
-int Grab(pcilib_t *handle, const char *output) {
+int Grab(pcilib_t *handle, const char *event, const char *output) {
     int err;
     
     void *data = NULL;
@@ -575,12 +575,14 @@ int Grab(pcilib_t *handle, const char *output) {
     
     FILE *o;
     
-    err = pcilib_grab(handle, PCILIB_ALL_EVENTS, &size, &data, NULL);
+    // ignoring event for now
+	
+    err = pcilib_grab(handle, PCILIB_EVENTS_ALL, &size, &data, NULL);
     if (err) {
 	Error("Grabbing event is failed");
     }
 
-    if (output) {    
+    if (output) {
 	o = fopen(output, "w");
 	if (!o) {
 	    Error("Failed to open file \"%s\"", output);
@@ -624,7 +626,7 @@ int main(int argc, char **argv) {
 
     pcilib_t *handle;
     
-    while ((c = getopt_long(argc, argv, "hilpr::w::d:m:b:a:s:e:g:", long_options, NULL)) != (unsigned char)-1) {
+    while ((c = getopt_long(argc, argv, "hilpr::w::g::d:m:b:a:s:e:o:", long_options, NULL)) != (unsigned char)-1) {
 	extern int optind;
 	switch (c) {
 	    case OPT_HELP:
@@ -831,7 +833,7 @@ int main(int argc, char **argv) {
         pcilib_reset(handle);
      break;
      case MODE_GRAB:
-        Grab(handle, output);
+        Grab(handle, event, output);
      break;
     }
 

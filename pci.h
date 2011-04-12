@@ -15,9 +15,9 @@ const pci_board_info *pcilib_get_board_info(pcilib_t *ctx);
 # include "default.h"
 
 pcilib_model_description_t pcilib_model[3] = {
-    { NULL, NULL, NULL, NULL },
-    { NULL, NULL, NULL, NULL },
-    { ipecamera_registers, ipecamera_register_banks, ipecamera_register_ranges, &ipecamera_image_api }
+    { 4, PCILIB_HOST_ENDIAN, 	NULL, NULL, NULL, NULL },
+    { 4, PCILIB_HOST_ENDIAN, 	NULL, NULL, NULL, NULL },
+    { 4, PCILIB_BIG_ENDIAN,	ipecamera_registers, ipecamera_register_banks, ipecamera_register_ranges, ipecamera_events, &ipecamera_image_api }
 };
 
 pcilib_protocol_description_t pcilib_protocol[3] = {

@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <arpa/inet.h>
 #include <errno.h>
 #include <assert.h>
 
@@ -279,9 +280,24 @@ pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const ch
 	if ((!strcasecmp(registers[i].name, reg))&&((!bank)||(registers[i].bank == bank_addr))) return i;
     }
     
-    return -1;
+    return (pcilib_register_t)-1;
 };
 
+
+pcilib_event_t pcilib_find_event(pcilib_t *ctx, const char *event) {
+    int i;
+    pcilib_register_bank_t res;
+    unsigned long addr;
+    
+    pcilib_model_t model = pcilib_get_model(ctx);
+    pcilib_event_description_t *events = pcilib_model[model].events;
+    
+    for (i = 0; events[i].name; i++) {
+	if (!strcasecmp(events[i].name, event)) return (1<<i);
+    }
+
+    return (pcilib_event_t)-1;
+}
 
 
 static int pcilib_map_register_space(pcilib_t *ctx) {
@@ -484,7 +500,7 @@ int pcilib_read_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_regi
     pcilib_register_value_t buf[n + 1];
     err = pcilib_read_register_space_internal(ctx, r->bank, r->addr, n, bits, buf);
 
-    if (b->endianess) {
+    if ((b->endianess == PCILIB_BIG_ENDIAN)||((b->endianess == PCILIB_HOST_ENDIAN)&&(ntohs(1) == 1))) {
 	pcilib_error("Big-endian byte order support is not implemented");
 	return PCILIB_ERROR_NOTSUPPORTED;
     } else {
@@ -581,7 +597,7 @@ int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_reg
     pcilib_register_value_t buf[n + 1];
     memset(buf, 0, (n + 1) * sizeof(pcilib_register_value_t));
     
-    if (b->endianess) {
+    if ((b->endianess == PCILIB_BIG_ENDIAN)||((b->endianess == PCILIB_HOST_ENDIAN)&&(ntohs(1) == 1))) {
 	pcilib_error("Big-endian byte order support is not implemented");
 	return PCILIB_ERROR_NOTSUPPORTED;
     } else {
@@ -688,6 +704,19 @@ int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, voi
 }
 
 
+void *pcilib_get_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size) {
+    pcilib_event_api_description_t *api = pcilib_model[ctx->model].event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return NULL;
+    }
+
+    if (api->get_data) 
+	return api->get_data(ctx->event_ctx, event_id, data_type, arg_size, arg, size);
+
+    return NULL;
+}
+
 void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size) {
     pcilib_event_api_description_t *api = pcilib_model[ctx->model].event_api;
     if (!api) {
@@ -696,7 +725,7 @@ void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_da
     }
 
     if (api->get_data) 
-	return api->get_data(ctx->event_ctx, event_id, data_type, size);
+	return api->get_data(ctx->event_ctx, event_id, data_type, 0, NULL, size);
 
     return NULL;
 }

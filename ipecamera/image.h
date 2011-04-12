@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 
+#include "ipecamera.h"
 #include "pcilib.h"
 
 typedef struct ipecamera_s ipecamera_t;
@@ -15,7 +16,7 @@ int ipecamera_start(void *ctx, pcilib_event_t event_mask, pcilib_callback_t cb, 
 int ipecamera_stop(void *ctx);
 int ipecamera_trigger(void *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
 
-void* ipecamera_get(void *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size);
+void* ipecamera_get(void *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size);
 int ipecamera_return(void *ctx, pcilib_event_id_t event_id);
 
 

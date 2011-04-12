@@ -81,10 +81,16 @@ pcilib_register_range_t ipecamera_register_ranges[] = {
     {0, 128, PCILIB_REGISTER_BANK0}, {0, 0, 0}
 };
 
+pcilib_event_description_t ipecamera_events[] = {
+    {"new_frame", ""},
+    {NULL, NULL}
+};
+
 #else
 extern pcilib_register_description_t ipecamera_registers[];
 extern pcilib_register_bank_description_t ipecamera_register_banks[];
 extern pcilib_register_range_t ipecamera_register_ranges[];
+extern pcilib_event_description_t ipecamera_events[];
 #endif 
 
 #ifdef _IPECAMERA_IMAGE_C
