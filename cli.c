@@ -18,7 +18,6 @@
 #include <getopt.h>
 
 #include "pci.h"
-#include "ipecamera.h"
 #include "tools.h"
 #include "kernel.h"
 
@@ -50,7 +49,9 @@ typedef enum {
     MODE_READ,
     MODE_READ_REGISTER,
     MODE_WRITE,
-    MODE_WRITE_REGISTER
+    MODE_WRITE_REGISTER,
+    MODE_RESET,
+    MODE_GRAB
 } MODE;
 
 typedef enum {
@@ -60,11 +61,14 @@ typedef enum {
     OPT_ACCESS = 'a',
     OPT_ENDIANESS = 'e',
     OPT_SIZE = 's',
+    OPT_OUTPUT = 'o',
     OPT_INFO = 'i',
     OPT_BENCHMARK = 'p',
     OPT_LIST = 'l',
     OPT_READ = 'r',
     OPT_WRITE = 'w',
+    OPT_GRAB = 'g',
+    OPT_RESET = 128,
     OPT_HELP = 'h',
 } OPTIONS;
 
@@ -75,11 +79,14 @@ static struct option long_options[] = {
     {"access",			required_argument, 0, OPT_ACCESS },
     {"endianess",		required_argument, 0, OPT_ENDIANESS },
     {"size",			required_argument, 0, OPT_SIZE },
+    {"size",			required_argument, 0, OPT_OUTPUT },
     {"info",			no_argument, 0, OPT_INFO },
     {"list",			no_argument, 0, OPT_LIST },
+    {"reset",			no_argument, 0, OPT_RESET },
     {"benchmark",		no_argument, 0, OPT_BENCHMARK },
     {"read",			optional_argument, 0, OPT_READ },
     {"write",			optional_argument, 0, OPT_WRITE },
+    {"grab",			optional_argument, 0, OPT_GRAB },
     {"help",			no_argument, 0, OPT_HELP },
     { 0, 0, 0, 0 }
 };
@@ -108,6 +115,8 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "	-p		- Performance Evaluation\n"
 "	-r <addr|reg>	- Read Data/Register\n"
 "	-w <addr|reg>	- Write Data/Register\n"
+"	-g <event>	- Grab Event\n"
+"	--reset		- Reset board\n"
 "	--help		- Help message\n"
 "\n"
 "  Addressing:\n"
@@ -121,6 +130,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "	-s <size>	- Number of words (default: 1)\n"
 "	-a <bitness>	- Bits per word (default: 32)\n"
 "	-e <l|b>	- Endianess Little/Big (default: host)\n"
+"	-o <file>	- Output to file (default: stdout)\n"
 "\n"
 "  Data:\n"
 "	Data can be specified as sequence of hexdecimal number or\n"
@@ -557,6 +567,38 @@ int WriteRegister(pcilib_t *handle, pcilib_model_t model, const char *bank, cons
     return 0;
 }
 
+int Grab(pcilib_t *handle, const char *output) {
+    int err;
+    
+    void *data = NULL;
+    size_t size, written;
+    
+    FILE *o;
+    
+    err = pcilib_grab(handle, PCILIB_ALL_EVENTS, &size, &data, NULL);
+    if (err) {
+	Error("Grabbing event is failed");
+    }
+
+    if (output) {    
+	o = fopen(output, "w");
+	if (!o) {
+	    Error("Failed to open file \"%s\"", output);
+	}
+	
+	printf("Writting %i bytes into %s...\n", size, output);
+    } else o = stdout;
+    
+    written = fwrite(data, 1, size, o);
+    if (written != size) {
+	if (written > 0) Error("Write failed, only %z bytes out of %z are stored", written, size);
+	else Error("Write failed");
+    }
+    
+    if (o != stdout) fclose(o);
+
+    return 0;
+}
 
 int main(int argc, char **argv) {
     int i;
@@ -571,16 +613,18 @@ int main(int argc, char **argv) {
     const char *reg = NULL;
     const char *bank = NULL;
     char **data = NULL;
+    const char *event = NULL;
     
     uintptr_t start = -1;
     size_t size = 1;
     access_t access = 4;
     int skip = 0;
     int endianess = 0;
+    const char *output = NULL;
 
     pcilib_t *handle;
     
-    while ((c = getopt_long(argc, argv, "hilpr::w::d:m:b:a:s:e:", long_options, NULL)) != (unsigned char)-1) {
+    while ((c = getopt_long(argc, argv, "hilpr::w::d:m:b:a:s:e:g:", long_options, NULL)) != (unsigned char)-1) {
 	extern int optind;
 	switch (c) {
 	    case OPT_HELP:
@@ -595,6 +639,11 @@ int main(int argc, char **argv) {
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 
 		mode = MODE_LIST;
+	    break;
+	    case OPT_RESET:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+
+		mode = MODE_RESET;
 	    break;
 	    case OPT_BENCHMARK:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
@@ -614,6 +663,13 @@ int main(int argc, char **argv) {
 		mode = MODE_WRITE;
 		if (optarg) addr = optarg;
 		else if ((optind < argc)&&(argv[optind][0] != '-')) addr = argv[optind++];
+	    break;
+	    case OPT_GRAB:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+
+		mode = MODE_GRAB;
+		if (optarg) event = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-')) event = argv[optind++];
 	    break;
 	    case OPT_DEVICE:
 		fpga_device = optarg;
@@ -652,6 +708,9 @@ int main(int argc, char **argv) {
 		} else Usage(argc, argv, "Invalid endianess is specified (%s)", optarg);
 		
 	    break;
+	    case OPT_OUTPUT:
+		output = optarg;
+	    break;
 	    default:
 		Usage(argc, argv, "Unknown option (%s)", argv[optind]);
 	}
@@ -674,11 +733,22 @@ int main(int argc, char **argv) {
         if (!addr) Usage(argc, argv, "The address is not specified");
         if (((argc - optind) == 1)&&(*argv[optind] == '*')) {
     	    int vallen = strlen(argv[optind]);
-	    data = (char**)malloc(size * (vallen + sizeof(char*)));
-	    if (!data) Error("Error allocating memory for data array");
-	    for (i = 0; i < size; i++) {
-		data[i] = ((char*)data) + size * sizeof(char*) + i * vallen;
-		strcpy(data[i], argv[optind] + 1);
+    	    if (vallen > 1) {
+		data = (char**)malloc(size * (vallen + sizeof(char*)));
+		if (!data) Error("Error allocating memory for data array");
+
+		for (i = 0; i < size; i++) {
+		    data[i] = ((char*)data) + size * sizeof(char*) + i * vallen;
+		    strcpy(data[i], argv[optind] + 1);
+		}
+	    } else {
+		data = (char**)malloc(size * (9 + sizeof(char*)));
+		if (!data) Error("Error allocating memory for data array");
+		
+		for (i = 0; i < size; i++) {
+		    data[i] = ((char*)data) + size * sizeof(char*) + i * 9;
+		    sprintf(data[i], "%x", i);
+		}
 	    }
         } else if ((argc - optind) == size) data = argv + optind;
         else Usage(argc, argv, "The %i data values is specified, but %i required", argc - optind, size);
@@ -756,6 +826,12 @@ int main(int argc, char **argv) {
      case MODE_WRITE_REGISTER:
         if (reg) WriteRegister(handle, model, bank, reg, data);
 	else WriteRegisterRange(handle, model, bank, start, size, data);
+     break;
+     case MODE_RESET:
+        pcilib_reset(handle);
+     break;
+     case MODE_GRAB:
+        Grab(handle, output);
      break;
     }
 

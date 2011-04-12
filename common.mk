@@ -19,6 +19,9 @@ CFLAGS += $(addprefix -I ,$(INCDIR)) -fPIC -std=c99
 SRC = $(wildcard *.cpp)
 SRCC = $(wildcard *.c)
 
+SRC += $(wildcard ipecamera/*.cpp)
+SRCC += $(wildcard ipecamera/*.c)
+
 # Corresponding object files 
 OBJ = $(addprefix $(OBJDIR)/,$(SRC:.cpp=.o))
 OBJ += $(addprefix $(OBJDIR)/,$(SRCC:.c=.o))

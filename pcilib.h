@@ -3,7 +3,15 @@
 
 #define PCILIB_MAX_BANKS 6
 
+#include <time.h>
 #include <stdint.h>
+
+#ifndef __timespec_defined
+struct timespec {
+    time_t tv_sec;
+    long tv_nsec;
+};
+#endif /* __timespec_defined */
 
 #define pcilib_memcpy pcilib_memcpy32
 #define pcilib_datacpy pcilib_datacpy32
@@ -17,6 +25,9 @@ typedef uint8_t pcilib_register_bank_t;		/**< Type holding the register bank num
 typedef uint8_t pcilib_register_bank_addr_t;	/**< Type holding the register bank number */
 typedef uint8_t pcilib_register_size_t;		/**< Type holding the size in bits of the register */
 typedef uint32_t pcilib_register_value_t;	/**< Type holding the register value */
+typedef uint64_t pcilib_event_id_t;
+
+typedef uint32_t pcilib_event_t;
 
 typedef enum {
     PCILIB_LITTLE_ENDIAN = 0,
@@ -35,11 +46,14 @@ typedef enum {
     PCILIB_REGISTER_RW = 3
 } pcilib_register_mode_t;
 
-
 typedef enum {
     PCILIB_DEFAULT_PROTOCOL,
     IPECAMERA_REGISTER_PROTOCOL
 } pcilib_register_protocol_t;
+
+typedef enum {
+    PCILIB_EVENT_DATA
+} pcilib_event_data_type_t;
 
 #define PCILIB_BAR_DETECT 		((pcilib_bar_t)-1)
 #define PCILIB_REGISTER_INVALID		((pcilib_register_t)-1)
@@ -49,6 +63,7 @@ typedef enum {
 #define PCILIB_REGISTER_BANK1 		1
 #define PCILIB_REGISTER_BANK2 		2
 #define PCILIB_REGISTER_BANK3 		3
+#define PCILIB_ALL_EVENTS		((pcilib_event_t)-1)
 
 typedef struct {
     pcilib_register_bank_addr_t addr;
@@ -69,6 +84,7 @@ typedef struct {
 
 typedef struct {
     pcilib_register_addr_t addr;
+    pcilib_register_size_t offset;
     pcilib_register_size_t bits;
     pcilib_register_value_t defvalue;
     pcilib_register_mode_t mode;
@@ -93,10 +109,28 @@ typedef struct {
     int (*write)(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, uint8_t bits, pcilib_register_value_t value);
 } pcilib_protocol_description_t;
 
+
+typedef int (*pcilib_callback_t)(pcilib_event_t event, pcilib_event_id_t event_id, void *user);
+
+typedef struct {
+    void *(*init)(pcilib_t *ctx);
+    void (*free)(void *ctx);
+
+    int (*reset)(void *ctx);
+
+    int (*start)(void *ctx, pcilib_event_t event_mask, pcilib_callback_t callback, void *user);
+    int (*stop)(void *ctx);
+    int (*trigger)(void *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
+    void* (*get_data)(void *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size);
+    int (*return_data)(void *ctx, pcilib_event_id_t event_id);
+} pcilib_event_api_description_t;
+
 typedef struct {
     pcilib_register_description_t *registers;
     pcilib_register_bank_description_t *banks;
     pcilib_register_range_t *ranges;
+    
+    pcilib_event_api_description_t *event_api;
 } pcilib_model_description_t;
 
 #ifndef _PCILIB_PCI_C
@@ -112,7 +146,8 @@ void pcilib_close(pcilib_t *ctx);
 
 void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar);
 void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data);
-char  *pcilib_resolve_register_address(pcilib_t *ctx, uintptr_t addr);
+char *pcilib_resolve_register_address(pcilib_t *ctx, uintptr_t addr);
+char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size);
 
 pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, const char *bank);
 pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const char *reg);
@@ -126,5 +161,25 @@ int pcilib_read_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_regi
 int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_register_value_t value);
 int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t *value);
 int pcilib_write_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t value);
+
+int pcilib_reset(pcilib_t *ctx);
+int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, void *callback, void *user);
+int pcilib_stop(pcilib_t *ctx);
+
+int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
+
+void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size);
+/*
+ * This function is provided to find potentially corrupted data. If the data is overwritten by 
+ * the time return_data is called it will return error.
+ */
+int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id);
+
+/*
+ * @param data - will be allocated and shuld be freed if NULL, otherwise used and size should contain correct size.
+ *   In case of failure the content of data is undefined.
+ * @param timeout - will be autotriggered if NULL
+ */
+int pcilib_grab(pcilib_t *ctx, pcilib_event_t event_mask, size_t *size, void **data, const struct timespec *timeout);
 
 #endif /* _PCITOOL_PCILIB_H */

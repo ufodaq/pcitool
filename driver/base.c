@@ -626,6 +626,7 @@ int pcidriver_mmap_pci(pcidriver_privdata_t *privdata, struct vm_area_struct *vm
 
 	/* Check sizes */
 	vma_size = (vmap->vm_end - vmap->vm_start);
+
 	if ((vma_size != bar_length) &&
 	   ((bar_length < PAGE_SIZE) && (vma_size != PAGE_SIZE))) {
 		mod_info( "mmap size is not correct! bar: %lu - vma: %lu\n", bar_length, vma_size );

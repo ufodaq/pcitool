@@ -1,4 +1,5 @@
 #define _PCILIB_PCI_C
+#define _POSIX_C_SOURCE 199309L
 
 #include <stdio.h>
 #include <string.h>
@@ -17,7 +18,7 @@
 #include "tools.h"
 
 #include "pci.h"
-#include "ipecamera.h"
+#include "ipecamera/model.h"
 #include "error.h"
 
 #define BIT_MASK(bits) ((1l << (bits)) - 1)
@@ -34,6 +35,12 @@ struct pcilib_s {
 
     pcilib_bar_t reg_bar;
     char *reg_space;
+
+    pcilib_bar_t data_bar;
+    char *data_space;
+    size_t data_size;
+    
+    void *event_ctx;
     
 #ifdef PCILIB_FILE_IO
     int file_io_handle;
@@ -60,6 +67,7 @@ int pcilib_set_error_handler(void (*err)(const char *msg, ...), void (*warn)(con
 }
 
 pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
+    pcilib_event_api_description_t *api;
     pcilib_t *ctx = malloc(sizeof(pcilib_t));
 
     if (ctx) {
@@ -67,6 +75,10 @@ pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
 	ctx->page_mask = (uintptr_t)-1;
 	ctx->model = model;
 	ctx->reg_space = NULL;
+
+	if (!model) model = pcilib_get_model(ctx);
+	api = pcilib_model[model].event_api;
+        if ((api)&&(api->init)) ctx->event_ctx = api->init(ctx);
     }
 
     return ctx;
@@ -297,17 +309,79 @@ static int pcilib_map_register_space(pcilib_t *ctx) {
 	    }
 	}
 	
-	return -1;
+	return PCILIB_ERROR_NOTFOUND;
     }
     
     return 0;
 }
+
+static int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
+    int err;
+    int i;
+    
+    if (!ctx->data_space) {
+        const pci_board_info *board_info = pcilib_get_board_info(ctx);
+
+	err = pcilib_map_register_space(ctx);
+	if (err) {
+	    pcilib_error("Error mapping register space");
+	    return err;
+	}
+	
+	if (addr) {
+	}
+	
+	int data_bar = -1;	
+	
+	for (i = 0; i < PCILIB_MAX_BANKS; i++) {
+	    if ((i == ctx->reg_bar)||(!board_info->bar_length[i])) continue;
 	    
+	    if (addr) {
+	        if (board_info->bar_start[i] == addr) {
+		    data_bar = i;
+		    break;
+		}
+	    } else {
+		if (data_bar >= 0) {
+		    data_bar = -1;
+		    break;
+		}
+		
+		data_bar = i;
+	    }
+	}
+	    
+
+	if (data_bar < 0) {
+	    if (addr) pcilib_error("Unable to find the specified data space (%lx)", addr);
+	    else pcilib_error("Unable to find the data space");
+	    return PCILIB_ERROR_NOTFOUND;
+	}
+	
+	ctx->data_bar = data_bar;
+	ctx->data_space = pcilib_map_bar(ctx, data_bar);
+	ctx->data_size = board_info->bar_length[data_bar];
+	
+	if (!ctx->data_space) {
+	    pcilib_error("Unable to map the data space");
+	    return PCILIB_ERROR_FAILED;
+	}
+    }
+    
+    return 0;
+}
 	
 static void pcilib_unmap_register_space(pcilib_t *ctx) {
     if (ctx->reg_space) {
 	pcilib_unmap_bar(ctx, ctx->reg_bar, ctx->reg_space);
 	ctx->reg_space = NULL;
+    }
+}
+
+static void pcilib_unmap_data_space(pcilib_t *ctx) {
+    if (ctx->data_space) {
+	pcilib_unmap_bar(ctx, ctx->data_bar, ctx->data_space);
+	ctx->data_space = NULL;
     }
 }
 
@@ -319,11 +393,31 @@ char  *pcilib_resolve_register_address(pcilib_t *ctx, uintptr_t addr) {
     return NULL;
 }
 
+char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size) {
+    int err;
+    
+    err = pcilib_map_data_space(ctx, addr);
+    if (err) {
+	pcilib_error("Failed to map the specified address space (%lx)", addr);
+	return NULL;
+    }
+    
+    if (size) *size = ctx->data_size;    
+    
+    return ctx->data_space + (ctx->board_info.bar_start[ctx->data_bar] & ctx->page_mask);
+}
+
 
 void pcilib_close(pcilib_t *ctx) {
     if (ctx) {
+	pcilib_model_t model = pcilib_get_model(ctx);
+	pcilib_event_api_description_t *api = pcilib_model[model].event_api;
+    
+        if ((api)&&(api->free)) api->free(ctx->event_ctx);
+	if (ctx->data_space) pcilib_unmap_data_space(ctx);
 	if (ctx->reg_space) pcilib_unmap_register_space(ctx);
 	close(ctx->handle);
+	
 	free(ctx);
     }
 }
@@ -491,17 +585,21 @@ int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_reg
 	pcilib_error("Big-endian byte order support is not implemented");
 	return PCILIB_ERROR_NOTSUPPORTED;
     } else {
-	for (i = 0, res = value; (res > 0)&&(i <= n); ++i) {
-	    buf[i] = res & BIT_MASK(b->access);
-	    res >>= b->access;
-	}
+	if (b->access == sizeof(res) * 8) {
+	    buf[i] = res;
+	} else {
+	    for (i = 0, res = value; (res > 0)&&(i <= n); ++i) {
+		buf[i] = res & BIT_MASK(b->access);
+	        res >>= b->access;
+	    }
 	
-	if (res) {
-	    pcilib_error("Value %i is to big to fit in the register %s", value, r->name);
-	    return PCILIB_ERROR_OUTOFRANGE;
+	    if (res) {
+		pcilib_error("Value %i is too big to fit in the register %s", value, r->name);
+		return PCILIB_ERROR_OUTOFRANGE;
+	    }
 	}
     }
-    
+
     err = pcilib_write_register_space_internal(ctx, r->bank, r->addr, n, bits, buf);
     return err;
 }
@@ -511,8 +609,175 @@ int pcilib_write_register(pcilib_t *ctx, const char *bank, const char *regname, 
     int reg;
     
     reg = pcilib_find_register(ctx, bank, regname);
-    if (reg < 0) pcilib_error("Register (%s) is not found", regname);
+    if (reg < 0) {
+	pcilib_error("Register (%s) is not found", regname);
+	return PCILIB_ERROR_NOTFOUND;
+    }
 
     return pcilib_write_register_by_id(ctx, reg, value);
 }
 
+
+int pcilib_reset(pcilib_t *ctx) {
+    pcilib_event_api_description_t *api;
+    
+    pcilib_model_t model = pcilib_get_model(ctx);
+
+    api = pcilib_model[model].event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+    
+    if (api->reset) 
+	return api->reset(ctx->event_ctx);
+	
+    return 0;
+}
+
+int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, void *callback, void *user) {
+    pcilib_event_api_description_t *api;
+    
+    pcilib_model_t model = pcilib_get_model(ctx);
+
+    api = pcilib_model[model].event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    if (api->start) 
+	return api->start(ctx->event_ctx, event_mask, callback, user);
+
+    return 0;
+}
+
+int pcilib_stop(pcilib_t *ctx) {
+    pcilib_event_api_description_t *api;
+    
+    pcilib_model_t model = pcilib_get_model(ctx);
+
+    api = pcilib_model[model].event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    if (api->stop) 
+	return api->stop(ctx->event_ctx);
+
+    return 0;
+}
+
+int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data) {
+    pcilib_event_api_description_t *api;
+    
+    pcilib_model_t model = pcilib_get_model(ctx);
+
+    api = pcilib_model[model].event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    if (api->trigger) 
+	return api->trigger(ctx->event_ctx, event, trigger_size, trigger_data);
+
+    pcilib_error("Self triggering is not supported by the selected model");
+    return PCILIB_ERROR_NOTSUPPORTED;
+}
+
+
+void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size) {
+    pcilib_event_api_description_t *api = pcilib_model[ctx->model].event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return NULL;
+    }
+
+    if (api->get_data) 
+	return api->get_data(ctx->event_ctx, event_id, data_type, size);
+
+    return NULL;
+}
+
+int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id) {
+    pcilib_event_api_description_t *api = pcilib_model[ctx->model].event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    if (api->return_data) 
+	return api->return_data(ctx->event_ctx, event_id);
+
+    return 0;
+}
+
+
+typedef struct {
+    pcilib_t *ctx;
+    
+    size_t *size;
+    void **data;
+} pcilib_grab_callback_user_data_t;
+
+static int pcilib_grab_callback(pcilib_event_t event, pcilib_event_id_t event_id, void *vuser) {
+    int err;
+    void *data;
+    size_t size;
+    int allocated = 0;
+
+    pcilib_grab_callback_user_data_t *user = (pcilib_grab_callback_user_data_t*)vuser;
+
+    data = pcilib_get_data(user->ctx, event_id, PCILIB_EVENT_DATA, &size);
+    if (!data) {
+	pcilib_error("Error getting event data");
+	return PCILIB_ERROR_FAILED;
+    }
+    
+    if (*(user->data)) {
+	if ((user->size)&&(*(user->size) < size)) {
+	    pcilib_error("The supplied buffer does not have enough space to hold the event data. Buffer size is %z, but %z is required", user->size, size);
+	    return PCILIB_ERROR_MEMORY;
+	}
+
+	*(user->size) = size;
+    } else {
+	*(user->data) = malloc(size);
+	if (!*(user->data)) {
+	    pcilib_error("Memory allocation (%i bytes) for event data is failed");
+	    return PCILIB_ERROR_MEMORY;
+	}
+	if (*(user->size)) *(user->size) = size;
+	allocated = 1;
+    }
+    
+    memcpy(*(user->data), data, size);
+    
+    err = pcilib_return_data(user->ctx, event_id);
+    if (err) {
+	if (allocated) {
+	    free(*(user->data));
+	    *(user->data) = NULL;
+	}
+	pcilib_error("The event data had been overwritten before it was returned, data corruption may occur");
+	return err;
+    }
+    
+    return 0;
+}
+
+int pcilib_grab(pcilib_t *ctx, pcilib_event_t event_mask, size_t *size, void **data, const struct timespec *timeout) {
+    int err;
+    
+    pcilib_grab_callback_user_data_t user = {ctx, size, data};
+    
+    err = pcilib_start(ctx, event_mask, pcilib_grab_callback, &user);
+    if (!err) {
+	if (timeout) nanosleep(timeout, NULL);
+        else err = pcilib_trigger(ctx, event_mask, 0, NULL);
+    }
+    pcilib_stop(ctx);
+    return 0;
+}

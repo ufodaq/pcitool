@@ -1,10 +1,10 @@
-#define _IPECAMERA_C
+#define _IPECAMERA_MODEL_C
 #include <sys/time.h>
 #include <assert.h>
 
-#include "tools.h"
-#include "ipecamera.h"
-#include "error.h"
+#include "../tools.h"
+#include "../error.h"
+#include "model.h"
 
 #define ADDR_MASK 0x7F00
 #define WRITE_BIT 0x8000
@@ -110,6 +110,11 @@ retry:
     }
 
     if ((val & READ_READY_BIT) == 0) {
+	if (--retries > 0) {
+	    pcilib_warning("Timeout occured during register write, retrying (try %i of %i)...", RETRIES - retries, RETRIES);
+	    goto retry;
+	}
+
 	pcilib_error("Timeout writting register value");
 	return PCILIB_ERROR_TIMEOUT;
     }
@@ -121,7 +126,7 @@ retry:
 
     if (((val&ADDR_MASK) >> 8) != addr) {
 	if (--retries > 0) {
-	    pcilib_warning("Address verification failed during register read, retrying (try %i of %i)...", RETRIES - retries, RETRIES);
+	    pcilib_warning("Address verification failed during register write, retrying (try %i of %i)...", RETRIES - retries, RETRIES);
 	    goto retry;
 	}
 	pcilib_error("Address verification failed during register write");
@@ -137,3 +142,6 @@ retry:
 
     return 0;
 }
+
+
+

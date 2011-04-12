@@ -11,13 +11,13 @@
 const pci_board_info *pcilib_get_board_info(pcilib_t *ctx);
 
 #ifdef _PCILIB_PCI_C
-# include "ipecamera.h"
+# include "ipecamera/model.h"
 # include "default.h"
 
 pcilib_model_description_t pcilib_model[3] = {
-    { NULL, NULL, NULL },
-    { NULL, NULL, NULL },
-    { ipecamera_registers, ipecamera_register_banks, ipecamera_register_ranges }
+    { NULL, NULL, NULL, NULL },
+    { NULL, NULL, NULL, NULL },
+    { ipecamera_registers, ipecamera_register_banks, ipecamera_register_ranges, &ipecamera_image_api }
 };
 
 pcilib_protocol_description_t pcilib_protocol[3] = {

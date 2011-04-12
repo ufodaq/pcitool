@@ -14,7 +14,7 @@ include common.mk
 ###############################################################
 # Target definitions
 
-OBJECTS = pci.o ipecamera.o default.o tools.o
+OBJECTS = pci.o  default.o tools.o ipecamera/model.o ipecamera/image.o
 
 libpcilib.so: $(OBJECTS)
 	echo -e "LD \t$@"
@@ -26,6 +26,7 @@ pci: cli.o libpcilib.so
 
 install: pci
 	install -m 644 pcilib.h $(DESTDIR)/include
+	install -m 644 ipecamera/ipecamera.h $(DESTDIR)/include
 	if [ -d $(DESTDIR)/lib64 ]; then install -m 755 libpcilib.so $(DESTDIR)/lib64; else install -m 755 libpcilib.so $(DESTDIR)/lib; fi
 	install -m 755 pci $(DESTDIR)/bin
 	ldconfig
