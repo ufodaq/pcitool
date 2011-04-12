@@ -271,6 +271,8 @@ int ipecamera_start(void *vctx, pcilib_event_t event_mask, pcilib_callback_t cb,
 	return err;
     }
     
+    ctx->started = 1;
+    
     return 0;
 }
 
@@ -282,6 +284,8 @@ int ipecamera_stop(void *vctx) {
 	pcilib_error("IPECamera imaging is not initialized");
 	return PCILIB_ERROR_NOTINITIALIZED;
     }
+
+    ctx->started = 0;   
 
     if (ctx->buffer) {
 	free(ctx->buffer);
@@ -295,8 +299,8 @@ int ipecamera_stop(void *vctx) {
 
 
     ctx->event_id = 0;
-    ctx->buf_ptr = 0;    
-    
+    ctx->buf_ptr = 0; 
+
     return 0;
 }
 
