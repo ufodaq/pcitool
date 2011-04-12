@@ -115,7 +115,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "	-p		- Performance Evaluation\n"
 "	-r <addr|reg>	- Read Data/Register\n"
 "	-w <addr|reg>	- Write Data/Register\n"
-"	-g <event>	- Grab Event\n"
+"	-g [event]	- Grab Event\n"
 "	--reset		- Reset board\n"
 "	--help		- Help message\n"
 "\n"
