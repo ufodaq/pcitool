@@ -54,6 +54,7 @@ pcilib_register_description_t ipecamera_registers[] = {
 {72, 	0, 	2, 	0, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "output_mode", ""},
 {78, 	0, 	12, 	85, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "training_pattern", ""},
 {80, 	0, 	18, 	0x3FFFF,PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "channel_en", ""},
+{82, 	0, 	3, 	7, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "special_82", ""},
 {89, 	0, 	8, 	96, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "vlow2", ""},
 {90, 	0, 	8, 	96, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "vlow3", ""},
 {100, 	0, 	14, 	16260, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "offset", ""},
@@ -61,6 +62,7 @@ pcilib_register_description_t ipecamera_registers[] = {
 {103, 	0, 	8, 	32, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "adc_gain", ""},
 {111, 	0, 	1, 	1, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "bit_mode", ""},
 {112, 	0, 	2, 	0, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "adc_resolution", ""},
+{115, 	0, 	1, 	1, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "special_115", ""},
 /*{126, 	0, 	16, 	0, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "temp", ""},*/
 {0,	0, 	32,	0,	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK1, "spi_conf_input", ""},
 {1,	0, 	32,	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "spi_conf_output", ""},
