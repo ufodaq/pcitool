@@ -19,6 +19,8 @@
 #define IPECAMERA_SLEEP_TIME 250000
 #define IPECAMERA_MAX_LINES 1088
 #define IPECAMERA_DEFAULT_BUFFER_SIZE 10
+#define IPECAMERA_EXPECTED_STATUS 0x0849FFFF
+//#define IPECAMERA_EXPECTED_STATUS 0x0049FFFF
 
 typedef uint32_t ipecamera_payload_t;
 
@@ -165,12 +167,12 @@ int ipecamera_reset(void *vctx) {
 
     pcilib_register_t control, status;
     pcilib_register_value_t value;
-    
+
     if (!ctx) {
 	pcilib_error("IPECamera imaging is not initialized");
 	return PCILIB_ERROR_NOTINITIALIZED;
     }
-    
+
     pcilib = ctx->pcilib;
     control = ctx->control_reg;
     status = ctx->status_reg;
@@ -198,7 +200,7 @@ int ipecamera_reset(void *vctx) {
 	return err;
     }
     usleep(IPECAMERA_SLEEP_TIME);
-    
+
     value = 07; err = pcilib_write_register_space(pcilib, "cmosis", 82, 1, &value);
     if (err) {
 	pcilib_error("Error setting CMOSIS configuration");
@@ -206,12 +208,11 @@ int ipecamera_reset(void *vctx) {
     }
     usleep(IPECAMERA_SLEEP_TIME);
 
-
 	// Set default parameters
     SET_REG(n_lines_reg, 1);
-    SET_REG(exposure_reg, 0);
-    SET_REG(control_reg, 141);
-    
+    //SET_REG(exposure_reg, 0);
+    SET_REG(control_reg, 0x141);
+
     if (err) return err;
     
 	// This is temporary for verification purposes
@@ -223,7 +224,7 @@ int ipecamera_reset(void *vctx) {
 	return err;
     }
 
-    if (value != 0x0849FFFF) {
+    if (value != IPECAMERA_EXPECTED_STATUS) {
 	pcilib_error("Unexpected value (%lx) of status register", value);
 	return PCILIB_ERROR_VERIFY;
     }
@@ -363,14 +364,18 @@ static int ipecamera_get_line(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecame
     ipecamera_payload_t *linebuf;
     int column = 0;
 
-    ipecamera_reset((void*)ctx);
+    err = ipecamera_reset((void*)ctx);
+    if (err) {
+	pcilib_error("Reset have failed");
+	return err;
+    }
 
     SET_REG(n_lines_reg, 1);
     SET_REG(line_reg, line);
     
-    SET_REG(control_reg, 149);
+    SET_REG(control_reg, 0x149);
     usleep(IPECAMERA_SLEEP_TIME);
-    CHECK_REG(status_reg, 0x0849FFFF);
+    CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
     
     GET_REG(start_reg, ptr);
     GET_REG(end_reg, size);
@@ -418,9 +423,10 @@ static int ipecamera_get_line(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecame
     }
 
     if (!err) {
-	SET_REG(control_reg, 141);
 	usleep(IPECAMERA_SLEEP_TIME);
-	CHECK_REG(status_reg, 0x0849FFFF);
+	SET_REG(control_reg, 0x141);
+	usleep(IPECAMERA_SLEEP_TIME);
+	CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
     }
     
     return err;
