@@ -68,6 +68,7 @@ typedef enum {
     OPT_READ = 'r',
     OPT_WRITE = 'w',
     OPT_GRAB = 'g',
+    OPT_QUIETE = 'q',
     OPT_RESET = 128,
     OPT_HELP = 'h',
 } OPTIONS;
@@ -87,6 +88,7 @@ static struct option long_options[] = {
     {"read",			optional_argument, 0, OPT_READ },
     {"write",			optional_argument, 0, OPT_WRITE },
     {"grab",			optional_argument, 0, OPT_GRAB },
+    {"quiete",			no_argument, 0, OPT_QUIETE },
     {"help",			no_argument, 0, OPT_HELP },
     { 0, 0, 0, 0 }
 };
@@ -132,6 +134,9 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "	-e <l|b>	- Endianess Little/Big (default: host)\n"
 "	-o <file>	- Output to file (default: stdout)\n"
 "\n"
+"  Information:\n"
+"	-q 		- Quiete mode (suppress warnings)\n"
+"\n"
 "  Data:\n"
 "	Data can be specified as sequence of hexdecimal number or\n"
 "	a single value prefixed with '*'. In this case it will be\n"
@@ -155,6 +160,8 @@ void Error(const char *format, ...) {
     exit(-1);
 }
 
+void Silence(const char *format, ...) {
+}
 
 void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
     int i;
@@ -607,6 +614,8 @@ int main(int argc, char **argv) {
     long itmp;
     unsigned char c;
 
+    int quiete = 0;
+    
     pcilib_model_t model = PCILIB_MODEL_DETECT;
     MODE mode = MODE_INVALID;
     const char *fpga_device = DEFAULT_FPGA_DEVICE;
@@ -626,7 +635,7 @@ int main(int argc, char **argv) {
 
     pcilib_t *handle;
     
-    while ((c = getopt_long(argc, argv, "hilpr::w::g::d:m:b:a:s:e:o:", long_options, NULL)) != (unsigned char)-1) {
+    while ((c = getopt_long(argc, argv, "hqilpr::w::g::d:m:b:a:s:e:o:", long_options, NULL)) != (unsigned char)-1) {
 	extern int optind;
 	switch (c) {
 	    case OPT_HELP:
@@ -713,6 +722,9 @@ int main(int argc, char **argv) {
 	    case OPT_OUTPUT:
 		output = optarg;
 	    break;
+	    case OPT_QUIETE:
+		quiete = 1;
+	    break;
 	    default:
 		Usage(argc, argv, "Unknown option (%s)", argv[optind]);
 	}
@@ -723,7 +735,7 @@ int main(int argc, char **argv) {
 	else Usage(argc, argv, NULL);
     }
 
-    pcilib_set_error_handler(&Error, NULL);
+    pcilib_set_error_handler(&Error, quiete?Silence:NULL);
 
     handle = pcilib_open(fpga_device, model);
     if (handle < 0) Error("Failed to open FPGA device: %s", fpga_device);
