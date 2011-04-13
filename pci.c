@@ -604,8 +604,8 @@ int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_reg
 	pcilib_error("Big-endian byte order support is not implemented");
 	return PCILIB_ERROR_NOTSUPPORTED;
     } else {
-	if (b->access == sizeof(res) * 8) {
-	    buf[i] = res;
+	if (b->access == sizeof(pcilib_register_value_t) * 8) {
+	    buf[0] = value;
 	} else {
 	    for (i = 0, res = value; (res > 0)&&(i <= n); ++i) {
 		buf[i] = res & BIT_MASK(b->access);
