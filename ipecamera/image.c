@@ -19,8 +19,11 @@
 #define IPECAMERA_SLEEP_TIME 250000
 #define IPECAMERA_MAX_LINES 1088
 #define IPECAMERA_DEFAULT_BUFFER_SIZE 10
-#define IPECAMERA_EXPECTED_STATUS 0x0849FFFF
-//#define IPECAMERA_EXPECTED_STATUS 0x0049FFFF
+//#define IPECAMERA_EXPECTED_STATUS 0x0849FFFF
+#define IPECAMERA_EXPECTED_STATUS 0x0049FFFF
+
+#define IPECAMERA_WRITE_RAW
+
 
 typedef uint32_t ipecamera_payload_t;
 
@@ -308,6 +311,7 @@ int ipecamera_stop(void *vctx) {
 
 static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecamera_change_mask_t *cbuf, int line_req, pcilib_register_value_t size, ipecamera_payload_t *payload, pcilib_register_value_t *advance) {
     int i, j;
+    int ppw;
     int err = 0;
     
     ipecamera_payload_t info = payload[0];
@@ -327,7 +331,8 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
     CHECK_FLAG("relative row number, should be 0", line == 0, line);
     CHECK_FLAG("channel, limited by 10 channels now", channel < 10, channel);
     CHECK_FLAG("channel, dublicate entry for channel", ((*cbuf)&(1<<channel)) == 0, channel);
-    CHECK_FLAG("number of pixels, 127 is expected", pixels == 127, pixels);
+    //CHECK_FLAG("number of pixels, 127 is expected", pixels == 127, pixels);
+    pixels = 127;
     
     bytes = pixels / 3;
     if (bytes * 3 < pixels) ++bytes;
@@ -340,12 +345,13 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
 	
         CHECK_FLAG("payload data magick", header == 3, header);
 	
-	for (j = 0; j < 3; j++) {
+	    // pixels per word
+	ppw = pixels - 3 * i;
+	if (ppw > 3) ppw = 3;
+	
+	for (j = 0; j < ppw; j++) {
 	    int pix = 3 * i + j;
-
-	    if (pix == pixels) break;
-    
-	    pbuf[channel*pixels + pix] = (data >> (10 * j))&0x3FF;
+	    pbuf[channel*pixels + pix] = (data >> (10 * (ppw - j - 1)))&0x3FF;
 	}
     }
     
@@ -364,11 +370,13 @@ static int ipecamera_get_line(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecame
     ipecamera_payload_t *linebuf;
     int column = 0;
 
+/*
     err = ipecamera_reset((void*)ctx);
     if (err) {
 	pcilib_error("Reset have failed");
 	return err;
     }
+*/
 
     SET_REG(n_lines_reg, 1);
     SET_REG(line_reg, line);
@@ -376,10 +384,13 @@ static int ipecamera_get_line(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecame
     SET_REG(control_reg, 0x149);
     usleep(IPECAMERA_SLEEP_TIME);
     CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
-    
+
     GET_REG(start_reg, ptr);
     GET_REG(end_reg, size);
     size -= ptr;
+
+    // Temporary compute size manually
+    size = 6 + 10 * 44;
 
     pcilib_warning("Reading line %i: %i %i\n", line, ptr, size);    
 
@@ -392,6 +403,16 @@ static int ipecamera_get_line(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecame
     if (linebuf) {
 	//pcilib_memcpy(linebuf, ctx->data + ptr, size * sizeof(ipecamera_payload_t));
 	pcilib_datacpy(linebuf, ctx->data + ptr, sizeof(ipecamera_payload_t), size, pcilib_model[PCILIB_MODEL_IPECAMERA].endianess);
+
+#ifdef IPECAMERA_WRITE_RAW
+	char fname[256];
+	sprintf(fname, "raw/line%04i", line);
+	FILE *f = fopen(fname, "w");
+	if (f) {
+	    fwrite(linebuf, 1, size, f);
+	    fclose(f);
+	}
+#endif
 
 	
 	CHECK_VALUE(linebuf[0], 0x51111111);	
@@ -420,6 +441,15 @@ static int ipecamera_get_line(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecame
 	CHECK_FLAG("payloads changed, we expect exactly 10 channels", *cbuf == 0x3FF, *cbuf);
 
 	free(linebuf);
+
+#ifdef IPECAMERA_WRITE_RAW
+	sprintf(fname, "raw/image");
+	f = fopen(fname, "a+");
+	if (f) {
+	    fwrite(pbuf, 2, ctx->dim.width, f);
+	    fclose(f);
+	}
+#endif
     }
 
     if (!err) {
@@ -438,6 +468,11 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
     int i;
     int buf_ptr;
     pcilib_t *pcilib = ctx->pcilib;
+
+#ifdef IPECAMERA_WRITE_RAW
+	FILE *f = fopen("raw/image", "w");
+	if (f) fclose(f);
+#endif
     
 //atomic    
     buf_ptr = ctx->buf_ptr;
