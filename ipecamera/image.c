@@ -23,6 +23,13 @@
 #define IPECAMERA_EXPECTED_STATUS 0x0049FFFF
 
 #define IPECAMERA_WRITE_RAW
+#define IPECAMERA_REORDER_CHANNELS
+
+
+#ifdef IPECAMERA_REORDER_CHANNELS
+int ipecamera_channel_order[10] = { 9, 7, 8, 6, 4, 2, 5, 1, 3, 0 };
+#endif 
+
 
 
 typedef uint32_t ipecamera_payload_t;
@@ -43,6 +50,7 @@ struct ipecamera_s {
     pcilib_register_t start_reg, end_reg;
     pcilib_register_t n_lines_reg, line_reg;
     pcilib_register_t exposure_reg;
+    pcilib_register_t flip_reg;
 
     int started;
     int buffer_size;
@@ -129,6 +137,7 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	FIND_REG(n_lines_reg, "cmosis", "number_lines");
 	FIND_REG(line_reg, "cmosis", "start1");
 	FIND_REG(exposure_reg, "cmosis", "exp_time");
+	FIND_REG(flip_reg, "cmosis", "image_flipping");
 
 	if (err) {
 	    free(ctx);
@@ -216,6 +225,7 @@ int ipecamera_reset(pcilib_context_t *vctx) {
     SET_REG(n_lines_reg, 1);
     //SET_REG(exposure_reg, 0);
     SET_REG(control_reg, 0x141);
+    //SET_REG(flip_reg, 0);
 
     if (err) return err;
     
@@ -327,7 +337,11 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
     int header = (info>>30)&0x03;	// 2 bits
     
     int bytes;
-    
+
+#ifdef IPECAMERA_REORDER_CHANNELS
+    channel = ipecamera_channel_order[channel];
+#endif 
+
     CHECK_FLAG("payload header magick", header == 2, header);
     CHECK_FLAG("pixel size, only 10 bits are supported", bpp == 10, bpp);
     //CHECK_FLAG("row number, should be %li", line == line_req, line, line_req);
@@ -337,6 +351,8 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
     //CHECK_FLAG("number of pixels, 127 is expected", pixels == 127, pixels);
     pixels = 127;
     
+
+
     bytes = pixels / 3;
     if (bytes * 3 < pixels) ++bytes;
     
@@ -395,7 +411,7 @@ static int ipecamera_get_line(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecame
     // Temporary compute size manually
     size = 6 + 10 * 44;
 
-    pcilib_warning("Reading line %i: %i %i\n", line, ptr, size);    
+    pcilib_warning("Reading line %i: %i %i", line, ptr, size);    
 
     if (size < 6) {
 	pcilib_error("The payload is tool small, we should have at least 5 header dwords and 1 footer.");
@@ -446,7 +462,7 @@ static int ipecamera_get_line(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecame
 	free(linebuf);
 
 #ifdef IPECAMERA_WRITE_RAW
-	sprintf(fname, "raw/image");
+	sprintf(fname, "raw/image.raw");
 	f = fopen(fname, "a+");
 	if (f) {
 	    (void)fwrite(pbuf, 2, ctx->dim.width, f);
@@ -473,7 +489,7 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
     pcilib_t *pcilib = ctx->pcilib;
 
 #ifdef IPECAMERA_WRITE_RAW
-	FILE *f = fopen("raw/image", "w");
+	FILE *f = fopen("raw/image.raw", "w");
 	if (f) fclose(f);
 #endif
     
