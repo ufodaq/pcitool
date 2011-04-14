@@ -98,7 +98,7 @@ const pci_board_info *pcilib_get_board_info(pcilib_t *ctx) {
     return &ctx->board_info;
 }
 
-void *pcilib_get_implementation_context(pcilib_t *ctx) {
+pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx) {
     return ctx->event_ctx;
 }
 

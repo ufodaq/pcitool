@@ -17,6 +17,7 @@ struct timespec {
 #define pcilib_datacpy pcilib_datacpy32
 
 typedef struct pcilib_s pcilib_t;
+typedef void pcilib_context_t;
 
 typedef uint8_t pcilib_bar_t;			/**< Type holding the PCI Bar number */
 typedef uint8_t pcilib_register_t;		/**< Type holding the register ID within the Bank */
@@ -125,18 +126,18 @@ typedef struct {
 typedef int (*pcilib_callback_t)(pcilib_event_t event, pcilib_event_id_t event_id, void *user);
 
 typedef struct {
-    void *(*init)(pcilib_t *ctx);
-    void (*free)(void *ctx);
+    pcilib_context_t *(*init)(pcilib_t *ctx);
+    void (*free)(pcilib_context_t *ctx);
 
-    int (*reset)(void *ctx);
+    int (*reset)(pcilib_context_t *ctx);
 
-    int (*start)(void *ctx, pcilib_event_t event_mask, pcilib_callback_t callback, void *user);
-    int (*stop)(void *ctx);
-    int (*trigger)(void *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
+    int (*start)(pcilib_context_t *ctx, pcilib_event_t event_mask, pcilib_callback_t callback, void *user);
+    int (*stop)(pcilib_context_t *ctx);
+    int (*trigger)(pcilib_context_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
     
-    pcilib_event_id_t (*next_event)(void *ctx, pcilib_event_t event_mask, const struct timespec *timeout);
-    void* (*get_data)(void *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size);
-    int (*return_data)(void *ctx, pcilib_event_id_t event_id);
+    pcilib_event_id_t (*next_event)(pcilib_context_t *ctx, pcilib_event_t event_mask, const struct timespec *timeout);
+    void* (*get_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size);
+    int (*return_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id);
 } pcilib_event_api_description_t;
 
 typedef struct {
@@ -158,7 +159,7 @@ extern pcilib_model_description_t pcilib_model[];
 int pcilib_set_error_handler(void (*err)(const char *msg, ...), void (*warn)(const char *msg, ...));
 
 pcilib_model_t pcilib_get_model(pcilib_t *ctx);
-void *pcilib_get_implementation_context(pcilib_t *ctx);
+pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx);
 
 pcilib_t *pcilib_open(const char *device, pcilib_model_t model);
 void pcilib_close(pcilib_t *ctx);

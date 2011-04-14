@@ -595,7 +595,7 @@ int Grab(pcilib_t *handle, const char *event, const char *output) {
 	    Error("Failed to open file \"%s\"", output);
 	}
 	
-	printf("Writting %i bytes into %s...\n", size, output);
+	printf("Writting %zu bytes into %s...\n", size, output);
     } else o = stdout;
     
     written = fwrite(data, 1, size, o);

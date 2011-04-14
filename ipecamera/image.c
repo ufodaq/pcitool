@@ -102,7 +102,7 @@ struct ipecamera_s {
     }
 
 
-void *ipecamera_init(pcilib_t *pcilib) {
+pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
     int err = 0; 
     
     ipecamera_t *ctx = malloc(sizeof(ipecamera_t));
@@ -139,10 +139,10 @@ void *ipecamera_init(pcilib_t *pcilib) {
     return (void*)ctx;
 }
 
-void ipecamera_free(void *vctx) {
+void ipecamera_free(pcilib_context_t *vctx) {
     if (vctx) {
 	ipecamera_t *ctx = (ipecamera_t*)vctx;
-	ipecamera_stop(ctx);
+	ipecamera_stop(vctx);
 	free(ctx);
     }
 }
@@ -164,7 +164,7 @@ int ipecamera_set_buffer_size(ipecamera_t *ctx, int size) {
 }
 
 
-int ipecamera_reset(void *vctx) {
+int ipecamera_reset(pcilib_context_t *vctx) {
     int err;
     pcilib_t *pcilib;
     ipecamera_t *ctx = (ipecamera_t*)vctx;
@@ -236,7 +236,7 @@ int ipecamera_reset(void *vctx) {
     return 0;    
 }
 
-int ipecamera_start(void *vctx, pcilib_event_t event_mask, pcilib_callback_t cb, void *user) {
+int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_callback_t cb, void *user) {
     int err = 0;
     ipecamera_t *ctx = (ipecamera_t*)vctx;
 
@@ -273,7 +273,7 @@ int ipecamera_start(void *vctx, pcilib_event_t event_mask, pcilib_callback_t cb,
     }
     
     if (err) {
-	ipecamera_stop(ctx);
+	ipecamera_stop(vctx);
 	return err;
     }
     
@@ -283,7 +283,7 @@ int ipecamera_start(void *vctx, pcilib_event_t event_mask, pcilib_callback_t cb,
 }
 
 
-int ipecamera_stop(void *vctx) {
+int ipecamera_stop(pcilib_context_t *vctx) {
     ipecamera_t *ctx = (ipecamera_t*)vctx;
 
     if (!ctx) {
@@ -412,7 +412,7 @@ static int ipecamera_get_line(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecame
 	sprintf(fname, "raw/line%04i", line);
 	FILE *f = fopen(fname, "w");
 	if (f) {
-	    fwrite(linebuf, 1, size, f);
+	    (void)fwrite(linebuf, 1, size, f);
 	    fclose(f);
 	}
 #endif
@@ -449,7 +449,7 @@ static int ipecamera_get_line(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecame
 	sprintf(fname, "raw/image");
 	f = fopen(fname, "a+");
 	if (f) {
-	    fwrite(pbuf, 2, ctx->dim.width, f);
+	    (void)fwrite(pbuf, 2, ctx->dim.width, f);
 	    fclose(f);
 	}
 #endif
@@ -491,7 +491,7 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
 }
 
 
-int ipecamera_trigger(void *vctx, pcilib_event_t event, size_t trigger_size, void *trigger_data) {
+int ipecamera_trigger(pcilib_context_t *vctx, pcilib_event_t event, size_t trigger_size, void *trigger_data) {
     int err;
     pcilib_t *pcilib;
     ipecamera_t *ctx = (ipecamera_t*)vctx;
@@ -532,7 +532,7 @@ static int ipecamera_resolve_event_id(ipecamera_t *ctx, pcilib_event_id_t evid) 
     return buf_ptr;
 }
 
-pcilib_event_id_t ipecamera_next_event(void *vctx, pcilib_event_t event_mask, const struct timespec *timeout) {
+pcilib_event_id_t ipecamera_next_event(pcilib_context_t *vctx, pcilib_event_t event_mask, const struct timespec *timeout) {
     int buf_ptr;
     pcilib_event_id_t reported;
     ipecamera_t *ctx = (ipecamera_t*)vctx;
@@ -567,7 +567,7 @@ pcilib_event_id_t ipecamera_next_event(void *vctx, pcilib_event_t event_mask, co
     return ctx->reported_id;
 }
 
-void* ipecamera_get(void *vctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size) {
+void* ipecamera_get(pcilib_context_t *vctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size) {
     int buf_ptr;
     ipecamera_t *ctx = (ipecamera_t*)vctx;
 
@@ -608,7 +608,7 @@ void* ipecamera_get(void *vctx, pcilib_event_id_t event_id, pcilib_event_data_ty
 
 
 
-int ipecamera_return(void *vctx, pcilib_event_id_t event_id) {
+int ipecamera_return(pcilib_context_t *vctx, pcilib_event_id_t event_id) {
     ipecamera_t *ctx = (ipecamera_t*)vctx;
 
     if (!ctx) {
