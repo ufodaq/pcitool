@@ -18,22 +18,17 @@
 
 #define ipecamera_datacpy(dst, src, bank)   pcilib_datacpy(dst, src, 4, 1, bank->raw_endianess)
 
-#define IPECAMERA_SIMPLIFIED_READOUT
+//#define IPECAMERA_SIMPLIFIED_READOUT
+#define IPECAMERA_MULTIREAD
 
 static pcilib_register_value_t ipecamera_bit_mask[9] = { 0, 1, 3, 7, 15, 31, 63, 127, 255 };
 
 int ipecamera_read(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, uint8_t bits, pcilib_register_value_t *value) {
-    uint32_t val, tmp;
+    uint32_t val, tmp[4];
     char *wr, *rd;
     struct timeval start, cur;
     int retries = RETRIES;
 
-/*
-#ifdef IPECAMERA_SIMPLIFIED_READOUT
-    uint32_t tmp;
-#endif
-*/
-    
     assert(addr < 128);
     
     wr =  pcilib_resolve_register_address(ctx, bank->write_addr);
@@ -47,7 +42,7 @@ int ipecamera_read(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcil
 
 /*
 #ifdef IPECAMERA_SIMPLIFIED_READOUT
-    ipecamera_datacpy(&tmp, rd, bank);
+    ipecamera_datacpy(tmp, rd, bank);
 #endif
 */
 
@@ -58,25 +53,32 @@ retry:
 
 #ifdef IPECAMERA_SIMPLIFIED_READOUT
     usleep(PCILIB_REGISTER_TIMEOUT);
-//    ipecamera_datacpy(&tmp, rd, bank);
+//    ipecamera_datacpy(tmp, rd, bank);
 //    usleep(PCILIB_REGISTER_TIMEOUT);
     ipecamera_datacpy(wr, &val, bank);
     usleep(PCILIB_REGISTER_TIMEOUT);
-//    ipecamera_datacpy(&tmp, rd, bank);
+//    ipecamera_datacpy(tmp, rd, bank);
 //    usleep(PCILIB_REGISTER_TIMEOUT);
     ipecamera_datacpy(wr, &val, bank);
     usleep(PCILIB_REGISTER_TIMEOUT);
-#endif
-
+#endif /* IPECAMERA_SIMPLIFIED_READOUT */
+    
     gettimeofday(&start, NULL);
 
+#ifdef IPECAMERA_MULTIREAD
+    usleep(PCILIB_REGISTER_TIMEOUT);
+    pcilib_datacpy(tmp, rd, 4, 4, bank->raw_endianess);
+    val = tmp[0];
+#else /* IPECAMERA_MULTIREAD */
     ipecamera_datacpy(&val, rd, bank);
+
     while ((val & READ_READY_BIT) == 0) {
         gettimeofday(&cur, NULL);
 	if (((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) > PCILIB_REGISTER_TIMEOUT) break;
 	
 	ipecamera_datacpy(&val, rd, bank);
     }
+#endif /* IPECAMERA_MULTIREAD */
 
     if ((val & READ_READY_BIT) == 0) {
 	if (--retries > 0) {
@@ -111,16 +113,10 @@ retry:
 }
 
 int ipecamera_write(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, uint8_t bits, pcilib_register_value_t value) {
-    uint32_t val;
+    uint32_t val, tmp[4];
     char *wr, *rd;
     struct timeval start, cur;
     int retries = RETRIES;
-
-/*
-#ifdef IPECAMERA_SIMPLIFIED_READOUT
-    uint32_t tmp;
-#endif
-*/
 
     assert(addr < 128);
     assert(value < 256);
@@ -136,7 +132,7 @@ int ipecamera_write(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pci
 
 /*
 #ifdef IPECAMERA_SIMPLIFIED_READOUT
-    ipecamera_datacpy(&tmp, rd, bank);
+    ipecamera_datacpy(tmp, rd, bank);
 #endif
 */
 
@@ -146,18 +142,23 @@ retry:
 
 #ifdef IPECAMERA_SIMPLIFIED_READOUT
     usleep(PCILIB_REGISTER_TIMEOUT);
-//    ipecamera_datacpy(&tmp, rd, bank);
+//    ipecamera_datacpy(tmp, rd, bank);
 //    usleep(PCILIB_REGISTER_TIMEOUT);
     ipecamera_datacpy(wr, &val, bank);
     usleep(PCILIB_REGISTER_TIMEOUT);
-//    ipecamera_datacpy(&tmp, rd, bank);
+//    ipecamera_datacpy(tmp, rd, bank);
 //    usleep(PCILIB_REGISTER_TIMEOUT);
     ipecamera_datacpy(wr, &val, bank);
     usleep(PCILIB_REGISTER_TIMEOUT);
-#endif
+#endif /* IPECAMERA_SIMPLIFIED_READOUT */
 
     gettimeofday(&start, NULL);
 
+#ifdef IPECAMERA_MULTIREAD
+    usleep(PCILIB_REGISTER_TIMEOUT);
+    pcilib_datacpy(tmp, rd, 4, 4, bank->raw_endianess);
+    val = tmp[0];
+#else /* IPECAMERA_MULTIREAD */
     ipecamera_datacpy(&val, rd, bank);
     while ((val & READ_READY_BIT) == 0) {
         gettimeofday(&cur, NULL);
@@ -165,6 +166,7 @@ retry:
 	
 	ipecamera_datacpy(&val, rd, bank);
     }
+#endif /* IPECAMERA_MULTIREAD */
 
     if ((val & READ_READY_BIT) == 0) {
 	if (--retries > 0) {
