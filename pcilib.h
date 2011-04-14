@@ -69,7 +69,8 @@ typedef enum {
 #define PCILIB_EVENT2			4
 #define PCILIB_EVENT3			8
 #define PCILIB_EVENTS_ALL		((pcilib_event_t)-1)
-#define PCILIB_EVENT_INVALID		((pcilib_event_t)-1)	
+#define PCILIB_EVENT_INVALID		((pcilib_event_t)-1)
+#define PCILIB_EVENT_ID_INVALID		0
 
 typedef struct {
     pcilib_register_bank_addr_t addr;
@@ -132,6 +133,8 @@ typedef struct {
     int (*start)(void *ctx, pcilib_event_t event_mask, pcilib_callback_t callback, void *user);
     int (*stop)(void *ctx);
     int (*trigger)(void *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
+    
+    pcilib_event_id_t (*next_event)(void *ctx, pcilib_event_t event_mask);
     void* (*get_data)(void *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size);
     int (*return_data)(void *ctx, pcilib_event_id_t event_id);
 } pcilib_event_api_description_t;
@@ -185,6 +188,7 @@ int pcilib_stop(pcilib_t *ctx);
 
 int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
 
+pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask);
 void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size);
 void *pcilib_get_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size);
 /*

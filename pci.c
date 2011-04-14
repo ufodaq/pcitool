@@ -688,6 +688,24 @@ int pcilib_stop(pcilib_t *ctx) {
     return 0;
 }
 
+pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask) {
+    pcilib_event_api_description_t *api;
+    
+    pcilib_model_t model = pcilib_get_model(ctx);
+
+    api = pcilib_model[model].event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    if (api->next_event) 
+	return api->next_event(ctx->event_ctx, event_mask);
+
+    pcilib_error("Event enumeration is not suppored by API");
+    return PCILIB_EVENT_ID_INVALID;
+}
+
 int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data) {
     pcilib_event_api_description_t *api;
     

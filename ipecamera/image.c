@@ -37,6 +37,7 @@ struct ipecamera_s {
     void *cb_user;
 
     pcilib_event_id_t event_id;
+    pcilib_event_id_t reported_id;
 
     pcilib_register_t control_reg, status_reg;
     pcilib_register_t start_reg, end_reg;
@@ -253,6 +254,7 @@ int ipecamera_start(void *vctx, pcilib_event_t event_mask, pcilib_callback_t cb,
     ctx->cb_user = user;
     
     ctx->event_id = 0;
+    ctx->reported_id = 0;
     ctx->buf_ptr = 0;    
 
     ctx->dim.width = 1270;
@@ -303,6 +305,7 @@ int ipecamera_stop(void *vctx) {
 
 
     ctx->event_id = 0;
+    ctx->reported_id = 0;
     ctx->buf_ptr = 0; 
 
     return 0;
@@ -504,7 +507,12 @@ int ipecamera_trigger(void *vctx, pcilib_event_t event, size_t trigger_size, voi
     }
     
     err = ipecamera_get_image(ctx);
-    if (!err) err = ctx->cb(event, ctx->event_id, ctx->cb_user);
+    if (!err) {
+	if (ctx->cb) {
+	    err = ctx->cb(event, ctx->event_id, ctx->cb_user);
+	    ctx->reported_id = ctx->event_id;
+	}
+    }
 
     return err;
 }
@@ -522,6 +530,36 @@ static int ipecamera_resolve_event_id(ipecamera_t *ctx, pcilib_event_id_t evid) 
     }
     
     return buf_ptr;
+}
+
+pcilib_event_id_t ipecamera_next_event(void *vctx, pcilib_event_t event_mask) {
+    int buf_ptr;
+    pcilib_event_id_t reported;
+    ipecamera_t *ctx = (ipecamera_t*)vctx;
+
+    if (!ctx) {
+	pcilib_error("IPECamera imaging is not initialized");
+	return PCILIB_EVENT_ID_INVALID;
+    }
+
+    if (!ctx->started) {
+	pcilib_error("IPECamera is not in grabbing state");
+	return PCILIB_EVENT_ID_INVALID;
+    }
+
+    if ((!ctx->event_id)||(ctx->reported_id == ctx->event_id)) return PCILIB_EVENT_ID_INVALID;
+
+	// We had an overflow in event counting
+    if (ctx->reported_id > ctx->event_id) {
+	do {
+	    if (++ctx->reported_id == 0) ctx->reported_id = 1;
+	} while (ipecamera_resolve_event_id(ctx, ctx->reported_id) < 0);
+    } else {
+	if ((ctx->event_id - ctx->reported_id) > ctx->buffer_size) ctx->reported_id = ctx->event_id - (ctx->buffer_size - 1);
+	else ++ctx->reported_id;
+    }
+    
+    return ctx->reported_id;
 }
 
 void* ipecamera_get(void *vctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size) {
