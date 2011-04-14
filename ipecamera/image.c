@@ -532,7 +532,7 @@ static int ipecamera_resolve_event_id(ipecamera_t *ctx, pcilib_event_id_t evid) 
     return buf_ptr;
 }
 
-pcilib_event_id_t ipecamera_next_event(void *vctx, pcilib_event_t event_mask) {
+pcilib_event_id_t ipecamera_next_event(void *vctx, pcilib_event_t event_mask, const struct timespec *timeout) {
     int buf_ptr;
     pcilib_event_id_t reported;
     ipecamera_t *ctx = (ipecamera_t*)vctx;
@@ -547,7 +547,12 @@ pcilib_event_id_t ipecamera_next_event(void *vctx, pcilib_event_t event_mask) {
 	return PCILIB_EVENT_ID_INVALID;
     }
 
-    if ((!ctx->event_id)||(ctx->reported_id == ctx->event_id)) return PCILIB_EVENT_ID_INVALID;
+    if ((!ctx->event_id)||(ctx->reported_id == ctx->event_id)) {
+	if (timeout) {
+	    // We should wait here for the specified timeout
+	}
+	return PCILIB_EVENT_ID_INVALID;
+    }
 
 	// We had an overflow in event counting
     if (ctx->reported_id > ctx->event_id) {

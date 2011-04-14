@@ -688,7 +688,7 @@ int pcilib_stop(pcilib_t *ctx) {
     return 0;
 }
 
-pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask) {
+pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask, const struct timespec *timeout) {
     pcilib_event_api_description_t *api;
     
     pcilib_model_t model = pcilib_get_model(ctx);
@@ -700,7 +700,7 @@ pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask
     }
 
     if (api->next_event) 
-	return api->next_event(ctx->event_ctx, event_mask);
+	return api->next_event(ctx->event_ctx, event_mask, timeout);
 
     pcilib_error("Event enumeration is not suppored by API");
     return PCILIB_EVENT_ID_INVALID;
