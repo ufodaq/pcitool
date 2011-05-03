@@ -73,6 +73,12 @@ pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
 
     if (ctx) {
 	ctx->handle = open(device, O_RDWR);
+	if (ctx->handle < 0) {
+	    pcilib_error("Error opening device (%s)", device);
+	    free(ctx);
+	    return NULL;
+	}
+	
 	ctx->page_mask = (uintptr_t)-1;
 	ctx->model = model;
 	ctx->reg_space = NULL;
@@ -90,7 +96,10 @@ const pci_board_info *pcilib_get_board_info(pcilib_t *ctx) {
     
     if (ctx->page_mask ==  (uintptr_t)-1) {
 	ret = ioctl( ctx->handle, PCIDRIVER_IOC_PCI_INFO, &ctx->board_info );
-	if (ret) pcilib_error("PCIDRIVER_IOC_PCI_INFO ioctl have failed");
+	if (ret) {
+	    pcilib_error("PCIDRIVER_IOC_PCI_INFO ioctl have failed");
+	    return NULL;
+	}
 	
 	ctx->page_mask = pcilib_get_page_mask();
     }
@@ -108,6 +117,7 @@ pcilib_model_t pcilib_get_model(pcilib_t *ctx) {
 	unsigned short device_id;
 
 	const pci_board_info *board_info = pcilib_get_board_info(ctx);
+	if (!board_info) return PCILIB_MODEL_PCI;
 
 	if ((board_info->vendor_id == PCIE_XILINX_VENDOR_ID)&&(board_info->device_id == PCIE_IPECAMERA_DEVICE_ID))
 	    ctx->model = PCILIB_MODEL_IPECAMERA;
@@ -122,6 +132,7 @@ static int pcilib_detect_bar(pcilib_t *ctx, uintptr_t addr, size_t size) {
     int ret,i;
 	
     const pci_board_info *board_info = pcilib_get_board_info(ctx);
+    if (!board_info) return -1;
 		
     for (i = 0; i < PCILIB_MAX_BANKS; i++) {
 	if ((addr >= board_info->bar_start[i])&&((board_info->bar_start[i] + board_info->bar_length[i]) >= (addr + size))) return i;
@@ -130,23 +141,31 @@ static int pcilib_detect_bar(pcilib_t *ctx, uintptr_t addr, size_t size) {
     return -1;
 }
 
-static void pcilib_detect_address(pcilib_t *ctx, pcilib_bar_t *bar, uintptr_t *addr, size_t size) {
+static int pcilib_detect_address(pcilib_t *ctx, pcilib_bar_t *bar, uintptr_t *addr, size_t size) {
     const pci_board_info *board_info = pcilib_get_board_info(ctx);
+    if (!board_info) return PCILIB_ERROR_NOTFOUND;
     
     if (*bar == PCILIB_BAR_DETECT) {
 	*bar = pcilib_detect_bar(ctx, *addr, size);
-	if (*bar < 0) pcilib_error("The requested data block at address 0x%x with size 0x%x does not belongs to any available memory bank", *addr, size);
+	if (*bar < 0) {
+	    pcilib_error("The requested data block at address 0x%x with size 0x%x does not belongs to any available memory bank", *addr, size);
+	    return PCILIB_ERROR_NOTFOUND;
+	}
     } else {
 	if ((*addr < board_info->bar_start[*bar])||((board_info->bar_start[*bar] + board_info->bar_length[*bar]) < (((uintptr_t)*addr) + size))) {
-	    if ((board_info->bar_length[*bar]) >= (((uintptr_t)*addr) + size)) 
+	    if ((board_info->bar_length[*bar]) >= (((uintptr_t)*addr) + size)) {
 		*addr += board_info->bar_start[*bar];
-	    else
+	    } else {
 		pcilib_error("The requested data block at address 0x%x with size 0x%x does not belong the specified memory bank (Bar %i: starting at 0x%x with size 0x%x)", *addr, size, *bar, board_info->bar_start[*bar], board_info->bar_length[*bar]);
+		return PCILIB_ERROR_NOTFOUND;
+	    }
 	}
     }
     
     *addr -= board_info->bar_start[*bar];
     *addr += board_info->bar_start[*bar] & ctx->page_mask;
+    
+    return 0;
 }
 
 void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar) {
@@ -154,12 +173,19 @@ void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar) {
     int ret; 
 
     const pci_board_info *board_info = pcilib_get_board_info(ctx);
+    if (!board_info) return NULL;
     
     ret = ioctl( ctx->handle, PCIDRIVER_IOC_MMAP_MODE, PCIDRIVER_MMAP_PCI );
-    if (ret) pcilib_error("PCIDRIVER_IOC_MMAP_MODE ioctl have failed", bar);
+    if (ret) {
+	pcilib_error("PCIDRIVER_IOC_MMAP_MODE ioctl have failed", bar);
+	return NULL;
+    }
 
     ret = ioctl( ctx->handle, PCIDRIVER_IOC_MMAP_AREA, PCIDRIVER_BAR0 + bar );
-    if (ret) pcilib_error("PCIDRIVER_IOC_MMAP_AREA ioctl have failed for bank %i", bar);
+    if (ret) {
+	pcilib_error("PCIDRIVER_IOC_MMAP_AREA ioctl have failed for bank %i", bar);
+	return NULL;
+    }
 
 #ifdef PCILIB_FILE_IO
     file_io_handle = open("/root/data", O_RDWR);
@@ -167,7 +193,10 @@ void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar) {
 #else
     res = mmap( 0, board_info->bar_length[bar], PROT_WRITE | PROT_READ, MAP_SHARED, ctx->handle, 0 );
 #endif
-    if ((!res)||(res == MAP_FAILED)) pcilib_error("Failed to mmap data bank %i", bar);
+    if ((!res)||(res == MAP_FAILED)) {
+	pcilib_error("Failed to mmap data bank %i", bar);
+	return NULL;
+    }
 
     
     return res;
@@ -175,7 +204,8 @@ void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar) {
 
 void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data) {
     const pci_board_info *board_info = pcilib_get_board_info(ctx);
-
+    if (!board_info) return;
+    
     munmap(data, board_info->bar_length[bar]);
 #ifdef PCILIB_FILE_IO
     close(ctx->file_io_handle);
@@ -340,14 +370,12 @@ static int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
     
     if (!ctx->data_space) {
         const pci_board_info *board_info = pcilib_get_board_info(ctx);
+	if (!board_info) return PCILIB_ERROR_FAILED;
 
 	err = pcilib_map_register_space(ctx);
 	if (err) {
 	    pcilib_error("Error mapping register space");
 	    return err;
-	}
-	
-	if (addr) {
 	}
 	
 	int data_bar = -1;	
