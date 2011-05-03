@@ -19,15 +19,28 @@
 #define IPECAMERA_SLEEP_TIME 250000
 #define IPECAMERA_MAX_LINES 1088
 #define IPECAMERA_DEFAULT_BUFFER_SIZE 10
-//#define IPECAMERA_EXPECTED_STATUS 0x0849FFFF
-#define IPECAMERA_EXPECTED_STATUS 0x0049FFFF
+#define IPECAMERA_EXPECTED_STATUS 0x0849FFFF
+//#define IPECAMERA_EXPECTED_STATUS 0x0049FFFF
+
+#define IPECAMERA_MAX_CHANNELS 16
+#define IPECAMERA_PIXELS_PER_CHANNEL 128
+#define IPECAMERA_WIDTH (IPECAMERA_MAX_CHANNELS * IPECAMERA_PIXELS_PER_CHANNEL)
+#define IPECAMERA_HEIGHT 1088
+
+//#define IPECAMERA_MEMORY 
+
+//#define IPECAMERA_FRAME_REQUEST 0x149
+//#define IPECAMERA_IDLE 		0x141
+#define IPECAMERA_FRAME_REQUEST 0x1E9
+#define IPECAMERA_IDLE 		0x1E1
 
 #define IPECAMERA_WRITE_RAW
 #define IPECAMERA_REORDER_CHANNELS
 
 
 #ifdef IPECAMERA_REORDER_CHANNELS
-int ipecamera_channel_order[10] = { 9, 7, 8, 6, 4, 2, 5, 1, 3, 0 };
+//int ipecamera_channel_order[10] = { 9, 7, 8, 6, 4, 2, 5, 1, 3, 0 };
+int ipecamera_channel_order[IPECAMERA_MAX_CHANNELS] = { 15, 13, 14, 12, 10, 8, 11, 7, 9, 6, 5, 2, 4, 3, 0, 1 };
 #endif 
 
 
@@ -48,7 +61,8 @@ struct ipecamera_s {
 
     pcilib_register_t control_reg, status_reg;
     pcilib_register_t start_reg, end_reg;
-    pcilib_register_t n_lines_reg, line_reg;
+    pcilib_register_t n_lines_reg;
+    uint16_t line_reg;
     pcilib_register_t exposure_reg;
     pcilib_register_t flip_reg;
 
@@ -99,13 +113,13 @@ struct ipecamera_s {
 
 #define CHECK_VALUE(value, val) \
     if ((!err)&&(value != val)) { \
-	pcilib_error("Unexpected value (%x) in data stream (%x is expected)", value, val); \
+	pcilib_error("Unexpected value (0x%x) in data stream (0x%x is expected)", value, val); \
 	err = PCILIB_ERROR_INVALID_DATA; \
     }
 
 #define CHECK_FLAG(flag, check, ...) \
     if ((!err)&&(!(check))) { \
-	pcilib_error("Unexpected value (%x) of " flag,  __VA_ARGS__); \
+	pcilib_error("Unexpected value (0x%x) of " flag,  __VA_ARGS__); \
 	err = PCILIB_ERROR_INVALID_DATA; \
     }
 
@@ -222,11 +236,7 @@ int ipecamera_reset(pcilib_context_t *vctx) {
     usleep(IPECAMERA_SLEEP_TIME);
 
 	// Set default parameters
-    SET_REG(n_lines_reg, 1);
-    //SET_REG(exposure_reg, 0);
-    SET_REG(control_reg, 0x141);
-    //SET_REG(flip_reg, 0);
-
+    SET_REG(control_reg, IPECAMERA_IDLE);
     if (err) return err;
     
 	// This is temporary for verification purposes
@@ -249,6 +259,8 @@ int ipecamera_reset(pcilib_context_t *vctx) {
 int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_callback_t cb, void *user) {
     int err = 0;
     ipecamera_t *ctx = (ipecamera_t*)vctx;
+    pcilib_t *pcilib = ctx->pcilib;
+    pcilib_register_value_t value;
 
     if (!ctx) {
 	pcilib_error("IPECamera imaging is not initialized");
@@ -259,6 +271,12 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ca
 	pcilib_error("IPECamera grabbing is already started");
 	return PCILIB_ERROR_INVALID_REQUEST;
     }
+
+	// if left in FRAME_REQUEST mode
+    SET_REG(control_reg, IPECAMERA_IDLE);
+    usleep(IPECAMERA_SLEEP_TIME);
+    CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
+    if (err) return err;
     
     ctx->cb = cb;
     ctx->cb_user = user;
@@ -267,8 +285,8 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ca
     ctx->reported_id = 0;
     ctx->buf_ptr = 0;    
 
-    ctx->dim.width = 1270;
-    ctx->dim.height = 1088; //GET_REG(lines_reg, lines);
+    ctx->dim.width = IPECAMERA_WIDTH;
+    ctx->dim.height = IPECAMERA_HEIGHT; //GET_REG(lines_reg, lines);
 
     ctx->buffer = malloc(ctx->dim.width * ctx->dim.height * ctx->buffer_size * sizeof(ipecamera_pixel_t));
     if (!ctx->buffer) {
@@ -326,7 +344,7 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
     int i, j;
     int ppw;
     int err = 0;
-    
+
     ipecamera_payload_t info = payload[0];
     int channel = info&0x0F;		// 4 bits
     int line = (info>>4)&0x7FF;		// 11 bits
@@ -335,152 +353,114 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
     int pixels = (info>>20)&0xFF;	// 8 bits
 					// 2 bits are reserved
     int header = (info>>30)&0x03;	// 2 bits
-    
+
     int bytes;
+    
+    int pix;
+    int pix_offset = 0;
+    ipecamera_payload_t data;
 
 #ifdef IPECAMERA_REORDER_CHANNELS
     channel = ipecamera_channel_order[channel];
 #endif 
 
+
+    //printf("channel[%x] = %x (line: %i, pixels: %i)\n", info, channel, line_req, pixels);
     CHECK_FLAG("payload header magick", header == 2, header);
     CHECK_FLAG("pixel size, only 10 bits are supported", bpp == 10, bpp);
-    //CHECK_FLAG("row number, should be %li", line == line_req, line, line_req);
-    CHECK_FLAG("relative row number, should be 0", line == 0, line);
-    CHECK_FLAG("channel, limited by 10 channels now", channel < 10, channel);
-    CHECK_FLAG("channel, dublicate entry for channel", ((*cbuf)&(1<<channel)) == 0, channel);
-    //CHECK_FLAG("number of pixels, 127 is expected", pixels == 127, pixels);
-    pixels = 127;
+    CHECK_FLAG("row number, should be %li", line == line_req, line, line_req);
+    CHECK_FLAG("channel, limited by %li output channels", channel < IPECAMERA_MAX_CHANNELS, channel, IPECAMERA_MAX_CHANNELS);
+    CHECK_FLAG("channel, duplicate entry for channel", ((*cbuf)&(1<<channel)) == 0, channel);
+
+	// Fixing first lines bug
+    if ((line < 2)&&(pixels == (IPECAMERA_PIXELS_PER_CHANNEL - 1))) {
+	pix_offset = 1;
+	pbuf[channel*IPECAMERA_PIXELS_PER_CHANNEL] = 0;
+    } else {
+	CHECK_FLAG("number of pixels, %li is expected", pixels == IPECAMERA_PIXELS_PER_CHANNEL, pixels, IPECAMERA_PIXELS_PER_CHANNEL);
+    }
     
-
-
     bytes = pixels / 3;
-    if (bytes * 3 < pixels) ++bytes;
-    
+    ppw = pixels - bytes * 3;
+    if (ppw) ++bytes;
+
     CHECK_FLAG("payload data bytes, at least %i are expected", bytes < size, size, bytes);
-    
-    for (i = 0; i < bytes; i++) {
-	ipecamera_payload_t data = payload[i + 1];
-        int header = (data>>30)&0x03;	
-	
+
+    if (err) return err;
+
+    for (i = 1, pix = pix_offset; i < bytes; i++) {
+	data = payload[i];
+        header = (data >> 30) & 0x03;	
+
         CHECK_FLAG("payload data magick", header == 3, header);
-	
-	    // pixels per word
-	ppw = pixels - 3 * i;
-	if (ppw > 3) ppw = 3;
-	
-	for (j = 0; j < ppw; j++) {
-	    int pix = 3 * i + j;
-	    pbuf[channel*pixels + pix] = (data >> (10 * (ppw - j - 1)))&0x3FF;
-	}
-    }
-    
-    if (!err) {
-	*cbuf |= (1 << channel);
-	*advance = bytes + 1;
+	if (err) return err;
+
+        for (j = 0; j < 3; j++, pix++) {
+            pbuf[channel*IPECAMERA_PIXELS_PER_CHANNEL + pix] = (data >> (10 * (2 - j))) & 0x3FF;
+        }
     }
 
-    return err;
+    data = payload[bytes];
+    header = (data >> 30) & 0x03;
+
+    CHECK_FLAG("payload data magick", header == 3, header);
+    CHECK_FLAG("payload footer magick", (data&0x3FF) == 0x55, (data&0x3FF));
+    if (err) return err;
+
+    ppw = pixels%3;
+    assert(ppw < 3);
+
+    for (j = 0; j < ppw; j++, pix++) {
+//	pbuf[channel*IPECAMERA_PIXELS_PER_CHANNEL + pix] = (data >> (10 * (ppw - j - 1))) & 0x3FF;
+        pbuf[channel*IPECAMERA_PIXELS_PER_CHANNEL + pix] = (data >> (10 * (ppw - j))) & 0x3FF;
+    }    
+
+    *cbuf |= (1 << channel);
+    *advance = bytes + 1;
+
+    return 0;
 }
 
-static int ipecamera_get_line(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecamera_change_mask_t *cbuf, int line) {
+static int ipecamera_parse_image(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipecamera_change_mask_t *cbuf, int first_line, int n_lines, pcilib_register_value_t size, ipecamera_payload_t *linebuf) {
     int err = 0;
     pcilib_t *pcilib = ctx->pcilib;
-    pcilib_register_value_t ptr, size, pos, advance, value;
-    ipecamera_payload_t *linebuf;
-    int column = 0;
 
-/*
-    err = ipecamera_reset((void*)ctx);
-    if (err) {
-	pcilib_error("Reset have failed");
-	return err;
-    }
-*/
+    int line = first_line;
+    pcilib_register_value_t pos, advance;
 
-    SET_REG(n_lines_reg, 1);
-    SET_REG(line_reg, line);
-    
-    SET_REG(control_reg, 0x149);
-    usleep(IPECAMERA_SLEEP_TIME);
-    CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
-
-    GET_REG(start_reg, ptr);
-    GET_REG(end_reg, size);
-    size -= ptr;
-
-    // Temporary compute size manually
-    size = 6 + 10 * 44;
-
-    pcilib_warning("Reading line %i: %i %i", line, ptr, size);    
-
-    if (size < 6) {
-	pcilib_error("The payload is tool small, we should have at least 5 header dwords and 1 footer.");
+    if (size < 8) {
+	pcilib_error("The payload is tool small, we should have at least 6 header dwords and 2 footer.");
 	return PCILIB_ERROR_INVALID_DATA;
     }
-    
-    linebuf = (uint32_t*)malloc(size * sizeof(ipecamera_payload_t));
-    if (linebuf) {
-	//pcilib_memcpy(linebuf, ctx->data + ptr, size * sizeof(ipecamera_payload_t));
-	pcilib_datacpy(linebuf, ctx->data + ptr, sizeof(ipecamera_payload_t), size, pcilib_model[PCILIB_MODEL_IPECAMERA].endianess);
 
-#ifdef IPECAMERA_WRITE_RAW
-	char fname[256];
-	sprintf(fname, "raw/line%04i", line);
-	FILE *f = fopen(fname, "w");
-	if (f) {
-	    (void)fwrite(linebuf, 1, size, f);
-	    fclose(f);
-	}
-#endif
+    CHECK_VALUE(linebuf[0], 0x51111111);
+    CHECK_VALUE(linebuf[1], 0x52222222);
+    CHECK_VALUE(linebuf[2], 0x53333333);
+    CHECK_VALUE(linebuf[3], 0x54444444);
+    CHECK_VALUE(linebuf[4], 0x55555555);
+    CHECK_VALUE(linebuf[5], 0x56666666);
+    if (err) return err;
 
-	
-	CHECK_VALUE(linebuf[0], 0x51111111);	
-	CHECK_VALUE(linebuf[1], 0x52222222);	
-	CHECK_VALUE(linebuf[2], 0x53333333);	
-	CHECK_VALUE(linebuf[3], 0x54444444);	
-	CHECK_VALUE(linebuf[4], 0x55555555);
-	
-	if (err) {
-	    size = 0;
-	} else {
-	    pos = 5;
-	    size -= 6;
-	}
-	
-	while (size > 0) {
-	    err = ipecamera_get_payload(ctx, pbuf, cbuf, line, size, linebuf + pos, &advance);
-	    if (err) break;
+    pos = 6;
+    size -= 8;
+
+    while (size > 0) {
+	err = ipecamera_get_payload(ctx, pbuf + line * ctx->dim.width, cbuf + line, line - first_line, size, linebuf + pos, &advance);
+	if (err) return err;
 	    
-	    pos += advance;
-	    size -= advance;
-	}
+	pos += advance;
+	size -= advance;
 	
-        CHECK_VALUE(linebuf[pos], 0x0AAAAAAA);
-
-	CHECK_FLAG("payloads changed, we expect exactly 10 channels", *cbuf == 0x3FF, *cbuf);
-
-	free(linebuf);
-
-#ifdef IPECAMERA_WRITE_RAW
-	sprintf(fname, "raw/image.raw");
-	f = fopen(fname, "a+");
-	if (f) {
-	    (void)fwrite(pbuf, 2, ctx->dim.width, f);
-	    fclose(f);
-	}
-#endif
+	if (cbuf[line] == ((1<<IPECAMERA_MAX_CHANNELS)-1)) ++line;
     }
 
-    if (!err) {
-	usleep(IPECAMERA_SLEEP_TIME);
-	SET_REG(control_reg, 0x141);
-	usleep(IPECAMERA_SLEEP_TIME);
-	CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
-    }
-    
+    CHECK_FLAG("lines read, we expect to read exactly %li lines", line == (first_line + n_lines), line - first_line, n_lines);
+
+    CHECK_VALUE(linebuf[pos  ], 0x0AAAAAAA);
+    CHECK_VALUE(linebuf[pos+1], 0x0BBBBBBB);
+
     return err;
 }
-
 
 static int ipecamera_get_image(ipecamera_t *ctx) {
     int err;
@@ -488,22 +468,87 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
     int buf_ptr;
     pcilib_t *pcilib = ctx->pcilib;
 
+    int num_lines;
+    const int max_lines = 89;
+    const int max_size = 8 + max_lines * (IPECAMERA_MAX_CHANNELS * (2 + IPECAMERA_PIXELS_PER_CHANNEL / 3));
+
+    pcilib_register_value_t ptr, size, pos, advance, value;
+
+    ipecamera_payload_t *linebuf = (ipecamera_payload_t*)malloc(max_size * sizeof(ipecamera_payload_t));
+    if (!linebuf) return PCILIB_ERROR_MEMORY;
+
 #ifdef IPECAMERA_WRITE_RAW
-	FILE *f = fopen("raw/image.raw", "w");
-	if (f) fclose(f);
+    FILE *f = fopen("raw/image.raw", "w");
+    if (f) fclose(f);
 #endif
-    
-//atomic    
+
+    //atomic    
     buf_ptr = ctx->buf_ptr;
     if (ctx->buf_ptr++ == ctx->buffer_size) ctx->buf_ptr = 0;
     if (ctx->event_id++ == 0) ctx->event_id = 1;
 
-    memset(ctx->buffer + buf_ptr * ctx->dim.width * ctx->dim.height, 0, ctx->dim.width * ctx->dim.height * sizeof(ipecamera_pixel_t));
+    //const size_t image_size = ctx->dim.width * ctx->dim.height;
+    //memset(ctx->buffer + buf_ptr * image_size, 0, image_size * sizeof(ipecamera_pixel_t));
     memset(ctx->cmask + buf_ptr * ctx->dim.height, 0, ctx->dim.height * sizeof(ipecamera_change_mask_t));
 
-    for (i = 0; i < ctx->dim.height; i++) {
-	ipecamera_get_line(ctx, ctx->buffer + buf_ptr * ctx->dim.width * ctx->dim.height + i * ctx->dim.width,  ctx->cmask + buf_ptr * ctx->dim.height + i, i);
+
+    for (i = 0; i < ctx->dim.height; i += max_lines) {
+	num_lines = ctx->dim.height - i;
+	if (num_lines > max_lines)  num_lines = max_lines;
+    
+        SET_REG(n_lines_reg, num_lines);
+	SET_REG(line_reg, i);
+
+	SET_REG(control_reg, IPECAMERA_FRAME_REQUEST);
+	usleep(IPECAMERA_SLEEP_TIME);
+	CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
+
+	GET_REG(start_reg, ptr);
+	GET_REG(end_reg, size);
+
+	size -= ptr;
+	size *= 2;
+	
+	CHECK_FLAG("data size", (size > 0)&&(size <= max_size), size);
+
+	if (!err) {
+	    pcilib_warning("Reading lines %i to %i: %i %i", i, i + num_lines - 1, ptr, size);  
+	    pcilib_datacpy(linebuf, ctx->data + ptr, sizeof(ipecamera_payload_t), size, pcilib_model[PCILIB_MODEL_IPECAMERA].endianess);
+	}
+
+	usleep(IPECAMERA_SLEEP_TIME);
+	SET_REG(control_reg, IPECAMERA_IDLE);
+	usleep(IPECAMERA_SLEEP_TIME);
+	CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
+
+	if (err) break;
+
+#ifdef IPECAMERA_WRITE_RAW
+	char fname[256];
+	sprintf(fname, "raw/line%04i", i);
+	FILE *f = fopen(fname, "w");
+	if (f) {
+	    (void)fwrite(linebuf, sizeof(ipecamera_payload_t), size, f);
+	    fclose(f);
+	}
+#endif
+
+
+        err = ipecamera_parse_image(ctx, ctx->buffer + buf_ptr * ctx->dim.width * ctx->dim.height,  ctx->cmask + buf_ptr * ctx->dim.height, i, num_lines, size, linebuf);
+	if (err) break;
+	
+#ifdef IPECAMERA_WRITE_RAW
+        f = fopen("raw/image.raw", "a+");
+        if (f) {
+            fwrite(ctx->buffer + buf_ptr * ctx->dim.width * ctx->dim.height + i * ctx->dim.width, sizeof(ipecamera_pixel_t), num_lines * ctx->dim.width, f);
+    	    fclose(f);
+	}
+#endif
     }
+
+    free(linebuf);
+
+    return err;
 }
 
 
