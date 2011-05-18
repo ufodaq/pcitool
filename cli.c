@@ -782,12 +782,14 @@ int main(int argc, char **argv) {
 	if ((isxnumber(addr))&&(sscanf(addr, "%lx", &start) == 1)) {
 		// check if the address in the register range
 	    pcilib_register_range_t *ranges =  pcilib_model[model].ranges;
-
-	    for (i = 0; ranges[i].start != ranges[i].end; i++) 
-		if ((start >= ranges[i].start)&&(start <= ranges[i].end)) break;
-		
-		// register access in plain mode
-	    if (ranges[i].start != ranges[i].end) ++mode;
+	    
+	    if (ranges) {
+		for (i = 0; ranges[i].start != ranges[i].end; i++) 
+		    if ((start >= ranges[i].start)&&(start <= ranges[i].end)) break;
+	    		
+		    // register access in plain mode
+		if (ranges[i].start != ranges[i].end) ++mode;
+	    }
 	} else {
 	    if (pcilib_find_register(handle, bank, addr) == PCILIB_REGISTER_INVALID) {
 	        Usage(argc, argv, "Invalid address (%s) is specified", addr);
