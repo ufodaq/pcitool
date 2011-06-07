@@ -6,7 +6,7 @@
 #include "default.h"
 #include "error.h"
 
-#define BIT_MASK(bits) ((1l << (bits)) - 1)
+#define BIT_MASK(bits) ((1ll << (bits)) - 1)
 
 #define default_datacpy(dst, src, access, bank)   pcilib_datacpy(dst, src, access, 1, bank->raw_endianess)
 
