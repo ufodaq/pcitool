@@ -301,58 +301,15 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 	 *
 	 * However, there is some difference in the interrupt handling functions.
 	 */
-	if ( (id->vendor == MPRACE1_VENDOR_ID) &&
-		(id->device == MPRACE1_DEVICE_ID))
-	{
-		/* It is a mpRACE-1 */
-		mod_info( "Found mpRACE-1 at %s\n", dev_name(&pdev->dev));
-		/* Set bus master */
-		pci_set_master(pdev);
-	}
-	else if ((id->vendor == PCIXTEST_VENDOR_ID) &&
-		(id->device == PCIXTEST_DEVICE_ID))
-	{
-		/* It is a PCI-X Test board */
-		mod_info( "Found PCI-X test board at %s\n", dev_name(&pdev->dev));
-	}
-	else if ((id->vendor == PCIEPLDA_VENDOR_ID) &&
-		(id->device == PCIEPLDA_DEVICE_ID))
-	{
-		/* It is a PCI-X Test board */
-		mod_info( "Found PCIe PLDA test board at %s\n", dev_name(&pdev->dev));
-	}
-	else if ((id->vendor == PCIEABB_VENDOR_ID) &&
-		(id->device == PCIEABB_DEVICE_ID))
-	{
-		/* It is a PCI-X Test board */
-		mod_info( "Found PCIe ABB test board at %s\n", dev_name(&pdev->dev));
-	}
-	else if ((id->vendor == PCIXPG4_VENDOR_ID) &&
-		(id->device == PCIXPG4_DEVICE_ID))
-	{
-		/* It is a PCI-X PROGRAPE4 board */
-		mod_info( "Found PCI-X PROGRAPE-4 board at %s\n", dev_name(&pdev->dev));
-	}
-	else if ((id->vendor == PCI64PG4_VENDOR_ID) &&
-		(id->device == PCI64PG4_DEVICE_ID))
-	{
-		/* It is a PCI-64 PROGRAPE4 board */
-		mod_info( "Found PCI-64b/66 PROGRAPE-4 board at %s\n", dev_name(&pdev->dev));
-	}
-	else if ((id->vendor == PCIE_XILINX_VENDOR_ID) &&
-		(id->device == PCIE_ML605_DEVICE_ID))
-	{
-                /* It is a PCI-E Xilinx ML605 evaluation board */
+	if (id->vendor == PCIE_XILINX_VENDOR_ID) {
+	    if (id->device == PCIE_ML605_DEVICE_ID) {
 		mod_info("Found ML605 board at %s\n", dev_name(&pdev->dev));
-	}
-	else if ((id->vendor == PCIE_XILINX_VENDOR_ID) &&
-		(id->device == PCIE_IPECAMERA_DEVICE_ID))
-	{
-                /* It is a PCI-E IPECamera based on Xilinx ML605 evaluation board */
+	    } else if (id->device == PCIE_IPECAMERA_DEVICE_ID) {
 		mod_info("Found IPE Camera at %s\n", dev_name(&pdev->dev));
-	}
-	else
-	{
+	    } else {
+		mod_info("Found unknown Xilinx device (%x) at %s\n", id->device, dev_name(&pdev->dev));
+	    }
+	} else {
 		/* It is something else */
 		mod_info( "Found unknown board (%x:%x) at %s\n", id->vendor, id->device, dev_name(&pdev->dev));
 	}

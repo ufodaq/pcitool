@@ -247,9 +247,7 @@ static bool pcidriver_irq_acknowledge(pcidriver_privdata_t *privdata)
 	/* FIXME: guillermo: which ones? all? */
 
 	/* Test if we have to handle this interrupt */
-	if ((privdata->pdev->vendor != PCIEABB_VENDOR_ID) ||
-	    (privdata->pdev->device != PCIEABB_DEVICE_ID))
-		return false;
+	return false;	// The device is not supported any more
 
 	/* Acknowledge the device */
 	/* this is for ABB / wenxue DMA engine */
