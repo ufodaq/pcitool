@@ -58,6 +58,9 @@ typedef enum {
 } pcilib_event_data_type_t;
 
 #define PCILIB_BAR_DETECT 		((pcilib_bar_t)-1)
+#define PCILIB_BAR_INVALID		((pcilib_bar_t)-1)
+#define PCILIB_BAR0			0
+#define PCILIB_BAR1			1
 #define PCILIB_REGISTER_INVALID		((pcilib_register_t)-1)
 #define PCILIB_ADDRESS_INVALID		((uintptr_t)-1)
 #define PCILIB_REGISTER_BANK_INVALID	((pcilib_register_bank_t)-1)
@@ -75,17 +78,20 @@ typedef enum {
 
 typedef struct {
     pcilib_register_bank_addr_t addr;
+
+    pcilib_bar_t bar;			// optional
     size_t size;
     
     pcilib_register_protocol_t protocol;
 
-    uintptr_t read_addr;
-    uintptr_t write_addr;
+    uintptr_t read_addr;		// or offset if bar specified
+    uintptr_t write_addr;		// or offset if bar specified
     uint8_t raw_endianess;
 
     uint8_t access;
     uint8_t endianess;
     
+    const char *format;
     const char *name;
     const char *description;
 } pcilib_register_bank_description_t;
@@ -166,9 +172,11 @@ void pcilib_close(pcilib_t *ctx);
 
 void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar);
 void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data);
-char *pcilib_resolve_register_address(pcilib_t *ctx, uintptr_t addr);
+char *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr);
 char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size);
 
+pcilib_register_bank_t pcilib_find_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank);
+pcilib_register_bank_t pcilib_find_bank_by_name(pcilib_t *ctx, const char *bankname);
 pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, const char *bank);
 pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const char *reg);
 pcilib_event_t pcilib_find_event(pcilib_t *ctx, const char *event);

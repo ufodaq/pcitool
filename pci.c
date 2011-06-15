@@ -33,13 +33,17 @@ struct pcilib_s {
     uintptr_t page_mask;
     pci_board_info board_info;
     pcilib_model_t model;
+    
+    char *bar_space[PCILIB_MAX_BANKS];
 
+    int reg_bar_mapped;
     pcilib_bar_t reg_bar;
-    char *reg_space;
+//    char *reg_space;
 
+    int data_bar_mapped;
     pcilib_bar_t data_bar;
-    char *data_space;
-    size_t data_size;
+//    char *data_space;
+//    size_t data_size;
     
     void *event_ctx;
     
@@ -72,6 +76,8 @@ pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
     pcilib_t *ctx = malloc(sizeof(pcilib_t));
 
     if (ctx) {
+	memset(ctx, 0, sizeof(pcilib_t));	
+    
 	ctx->handle = open(device, O_RDWR);
 	if (ctx->handle < 0) {
 	    pcilib_error("Error opening device (%s)", device);
@@ -81,7 +87,6 @@ pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
 	
 	ctx->page_mask = (uintptr_t)-1;
 	ctx->model = model;
-	ctx->reg_space = NULL;
 
 	if (!model) model = pcilib_get_model(ctx);
 	api = pcilib_model[model].event_api;
@@ -116,6 +121,8 @@ pcilib_model_t pcilib_get_model(pcilib_t *ctx) {
 	unsigned short vendor_id;
 	unsigned short device_id;
 
+	//return PCILIB_MODEL_PCI;
+	
 	const pci_board_info *board_info = pcilib_get_board_info(ctx);
 	if (!board_info) return PCILIB_MODEL_PCI;
 
@@ -128,17 +135,17 @@ pcilib_model_t pcilib_get_model(pcilib_t *ctx) {
     return ctx->model;
 }
 
-static int pcilib_detect_bar(pcilib_t *ctx, uintptr_t addr, size_t size) {
-    int ret,i;
+static pcilib_bar_t pcilib_detect_bar(pcilib_t *ctx, uintptr_t addr, size_t size) {
+    pcilib_bar_t i;
 	
     const pci_board_info *board_info = pcilib_get_board_info(ctx);
-    if (!board_info) return -1;
+    if (!board_info) return PCILIB_BAR_INVALID;
 		
     for (i = 0; i < PCILIB_MAX_BANKS; i++) {
 	if ((addr >= board_info->bar_start[i])&&((board_info->bar_start[i] + board_info->bar_length[i]) >= (addr + size))) return i;
     }
 	
-    return -1;
+    return PCILIB_BAR_INVALID;
 }
 
 static int pcilib_detect_address(pcilib_t *ctx, pcilib_bar_t *bar, uintptr_t *addr, size_t size) {
@@ -175,6 +182,8 @@ void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar) {
     const pci_board_info *board_info = pcilib_get_board_info(ctx);
     if (!board_info) return NULL;
     
+    if (ctx->bar_space[bar]) return ctx->bar_space[bar];
+    
     ret = ioctl( ctx->handle, PCIDRIVER_IOC_MMAP_MODE, PCIDRIVER_MMAP_PCI );
     if (ret) {
 	pcilib_error("PCIDRIVER_IOC_MMAP_MODE ioctl have failed", bar);
@@ -205,6 +214,8 @@ void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar) {
 void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data) {
     const pci_board_info *board_info = pcilib_get_board_info(ctx);
     if (!board_info) return;
+
+    if (ctx->bar_space[bar]) return;
     
     munmap(data, board_info->bar_length[bar]);
 #ifdef PCILIB_FILE_IO
@@ -227,7 +238,6 @@ int pcilib_read(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, vo
 	((uint32_t*)((char*)data+addr))[i] = 0x100 * i + 1;
     }
 */
-
     pcilib_memcpy(buf, data + addr, size);
     
     pcilib_unmap_bar(ctx, bar, data);    
@@ -249,7 +259,7 @@ int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, v
 }
 
 
-static pcilib_register_bank_t pcilib_find_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank) {
+pcilib_register_bank_t pcilib_find_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank) {
     pcilib_register_bank_t i;
     pcilib_model_t model = pcilib_get_model(ctx);
     pcilib_register_bank_description_t *banks = pcilib_model[model].banks;
@@ -260,7 +270,7 @@ static pcilib_register_bank_t pcilib_find_bank_by_addr(pcilib_t *ctx, pcilib_reg
     return -1;
 }
 
-static pcilib_register_bank_t pcilib_find_bank_by_name(pcilib_t *ctx, const char *bankname) {
+pcilib_register_bank_t pcilib_find_bank_by_name(pcilib_t *ctx, const char *bankname) {
     pcilib_register_bank_t i;
     pcilib_register_bank_description_t *banks = pcilib_model[ctx->model].banks;
 
@@ -334,31 +344,48 @@ pcilib_event_t pcilib_find_event(pcilib_t *ctx, const char *event) {
 
 
 static int pcilib_map_register_space(pcilib_t *ctx) {
-    if (!ctx->reg_space)  {
+    int err;
+    pcilib_register_bank_t i;
+    
+    if (!ctx->reg_bar_mapped)  {
 	pcilib_model_t model = pcilib_get_model(ctx);
 	pcilib_register_bank_description_t *banks = pcilib_model[model].banks;
-
-	if ((banks)&&(banks[0].access)) {
+    
+	for (i = 0; ((banks)&&(banks[i].access)); i++) {
+//	    uint32_t buf[2];
 	    void *reg_space;
-	    
-	    uintptr_t addr = banks[0].read_addr;
-	    pcilib_bar_t bar = PCILIB_BAR_DETECT;
-	    
-	    pcilib_detect_address(ctx, &bar, &addr, 1);
-	    reg_space = pcilib_map_bar(ctx, bar);
+            pcilib_bar_t bar = banks[i].bar;
 
-	    uint32_t buf[2];
-	    pcilib_memcpy(&buf, reg_space, 8);
+	    if (bar == PCILIB_BAR_DETECT) {
+		uintptr_t addr = banks[0].read_addr;
 	    
-	    if (reg_space) {
-	        ctx->reg_bar = bar;
-		ctx->reg_space = reg_space;
-
-		return 0;
+		err = pcilib_detect_address(ctx, &bar, &addr, 1);
+		if (err) return err;
+		
+		if (!ctx->bar_space[bar]) {
+		    reg_space = pcilib_map_bar(ctx, bar);
+//		    pcilib_memcpy(&buf, reg_space, 8);
+	    
+		    if (reg_space) {
+			ctx->bar_space[bar] = reg_space;
+		    } else {
+			return PCILIB_ERROR_FAILED;
+		    }
+		}
+	    } else if (!ctx->bar_space[bar]) {
+		reg_space = pcilib_map_bar(ctx, bar);
+		if (reg_space) {
+		    ctx->bar_space[bar] = reg_space;
+		} else {
+		    return PCILIB_ERROR_FAILED;
+		}
+//		pcilib_memcpy(&buf, reg_space, 8);
+		
 	    }
+	    if (!i) ctx->reg_bar = bar;
 	}
 	
-	return PCILIB_ERROR_NOTFOUND;
+	ctx->reg_bar_mapped = 1;
     }
     
     return 0;
@@ -366,9 +393,9 @@ static int pcilib_map_register_space(pcilib_t *ctx) {
 
 static int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
     int err;
-    int i;
+    pcilib_bar_t i;
     
-    if (!ctx->data_space) {
+    if (!ctx->data_bar_mapped) {
         const pci_board_info *board_info = pcilib_get_board_info(ctx);
 	if (!board_info) return PCILIB_ERROR_FAILED;
 
@@ -381,7 +408,7 @@ static int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
 	int data_bar = -1;	
 	
 	for (i = 0; i < PCILIB_MAX_BANKS; i++) {
-	    if ((i == ctx->reg_bar)||(!board_info->bar_length[i])) continue;
+	    if ((ctx->bar_space[i])||(!board_info->bar_length[i])) continue;
 	    
 	    if (addr) {
 	        if (board_info->bar_start[i] == addr) {
@@ -406,18 +433,23 @@ static int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
 	}
 	
 	ctx->data_bar = data_bar;
-	ctx->data_space = pcilib_map_bar(ctx, data_bar);
-	ctx->data_size = board_info->bar_length[data_bar];
 	
-	if (!ctx->data_space) {
-	    pcilib_error("Unable to map the data space");
-	    return PCILIB_ERROR_FAILED;
+	if (!ctx->bar_space[data_bar]) {
+	    char *data_space = pcilib_map_bar(ctx, data_bar);
+	    if (data_space) ctx->bar_space[data_bar] = data_space;
+	    else {
+	        pcilib_error("Unable to map the data space");
+		return PCILIB_ERROR_FAILED;
+	    }
 	}
+	
+	ctx->data_bar_mapped = 0;
     }
     
     return 0;
 }
 	
+/*
 static void pcilib_unmap_register_space(pcilib_t *ctx) {
     if (ctx->reg_space) {
 	pcilib_unmap_bar(ctx, ctx->reg_bar, ctx->reg_space);
@@ -431,12 +463,31 @@ static void pcilib_unmap_data_space(pcilib_t *ctx) {
 	ctx->data_space = NULL;
     }
 }
+*/
 
-char  *pcilib_resolve_register_address(pcilib_t *ctx, uintptr_t addr) {
-    size_t offset = addr - ctx->board_info.bar_start[ctx->reg_bar];
-    if (offset < ctx->board_info.bar_length[ctx->reg_bar]) {
-	return ctx->reg_space + offset + (ctx->board_info.bar_start[ctx->reg_bar] & ctx->page_mask);
+char  *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr) {
+    if (bar == PCILIB_BAR_DETECT) {
+	    // First checking the default register bar
+	size_t offset = addr - ctx->board_info.bar_start[ctx->reg_bar];
+	if ((addr > ctx->board_info.bar_start[ctx->reg_bar])&&(offset < ctx->board_info.bar_length[ctx->reg_bar])) {
+	    return ctx->bar_space[ctx->reg_bar] + offset + (ctx->board_info.bar_start[ctx->reg_bar] & ctx->page_mask);
+	}
+	    
+	    // Otherwise trying to detect
+	bar = pcilib_detect_bar(ctx, addr, 1);
+	if (bar != PCILIB_BAR_INVALID) {
+	    size_t offset = addr - ctx->board_info.bar_start[bar];
+	    if ((offset < ctx->board_info.bar_length[bar])&&(ctx->bar_space[bar])) {
+		return ctx->bar_space[bar] + offset + (ctx->board_info.bar_start[bar] & ctx->page_mask);
+	    }
+	}
+    } else {
+	if (addr < ctx->board_info.bar_length[bar]) {
+	    return ctx->bar_space[bar] + addr + (ctx->board_info.bar_start[bar] & ctx->page_mask);
+	}
+	
     }
+
     return NULL;
 }
 
@@ -449,20 +500,28 @@ char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size) {
 	return NULL;
     }
     
-    if (size) *size = ctx->data_size;    
+    if (size) *size = ctx->board_info.bar_length[ctx->data_bar];
     
-    return ctx->data_space + (ctx->board_info.bar_start[ctx->data_bar] & ctx->page_mask);
+    return ctx->bar_space[ctx->data_bar] + (ctx->board_info.bar_start[ctx->data_bar] & ctx->page_mask);
 }
 
 
 void pcilib_close(pcilib_t *ctx) {
+    pcilib_bar_t i;
+    
     if (ctx) {
 	pcilib_model_t model = pcilib_get_model(ctx);
 	pcilib_event_api_description_t *api = pcilib_model[model].event_api;
     
         if ((api)&&(api->free)) api->free(ctx->event_ctx);
-	if (ctx->data_space) pcilib_unmap_data_space(ctx);
-	if (ctx->reg_space) pcilib_unmap_register_space(ctx);
+
+	for (i = 0; i < PCILIB_MAX_BANKS; i++) {
+	    if (ctx->bar_space[i]) {
+		char *ptr = ctx->bar_space[i];
+		ctx->bar_space[i] = NULL;
+		pcilib_unmap_bar(ctx, i, ptr);
+	    }
+	}
 	close(ctx->handle);
 	
 	free(ctx);

@@ -87,7 +87,8 @@
 #define PCIE_ML605_DEVICE_ID 0x04a0
 
 /* Identifies the PCI-E IPE Camera */
-#define PCIE_IPECAMERA_DEVICE_ID 0x6018
+#define PCIE_IPECAMERA_DEVICE_ID 0x6081
+//#define PCIE_IPECAMERA_DEVICE_ID 0x6018
 
 
 /* Possible values for ioctl commands */

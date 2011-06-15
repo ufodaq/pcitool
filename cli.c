@@ -397,20 +397,31 @@ int ReadData(pcilib_t *handle, pcilib_bar_t bar, uintptr_t addr, size_t n, acces
 }
 
 int ReadRegister(pcilib_t *handle, pcilib_model_t model, const char *bank, const char *reg) {
-    int err;
     int i;
+    int err;
+    const char *format;
+
+    pcilib_register_bank_t bank_id;
+    pcilib_register_bank_addr_t bank_addr;
+    pcilib_register_description_t *registers = pcilib_model[model].registers;
 
     pcilib_register_value_t value;
     
     if (reg) {
-        err = pcilib_read_register(handle, bank, reg, &value);
+	pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
+        bank_id = pcilib_find_bank_by_addr(handle, registers[regid].bank);
+        format = pcilib_model[model].banks[bank_id].format;
+        if (!format) format = "%lu";
+
+        err = pcilib_read_register_by_id(handle, regid, &value);
+    //    err = pcilib_read_register(handle, bank, reg, &value);
         if (err) printf("Error reading register %s\n", reg);
-        else printf("%s = %i\n", reg, value);
+        else {
+	    printf("%s = ", reg);
+	    printf(format, value);
+	    printf("\n");
+	}
     } else {
-	pcilib_register_bank_t bank_id;
-	pcilib_register_bank_addr_t bank_addr;
-        
-	pcilib_register_description_t *registers = pcilib_model[model].registers;
 	
 	if (registers) {
 	    if (bank) {
@@ -421,9 +432,20 @@ int ReadRegister(pcilib_t *handle, pcilib_model_t model, const char *bank, const
 	    printf("Registers:\n");
 	    for (i = 0; registers[i].bits; i++) {
 		if ((registers[i].mode & PCILIB_REGISTER_R)&&((!bank)||(registers[i].bank == bank_addr))) {
+		    bank_id = pcilib_find_bank_by_addr(handle, registers[i].bank);
+		    format = pcilib_model[model].banks[bank_id].format;
+		    if (!format) format = "%lu";
+
 		    err = pcilib_read_register_by_id(handle, i, &value);
-		    if (err) printf(" %s = error reading value [%i]", registers[i].name, registers[i].defvalue);
-	    	    else printf(" %s = %i [%i]", registers[i].name, value, registers[i].defvalue);
+		    if (err) printf(" %s = error reading value", registers[i].name);
+	    	    else {
+			printf(" %s = ", registers[i].name);
+			printf(format, value);
+		    }
+
+		    printf(" [");
+		    printf(format, registers[i].defvalue);
+		    printf("]");
 		}
 		printf("\n");
 	    }

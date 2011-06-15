@@ -136,12 +136,13 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 
 	ctx->buffer_size = IPECAMERA_DEFAULT_BUFFER_SIZE;
 	ctx->dim.bpp = sizeof(ipecamera_pixel_t) * 8;
-
+/*
 	ctx->data = pcilib_resolve_data_space(pcilib, 0, &ctx->size);
 	if (!ctx->data) {
 	    err = -1;
 	    pcilib_error("Unable to resolve the data space");
 	}
+*/
 	
 	FIND_REG(status_reg, "fpga", "status");
 	FIND_REG(control_reg, "fpga", "control");
@@ -240,8 +241,10 @@ int ipecamera_reset(pcilib_context_t *vctx) {
     if (err) return err;
     
 	// This is temporary for verification purposes
-    memset(ctx->data, 0, ctx->size);
+    if (ctx->data) memset(ctx->data, 0, ctx->size);
 
+    usleep(10000);
+    
     err = pcilib_read_register_by_id(pcilib, status, &value);
     if (err) {
 	pcilib_error("Error reading status register");
@@ -249,7 +252,7 @@ int ipecamera_reset(pcilib_context_t *vctx) {
     }
 
     if (value != IPECAMERA_EXPECTED_STATUS) {
-	pcilib_error("Unexpected value (%lx) of status register", value);
+	pcilib_error("Unexpected value (%lx) of status register, expected %lx", value, IPECAMERA_EXPECTED_STATUS);
 	return PCILIB_ERROR_VERIFY;
     }
 
@@ -477,6 +480,8 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
     ipecamera_payload_t *linebuf = (ipecamera_payload_t*)malloc(max_size * sizeof(ipecamera_payload_t));
     if (!linebuf) return PCILIB_ERROR_MEMORY;
 
+    if (!ctx->data) return PCILIB_ERROR_NOTSUPPORTED;
+    
 #ifdef IPECAMERA_WRITE_RAW
     FILE *f = fopen("raw/image.raw", "w");
     if (f) fclose(f);

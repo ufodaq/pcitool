@@ -17,8 +17,9 @@ int pcilib_default_read(pcilib_t *ctx, pcilib_register_bank_description_t *bank,
     pcilib_register_value_t val = 0;
     int access = bank->access / 8;
 
-    ptr =  pcilib_resolve_register_address(ctx, bank->read_addr + addr * access);
+    ptr =  pcilib_resolve_register_address(ctx, bank->bar, bank->read_addr + addr * access);
     default_datacpy(&val, ptr, access, bank);
+//    printf("%lx %lx\n",val, BIT_MASK(bits));
     
     *value = val&BIT_MASK(bits);
 
@@ -32,7 +33,7 @@ int pcilib_default_write(pcilib_t *ctx, pcilib_register_bank_description_t *bank
     char *ptr;
     int access = bank->access / 8;
 
-    ptr =  pcilib_resolve_register_address(ctx, bank->write_addr + addr * access);
+    ptr =  pcilib_resolve_register_address(ctx, bank->bar, bank->write_addr + addr * access);
     default_datacpy(ptr, &value, access, bank);
 
     return 0;

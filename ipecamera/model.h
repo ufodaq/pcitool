@@ -6,15 +6,16 @@
 #include "pcilib.h"
 #include "image.h"
 
-#define IPECAMERA_REGISTER_SPACE 0xfeaffc00
+//#define IPECAMERA_REGISTER_SPACE 0xfeaffc00
+#define IPECAMERA_REGISTER_SPACE 0x9000
 #define IPECAMERA_REGISTER_WRITE (IPECAMERA_REGISTER_SPACE + 0)
-#define IPECAMERA_REGISTER_READ (IPECAMERA_REGISTER_WRITE + 4)
+#define IPECAMERA_REGISTER_READ (IPECAMERA_REGISTER_WRITE + 16)
 
 #ifdef _IPECAMERA_MODEL_C
 pcilib_register_bank_description_t ipecamera_register_banks[] = {
-    { PCILIB_REGISTER_BANK0, 128, IPECAMERA_REGISTER_PROTOCOL, IPECAMERA_REGISTER_READ,	IPECAMERA_REGISTER_WRITE, PCILIB_BIG_ENDIAN, 8, PCILIB_LITTLE_ENDIAN, "cmosis", "CMOSIS CMV2000 Registers" },
-    { PCILIB_REGISTER_BANK1, 64, PCILIB_DEFAULT_PROTOCOL, IPECAMERA_REGISTER_SPACE, IPECAMERA_REGISTER_SPACE, PCILIB_BIG_ENDIAN, 32, PCILIB_LITTLE_ENDIAN, "fpga", "IPECamera Registers" },
-    { 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL }
+    { PCILIB_REGISTER_BANK0, PCILIB_BAR0, 128, IPECAMERA_REGISTER_PROTOCOL, IPECAMERA_REGISTER_READ, IPECAMERA_REGISTER_WRITE, PCILIB_LITTLE_ENDIAN, 8, PCILIB_LITTLE_ENDIAN, "%lu", "cmosis", "CMOSIS CMV2000 Registers" },
+    { PCILIB_REGISTER_BANK1, PCILIB_BAR0,  64, PCILIB_DEFAULT_PROTOCOL, IPECAMERA_REGISTER_SPACE, IPECAMERA_REGISTER_SPACE, PCILIB_LITTLE_ENDIAN, 32, PCILIB_LITTLE_ENDIAN, "0x%lx", "fpga", "IPECamera Registers" },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL }
 };
 
 pcilib_register_description_t ipecamera_registers[] = {
@@ -65,17 +66,17 @@ pcilib_register_description_t ipecamera_registers[] = {
 {115, 	0, 	1, 	1, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "special_115", ""},
 /*{126, 	0, 	16, 	0, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK0, "temp", ""},*/
 {0,	0, 	32,	0,	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK1, "spi_conf_input", ""},
-{1,	0, 	32,	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "spi_conf_output", ""},
-{2,	0, 	32,	0,	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK1, "spi_clk_speed", ""},
-{3,	0, 	32,	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "firmware_version", ""},
-{4,	0, 	32, 	0,	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK1, "control", ""},
-{5,	0, 	32, 	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "status", ""},
-{6,	0, 	16,	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "cmosis_temperature", ""},
-{7,	0, 	32,	0,	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK1, "temperature_sample_timing", ""},
-{8,	0, 	32, 	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "start_address", ""},
-{9,	0, 	32, 	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "end_address", ""},
-{10,	0, 	32, 	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "last_write_address", ""},
-{11,	0, 	32, 	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "last_write_value", ""},
+{4,	0, 	32,	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "spi_conf_output", ""},
+{8,	0, 	32,	0,	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK1, "spi_clk_speed", ""},
+{12,	0, 	32,	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "firmware_version", ""},
+{16,	0, 	32, 	0,	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK1, "control", ""},
+{20,	0, 	32, 	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "status", ""},
+{24,	0, 	16,	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "cmosis_temperature", ""},
+{28,	0, 	32,	0,	PCILIB_REGISTER_RW, PCILIB_REGISTER_BANK1, "temperature_sample_timing", ""},
+{32,	0, 	32, 	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "start_address", ""},
+{36,	0, 	32, 	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "end_address", ""},
+{40,	0, 	32, 	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "last_write_address", ""},
+{44,	0, 	32, 	0,	PCILIB_REGISTER_R,  PCILIB_REGISTER_BANK1, "last_write_value", ""},
 {0,	0,	0,	0,	0,                  0,                     NULL, NULL}
 };
 
