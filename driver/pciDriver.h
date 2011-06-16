@@ -152,7 +152,7 @@ typedef struct {
 	unsigned long bar_start[6];
 	unsigned long bar_length[6];
 	unsigned long bar_flags[6];
-} pci_board_info;
+} pcilib_board_info_t;
 
 
 /* ioctl interface */
@@ -182,7 +182,7 @@ typedef struct {
 /* And now, the methods to access the PCI configuration area */
 #define PCIDRIVER_IOC_PCI_CFG_RD  _IOWR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 10, pci_cfg_cmd * )
 #define PCIDRIVER_IOC_PCI_CFG_WR  _IOWR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 11, pci_cfg_cmd * )
-#define PCIDRIVER_IOC_PCI_INFO    _IOWR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 12, pci_board_info * )
+#define PCIDRIVER_IOC_PCI_INFO    _IOWR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 12, pcilib_board_info_t * )
 
 /* Clear interrupt queues */
 #define PCIDRIVER_IOC_CLEAR_IOQ   _IO(   PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 13 )

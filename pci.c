@@ -31,7 +31,8 @@ struct pcilib_s {
     int handle;
     
     uintptr_t page_mask;
-    pci_board_info board_info;
+    pcilib_board_info_t board_info;
+    pcilib_dma_info_t dma_info;
     pcilib_model_t model;
     
     char *bar_space[PCILIB_MAX_BANKS];
@@ -45,7 +46,10 @@ struct pcilib_s {
 //    char *data_space;
 //    size_t data_size;
     
-    void *event_ctx;
+
+    pcilib_dma_context_t *dma_ctx;
+    
+    pcilib_event_context_t *event_ctx;
     
 #ifdef PCILIB_FILE_IO
     int file_io_handle;
@@ -96,7 +100,7 @@ pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
     return ctx;
 }
 
-const pci_board_info *pcilib_get_board_info(pcilib_t *ctx) {
+const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx) {
     int ret;
     
     if (ctx->page_mask ==  (uintptr_t)-1) {
@@ -112,6 +116,18 @@ const pci_board_info *pcilib_get_board_info(pcilib_t *ctx) {
     return &ctx->board_info;
 }
 
+const pcilib_dma_info_t *pcilib_get_dma_info(pcilib_t *ctx) {
+    if (!ctx->dma_ctx) {
+	pcilib_model_t model = pcilib_get_model(ctx);
+	pcilib_dma_api_description_t *api = pcilib_model[model].dma_api;
+	if ((api)&&(api->init)) ctx->dma_ctx = api->init(ctx);
+	
+	if (!ctx->dma_ctx) return NULL;
+    }
+    
+    return &ctx->dma_info;
+}
+
 pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx) {
     return ctx->event_ctx;
 }
@@ -123,7 +139,7 @@ pcilib_model_t pcilib_get_model(pcilib_t *ctx) {
 
 	//return PCILIB_MODEL_PCI;
 	
-	const pci_board_info *board_info = pcilib_get_board_info(ctx);
+	const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
 	if (!board_info) return PCILIB_MODEL_PCI;
 
 	if ((board_info->vendor_id == PCIE_XILINX_VENDOR_ID)&&(board_info->device_id == PCIE_IPECAMERA_DEVICE_ID))
@@ -138,7 +154,7 @@ pcilib_model_t pcilib_get_model(pcilib_t *ctx) {
 static pcilib_bar_t pcilib_detect_bar(pcilib_t *ctx, uintptr_t addr, size_t size) {
     pcilib_bar_t i;
 	
-    const pci_board_info *board_info = pcilib_get_board_info(ctx);
+    const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
     if (!board_info) return PCILIB_BAR_INVALID;
 		
     for (i = 0; i < PCILIB_MAX_BANKS; i++) {
@@ -149,7 +165,7 @@ static pcilib_bar_t pcilib_detect_bar(pcilib_t *ctx, uintptr_t addr, size_t size
 }
 
 static int pcilib_detect_address(pcilib_t *ctx, pcilib_bar_t *bar, uintptr_t *addr, size_t size) {
-    const pci_board_info *board_info = pcilib_get_board_info(ctx);
+    const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
     if (!board_info) return PCILIB_ERROR_NOTFOUND;
     
     if (*bar == PCILIB_BAR_DETECT) {
@@ -179,7 +195,7 @@ void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar) {
     void *res;
     int ret; 
 
-    const pci_board_info *board_info = pcilib_get_board_info(ctx);
+    const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
     if (!board_info) return NULL;
     
     if (ctx->bar_space[bar]) return ctx->bar_space[bar];
@@ -212,7 +228,7 @@ void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar) {
 }
 
 void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data) {
-    const pci_board_info *board_info = pcilib_get_board_info(ctx);
+    const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
     if (!board_info) return;
 
     if (ctx->bar_space[bar]) return;
@@ -396,7 +412,7 @@ static int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
     pcilib_bar_t i;
     
     if (!ctx->data_bar_mapped) {
-        const pci_board_info *board_info = pcilib_get_board_info(ctx);
+        const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
 	if (!board_info) return PCILIB_ERROR_FAILED;
 
 	err = pcilib_map_register_space(ctx);
@@ -511,9 +527,11 @@ void pcilib_close(pcilib_t *ctx) {
     
     if (ctx) {
 	pcilib_model_t model = pcilib_get_model(ctx);
-	pcilib_event_api_description_t *api = pcilib_model[model].event_api;
+	pcilib_event_api_description_t *eapi = pcilib_model[model].event_api;
+	pcilib_dma_api_description_t *dapi = pcilib_model[model].dma_api;
     
-        if ((api)&&(api->free)) api->free(ctx->event_ctx);
+        if ((eapi)&&(eapi->free)) eapi->free(ctx->event_ctx);
+        if ((dapi)&&(dapi->free)) dapi->free(ctx->dma_ctx);
 
 	for (i = 0; i < PCILIB_MAX_BANKS; i++) {
 	    if (ctx->bar_space[i]) {

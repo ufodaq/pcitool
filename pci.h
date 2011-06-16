@@ -5,19 +5,24 @@
 
 #include "driver/pciDriver.h"
 
+
+typedef void pcilib_event_context_t;
+typedef void pcilib_dma_context_t;
+
 #include "pcilib.h"
 
 
-const pci_board_info *pcilib_get_board_info(pcilib_t *ctx);
+const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx);
+const pcilib_dma_info_t *pcilib_get_dma_info(pcilib_t *ctx);
 
 #ifdef _PCILIB_PCI_C
 # include "ipecamera/model.h"
 # include "default.h"
 
 pcilib_model_description_t pcilib_model[3] = {
-    { 4, PCILIB_HOST_ENDIAN, 	NULL, NULL, NULL, NULL },
-    { 4, PCILIB_HOST_ENDIAN, 	NULL, NULL, NULL, NULL },
-    { 4, PCILIB_BIG_ENDIAN,	ipecamera_registers, ipecamera_register_banks, ipecamera_register_ranges, ipecamera_events, &ipecamera_image_api }
+    { 4, PCILIB_HOST_ENDIAN, 	NULL, NULL, NULL, NULL, NULL },
+    { 4, PCILIB_HOST_ENDIAN, 	NULL, NULL, NULL, NULL, NULL },
+    { 4, PCILIB_BIG_ENDIAN,	ipecamera_registers, ipecamera_register_banks, ipecamera_register_ranges, ipecamera_events, NULL, &ipecamera_image_api }
 };
 
 pcilib_protocol_description_t pcilib_protocol[3] = {

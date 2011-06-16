@@ -143,7 +143,7 @@ static int ioctl_pci_info(pcidriver_privdata_t *privdata, unsigned long arg)
 {
 	int ret;
 	int bar;
-	READ_FROM_USER(pci_board_info, pci_info);
+	READ_FROM_USER(pcilib_board_info_t, pci_info);
 
 	pci_info.vendor_id = privdata->pdev->vendor;
 	pci_info.device_id = privdata->pdev->device;
@@ -163,7 +163,7 @@ static int ioctl_pci_info(pcidriver_privdata_t *privdata, unsigned long arg)
 		pci_info.bar_flags[bar] = pci_resource_flags(privdata->pdev, bar);
 	}
 
-	WRITE_TO_USER(pci_board_info, pci_info);
+	WRITE_TO_USER(pcilib_board_info_t, pci_info);
 
 	return 0;
 }

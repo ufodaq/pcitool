@@ -167,8 +167,10 @@ void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
     int i;
     pcilib_register_bank_description_t *banks;
     pcilib_register_description_t *registers;
+    pcilib_event_description_t *events;
 
-    const pci_board_info *board_info = pcilib_get_board_info(handle);
+    const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
+    const pcilib_dma_info_t *dma_info = pcilib_get_dma_info(handle);
 
     for (i = 0; i < PCILIB_MAX_BANKS; i++) {
 	if (board_info->bar_length[i] > 0) {
@@ -188,6 +190,36 @@ void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
 	}
     }
     printf("\n");
+    
+    if ((dma_info)&&(dma_info->engines)) {
+	printf("DMA Engines: \n");
+	for (i = 0; dma_info->engines[i]; i++) {
+	    pcilib_dma_engine_description_t *engine = dma_info->engines[i];
+	    printf(" DMA %2d ", engine->addr);
+	    switch (engine->direction) {
+		case PCILIB_DMA_FROM_DEVICE:
+		    printf("C2S");
+		break;
+		case PCILIB_DMA_TO_DEVICE:
+		    printf("S2C");
+		break;
+		case PCILIB_DMA_BIDIRECTIONAL:
+		    printf("BI ");
+		break;
+	    }
+	    printf(" - Type: ");
+	    switch (engine->type) {
+		case PCILIB_DMA_TYPE_BLOCK:
+		    printf("Block");
+		break;
+		case PCILIB_DMA_TYPE_PACKET:
+		    printf("Packet");
+		break;
+	    }
+	    
+	    printf(", Size: %08lx", engine->max_bytes);
+	}
+    }
 
     if ((bank)&&(bank != (char*)-1)) banks = NULL;
     else banks = pcilib_model[model].banks;
@@ -239,10 +271,24 @@ void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
 	}
 	printf("\n");
     }
+
+    if (bank == (char*)-1) events = NULL;
+    else events = pcilib_model[model].events;
+
+    if (events) {
+	printf("Events: \n");
+	for (i = 0; events[i].name; i++) {
+	    printf(" %s", events[i].name);
+	    if ((events[i].description)&&(events[i].description[0])) {
+		printf(": %s", events[i].description);
+	    }
+	}
+	printf("\n");
+    }
 }
 
 void Info(pcilib_t *handle, pcilib_model_t model) {
-    const pci_board_info *board_info = pcilib_get_board_info(handle);
+    const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
 
     printf("Vendor: %x, Device: %x, Interrupt Pin: %i, Interrupt Line: %i\n", board_info->vendor_id, board_info->device_id, board_info->interrupt_pin, board_info->interrupt_line);
     List(handle, model, (char*)-1);
@@ -257,7 +303,7 @@ int Benchmark(pcilib_t *handle, pcilib_bar_t bar) {
     unsigned long time;
     unsigned int size, max_size;
     
-    const pci_board_info *board_info = pcilib_get_board_info(handle);
+    const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
 		
     if (bar < 0) {
 	unsigned long maxlength = 0;

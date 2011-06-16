@@ -27,6 +27,9 @@ typedef uint8_t pcilib_register_bank_addr_t;	/**< Type holding the register bank
 typedef uint8_t pcilib_register_size_t;		/**< Type holding the size in bits of the register */
 typedef uint32_t pcilib_register_value_t;	/**< Type holding the register value */
 typedef uint64_t pcilib_event_id_t;
+typedef uint8_t pcilib_dma_addr_t;
+typedef uint8_t pcilib_dma_t;
+
 
 typedef uint32_t pcilib_event_t;
 
@@ -128,8 +131,37 @@ typedef struct {
     int (*write)(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, uint8_t bits, pcilib_register_value_t value);
 } pcilib_protocol_description_t;
 
+typedef enum {
+    PCILIB_DMA_FROM_DEVICE = 1,
+    PCILIB_DMA_TO_DEVICE = 2,
+    PCILIB_DMA_BIDIRECTIONAL = 3
+} pcilib_dma_direction_t;
+
+typedef enum {
+    PCILIB_DMA_TYPE_BLOCK,
+    PCILIB_DMA_TYPE_PACKET
+} pcilib_dma_type_t;
+
+typedef struct {
+    pcilib_dma_addr_t addr;
+    pcilib_dma_type_t type;
+    pcilib_dma_direction_t direction;
+    size_t max_bytes;
+} pcilib_dma_engine_description_t;
+
+typedef struct {
+    pcilib_dma_engine_description_t **engines;
+} pcilib_dma_info_t;
 
 typedef int (*pcilib_callback_t)(pcilib_event_t event, pcilib_event_id_t event_id, void *user);
+
+typedef struct {
+    pcilib_dma_context_t *(*init)(pcilib_t *ctx);
+    void (*free)(pcilib_dma_context_t *ctx);
+
+//    int (*read)(pcilib_dma_context_t *ctx, pcilib_event_t event_mask, pcilib_callback_t callback, void *user);
+//    int (*write)(pcilib_dma_context_t *ctx);
+} pcilib_dma_api_description_t;
 
 typedef struct {
     pcilib_context_t *(*init)(pcilib_t *ctx);
@@ -154,7 +186,8 @@ typedef struct {
     pcilib_register_bank_description_t *banks;
     pcilib_register_range_t *ranges;
     pcilib_event_description_t *events;
-    
+
+    pcilib_dma_api_description_t *dma_api;    
     pcilib_event_api_description_t *event_api;
 } pcilib_model_description_t;
 

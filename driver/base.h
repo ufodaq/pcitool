@@ -53,7 +53,7 @@ static const __devinitdata struct pci_device_id pcidriver_ids[] = {
 /* prototypes for internal driver functions */
 int pcidriver_pci_read( pcidriver_privdata_t *privdata, pci_cfg_cmd *pci_cmd );
 int pcidriver_pci_write( pcidriver_privdata_t *privdata, pci_cfg_cmd *pci_cmd );
-int pcidriver_pci_info( pcidriver_privdata_t *privdata, pci_board_info *pci_info );
+int pcidriver_pci_info( pcidriver_privdata_t *privdata, pcilib_board_info_t *pci_info );
 
 int pcidriver_mmap_pci( pcidriver_privdata_t *privdata, struct vm_area_struct *vmap , int bar );
 int pcidriver_mmap_kmem( pcidriver_privdata_t *privdata, struct vm_area_struct *vmap );
