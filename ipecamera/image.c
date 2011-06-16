@@ -19,7 +19,7 @@
 #define IPECAMERA_SLEEP_TIME 250000
 #define IPECAMERA_MAX_LINES 1088
 #define IPECAMERA_DEFAULT_BUFFER_SIZE 10
-#define IPECAMERA_EXPECTED_STATUS 0x0849FFFF
+#define IPECAMERA_EXPECTED_STATUS 0x08409FFFF
 //#define IPECAMERA_EXPECTED_STATUS 0x0049FFFF
 
 #define IPECAMERA_MAX_CHANNELS 16
@@ -206,7 +206,7 @@ int ipecamera_reset(pcilib_context_t *vctx) {
     status = ctx->status_reg;
 
 	// Set Reset bit to CMOSIS
-    err = pcilib_write_register_by_id(pcilib, control, 5);
+    err = pcilib_write_register_by_id(pcilib, control, 0x1e4);
     if (err) {
 	pcilib_error("Error setting CMOSIS reset bit");
 	return err;
@@ -214,7 +214,7 @@ int ipecamera_reset(pcilib_context_t *vctx) {
     usleep(IPECAMERA_SLEEP_TIME);
 
 	// Remove Reset bit to CMOSIS
-    err = pcilib_write_register_by_id(pcilib, control, 1);
+    err = pcilib_write_register_by_id(pcilib, control, 0x1e1);
     if (err) {
 	pcilib_error("Error reseting CMOSIS reset bit");
 	return err;
