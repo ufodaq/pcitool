@@ -6,23 +6,22 @@
 #include "driver/pciDriver.h"
 
 
-typedef void pcilib_event_context_t;
-typedef void pcilib_dma_context_t;
-
 #include "pcilib.h"
 
+int pcilib_set_dma_engine_description(pcilib_t *ctx, pcilib_dma_t engine, pcilib_dma_engine_description_t *desc);
 
 const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx);
 const pcilib_dma_info_t *pcilib_get_dma_info(pcilib_t *ctx);
 
 #ifdef _PCILIB_PCI_C
 # include "ipecamera/model.h"
+# include "dma/nwl.h"
 # include "default.h"
 
 pcilib_model_description_t pcilib_model[3] = {
     { 4, PCILIB_HOST_ENDIAN, 	NULL, NULL, NULL, NULL, NULL },
     { 4, PCILIB_HOST_ENDIAN, 	NULL, NULL, NULL, NULL, NULL },
-    { 4, PCILIB_BIG_ENDIAN,	ipecamera_registers, ipecamera_register_banks, ipecamera_register_ranges, ipecamera_events, NULL, &ipecamera_image_api }
+    { 4, PCILIB_LITTLE_ENDIAN,	ipecamera_registers, ipecamera_register_banks, ipecamera_register_ranges, ipecamera_events, &nwl_dma_api, &ipecamera_image_api }
 };
 
 pcilib_protocol_description_t pcilib_protocol[3] = {

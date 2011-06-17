@@ -160,7 +160,7 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	}
     }
     
-    return (void*)ctx;
+    return (pcilib_context_t*)ctx;
 }
 
 void ipecamera_free(pcilib_context_t *vctx) {

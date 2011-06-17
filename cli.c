@@ -217,8 +217,9 @@ void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
 		break;
 	    }
 	    
-	    printf(", Size: %08lx", engine->max_bytes);
+	    printf(", Address Width: %02lu bits\n", engine->addr_bits);
 	}
+	printf("\n");
     }
 
     if ((bank)&&(bank != (char*)-1)) banks = NULL;

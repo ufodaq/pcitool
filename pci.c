@@ -47,9 +47,10 @@ struct pcilib_s {
 //    size_t data_size;
     
 
-    pcilib_dma_context_t *dma_ctx;
+    pcilib_model_description_t *model_info;
     
-    pcilib_event_context_t *event_ctx;
+    pcilib_dma_context_t *dma_ctx;
+    pcilib_context_t *event_ctx;
     
 #ifdef PCILIB_FILE_IO
     int file_io_handle;
@@ -93,11 +94,18 @@ pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
 	ctx->model = model;
 
 	if (!model) model = pcilib_get_model(ctx);
+	
+	ctx->model_info = pcilib_model + model;
+	
 	api = pcilib_model[model].event_api;
         if ((api)&&(api->init)) ctx->event_ctx = api->init(ctx);
     }
 
     return ctx;
+}
+
+pcilib_model_description_t *pcilib_get_model_description(pcilib_t *ctx) {
+    return ctx->model_info;
 }
 
 const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx) {
@@ -114,18 +122,6 @@ const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx) {
     }
     
     return &ctx->board_info;
-}
-
-const pcilib_dma_info_t *pcilib_get_dma_info(pcilib_t *ctx) {
-    if (!ctx->dma_ctx) {
-	pcilib_model_t model = pcilib_get_model(ctx);
-	pcilib_dma_api_description_t *api = pcilib_model[model].dma_api;
-	if ((api)&&(api->init)) ctx->dma_ctx = api->init(ctx);
-	
-	if (!ctx->dma_ctx) return NULL;
-    }
-    
-    return &ctx->dma_info;
 }
 
 pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx) {
@@ -505,6 +501,26 @@ char  *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_
     }
 
     return NULL;
+}
+
+const pcilib_dma_info_t *pcilib_get_dma_info(pcilib_t *ctx) {
+    if (!ctx->dma_ctx) {
+	pcilib_model_t model = pcilib_get_model(ctx);
+	pcilib_dma_api_description_t *api = pcilib_model[model].dma_api;
+	
+	if ((api)&&(api->init)) {
+	    pcilib_map_register_space(ctx);
+	    ctx->dma_ctx = api->init(ctx);
+	}
+	
+	if (!ctx->dma_ctx) return NULL;
+    }
+    
+    return &ctx->dma_info;
+}
+
+int pcilib_set_dma_engine_description(pcilib_t *ctx, pcilib_dma_t engine, pcilib_dma_engine_description_t *desc) {
+    ctx->dma_info.engines[engine] = desc;
 }
 
 char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size) {

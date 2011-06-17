@@ -2,6 +2,7 @@
 #define _PCITOOL_PCILIB_H
 
 #define PCILIB_MAX_BANKS 6
+#define PCILIB_MAX_DMA_ENGINES 32
 
 #include <time.h>
 #include <stdint.h>
@@ -18,6 +19,7 @@ struct timespec {
 
 typedef struct pcilib_s pcilib_t;
 typedef void pcilib_context_t;
+typedef void pcilib_dma_context_t;
 
 typedef uint8_t pcilib_bar_t;			/**< Type holding the PCI Bar number */
 typedef uint8_t pcilib_register_t;		/**< Type holding the register ID within the Bank */
@@ -71,6 +73,7 @@ typedef enum {
 #define PCILIB_REGISTER_BANK1 		1
 #define PCILIB_REGISTER_BANK2 		2
 #define PCILIB_REGISTER_BANK3 		3
+#define PCILIB_REGISTER_BANK_DMA	128
 #define PCILIB_EVENT0			1
 #define PCILIB_EVENT1			2
 #define PCILIB_EVENT2			4
@@ -139,18 +142,19 @@ typedef enum {
 
 typedef enum {
     PCILIB_DMA_TYPE_BLOCK,
-    PCILIB_DMA_TYPE_PACKET
+    PCILIB_DMA_TYPE_PACKET,
+    PCILIB_DMA_TYPE_UNKNOWN
 } pcilib_dma_type_t;
 
 typedef struct {
     pcilib_dma_addr_t addr;
     pcilib_dma_type_t type;
     pcilib_dma_direction_t direction;
-    size_t max_bytes;
+    size_t addr_bits;
 } pcilib_dma_engine_description_t;
 
 typedef struct {
-    pcilib_dma_engine_description_t **engines;
+    pcilib_dma_engine_description_t *engines[PCILIB_MAX_DMA_ENGINES +  1];
 } pcilib_dma_info_t;
 
 typedef int (*pcilib_callback_t)(pcilib_event_t event, pcilib_event_id_t event_id, void *user);
@@ -198,6 +202,7 @@ extern pcilib_model_description_t pcilib_model[];
 int pcilib_set_error_handler(void (*err)(const char *msg, ...), void (*warn)(const char *msg, ...));
 
 pcilib_model_t pcilib_get_model(pcilib_t *ctx);
+pcilib_model_description_t *pcilib_get_model_description(pcilib_t *ctx);
 pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx);
 
 pcilib_t *pcilib_open(const char *device, pcilib_model_t model);
@@ -205,7 +210,7 @@ void pcilib_close(pcilib_t *ctx);
 
 void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar);
 void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data);
-char *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr);
+char *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr);	// addr is offset if bar is specified
 char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size);
 
 pcilib_register_bank_t pcilib_find_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank);
