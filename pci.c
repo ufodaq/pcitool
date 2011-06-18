@@ -270,6 +270,44 @@ int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, v
     pcilib_unmap_bar(ctx, bar, data);    
 }
 
+pcilib_dma_t pcilib_find_dma_by_addr(pcilib_t *ctx, pcilib_dma_direction_t direction, pcilib_dma_addr_t dma) {
+    pcilib_dma_t i;
+
+    const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
+    if (!info) {
+	pcilib_error("DMA Engine is not configured in the current model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+    
+    for (i = 0; info->engines[i]; i++) {
+	if ((info->engines[i]->addr == dma)&&((info->engines[i]->direction&direction)==direction)) break;
+    }
+    
+    if (info->engines[i]) return i;
+    return PCILIB_DMA_INVALID;
+}
+
+int pcilib_read_dma(pcilib_t *ctx, pcilib_dma_t dma, size_t size, void *buf) {
+    const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
+
+    if (!ctx->model_info->dma_api) {
+	pcilib_error("DMA Engine is not configured in the current model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+    
+    if (!ctx->model_info->dma_api->read) {
+	pcilib_error("The DMA read is not supported by configured DMA engine");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+    
+    if (!info->engines[dma]) {
+	pcilib_error("The DMA engine (%i) is not supported by device", dma);
+	return PCILIB_ERROR_OUTOFRANGE;
+    }
+    
+    return ctx->model_info->dma_api->read(ctx->dma_ctx, dma, size, buf);
+}
+
 
 pcilib_register_bank_t pcilib_find_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank) {
     pcilib_register_bank_t i;

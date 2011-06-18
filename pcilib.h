@@ -66,6 +66,7 @@ typedef enum {
 #define PCILIB_BAR_INVALID		((pcilib_bar_t)-1)
 #define PCILIB_BAR0			0
 #define PCILIB_BAR1			1
+#define PCILIB_DMA_INVALID		((pcilib_dma_t)-1)
 #define PCILIB_REGISTER_INVALID		((pcilib_register_t)-1)
 #define PCILIB_ADDRESS_INVALID		((uintptr_t)-1)
 #define PCILIB_REGISTER_BANK_INVALID	((pcilib_register_bank_t)-1)
@@ -163,7 +164,7 @@ typedef struct {
     pcilib_dma_context_t *(*init)(pcilib_t *ctx);
     void (*free)(pcilib_dma_context_t *ctx);
 
-//    int (*read)(pcilib_dma_context_t *ctx, pcilib_event_t event_mask, pcilib_callback_t callback, void *user);
+    int (*read)(pcilib_dma_context_t *ctx, pcilib_dma_t dma, size_t size, void *buf);
 //    int (*write)(pcilib_dma_context_t *ctx);
 } pcilib_dma_api_description_t;
 

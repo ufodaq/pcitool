@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "pci.h"
 #include "pcilib.h"
@@ -63,9 +64,44 @@
 #define DMA_ENG_NUMBER          0x0000FF00  /**< DMA engine number */
 #define DMA_ENG_BD_MAX_BC       0x3F000000  /**< DMA engine max buffer size */
 
+
 /* Shift constants for selected masks */
 #define DMA_ENG_NUMBER_SHIFT        8
 #define DMA_ENG_BD_MAX_BC_SHIFT     24
+
+/** @name Bitmasks of REG_DMA_ENG_CTRL_STATUS register.
+ * @{
+ */
+/* Interrupt activity and acknowledgement bits */
+#define DMA_ENG_INT_ENABLE          0x00000001  /**< Enable interrupts */
+#define DMA_ENG_INT_DISABLE         0x00000000  /**< Disable interrupts */
+#define DMA_ENG_INT_ACTIVE_MASK     0x00000002  /**< Interrupt active? */
+#define DMA_ENG_INT_ACK             0x00000002  /**< Interrupt ack */
+#define DMA_ENG_INT_BDCOMP          0x00000004  /**< Int - BD completion */
+#define DMA_ENG_INT_BDCOMP_ACK      0x00000004  /**< Acknowledge */
+#define DMA_ENG_INT_ALERR           0x00000008  /**< Int - BD align error */
+#define DMA_ENG_INT_ALERR_ACK       0x00000008  /**< Acknowledge */
+#define DMA_ENG_INT_FETERR          0x00000010  /**< Int - BD fetch error */
+#define DMA_ENG_INT_FETERR_ACK      0x00000010  /**< Acknowledge */
+#define DMA_ENG_INT_ABORTERR        0x00000020  /**< Int - DMA abort error */
+#define DMA_ENG_INT_ABORTERR_ACK    0x00000020  /**< Acknowledge */
+#define DMA_ENG_INT_CHAINEND        0x00000080  /**< Int - BD chain ended */
+#define DMA_ENG_INT_CHAINEND_ACK    0x00000080  /**< Acknowledge */
+
+/* DMA engine control */
+#define DMA_ENG_ENABLE_MASK         0x00000100  /**< DMA enabled? */
+#define DMA_ENG_ENABLE              0x00000100  /**< Enable DMA */
+#define DMA_ENG_DISABLE             0x00000000  /**< Disable DMA */
+#define DMA_ENG_STATE_MASK          0x00000C00  /**< Current DMA state? */
+#define DMA_ENG_RUNNING             0x00000400  /**< DMA running */
+#define DMA_ENG_IDLE                0x00000000  /**< DMA idle */
+#define DMA_ENG_WAITING             0x00000800  /**< DMA waiting */
+#define DMA_ENG_STATE_WAITED        0x00001000  /**< DMA waited earlier */
+#define DMA_ENG_WAITED_ACK          0x00001000  /**< Acknowledge */
+#define DMA_ENG_USER_RESET          0x00004000  /**< Reset only user logic */
+#define DMA_ENG_RESET               0x00008000  /**< Reset DMA engine + user */
+
+#define DMA_ENG_ALLINT_MASK         0x000000BE  /**< To get only int events */
 
 #define DMA_ENGINE_PER_SIZE     0x100   /**< Separation between engine regs */
 #define DMA_OFFSET              0       /**< Starting register offset */
@@ -96,6 +132,7 @@ struct nwl_dma_s {
     pcilib_register_bank_description_t *dma_bank;
     char *base_addr;
     
+    pcilib_dma_t n_engines;
     pcilib_nwl_engine_description_t engines[PCILIB_MAX_DMA_ENGINES + 1];
 };
 
@@ -104,6 +141,8 @@ struct nwl_dma_s {
 
 static int nwl_read_engine_config(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, char *base) {
     uint32_t val;
+    
+    info->base_addr = base;
     
     nwl_read_register(val, ctx, base, REG_DMA_ENG_CAP);
 
@@ -135,6 +174,54 @@ static int nwl_read_engine_config(nwl_dma_t *ctx, pcilib_nwl_engine_description_
     return 0;
 }
 
+static int nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_t dma) {
+    uint32_t val;
+    struct timeval start, cur;
+    
+    pcilib_nwl_engine_description_t *info = ctx->engines + dma;
+    char *base = ctx->engines[dma].base_addr;
+    
+	// Disable IRQ
+    nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+    val &= ~(DMA_ENG_INT_ENABLE);
+    nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+
+     
+	// Reseting 
+    val = DMA_ENG_DISABLE|DMA_ENG_USER_RESET; nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+    gettimeofday(&start, NULL);
+    do {
+	nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+        gettimeofday(&cur, NULL);
+    } while ((val & (DMA_ENG_STATE_MASK|DMA_ENG_USER_RESET))&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_REGISTER_TIMEOUT));
+    
+    if (val & DMA_ENG_RESET) {
+	pcilib_error("Timeout during reset of DMA engine %i", info->desc.addr);
+	return PCILIB_ERROR_TIMEOUT;
+    }
+    
+
+    val = DMA_ENG_RESET; nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+    gettimeofday(&start, NULL);
+    do {
+	nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+        gettimeofday(&cur, NULL);
+    } while ((val & DMA_ENG_RESET)&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_REGISTER_TIMEOUT));
+    
+    if (val & DMA_ENG_RESET) {
+	pcilib_error("Timeout during reset of DMA engine %i", info->desc.addr);
+	return PCILIB_ERROR_TIMEOUT;
+    }
+
+	// Acknowledge asserted engine interrupts    
+    if (val & DMA_ENG_INT_ACTIVE_MASK) {
+	val |= DMA_ENG_ALLINT_MASK;
+	nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+    }
+    
+    return 0;
+}
+
 pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib) {
     int i;
     int err;
@@ -159,20 +246,31 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib) {
 	for (i = 0, n_engines = 0; i < 2 * PCILIB_MAX_DMA_ENGINES; i++) {
 	    char *addr = ctx->base_addr + DMA_OFFSET + i * DMA_ENGINE_PER_SIZE;
 	    err = nwl_read_engine_config(ctx, ctx->engines + n_engines, addr);
+	    if (!err) err = nwl_stop_engine(ctx, n_engines);
 	    if (!err) {
 		ctx->engines[n_engines].base_addr = addr;
 		pcilib_set_dma_engine_description(pcilib, n_engines, (pcilib_dma_engine_description_t*)(ctx->engines + n_engines));
 		++n_engines;
 	    }
+	    
 	}
 	pcilib_set_dma_engine_description(pcilib, n_engines, NULL);
+	
+	ctx->n_engines = n_engines;
     }
     return (pcilib_dma_context_t*)ctx;
 }
 
 void  dma_nwl_free(pcilib_dma_context_t *vctx) {
+    pcilib_dma_t i;
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
     if (ctx) {
+	for (i = 0; i < ctx->n_engines; i++) nwl_stop_engine(vctx, i);
 	free(ctx);
     }
+}
+
+int dma_nwl_read(pcilib_dma_context_t *vctx, pcilib_dma_t dma, size_t size, void *buf) {
+    nwl_dma_t *ctx = (nwl_dma_t*)vctx;
+    printf("Reading dma: %i\n", dma);
 }

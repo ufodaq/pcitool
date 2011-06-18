@@ -55,6 +55,12 @@ typedef enum {
 } MODE;
 
 typedef enum {
+    ACCESS_BAR,
+    ACCESS_DMA,
+    ACCESS_FIFO
+} ACCESS_MODE;
+
+typedef enum {
     OPT_DEVICE = 'd',
     OPT_MODEL = 'm',
     OPT_BAR = 'b',
@@ -112,30 +118,30 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "Usage:\n"
 " %s <mode> [options] [hex data]\n"
 "  Modes:\n"
-"	-i		- Device Info\n"
-"	-l		- List Data Banks & Registers\n"
-"	-p		- Performance Evaluation\n"
-"	-r <addr|reg>	- Read Data/Register\n"
-"	-w <addr|reg>	- Write Data/Register\n"
-"	-g [event]	- Grab Event\n"
-"	--reset		- Reset board\n"
-"	--help		- Help message\n"
+"	-i			- Device Info\n"
+"	-l			- List Data Banks & Registers\n"
+"	-p			- Performance Evaluation\n"
+"	-r <addr|reg|dmaX>	- Read Data/Register\n"
+"	-w <addr|reg|dmaX>	- Write Data/Register\n"
+"	-g [event]		- Grab Event\n"
+"	--reset			- Reset board\n"
+"	--help			- Help message\n"
 "\n"
 "  Addressing:\n"
-"	-d <device>	- FPGA device (/dev/fpga0)\n"
-"	-m <model>	- Memory model (autodetected)\n"
-"	   pci		- Plain\n"
-"	   ipecamera	- IPE Camera\n"
-"	-b <bank>	- Data/Register bank (autodetected)\n"
+"	-d <device>		- FPGA device (/dev/fpga0)\n"
+"	-m <model>		- Memory model (autodetected)\n"
+"	   pci			- Plain\n"
+"	   ipecamera		- IPE Camera\n"
+"	-b <bank>		- Data/Register bank (autodetected)\n"
 "\n"
 "  Options:\n"
-"	-s <size>	- Number of words (default: 1)\n"
-"	-a <bitness>	- Bits per word (default: 32)\n"
-"	-e <l|b>	- Endianess Little/Big (default: host)\n"
-"	-o <file>	- Output to file (default: stdout)\n"
+"	-s <size>		- Number of words (default: 1)\n"
+"	-a <bitness>		- Bits per word (default: 32)\n"
+"	-e <l|b>		- Endianess Little/Big (default: host)\n"
+"	-o <file>		- Output to file (default: stdout)\n"
 "\n"
 "  Information:\n"
-"	-q 		- Quiete mode (suppress warnings)\n"
+"	-q 			- Quiete mode (suppress warnings)\n"
 "\n"
 "  Data:\n"
 "	Data can be specified as sequence of hexdecimal number or\n"
@@ -398,7 +404,7 @@ int Benchmark(pcilib_t *handle, pcilib_bar_t bar) {
 #define pci2host16(endianess, value) endianess?
 
 
-int ReadData(pcilib_t *handle, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess) {
+int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess) {
     void *buf;
     int i, err;
     int size = n * abs(access);
@@ -416,7 +422,15 @@ int ReadData(pcilib_t *handle, pcilib_bar_t bar, uintptr_t addr, size_t n, acces
     err = posix_memalign( (void**)&buf, 256, size );
     if ((err)||(!buf)) Error("Allocation of %i bytes of memory have failed", size);
     
-    pcilib_read(handle, bar, addr, size, buf);
+    if (mode == ACCESS_DMA) {
+	pcilib_dma_t dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_FROM_DEVICE, dma);
+	if (dmaid == PCILIB_DMA_INVALID) Error("Invalid DMA engine (%lu) is specified", dma);
+	pcilib_read_dma(handle, dmaid, size, buf);
+
+	addr = 0;
+    } else {
+	pcilib_read(handle, bar, addr, size, buf);
+    }
     if (endianess) pcilib_swap(buf, buf, abs(access), n);
 
     for (i = 0; i < n; i++) {
@@ -442,6 +456,9 @@ int ReadData(pcilib_t *handle, pcilib_bar_t bar, uintptr_t addr, size_t n, acces
     
     free(buf);
 }
+
+
+
 
 int ReadRegister(pcilib_t *handle, pcilib_model_t model, const char *bank, const char *reg) {
     int i;
@@ -548,7 +565,7 @@ int ReadRegisterRange(pcilib_t *handle, pcilib_model_t model, const char *bank, 
     printf("\n\n");
 }
 
-int WriteData(pcilib_t *handle, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, char ** data) {
+int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, char ** data) {
     void *buf, *check;
     int res, i, err;
     int size = n * abs(access);
@@ -574,7 +591,7 @@ int WriteData(pcilib_t *handle, pcilib_bar_t bar, uintptr_t addr, size_t n, acce
     if (memcmp(buf, check, size)) {
 	printf("Write failed: the data written and read differ, the foolowing is read back:\n");
         if (endianess) pcilib_swap(check, check, abs(access), n);
-	ReadData(handle, bar, addr, n, access, endianess);
+	ReadData(handle, mode, dma, bar, addr, n, access, endianess);
 	exit(-1);
     }
 
@@ -687,6 +704,7 @@ int main(int argc, char **argv) {
     
     pcilib_model_t model = PCILIB_MODEL_DETECT;
     MODE mode = MODE_INVALID;
+    ACCESS_MODE amode = ACCESS_BAR;
     const char *fpga_device = DEFAULT_FPGA_DEVICE;
     pcilib_bar_t bar = PCILIB_BAR_DETECT;
     const char *addr = NULL;
@@ -695,6 +713,7 @@ int main(int argc, char **argv) {
     char **data = NULL;
     const char *event = NULL;
     
+    pcilib_dma_addr_t dma;
     uintptr_t start = -1;
     size_t size = 1;
     access_t access = 4;
@@ -848,7 +867,10 @@ int main(int argc, char **argv) {
     }
 
     if (addr) {
-	if ((isxnumber(addr))&&(sscanf(addr, "%lx", &start) == 1)) {
+	if (!strncmp(addr, "dma", 3)) {
+	    dma = atoi(addr + 3);
+	    amode = ACCESS_DMA;
+	} else if ((isxnumber(addr))&&(sscanf(addr, "%lx", &start) == 1)) {
 		// check if the address in the register range
 	    pcilib_register_range_t *ranges =  pcilib_model[model].ranges;
 	    
@@ -896,7 +918,7 @@ int main(int argc, char **argv) {
      break;
      case MODE_READ:
         if (addr) {
-	    ReadData(handle, bar, start, size, access, endianess);
+	    ReadData(handle, amode, dma, bar, start, size, access, endianess);
 	} else {
 	    Error("Address to read is not specified");
 	}
@@ -906,7 +928,7 @@ int main(int argc, char **argv) {
 	else ReadRegisterRange(handle, model, bank, start, size);
      break;
      case MODE_WRITE:
-	WriteData(handle, bar, start, size, access, endianess, data);
+	WriteData(handle, amode, dma, bar, start, size, access, endianess, data);
      break;
      case MODE_WRITE_REGISTER:
         if (reg) WriteRegister(handle, model, bank, reg, data);
