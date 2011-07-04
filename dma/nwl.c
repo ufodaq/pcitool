@@ -17,6 +17,8 @@
 #include "nwl_defines.h"
 
 
+#define NWL_XAUI_ENGINE 0
+#define NWL_XRAWDATA_ENGINE 1
 #define NWL_FIX_EOP_FOR_BIG_PACKETS		// requires precise sizes in read requests
 
 /*
@@ -101,7 +103,7 @@ static int nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_t dma) {
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
     char *base = ctx->engines[dma].base_addr;
 
-    if (info->desc.addr == 1) {
+    if (info->desc.addr == NWL_XRAWDATA_ENGINE) {
 	    // Stop Generators
 	nwl_read_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
 	val = ~(LOOPBACK|PKTCHKR|PKTGENR);
