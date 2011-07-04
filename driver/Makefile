@@ -6,8 +6,10 @@ KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 INSTALLDIR ?= /lib/modules/$(shell uname -r)/extra
 PWD := $(shell pwd)
 
+EXTRA_CFLAGS += -I$(M)/..
+
 default:
-	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
+	$(MAKE) $(CFLAGS) -C $(KERNELDIR) M=$(PWD) modules
 
 install:
 	@mkdir -p $(INSTALLDIR)

@@ -57,6 +57,7 @@
  */
 
 #include <linux/ioctl.h>
+#include "pcilib_types.h"
 
 /* Identifies the PCI-E Xilinx ML605 */
 #define PCIE_XILINX_VENDOR_ID 0x10ee
@@ -82,9 +83,9 @@
 #define PCIDRIVER_MMAP_KMEM 1
 
 /* Direction of a DMA operation */
-#define PCIDRIVER_DMA_BIDIRECTIONAL 0
-#define	PCIDRIVER_DMA_TODEVICE		1
-#define PCIDRIVER_DMA_FROMDEVICE	2
+#define PCIDRIVER_DMA_BIDIRECTIONAL 	0
+#define	PCIDRIVER_DMA_TODEVICE		PCILIB_KMEM_SYNC_TODEVICE
+#define PCIDRIVER_DMA_FROMDEVICE	PCILIB_KMEM_SYNC_FROMDEVICE
 
 /* Possible sizes in a PCI command */
 #define PCIDRIVER_PCI_CFG_SZ_BYTE  1
@@ -100,8 +101,11 @@
 
 /* Types */
 typedef struct {
+	unsigned long type;
 	unsigned long pa;
 	unsigned long size;
+	unsigned long align;
+	unsigned long use;
 	int handle_id;
 } kmem_handle_t;
 
@@ -171,8 +175,8 @@ typedef struct {
 #define PCIDRIVER_IOC_MMAP_MODE  _IO(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 0 )
 #define PCIDRIVER_IOC_MMAP_AREA  _IO(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 1 )
 #define PCIDRIVER_IOC_KMEM_ALLOC _IOWR( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 2, kmem_handle_t * )
-#define PCIDRIVER_IOC_KMEM_FREE  _IOW(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 3, kmem_handle_t * )
-#define PCIDRIVER_IOC_KMEM_SYNC  _IOW(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 4, kmem_sync_t * )
+#define PCIDRIVER_IOC_KMEM_FREE  _IOW ( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 3, kmem_handle_t * )
+#define PCIDRIVER_IOC_KMEM_SYNC  _IOWR( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 4, kmem_sync_t * )
 #define PCIDRIVER_IOC_UMEM_SGMAP _IOWR( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 5, umem_handle_t * )
 #define PCIDRIVER_IOC_UMEM_SGUNMAP _IOW(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 6, umem_handle_t * )
 #define PCIDRIVER_IOC_UMEM_SGGET _IOWR( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 7, umem_sglist_t * )

@@ -319,6 +319,17 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 		mod_info("Couldn't enable device\n");
 		goto probe_pcien_fail;
 	}
+	
+	/* Bus master & dma */
+	if ((id->vendor == PCIE_XILINX_VENDOR_ID)&&(id->device == PCIE_IPECAMERA_DEVICE_ID)) {
+	    pci_set_master(pdev);
+	    
+	    err = pci_set_dma_mask(pdev, DMA_32BIT_MASK);
+	    if (err < 0) {
+		printk(KERN_ERR "pci_set_dma_mask failed\n");
+		goto probe_dma_fail;
+	    }
+	}
 
 	/* Set Memory-Write-Invalidate support */
 	if ((err = pci_set_mwi(pdev)) != 0)
@@ -404,6 +415,7 @@ probe_irq_probe_fail:
 probe_nomem:
 	atomic_dec(&pcidriver_deviceCount);
 probe_maxdevices_fail:
+probe_dma_fail:
 	pci_disable_device(pdev);
 probe_pcien_fail:
  	return err;

@@ -1,6 +1,8 @@
 #ifndef _PCIDRIVER_COMMON_H
 #define _PCIDRIVER_COMMON_H
 
+#include "pcilib_types.h"
+
 /*************************************************************************/
 /* Private data types and structures */
 
@@ -12,6 +14,8 @@ typedef struct {
 	dma_addr_t dma_handle;
 	unsigned long cpua;
 	unsigned long size;
+	unsigned long type;
+	unsigned long use;
 	struct class_device_attribute sysfs_attr;	/* initialized when adding the entry */
 } pcidriver_kmem_entry_t;
 

@@ -3,7 +3,7 @@
 /*******************************/
 
 /* Debug messages */
-//#define DEBUG
+#define DEBUG
 
 /* Enable/disable IRQ handling */
 #define ENABLE_IRQ

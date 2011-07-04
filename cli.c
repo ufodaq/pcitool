@@ -90,7 +90,7 @@ static struct option long_options[] = {
     {"info",			no_argument, 0, OPT_INFO },
     {"list",			no_argument, 0, OPT_LIST },
     {"reset",			no_argument, 0, OPT_RESET },
-    {"benchmark",		no_argument, 0, OPT_BENCHMARK },
+    {"benchmark",		optional_argument, 0, OPT_BENCHMARK },
     {"read",			optional_argument, 0, OPT_READ },
     {"write",			optional_argument, 0, OPT_WRITE },
     {"grab",			optional_argument, 0, OPT_GRAB },
@@ -120,7 +120,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "  Modes:\n"
 "	-i			- Device Info\n"
 "	-l			- List Data Banks & Registers\n"
-"	-p			- Performance Evaluation\n"
+"	-p <barX|dmaX>		- Performance Evaluation\n"
 "	-r <addr|reg|dmaX>	- Read Data/Register\n"
 "	-w <addr|reg|dmaX>	- Write Data/Register\n"
 "	-g [event]		- Grab Event\n"
@@ -302,15 +302,41 @@ void Info(pcilib_t *handle, pcilib_model_t model) {
 }
 
 
-int Benchmark(pcilib_t *handle, pcilib_bar_t bar) {
+int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_bar_t bar) {
     int err;
     int i, errors;
     void *data, *buf, *check;
     struct timeval start, end;
     unsigned long time;
     unsigned int size, max_size;
+    double mbs_in, mbs_out, mbs;
     
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
+
+    if (mode == ACCESS_DMA) {
+        for (size = 1024 ; size < 16 * 1024 * 1024; size *= 4) {
+	    mbs_in = pcilib_benchmark_dma(handle, dma, 0, size, BENCHMARK_ITERATIONS, PCILIB_DMA_FROM_DEVICE);
+	    mbs_out = pcilib_benchmark_dma(handle, dma, 0, size, BENCHMARK_ITERATIONS, PCILIB_DMA_TO_DEVICE);
+	    mbs = pcilib_benchmark_dma(handle, dma, 0, size, BENCHMARK_ITERATIONS, PCILIB_DMA_BIDIRECTIONAL);
+	    printf("%8i KB - ", size / 1024);
+	    
+	    printf("RW: ");
+	    if (mbs < 0) printf("failed ...   ");
+	    else printf("%8.2lf MB/s", mbs);
+
+	    printf(", R: ");
+	    if (mbs_in < 0) printf("failed ...   ");
+	    else printf("%8.2lf MB/s", mbs_in);
+
+	    printf(", W: ");
+	    if (mbs_out < 0) printf("failed ...   ");
+	    else printf("%8.2lf MB/s", mbs_out);
+
+	    printf("\n");
+	}
+	
+	return 0;
+    }
 		
     if (bar < 0) {
 	unsigned long maxlength = 0;
@@ -425,7 +451,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_b
     if (mode == ACCESS_DMA) {
 	pcilib_dma_t dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_FROM_DEVICE, dma);
 	if (dmaid == PCILIB_DMA_INVALID) Error("Invalid DMA engine (%lu) is specified", dma);
-	pcilib_read_dma(handle, dmaid, size, buf);
+	pcilib_read_dma(handle, dmaid, addr, size, buf);
 
 	addr = 0;
     } else {
@@ -748,6 +774,9 @@ int main(int argc, char **argv) {
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 
 		mode = MODE_BENCHMARK;
+
+		if (optarg) addr = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-')) addr = argv[optind++];
 	    break;
 	    case OPT_READ:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
@@ -870,6 +899,9 @@ int main(int argc, char **argv) {
 	if (!strncmp(addr, "dma", 3)) {
 	    dma = atoi(addr + 3);
 	    amode = ACCESS_DMA;
+	} else if (!strncmp(addr, "bar", 3)) {
+	    bar = atoi(addr + 3);
+	    amode = ACCESS_DMA;
 	} else if ((isxnumber(addr))&&(sscanf(addr, "%lx", &start) == 1)) {
 		// check if the address in the register range
 	    pcilib_register_range_t *ranges =  pcilib_model[model].ranges;
@@ -914,7 +946,7 @@ int main(int argc, char **argv) {
         List(handle, model, bank);
      break;
      case MODE_BENCHMARK:
-        Benchmark(handle, bar);
+        Benchmark(handle, amode, dma, bar);
      break;
      case MODE_READ:
         if (addr) {

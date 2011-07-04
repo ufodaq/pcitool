@@ -218,7 +218,12 @@ static int ioctl_kmem_sync(pcidriver_privdata_t *privdata, unsigned long arg)
 	int ret;
 	READ_FROM_USER(kmem_sync_t, ksync);
 
-	return pcidriver_kmem_sync(privdata, &ksync);
+	if ((ret =  pcidriver_kmem_sync(privdata, &ksync)) != 0)
+	    return ret;
+	
+	WRITE_TO_USER(kmem_sync_t, ksync);
+	
+	return 0;
 }
 
 /*

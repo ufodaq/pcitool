@@ -1,6 +1,6 @@
 # Compiler and default flags
 CC ?= gcc
-CFLAGS ?= -O2
+CFLAGS ?= -O0
 
 
 # Defaults for directories

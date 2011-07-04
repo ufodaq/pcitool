@@ -1,4 +1,5 @@
 #define _PCILIB_PCI_C
+//#define PCILIB_FILE_IO
 #define _POSIX_C_SOURCE 199309L
 
 #include <stdio.h>
@@ -18,6 +19,7 @@
 #include "kernel.h"
 #include "tools.h"
 
+#include "dma.h"
 #include "pci.h"
 #include "ipecamera/model.h"
 #include "error.h"
@@ -25,37 +27,7 @@
 #define BIT_MASK(bits) ((1l << (bits)) - 1)
 
 
-//#define PCILIB_FILE_IO
 
-struct pcilib_s {
-    int handle;
-    
-    uintptr_t page_mask;
-    pcilib_board_info_t board_info;
-    pcilib_dma_info_t dma_info;
-    pcilib_model_t model;
-    
-    char *bar_space[PCILIB_MAX_BANKS];
-
-    int reg_bar_mapped;
-    pcilib_bar_t reg_bar;
-//    char *reg_space;
-
-    int data_bar_mapped;
-    pcilib_bar_t data_bar;
-//    char *data_space;
-//    size_t data_size;
-    
-
-    pcilib_model_description_t *model_info;
-    
-    pcilib_dma_context_t *dma_ctx;
-    pcilib_context_t *event_ctx;
-    
-#ifdef PCILIB_FILE_IO
-    int file_io_handle;
-#endif /* PCILIB_FILE_IO */
-};
 
 static void pcilib_print_error(const char *msg, ...) {
     va_list va;
@@ -122,6 +94,19 @@ const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx) {
     }
     
     return &ctx->board_info;
+}
+
+
+int pcilib_wait_irq(pcilib_t *ctx, pcilib_irq_source_t source, unsigned long timeout) {
+    int err;
+
+    err = ioctl(ctx->handle, PCIDRIVER_IOC_WAITI, source);
+    if (err) {
+	pcilib_error("PCIDRIVER_IOC_WAITI ioctl have failed");
+	return PCILIB_ERROR_FAILED;
+    }
+    
+    return 0;
 }
 
 pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx) {
@@ -270,44 +255,6 @@ int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, v
     pcilib_unmap_bar(ctx, bar, data);    
 }
 
-pcilib_dma_t pcilib_find_dma_by_addr(pcilib_t *ctx, pcilib_dma_direction_t direction, pcilib_dma_addr_t dma) {
-    pcilib_dma_t i;
-
-    const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
-    if (!info) {
-	pcilib_error("DMA Engine is not configured in the current model");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    }
-    
-    for (i = 0; info->engines[i]; i++) {
-	if ((info->engines[i]->addr == dma)&&((info->engines[i]->direction&direction)==direction)) break;
-    }
-    
-    if (info->engines[i]) return i;
-    return PCILIB_DMA_INVALID;
-}
-
-int pcilib_read_dma(pcilib_t *ctx, pcilib_dma_t dma, size_t size, void *buf) {
-    const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
-
-    if (!ctx->model_info->dma_api) {
-	pcilib_error("DMA Engine is not configured in the current model");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    }
-    
-    if (!ctx->model_info->dma_api->read) {
-	pcilib_error("The DMA read is not supported by configured DMA engine");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    }
-    
-    if (!info->engines[dma]) {
-	pcilib_error("The DMA engine (%i) is not supported by device", dma);
-	return PCILIB_ERROR_OUTOFRANGE;
-    }
-    
-    return ctx->model_info->dma_api->read(ctx->dma_ctx, dma, size, buf);
-}
-
 
 pcilib_register_bank_t pcilib_find_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank) {
     pcilib_register_bank_t i;
@@ -393,7 +340,7 @@ pcilib_event_t pcilib_find_event(pcilib_t *ctx, const char *event) {
 }
 
 
-static int pcilib_map_register_space(pcilib_t *ctx) {
+int pcilib_map_register_space(pcilib_t *ctx) {
     int err;
     pcilib_register_bank_t i;
     
@@ -441,7 +388,7 @@ static int pcilib_map_register_space(pcilib_t *ctx) {
     return 0;
 }
 
-static int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
+int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
     int err;
     pcilib_bar_t i;
     
@@ -541,26 +488,6 @@ char  *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_
     return NULL;
 }
 
-const pcilib_dma_info_t *pcilib_get_dma_info(pcilib_t *ctx) {
-    if (!ctx->dma_ctx) {
-	pcilib_model_t model = pcilib_get_model(ctx);
-	pcilib_dma_api_description_t *api = pcilib_model[model].dma_api;
-	
-	if ((api)&&(api->init)) {
-	    pcilib_map_register_space(ctx);
-	    ctx->dma_ctx = api->init(ctx);
-	}
-	
-	if (!ctx->dma_ctx) return NULL;
-    }
-    
-    return &ctx->dma_info;
-}
-
-int pcilib_set_dma_engine_description(pcilib_t *ctx, pcilib_dma_t engine, pcilib_dma_engine_description_t *desc) {
-    ctx->dma_info.engines[engine] = desc;
-}
-
 char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size) {
     int err;
     
@@ -586,6 +513,10 @@ void pcilib_close(pcilib_t *ctx) {
     
         if ((eapi)&&(eapi->free)) eapi->free(ctx->event_ctx);
         if ((dapi)&&(dapi->free)) dapi->free(ctx->dma_ctx);
+	
+	while (ctx->kmem_list) {
+	    pcilib_free_kernel_memory(ctx, ctx->kmem_list);
+	}
 
 	for (i = 0; i < PCILIB_MAX_BANKS; i++) {
 	    if (ctx->bar_space[i]) {

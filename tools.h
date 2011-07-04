@@ -6,6 +6,8 @@
 
 #include "pci.h"
 
+#define min2(a, b) (((a)<(b))?(a):(b))
+
 int pcilib_isnumber(const char *str);
 int pcilib_isxnumber(const char *str);
 

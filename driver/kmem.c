@@ -41,7 +41,8 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 
 	/* Initialize the kmem_entry */
 	kmem_entry->id = atomic_inc_return(&privdata->kmem_count) - 1;
-	kmem_entry->size = kmem_handle->size;
+	kmem_entry->use = kmem_handle->use;
+	kmem_entry->type = kmem_handle->type;
 	kmem_handle->handle_id = kmem_entry->id;
 
 	/* Initialize sysfs if possible */
@@ -55,9 +56,25 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	 * CPU address is used for the mmap (internal to the driver), and
 	 * PCI address is the address passed to the DMA Controller in the device.
 	 */
-	retptr = pci_alloc_consistent( privdata->pdev, kmem_handle->size, &(kmem_entry->dma_handle) );
+	switch (kmem_entry->type) {
+	 case PCILIB_KMEM_TYPE_CONSISTENT:
+	    retptr = pci_alloc_consistent( privdata->pdev, kmem_handle->size, &(kmem_entry->dma_handle) );
+	    break;
+	 case PCILIB_KMEM_TYPE_PAGE:
+	    retptr = (void*)__get_free_pages(GFP_KERNEL, get_order(PAGE_SIZE));
+	    kmem_entry->dma_handle = 0;
+	    kmem_handle->size = PAGE_SIZE;
+
+//    	    kmem_entry->dma_handle = pci_map_single(privdata->pdev, retptr, PAGE_SIZE,  PCI_DMA_FROMDEVICE);
+//	    printk("%llx %lx\n", kmem_entry->dma_handle, retptr);
+	    break;
+	 default:
+	    goto kmem_alloc_mem_fail;
+	}
 	if (retptr == NULL)
 		goto kmem_alloc_mem_fail;
+	
+	kmem_entry->size = kmem_handle->size;
 	kmem_entry->cpua = (unsigned long)retptr;
 	kmem_handle->pa = (unsigned long)(kmem_entry->dma_handle);
 
@@ -124,6 +141,17 @@ int pcidriver_kmem_sync( pcidriver_privdata_t *privdata, kmem_sync_t *kmem_sync 
 	if ((kmem_entry = pcidriver_kmem_find_entry(privdata, &(kmem_sync->handle))) == NULL)
 		return -EINVAL;					/* kmem_handle is not valid */
 
+
+	if (!kmem_entry->dma_handle) {
+	    mod_info_dbg("Instead of synchronization, we are mapping kmem_entry with id: %d\n", kmem_entry->id);
+	    if (kmem_sync->dir == PCIDRIVER_DMA_TODEVICE) 
+		kmem_entry->dma_handle = pci_map_single(privdata->pdev, (void*)kmem_entry->cpua, kmem_entry->size,  PCI_DMA_TODEVICE);
+	    else
+		kmem_entry->dma_handle = pci_map_single(privdata->pdev, (void*)kmem_entry->cpua, kmem_entry->size,  PCI_DMA_FROMDEVICE);
+
+	    kmem_sync->handle.pa = kmem_entry->dma_handle;
+	}
+	
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,11)
 	switch (kmem_sync->dir) {
 		case PCIDRIVER_DMA_TODEVICE:
@@ -197,7 +225,16 @@ int pcidriver_kmem_free_entry(pcidriver_privdata_t *privdata, pcidriver_kmem_ent
 #endif
 
 	/* Release DMA memory */
-	pci_free_consistent( privdata->pdev, kmem_entry->size, (void *)(kmem_entry->cpua), kmem_entry->dma_handle );
+	switch (kmem_entry->type) {
+	 case PCILIB_KMEM_TYPE_CONSISTENT:
+	    pci_free_consistent( privdata->pdev, kmem_entry->size, (void *)(kmem_entry->cpua), kmem_entry->dma_handle );
+	    break;
+	 case PCILIB_KMEM_TYPE_PAGE:
+	    if (kmem_entry->dma_handle) pci_unmap_single(privdata->pdev, kmem_entry->dma_handle, kmem_entry->size, PCI_DMA_TODEVICE);
+	    free_page((unsigned long)kmem_entry->cpua);
+	    break;
+	}
+
 
 	/* Remove the kmem list entry */
 	spin_lock( &(privdata->kmemlist_lock) );
@@ -226,7 +263,7 @@ pcidriver_kmem_entry_t *pcidriver_kmem_find_entry(pcidriver_privdata_t *privdata
 	list_for_each(ptr, &(privdata->kmem_list)) {
 		entry = list_entry(ptr, pcidriver_kmem_entry_t, list);
 
-		if (entry->dma_handle == kmem_handle->pa) {
+		if (entry->id == kmem_handle->handle_id) {
 			result = entry;
 			break;
 		}
@@ -288,6 +325,7 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 
 	/* Check sizes */
 	vma_size = (vma->vm_end - vma->vm_start);
+	
 	if ((vma_size != kmem_entry->size) &&
 		((kmem_entry->size < PAGE_SIZE) && (vma_size != PAGE_SIZE))) {
 		mod_info("kem_entry size(%lu) and vma size do not match(%lu)\n", kmem_entry->size, vma_size);
@@ -316,6 +354,6 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 		mod_info("kmem remap failed: %d (%lx)\n", ret,kmem_entry->cpua);
 		return -EAGAIN;
 	}
-
+	
 	return ret;
 }
