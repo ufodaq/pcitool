@@ -308,7 +308,7 @@ void Info(pcilib_t *handle, pcilib_model_t model) {
 #define BENCH_MAX_DMA_SIZE 16 * 1024 * 1024
 #define BENCH_MAX_FIFO_SIZE 1024 * 1024
 
-int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access) {
+int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access) {
     int err;
     int i, j, errors;
     void *data, *buf, *check;
@@ -502,14 +502,14 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_
 #define pci2host16(endianess, value) endianess?
 
 
-int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess) {
+int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess) {
     void *buf;
     int i, err;
     size_t ret;
     int size = n * abs(access);
     int block_width, blocks_per_line;
     int numbers_per_block, numbers_per_line; 
-    pcilib_dma_t dmaid;
+    pcilib_dma_engine_t dmaid;
     
     numbers_per_block = BLOCK_SIZE / access;
 
@@ -672,13 +672,13 @@ int ReadRegisterRange(pcilib_t *handle, pcilib_model_t model, const char *bank, 
     printf("\n\n");
 }
 
-int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, char ** data) {
+int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, char ** data) {
     int read_back = 0;
     void *buf, *check;
     int res, i, err;
     int size = n * abs(access);
     size_t ret;
-    pcilib_dma_t dmaid;
+    pcilib_dma_engine_t dmaid;
 
     err = posix_memalign( (void**)&buf, 256, size );
     if (!err) err = posix_memalign( (void**)&check, 256, size );
@@ -841,7 +841,7 @@ int main(int argc, char **argv) {
     char **data = NULL;
     const char *event = NULL;
     
-    pcilib_dma_addr_t dma;
+    pcilib_dma_engine_addr_t dma;
     uintptr_t start = -1;
     size_t size = 1;
     access_t access = 4;

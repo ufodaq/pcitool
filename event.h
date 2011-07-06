@@ -9,7 +9,7 @@ struct pcilib_event_api_description_s {
 
     int (*reset)(pcilib_context_t *ctx);
 
-    int (*start)(pcilib_context_t *ctx, pcilib_event_t event_mask, pcilib_callback_t callback, void *user);
+    int (*start)(pcilib_context_t *ctx, pcilib_event_t event_mask, pcilib_event_callback_t callback, void *user);
     int (*stop)(pcilib_context_t *ctx);
     int (*trigger)(pcilib_context_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
     

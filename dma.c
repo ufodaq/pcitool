@@ -33,8 +33,8 @@ const pcilib_dma_info_t *pcilib_get_dma_info(pcilib_t *ctx) {
     return &ctx->dma_info;
 }
 
-pcilib_dma_t pcilib_find_dma_by_addr(pcilib_t *ctx, pcilib_dma_direction_t direction, pcilib_dma_addr_t dma) {
-    pcilib_dma_t i;
+pcilib_dma_engine_t pcilib_find_dma_by_addr(pcilib_t *ctx, pcilib_dma_direction_t direction, pcilib_dma_engine_addr_t dma) {
+    pcilib_dma_engine_t i;
 
     const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
     if (!info) {
@@ -50,7 +50,7 @@ pcilib_dma_t pcilib_find_dma_by_addr(pcilib_t *ctx, pcilib_dma_direction_t direc
     return PCILIB_DMA_INVALID;
 }
 
-int pcilib_set_dma_engine_description(pcilib_t *ctx, pcilib_dma_t engine, pcilib_dma_engine_description_t *desc) {
+int pcilib_set_dma_engine_description(pcilib_t *ctx, pcilib_dma_engine_t engine, pcilib_dma_engine_description_t *desc) {
     ctx->dma_info.engines[engine] = desc;
 }
 
@@ -79,7 +79,7 @@ static int pcilib_dma_skip_callback(void *arg, pcilib_dma_flags_t flags, size_t 
     return 1;
 }
 
-size_t pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, pcilib_dma_callback_t cb, void *cbattr) {
+size_t pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, pcilib_dma_callback_t cb, void *cbattr) {
     int err; 
 
     const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
@@ -111,7 +111,7 @@ size_t pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_t dma, uintptr_t addr, size_t
     return ctx->model_info->dma_api->stream(ctx->dma_ctx, dma, addr, size, flags, timeout, cb, cbattr);
 }
 
-size_t pcilib_read_dma(pcilib_t *ctx, pcilib_dma_t dma, uintptr_t addr, size_t size, void *buf) {
+size_t pcilib_read_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf) {
     int err; 
 
     pcilib_dma_read_callback_context_t opts = {
@@ -121,7 +121,7 @@ size_t pcilib_read_dma(pcilib_t *ctx, pcilib_dma_t dma, uintptr_t addr, size_t s
     return pcilib_stream_dma(ctx, dma, addr, size, PCILIB_DMA_FLAGS_DEFAULT, PCILIB_DMA_TIMEOUT, pcilib_dma_read_callback, &opts);
 }
 
-int pcilib_skip_dma(pcilib_t *ctx, pcilib_dma_t dma) {
+int pcilib_skip_dma(pcilib_t *ctx, pcilib_dma_engine_t dma) {
     size_t skipped;
     do {
 	    // IMMEDIATE timeout is not working properly, so default is set
@@ -132,7 +132,7 @@ int pcilib_skip_dma(pcilib_t *ctx, pcilib_dma_t dma) {
 }
 
 
-size_t pcilib_push_dma(pcilib_t *ctx, pcilib_dma_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, void *buf) {
+size_t pcilib_push_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, void *buf) {
     int err; 
 
     const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
@@ -165,11 +165,11 @@ size_t pcilib_push_dma(pcilib_t *ctx, pcilib_dma_t dma, uintptr_t addr, size_t s
 }
 
 
-size_t pcilib_write_dma(pcilib_t *ctx, pcilib_dma_t dma, uintptr_t addr, size_t size, void *buf) {
+size_t pcilib_write_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf) {
     return pcilib_push_dma(ctx, dma, addr, size, PCILIB_DMA_FLAG_EOP, PCILIB_DMA_TIMEOUT, buf);
 }
 
-double pcilib_benchmark_dma(pcilib_t *ctx, pcilib_dma_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction) {
+double pcilib_benchmark_dma(pcilib_t *ctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction) {
     int err; 
 
     const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);

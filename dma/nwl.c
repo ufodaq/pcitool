@@ -54,7 +54,7 @@ struct nwl_dma_s {
     pcilib_register_bank_description_t *dma_bank;
     char *base_addr;
     
-    pcilib_dma_t n_engines;
+    pcilib_dma_engine_t n_engines;
     pcilib_nwl_engine_description_t engines[PCILIB_MAX_DMA_ENGINES + 1];
 };
 
@@ -96,7 +96,7 @@ static int nwl_read_engine_config(nwl_dma_t *ctx, pcilib_nwl_engine_description_
     return 0;
 }
 
-static int nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_t dma) {
+static int nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     uint32_t val;
     struct timeval start, cur;
     
@@ -173,7 +173,7 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib) {
     int i;
     int err;
     uint32_t val;
-    pcilib_dma_t n_engines;
+    pcilib_dma_engine_t n_engines;
 
     pcilib_model_description_t *model_info = pcilib_get_model_description(pcilib);
     
@@ -217,7 +217,7 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib) {
 }
 
 void  dma_nwl_free(pcilib_dma_context_t *vctx) {
-    pcilib_dma_t i;
+    pcilib_dma_engine_t i;
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
     if (ctx) {
 	for (i = 0; i < ctx->n_engines; i++) nwl_stop_engine(vctx, i);
@@ -532,7 +532,7 @@ static int dma_nwl_return_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t
 }
     
 
-size_t dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, void *data) {
+size_t dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, void *data) {
     int err;
     size_t pos;
     size_t bufnum;
@@ -560,7 +560,7 @@ size_t dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_t dma, uint
     return size;
 }
 
-size_t dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, pcilib_dma_callback_t cb, void *cbattr) {
+size_t dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, pcilib_dma_callback_t cb, void *cbattr) {
     int err, ret;
     size_t res = 0;
     size_t bufnum;
@@ -600,7 +600,7 @@ size_t dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_t dma, uintptr
     return res;
 }
 
-double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction) {
+double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction) {
     int i;
     int res;
     int err;
@@ -614,8 +614,8 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_addr_t dma, uint
 
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
 
-    pcilib_dma_t readid = pcilib_find_dma_by_addr(ctx->pcilib, PCILIB_DMA_FROM_DEVICE, dma);
-    pcilib_dma_t writeid = pcilib_find_dma_by_addr(ctx->pcilib, PCILIB_DMA_TO_DEVICE, dma);
+    pcilib_dma_engine_t readid = pcilib_find_dma_by_addr(ctx->pcilib, PCILIB_DMA_FROM_DEVICE, dma);
+    pcilib_dma_engine_t writeid = pcilib_find_dma_by_addr(ctx->pcilib, PCILIB_DMA_TO_DEVICE, dma);
 
     if (size%sizeof(uint32_t)) size = 1 + size / sizeof(uint32_t);
     else size /= sizeof(uint32_t);

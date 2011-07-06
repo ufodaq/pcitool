@@ -53,7 +53,7 @@ struct ipecamera_s {
     char *data;
     size_t size;
 
-    pcilib_callback_t cb;
+    pcilib_event_callback_t cb;
     void *cb_user;
 
     pcilib_event_id_t event_id;
@@ -259,7 +259,7 @@ int ipecamera_reset(pcilib_context_t *vctx) {
     return 0;    
 }
 
-int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_callback_t cb, void *user) {
+int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_event_callback_t cb, void *user) {
     int err = 0;
     ipecamera_t *ctx = (ipecamera_t*)vctx;
     pcilib_t *pcilib = ctx->pcilib;

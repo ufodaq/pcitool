@@ -10,7 +10,7 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib);
 void ipecamera_free(pcilib_context_t *ctx);
 
 int ipecamera_reset(pcilib_context_t *ctx);
-int ipecamera_start(pcilib_context_t *ctx, pcilib_event_t event_mask, pcilib_callback_t cb, void *user);
+int ipecamera_start(pcilib_context_t *ctx, pcilib_event_t event_mask, pcilib_event_callback_t cb, void *user);
 int ipecamera_stop(pcilib_context_t *ctx);
 int ipecamera_trigger(pcilib_context_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
 pcilib_event_id_t ipecamera_next_event(pcilib_context_t *ctx, pcilib_event_t event_mask, const struct timespec *timeout);
