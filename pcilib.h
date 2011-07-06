@@ -125,7 +125,8 @@ typedef struct {
     pcilib_register_size_t bits;
     pcilib_register_value_t defvalue;
     pcilib_register_mode_t mode;
-
+    pcilib_register_type_t type;
+    
     pcilib_register_bank_t bank;
     
     const char *name;

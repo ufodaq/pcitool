@@ -1,3 +1,4 @@
 1. Support registers with bit shifts
 2. Hint for register value representation in the bank (hex, decimal)
 3. Implement software registers
+4. Support FIFO reads/writes from/to registers
