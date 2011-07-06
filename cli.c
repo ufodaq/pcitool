@@ -1013,7 +1013,11 @@ int main(int argc, char **argv) {
     if (addr) {
 	if ((!strncmp(addr, "dma", 3))&&((addr[3]==0)||isnumber(addr+3))) {
 	    if ((type)&&(amode != ACCESS_DMA)) Usage(argc, argv, "Conflicting access modes, the DMA read is requested, but access type is (%s)", type);
-	    if ((addr[3] != 0)&&(strcmp(addr + 3, bank))) Usage(argc, argv, "Conflicting DMA channels are specified in read parameter (%s) and bank parameter (%s)", addr + 3, bank);
+	    if (bank) {
+		if ((addr[3] != 0)&&(strcmp(addr + 3, bank))) Usage(argc, argv, "Conflicting DMA channels are specified in read parameter (%s) and bank parameter (%s)", addr + 3, bank);
+	    } else {
+		if (addr[3] == 0) Usage(argc, argv, "The DMA channel is not specified");
+	    }
 	    dma = atoi(addr + 3);
 	    amode = ACCESS_DMA;
 	} else if ((!strncmp(addr, "bar", 3))&&((addr[3]==0)||isnumber(addr+3))) {
