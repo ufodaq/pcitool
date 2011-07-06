@@ -258,7 +258,7 @@ int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_descriptio
     if (info->pages) return 0;
     
     pcilib_kmem_handle_t *ring = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE, PCILIB_NWL_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA, info->desc.addr), 0);
-    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_PAGE, PCILIB_NWL_DMA_PAGES, 0, PCILIB_NWL_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA, info->desc.addr), 0);
+    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_PAGE, PCILIB_NWL_DMA_PAGES, 0, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA, info->desc.addr), 0);
 
     if ((ring)&&(pages)) err = dma_nwl_sync_buffers(ctx, info, pages);
     else err = PCILIB_ERROR_FAILED;

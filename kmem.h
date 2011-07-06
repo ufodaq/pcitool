@@ -11,6 +11,9 @@ typedef struct {
 //    uintptr_t va;
     void *ua;
     size_t size;
+    
+    size_t alignment_offset;
+    size_t mmap_offset;
 } pcilib_kmem_addr_t;
 
 /**

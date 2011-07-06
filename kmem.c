@@ -44,6 +44,10 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
     kh.align = alignment;
     kh.use = use;
 
+    if (type != PCILIB_KMEM_TYPE_PAGE) {
+	kh.size += alignment;
+    }
+    
     for ( i = 0; i < nmemb; i++) {
         ret = ioctl(ctx->handle, PCIDRIVER_IOC_KMEM_ALLOC, &kh);
 	if (ret) {
@@ -56,13 +60,13 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	kbuf->buf.blocks[i].handle_id = kh.handle_id;
 	kbuf->buf.blocks[i].pa = kh.pa;
 	kbuf->buf.blocks[i].size = kh.size;
-	
-	if (!i) {
-	    if (kh.pa % alignment) printf("Alignment problem\n");
-	    else if (kh.pa & ctx->page_mask) printf("Mmap alignment problem\n");
+    
+        if ((alignment)&&(type != PCILIB_KMEM_TYPE_PAGE)) {
+	    if (kh.pa % alignment) kbuf->buf.blocks[i].alignment_offset = alignment - kh.pa % alignment;
+	    kbuf->buf.blocks[i].size -= alignment;
 	}
-
-    	addr = mmap( 0, kh.size, PROT_WRITE | PROT_READ, MAP_SHARED, ctx->handle, 0 );
+	
+    	addr = mmap( 0, kh.size + kbuf->buf.blocks[i].alignment_offset, PROT_WRITE | PROT_READ, MAP_SHARED, ctx->handle, 0 );
 	if ((!addr)||(addr == MAP_FAILED)) {
 	    kbuf->buf.n_blocks = i + 1;
 	    pcilib_free_kernel_memory(ctx, kbuf);
@@ -71,6 +75,8 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	}
 
 	kbuf->buf.blocks[i].ua = addr;
+	
+	kbuf->buf.blocks[i].mmap_offset = kh.pa & ctx->page_mask;
     }
     
     if (nmemb == 1) {
@@ -99,7 +105,7 @@ void pcilib_free_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
     else if (ctx->kmem_list == kbuf) ctx->kmem_list = kbuf->next;
 
     for (i = 0; i < kbuf->buf.n_blocks; i++) {
-        if (kbuf->buf.blocks[i].ua) munmap(kbuf->buf.blocks[i].ua, kbuf->buf.blocks[i].size);
+        if (kbuf->buf.blocks[i].ua) munmap(kbuf->buf.blocks[i].ua, kbuf->buf.blocks[i].size + kbuf->buf.blocks[i].alignment_offset);
 
         kh.handle_id = kbuf->buf.blocks[i].handle_id;
         kh.pa = kbuf->buf.blocks[i].pa;
@@ -142,22 +148,22 @@ int pcilib_sync_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kme
 
 void *pcilib_kmem_get_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
-    return kbuf->buf.addr.ua;
+    return kbuf->buf.addr.ua + kbuf->buf.addr.alignment_offset + kbuf->buf.addr.mmap_offset;
 }
 
 uintptr_t pcilib_kmem_get_pa(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
-    return kbuf->buf.addr.pa;
+    return kbuf->buf.addr.pa + kbuf->buf.addr.alignment_offset;
 }
 
 void *pcilib_kmem_get_block_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
-    return kbuf->buf.blocks[block].ua;
+    return kbuf->buf.blocks[block].ua + kbuf->buf.blocks[block].alignment_offset + kbuf->buf.blocks[block].mmap_offset;
 }
 
 uintptr_t pcilib_kmem_get_block_pa(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
-    return kbuf->buf.blocks[block].pa;
+    return kbuf->buf.blocks[block].pa + kbuf->buf.blocks[block].alignment_offset;
 }
 
 size_t pcilib_kmem_get_block_size(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block) {
