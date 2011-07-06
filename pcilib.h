@@ -33,13 +33,10 @@ typedef uint8_t pcilib_register_bank_t;		/**< Type holding the register bank num
 typedef uint8_t pcilib_register_bank_addr_t;	/**< Type holding the register bank number */
 typedef uint8_t pcilib_register_size_t;		/**< Type holding the size in bits of the register */
 typedef uint32_t pcilib_register_value_t;	/**< Type holding the register value */
-typedef uint64_t pcilib_event_id_t;
 typedef uint8_t pcilib_dma_engine_addr_t;
 typedef uint8_t pcilib_dma_engine_t;
+typedef uint64_t pcilib_event_id_t;
 typedef uint32_t pcilib_event_t;
-
-typedef int (*pcilib_dma_callback_t)(void *ctx, pcilib_dma_flags_t flags, size_t bufsize, void *buf);
-typedef int (*pcilib_event_callback_t)(pcilib_event_t event, pcilib_event_id_t event_id, void *user);
 
 typedef enum {
     PCILIB_HOST_ENDIAN = 0,
@@ -100,6 +97,9 @@ typedef enum {
 #define PCILIB_EVENT_ID_INVALID		0
 #define PCILIB_TIMEOUT_INFINITE		((size_t)-1)
 #define PCILIB_TIMEOUT_IMMEDIATE	0
+
+typedef int (*pcilib_dma_callback_t)(void *ctx, pcilib_dma_flags_t flags, size_t bufsize, void *buf);
+typedef int (*pcilib_event_callback_t)(pcilib_event_t event, pcilib_event_id_t event_id, void *user);
 
 typedef struct {
     pcilib_register_bank_addr_t addr;
