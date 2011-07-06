@@ -16,17 +16,13 @@
 #include <errno.h>
 #include <assert.h>
 
+#include "pci.h"
+
 #include "kernel.h"
 #include "tools.h"
-
-#include "dma.h"
-#include "pci.h"
-#include "ipecamera/model.h"
 #include "error.h"
 
-#define BIT_MASK(bits) ((1l << (bits)) - 1)
-
-
+#include "ipecamera/model.h"
 
 
 static void pcilib_print_error(const char *msg, ...) {
@@ -220,126 +216,6 @@ void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data) {
 #endif
 }
 
-int pcilib_read(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf) {
-    int i;
-    void *data;
-    unsigned int offset;
-    char local_buf[size];
-    
-
-    pcilib_detect_address(ctx, &bar, &addr, size);
-    data = pcilib_map_bar(ctx, bar);
-
-/*
-    for (i = 0; i < size/4; i++)  {
-	((uint32_t*)((char*)data+addr))[i] = 0x100 * i + 1;
-    }
-*/
-    pcilib_memcpy(buf, data + addr, size);
-    
-    pcilib_unmap_bar(ctx, bar, data);    
-}
-
-int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf) {
-    int i;
-    void *data;
-    unsigned int offset;
-    char local_buf[size];
-    
-
-    pcilib_detect_address(ctx, &bar, &addr, size);
-    data = pcilib_map_bar(ctx, bar);
-
-    pcilib_memcpy(data + addr, buf, size);
-    
-    pcilib_unmap_bar(ctx, bar, data);    
-}
-
-
-pcilib_register_bank_t pcilib_find_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank) {
-    pcilib_register_bank_t i;
-    pcilib_model_t model = pcilib_get_model(ctx);
-    pcilib_register_bank_description_t *banks = pcilib_model[model].banks;
-
-    for (i = 0; banks[i].access; i++)
-	if (banks[i].addr == bank) return i;
-	
-    return -1;
-}
-
-pcilib_register_bank_t pcilib_find_bank_by_name(pcilib_t *ctx, const char *bankname) {
-    pcilib_register_bank_t i;
-    pcilib_register_bank_description_t *banks = pcilib_model[ctx->model].banks;
-
-    for (i = 0; banks[i].access; i++)
-	if (!strcasecmp(banks[i].name, bankname)) return i;
-	
-    return -1;
-}
-
-pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, const char *bank) {
-    pcilib_register_bank_t res;
-    unsigned long addr;
-    
-    if (!bank) {
-	pcilib_model_t model = pcilib_get_model(ctx);
-	pcilib_register_bank_description_t *banks = pcilib_model[model].banks;
-	if ((banks)&&(banks[0].access)) return (pcilib_register_bank_t)0;
-	return -1;
-    }
-    
-    if (pcilib_isxnumber(bank)&&(sscanf(bank,"%lx", &addr) == 1)) {
-	res = pcilib_find_bank_by_addr(ctx, addr);
-	if (res != PCILIB_REGISTER_BANK_INVALID) return res;
-    }
-    
-    return pcilib_find_bank_by_name(ctx, bank);
-}
-
-    // FIXME create hash during map_register space
-pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const char *reg) {
-    pcilib_register_t i;
-    pcilib_register_bank_t bank_id;
-    pcilib_register_bank_addr_t bank_addr;
-    
-    pcilib_model_t model = pcilib_get_model(ctx);
-    
-    pcilib_register_description_t *registers =  pcilib_model[model].registers;
-    
-    if (bank) {
-	bank_id = pcilib_find_bank(ctx, bank);
-	if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
-	    pcilib_error("Invalid bank (%s) is specified", bank);
-	    return -1;
-	}
-	
-	bank_addr = pcilib_model[model].banks[bank_id].addr;
-    }
-    
-    for (i = 0; registers[i].bits; i++) {
-	if ((!strcasecmp(registers[i].name, reg))&&((!bank)||(registers[i].bank == bank_addr))) return i;
-    }
-    
-    return (pcilib_register_t)-1;
-};
-
-
-pcilib_event_t pcilib_find_event(pcilib_t *ctx, const char *event) {
-    int i;
-    pcilib_register_bank_t res;
-    unsigned long addr;
-    
-    pcilib_model_t model = pcilib_get_model(ctx);
-    pcilib_event_description_t *events = pcilib_model[model].events;
-    
-    for (i = 0; events[i].name; i++) {
-	if (!strcasecmp(events[i].name, event)) return (1<<i);
-    }
-
-    return (pcilib_event_t)-1;
-}
-
-
 int pcilib_map_register_space(pcilib_t *ctx) {
     int err;
     pcilib_register_bank_t i;
@@ -467,6 +343,11 @@ char  *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_
 	    // First checking the default register bar
 	size_t offset = addr - ctx->board_info.bar_start[ctx->reg_bar];
 	if ((addr > ctx->board_info.bar_start[ctx->reg_bar])&&(offset < ctx->board_info.bar_length[ctx->reg_bar])) {
+	    if (!ctx->bar_space[ctx->reg_bar]) {
+		pcilib_error("The register bar is not mapped");
+		return NULL;
+	    }
+
 	    return ctx->bar_space[ctx->reg_bar] + offset + (ctx->board_info.bar_start[ctx->reg_bar] & ctx->page_mask);
 	}
 	    
@@ -475,14 +356,26 @@ char  *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_
 	if (bar != PCILIB_BAR_INVALID) {
 	    size_t offset = addr - ctx->board_info.bar_start[bar];
 	    if ((offset < ctx->board_info.bar_length[bar])&&(ctx->bar_space[bar])) {
+		if (!ctx->bar_space[bar]) {
+		    pcilib_error("The requested bar (%i) is not mapped", bar);
+		    return NULL;
+		}
 		return ctx->bar_space[bar] + offset + (ctx->board_info.bar_start[bar] & ctx->page_mask);
 	    }
 	}
     } else {
+	if (!ctx->bar_space[bar]) {
+	    pcilib_error("The requested bar (%i) is not mapped", bar);
+	    return NULL;
+	}
+	
 	if (addr < ctx->board_info.bar_length[bar]) {
 	    return ctx->bar_space[bar] + addr + (ctx->board_info.bar_start[bar] & ctx->page_mask);
 	}
 	
+	if ((addr >= ctx->board_info.bar_start[bar])&&(addr < (ctx->board_info.bar_start[bar] + ctx->board_info.bar_length[ctx->reg_bar]))) {
+	    return ctx->bar_space[bar] + (addr - ctx->board_info.bar_start[bar]) + (ctx->board_info.bar_start[bar] & ctx->page_mask);
+	}
     }
 
     return NULL;
@@ -531,393 +424,56 @@ void pcilib_close(pcilib_t *ctx) {
     }
 }
 
-static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, uint8_t bits, pcilib_register_value_t *buf) {
-    int err;
-    int rest;
-    size_t i;
-    
-    pcilib_model_t model = pcilib_get_model(ctx);
-    pcilib_register_bank_description_t *b = pcilib_model[model].banks + bank;
-
-    assert(bits < 8 * sizeof(pcilib_register_value_t));
-    
-    if (((addr + n) > b->size)||(((addr + n) == b->size)&&(bits))) {
-	pcilib_error("Accessing sregister (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
-	return PCILIB_ERROR_OUTOFRANGE;
-    }
-
-    err = pcilib_map_register_space(ctx);
-    if (err) {
-	pcilib_error("Failed to map the register space");
-	return err;
-    }
-    
-    //n += bits / b->access;
-    //bits %= b->access; 
-    
-    for (i = 0; i < n; i++) {
-	err = pcilib_protocol[b->protocol].read(ctx, b, addr + i, b->access, buf + i);
-	if (err) break;
-    }
-    
-    if ((bits > 0)&&(!err)) err = pcilib_protocol[b->protocol].read(ctx, b, addr + n, bits, buf + n);
-    
-    return err;
-}
-
-int pcilib_read_register_space(pcilib_t *ctx, const char *bank, pcilib_register_addr_t addr, size_t n, pcilib_register_value_t *buf) {
-    pcilib_register_bank_t bank_id = pcilib_find_bank(ctx, bank);
-    if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
-	if (bank) pcilib_error("Invalid register bank is specified (%s)", bank);
-	else pcilib_error("Register bank should be specified");
-	return PCILIB_ERROR_INVALID_BANK;
-    }
-    
-    return pcilib_read_register_space_internal(ctx, bank_id, addr, n, 0, buf);
-}
-
-int pcilib_read_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_register_value_t *value) {
-    int err;
-    size_t i, n, bits;
-    pcilib_register_value_t res;
-    pcilib_register_description_t *r;
-    pcilib_register_bank_description_t *b;
-    pcilib_model_t model = pcilib_get_model(ctx);
-
-    r = pcilib_model[model].registers + reg;
-    b = pcilib_model[model].banks + r->bank;
-    
-    n = r->bits / b->access;
-    bits = r->bits % b->access; 
-
-    pcilib_register_value_t buf[n + 1];
-    err = pcilib_read_register_space_internal(ctx, r->bank, r->addr, n, bits, buf);
-
-    if ((b->endianess == PCILIB_BIG_ENDIAN)||((b->endianess == PCILIB_HOST_ENDIAN)&&(ntohs(1) == 1))) {
-	pcilib_error("Big-endian byte order support is not implemented");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    } else {
-	res = 0;
-	if (bits) ++n;
-	for (i = 0; i < n; i++) {
-	    res |= buf[i] << (i * b->access);
-	}
-    }
-    
-    *value = res;
-    
-    return err;
-}
-
-
-int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t *value) {
-    int err;
-    int reg;
-    
-    reg = pcilib_find_register(ctx, bank, regname);
-    if (reg < 0) {
-	pcilib_error("Register (%s) is not found", regname);
-	return PCILIB_ERROR_NOTFOUND;
-    }
-    
-    return pcilib_read_register_by_id(ctx, reg, value);
-
-//    registers[reg].bank
-//    printf("%li %li", sizeof(pcilib_model[model].banks), sizeof(pcilib_register_bank_description_t));
-}
-
-
-static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, uint8_t bits, pcilib_register_value_t *buf) {
-    int err;
-    int rest;
-    size_t i;
-    
-    pcilib_model_t model = pcilib_get_model(ctx);
-    pcilib_register_bank_description_t *b = pcilib_model[model].banks + bank;
-
-    assert(bits < 8 * sizeof(pcilib_register_value_t));
-
-    if (((addr + n) > b->size)||(((addr + n) == b->size)&&(bits))) {
-	pcilib_error("Accessing sregister (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
-	return PCILIB_ERROR_OUTOFRANGE;
-    }
-
-    err = pcilib_map_register_space(ctx);
-    if (err) {
-	pcilib_error("Failed to map the register space");
-	return err;
-    }
-    
-    //n += bits / b->access;
-    //bits %= b->access; 
-    
-    for (i = 0; i < n; i++) {
-	err = pcilib_protocol[b->protocol].write(ctx, b, addr + i, b->access, buf[i]);
-	if (err) break;
-    }
-    
-    if ((bits > 0)&&(!err)) err = pcilib_protocol[b->protocol].write(ctx, b, addr + n, bits, buf[n]);
-    
-    return err;
-}
-
-int pcilib_write_register_space(pcilib_t *ctx, const char *bank, pcilib_register_addr_t addr, size_t n, pcilib_register_value_t *buf) {
-    pcilib_register_bank_t bank_id = pcilib_find_bank(ctx, bank);
-    if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
-	if (bank) pcilib_error("Invalid register bank is specified (%s)", bank);
-	else pcilib_error("Register bank should be specified");
-	return PCILIB_ERROR_INVALID_BANK;
-    }
-    
-    return pcilib_write_register_space_internal(ctx, bank_id, addr, n, 0, buf);
-}
-
-
-int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_register_value_t value) {
-    int err;
-    size_t i, n, bits;
-    pcilib_register_value_t res;
-    pcilib_register_description_t *r;
-    pcilib_register_bank_description_t *b;
-    pcilib_model_t model = pcilib_get_model(ctx);
-
-    r = pcilib_model[model].registers + reg;
-    b = pcilib_model[model].banks + r->bank;
-    
-    n = r->bits / b->access;
-    bits = r->bits % b->access; 
-
-    pcilib_register_value_t buf[n + 1];
-    memset(buf, 0, (n + 1) * sizeof(pcilib_register_value_t));
-    
-    if ((b->endianess == PCILIB_BIG_ENDIAN)||((b->endianess == PCILIB_HOST_ENDIAN)&&(ntohs(1) == 1))) {
-	pcilib_error("Big-endian byte order support is not implemented");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    } else {
-	if (b->access == sizeof(pcilib_register_value_t) * 8) {
-	    buf[0] = value;
-	} else {
-	    for (i = 0, res = value; (res > 0)&&(i <= n); ++i) {
-		buf[i] = res & BIT_MASK(b->access);
-	        res >>= b->access;
-	    }
-	
-	    if (res) {
-		pcilib_error("Value %i is too big to fit in the register %s", value, r->name);
-		return PCILIB_ERROR_OUTOFRANGE;
-	    }
-	}
-    }
-
-    err = pcilib_write_register_space_internal(ctx, r->bank, r->addr, n, bits, buf);
-    return err;
-}
-
-int pcilib_write_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t value) {
-    int err;
-    int reg;
-    
-    reg = pcilib_find_register(ctx, bank, regname);
-    if (reg < 0) {
-	pcilib_error("Register (%s) is not found", regname);
-	return PCILIB_ERROR_NOTFOUND;
-    }
-
-    return pcilib_write_register_by_id(ctx, reg, value);
-}
-
-
-int pcilib_reset(pcilib_t *ctx) {
-    pcilib_event_api_description_t *api;
-    
-    pcilib_model_t model = pcilib_get_model(ctx);
-
-    api = pcilib_model[model].event_api;
-    if (!api) {
-	pcilib_error("Event API is not supported by the selected model");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    }
-    
-    if (api->reset) 
-	return api->reset(ctx->event_ctx);
-	
-    return 0;
-}
-
-int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, void *callback, void *user) {
-    pcilib_event_api_description_t *api;
-    
-    pcilib_model_t model = pcilib_get_model(ctx);
-
-    api = pcilib_model[model].event_api;
-    if (!api) {
-	pcilib_error("Event API is not supported by the selected model");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    }
-
-    if (api->start) 
-	return api->start(ctx->event_ctx, event_mask, callback, user);
-
-    return 0;
-}
-
-int pcilib_stop(pcilib_t *ctx) {
-    pcilib_event_api_description_t *api;
-    
-    pcilib_model_t model = pcilib_get_model(ctx);
-
-    api = pcilib_model[model].event_api;
-    if (!api) {
-	pcilib_error("Event API is not supported by the selected model");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    }
-
-    if (api->stop) 
-	return api->stop(ctx->event_ctx);
-
-    return 0;
-}
-
-pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask, const struct timespec *timeout) {
-    pcilib_event_api_description_t *api;
-    
-    pcilib_model_t model = pcilib_get_model(ctx);
-
-    api = pcilib_model[model].event_api;
-    if (!api) {
-	pcilib_error("Event API is not supported by the selected model");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    }
-
-    if (api->next_event) 
-	return api->next_event(ctx->event_ctx, event_mask, timeout);
-
-    pcilib_error("Event enumeration is not suppored by API");
-    return PCILIB_EVENT_ID_INVALID;
-}
-
-int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data) {
-    pcilib_event_api_description_t *api;
-    
-    pcilib_model_t model = pcilib_get_model(ctx);
-
-    api = pcilib_model[model].event_api;
-    if (!api) {
-	pcilib_error("Event API is not supported by the selected model");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    }
-
-    if (api->trigger) 
-	return api->trigger(ctx->event_ctx, event, trigger_size, trigger_data);
-
-    pcilib_error("Self triggering is not supported by the selected model");
-    return PCILIB_ERROR_NOTSUPPORTED;
-}
-
-
-void *pcilib_get_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size) {
-    pcilib_event_api_description_t *api = pcilib_model[ctx->model].event_api;
-    if (!api) {
-	pcilib_error("Event API is not supported by the selected model");
-	return NULL;
-    }
-
-    if (api->get_data) 
-	return api->get_data(ctx->event_ctx, event_id, data_type, arg_size, arg, size);
-
-    return NULL;
-}
-
-void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size) {
-    pcilib_event_api_description_t *api = pcilib_model[ctx->model].event_api;
-    if (!api) {
-	pcilib_error("Event API is not supported by the selected model");
-	return NULL;
-    }
-
-    if (api->get_data) 
-	return api->get_data(ctx->event_ctx, event_id, data_type, 0, NULL, size);
-
-    return NULL;
-}
-
-int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id) {
-    pcilib_event_api_description_t *api = pcilib_model[ctx->model].event_api;
-    if (!api) {
-	pcilib_error("Event API is not supported by the selected model");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    }
-
-    if (api->return_data) 
-	return api->return_data(ctx->event_ctx, event_id);
-
-    return 0;
-}
-
-
-typedef struct {
-    pcilib_t *ctx;
-    
-    size_t *size;
-    void **data;
-} pcilib_grab_callback_user_data_t;
-
-static int pcilib_grab_callback(pcilib_event_t event, pcilib_event_id_t event_id, void *vuser) {
-    int err;
+int pcilib_read(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf) {
+    int i;
     void *data;
-    size_t size;
-    int allocated = 0;
 
-    pcilib_grab_callback_user_data_t *user = (pcilib_grab_callback_user_data_t*)vuser;
+    pcilib_detect_address(ctx, &bar, &addr, size);
+    data = pcilib_map_bar(ctx, bar);
 
-    data = pcilib_get_data(user->ctx, event_id, PCILIB_EVENT_DATA, &size);
-    if (!data) {
-	pcilib_error("Error getting event data");
-	return PCILIB_ERROR_FAILED;
-    }
+    pcilib_memcpy(buf, data + addr, size);
     
-    if (*(user->data)) {
-	if ((user->size)&&(*(user->size) < size)) {
-	    pcilib_error("The supplied buffer does not have enough space to hold the event data. Buffer size is %z, but %z is required", user->size, size);
-	    return PCILIB_ERROR_MEMORY;
-	}
-
-	*(user->size) = size;
-    } else {
-	*(user->data) = malloc(size);
-	if (!*(user->data)) {
-	    pcilib_error("Memory allocation (%i bytes) for event data is failed");
-	    return PCILIB_ERROR_MEMORY;
-	}
-	if (*(user->size)) *(user->size) = size;
-	allocated = 1;
-    }
-    
-    memcpy(*(user->data), data, size);
-    
-    err = pcilib_return_data(user->ctx, event_id);
-    if (err) {
-	if (allocated) {
-	    free(*(user->data));
-	    *(user->data) = NULL;
-	}
-	pcilib_error("The event data had been overwritten before it was returned, data corruption may occur");
-	return err;
-    }
-    
-    return 0;
+    pcilib_unmap_bar(ctx, bar, data);    
 }
 
-int pcilib_grab(pcilib_t *ctx, pcilib_event_t event_mask, size_t *size, void **data, const struct timespec *timeout) {
-    int err;
+int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf) {
+    int i;
+    void *data;
+
+    pcilib_detect_address(ctx, &bar, &addr, size);
+    data = pcilib_map_bar(ctx, bar);
+
+    pcilib_memcpy(data + addr, buf, size);
     
-    pcilib_grab_callback_user_data_t user = {ctx, size, data};
-    
-    err = pcilib_start(ctx, event_mask, pcilib_grab_callback, &user);
-    if (!err) {
-	if (timeout) nanosleep(timeout, NULL);
-        else err = pcilib_trigger(ctx, event_mask, 0, NULL);
-    }
-    pcilib_stop(ctx);
-    return 0;
+    pcilib_unmap_bar(ctx, bar, data);    
 }
+
+
+int pcilib_read_fifo(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t fifo_size, size_t n, void *buf) {
+    int i;
+    void *data;
+    
+    pcilib_detect_address(ctx, &bar, &addr, fifo_size);
+    data = pcilib_map_bar(ctx, bar);
+
+    for (i = 0; i < n; i++) {
+	pcilib_memcpy(buf + i * fifo_size, data + addr, fifo_size);
+    }
+    
+    pcilib_unmap_bar(ctx, bar, data);    
+}
+
+int pcilib_write_fifo(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t fifo_size, size_t n, void *buf) {
+    int i;
+    void *data;
+
+    pcilib_detect_address(ctx, &bar, &addr, fifo_size);
+    data = pcilib_map_bar(ctx, bar);
+
+    for (i = 0; i < n; i++) {
+	pcilib_memcpy(data + addr, buf + i * fifo_size, fifo_size);
+    }
+
+    pcilib_unmap_bar(ctx, bar, data);    
+}
+

@@ -8,7 +8,10 @@
 #include "pcilib_types.h"
 
 #include "pcilib.h"
+#include "register.h"
 #include "kmem.h"
+#include "dma.h"
+#include "event.h"
 
 struct pcilib_s {
     int handle;

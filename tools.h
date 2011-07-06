@@ -6,6 +6,8 @@
 
 #include "pci.h"
 
+#define BIT_MASK(bits) ((1ll << (bits)) - 1)
+
 #define min2(a, b) (((a)<(b))?(a):(b))
 
 int pcilib_isnumber(const char *str);

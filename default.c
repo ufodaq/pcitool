@@ -6,8 +6,6 @@
 #include "default.h"
 #include "error.h"
 
-#define BIT_MASK(bits) ((1ll << (bits)) - 1)
-
 #define default_datacpy(dst, src, access, bank)   pcilib_datacpy(dst, src, access, 1, bank->raw_endianess)
 
 int pcilib_default_read(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, uint8_t bits, pcilib_register_value_t *value) {

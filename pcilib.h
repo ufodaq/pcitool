@@ -22,8 +22,8 @@ typedef void pcilib_context_t;
 typedef void pcilib_dma_context_t;
 
 typedef struct pcilib_dma_api_description_s pcilib_dma_api_description_t;
-
-
+typedef struct pcilib_event_api_description_s pcilib_event_api_description_t;
+typedef struct  pcilib_protocol_description_s pcilib_protocol_description_t;
 typedef unsigned long pcilib_irq_source_t;
 
 typedef uint8_t pcilib_bar_t;			/**< Type holding the PCI Bar number */
@@ -71,6 +71,10 @@ typedef enum {
     PCILIB_DMA_FLAG_EOP = 1
 } pcilib_dma_flags_t;
 
+typedef enum {
+    PCILIB_REGISTER_STANDARD = 0,
+    PCILIB_REGISTER_FIFO
+} pcilib_register_type_t;
 
 #define PCILIB_BAR_DETECT 		((pcilib_bar_t)-1)
 #define PCILIB_BAR_INVALID		((pcilib_bar_t)-1)
@@ -142,11 +146,6 @@ typedef struct {
     const char *description;
 } pcilib_event_description_t;
 
-typedef struct {
-    int (*read)(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, uint8_t bits, pcilib_register_value_t *value);
-    int (*write)(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, uint8_t bits, pcilib_register_value_t value);
-} pcilib_protocol_description_t;
-
 typedef enum {
     PCILIB_DMA_FROM_DEVICE = 1,
     PCILIB_DMA_TO_DEVICE = 2,
@@ -171,21 +170,6 @@ typedef struct {
 } pcilib_dma_info_t;
 
 typedef int (*pcilib_callback_t)(pcilib_event_t event, pcilib_event_id_t event_id, void *user);
-
-typedef struct {
-    pcilib_context_t *(*init)(pcilib_t *ctx);
-    void (*free)(pcilib_context_t *ctx);
-
-    int (*reset)(pcilib_context_t *ctx);
-
-    int (*start)(pcilib_context_t *ctx, pcilib_event_t event_mask, pcilib_callback_t callback, void *user);
-    int (*stop)(pcilib_context_t *ctx);
-    int (*trigger)(pcilib_context_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
-    
-    pcilib_event_id_t (*next_event)(pcilib_context_t *ctx, pcilib_event_t event_mask, const struct timespec *timeout);
-    void* (*get_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size);
-    int (*return_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id);
-} pcilib_event_api_description_t;
 
 typedef struct {
     uint8_t access;
@@ -228,6 +212,9 @@ pcilib_dma_t pcilib_find_dma_by_addr(pcilib_t *ctx, pcilib_dma_direction_t direc
 
 int pcilib_read(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf);
 int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf);
+int pcilib_write_fifo(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t fifo_size, size_t n, void *buf);
+int pcilib_read_fifo(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t fifo_size, size_t n, void *buf);
+
 
 typedef int (*pcilib_dma_callback_t)(void *ctx, pcilib_dma_flags_t flags, size_t bufsize, void *buf);
 

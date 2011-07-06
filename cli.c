@@ -17,7 +17,7 @@
 
 #include <getopt.h>
 
-#include "pci.h"
+//#include "pci.h"
 #include "tools.h"
 #include "kernel.h"
 
@@ -63,6 +63,7 @@ typedef enum {
 typedef enum {
     OPT_DEVICE = 'd',
     OPT_MODEL = 'm',
+    OPT_TYPE = 't',
     OPT_BAR = 'b',
     OPT_ACCESS = 'a',
     OPT_ENDIANESS = 'e',
@@ -82,6 +83,7 @@ typedef enum {
 static struct option long_options[] = {
     {"device",			required_argument, 0, OPT_DEVICE },
     {"model",			required_argument, 0, OPT_MODEL },
+    {"type",			required_argument, 0, OPT_TYPE },
     {"bar",			required_argument, 0, OPT_BAR },
     {"access",			required_argument, 0, OPT_ACCESS },
     {"endianess",		required_argument, 0, OPT_ENDIANESS },
@@ -132,7 +134,8 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "	-m <model>		- Memory model (autodetected)\n"
 "	   pci			- Plain\n"
 "	   ipecamera		- IPE Camera\n"
-"	-b <bank>		- Data/Register bank (autodetected)\n"
+"	-t <plain|fifo|dma>	- Access type (default: plain)\n"
+"	-b <bank>		- PCI bar, Register bank, or DMA channel\n"
 "\n"
 "  Options:\n"
 "	-s <size>		- Number of words (default: 1)\n"
@@ -302,22 +305,34 @@ void Info(pcilib_t *handle, pcilib_model_t model) {
 }
 
 
-int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_bar_t bar) {
+#define BENCH_MAX_DMA_SIZE 16 * 1024 * 1024
+#define BENCH_MAX_FIFO_SIZE 1024 * 1024
+
+int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access) {
     int err;
-    int i, errors;
+    int i, j, errors;
     void *data, *buf, *check;
+    void *fifo;
     struct timeval start, end;
     unsigned long time;
-    unsigned int size, max_size;
+    size_t size, min_size, max_size;
     double mbs_in, mbs_out, mbs;
     
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
 
     if (mode == ACCESS_DMA) {
-        for (size = 1024 ; size < 16 * 1024 * 1024; size *= 4) {
-	    mbs_in = pcilib_benchmark_dma(handle, dma, 0, size, BENCHMARK_ITERATIONS, PCILIB_DMA_FROM_DEVICE);
-	    mbs_out = pcilib_benchmark_dma(handle, dma, 0, size, BENCHMARK_ITERATIONS, PCILIB_DMA_TO_DEVICE);
-	    mbs = pcilib_benchmark_dma(handle, dma, 0, size, BENCHMARK_ITERATIONS, PCILIB_DMA_BIDIRECTIONAL);
+	if (n) {
+	    min_size = n * access;
+	    max_size = n * access;
+	} else {
+	    min_size = 1024;
+	    max_size = BENCH_MAX_DMA_SIZE;
+	}
+	
+        for (size = min_size; size < max_size; size *= 4) {
+	    mbs_in = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_FROM_DEVICE);
+	    mbs_out = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_TO_DEVICE);
+	    mbs = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_BIDIRECTIONAL);
 	    printf("%8i KB - ", size / 1024);
 	    
 	    printf("RW: ");
@@ -337,10 +352,17 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_
 	
 	return 0;
     }
-		
-    if (bar < 0) {
+
+    if (bar == PCILIB_BAR_INVALID) {
 	unsigned long maxlength = 0;
+	
+
 	for (i = 0; i < PCILIB_MAX_BANKS; i++) {
+	    if ((addr >= board_info->bar_start[i])&&((board_info->bar_start[i] + board_info->bar_length[i]) >= (addr + access))) {
+		bar = i;
+		break;
+	    }
+
 	    if (board_info->bar_length[i] > maxlength) {
 		maxlength = board_info->bar_length[i];
 		bar = i;
@@ -350,36 +372,71 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_
 	if (bar < 0) Error("Data banks are not available");
     }
     
+    if (n) {
+	if ((mode == ACCESS_BAR)&&(n * access > board_info->bar_length[bar])) Error("The specified size (%i) exceeds the size of bar (%i)", n * access, board_info->bar_length[bar]);
 
-    max_size = board_info->bar_length[bar];
+	min_size = n * access;
+	max_size = n * access;
+    } else {
+	min_size = access;
+	if (mode == ACCESS_BAR) max_size = board_info->bar_length[bar];
+	else max_size = BENCH_MAX_FIFO_SIZE;
+    }
     
     err = posix_memalign( (void**)&buf, 256, max_size );
     if (!err) err = posix_memalign( (void**)&check, 256, max_size );
     if ((err)||(!buf)||(!check)) Error("Allocation of %i bytes of memory have failed", max_size);
 
-    printf("Transfer time (Bank: %i):\n", bar);    
     data = pcilib_map_bar(handle, bar);
-    
-    for (size = 4 ; size < max_size; size *= 8) {
+    if (!data) Error("Can't map bar %i", bar);
+
+    if (mode == ACCESS_FIFO) {
+        fifo = data + (addr - board_info->bar_start[bar]) + (board_info->bar_start[bar] & pcilib_get_page_mask());
+//	pcilib_resolve_register_address(handle, bar, addr);
+	if (!fifo) Error("Can't resolve address (%lx) in bar (%u)", addr, bar);
+    }
+
+    if (mode == ACCESS_FIFO)
+	printf("Transfer time (Bank: %i, Fifo: %lx):\n", bar, addr);
+    else
+	printf("Transfer time (Bank: %i):\n", bar);
+	
+    for (size = min_size ; size < max_size; size *= 8) {
 	gettimeofday(&start,NULL);
-	for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
-	    pcilib_memcpy(buf, data, size);
+	if (mode == ACCESS_BAR) {
+	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
+		pcilib_memcpy(buf, data, size);
+	    }
+	} else {
+	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
+		for (j = 0; j < (size/access); j++) {
+		    pcilib_memcpy(buf + j * access, fifo, access);
+		}
+	    }
 	}
 	gettimeofday(&end,NULL);
 
 	time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	printf("%8i bytes - read: %8.2lf MB/s", size, 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024 * 1024));
+	printf("%8i bytes - read: %8.2lf MB/s", size, 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
 	
 	fflush(0);
 
 	gettimeofday(&start,NULL);
-	for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
-	    pcilib_memcpy(data, buf, size);
+	if (mode == ACCESS_BAR) {
+	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
+		pcilib_memcpy(data, buf, size);
+	    }
+	} else {
+	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
+		for (j = 0; j < (size/access); j++) {
+		    pcilib_memcpy(fifo, buf + j * access, access);
+		}
+	    }
 	}
 	gettimeofday(&end,NULL);
 
 	time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	printf(", write: %8.2lf MB/s\n", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024 * 1024));
+	printf(", write: %8.2lf MB/s\n", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
     }
     
     pcilib_unmap_bar(handle, bar, data);
@@ -388,36 +445,51 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_
     
     for (size = 4 ; size < max_size; size *= 8) {
 	gettimeofday(&start,NULL);
-	for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
-	    pcilib_read(handle, bar, 0, size, buf);
+	if (mode == ACCESS_BAR) {
+	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
+		pcilib_read(handle, bar, 0, size, buf);
+	    }
+	} else {
+	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
+		pcilib_read_fifo(handle, bar, addr, access, size / access, buf);
+	    }
 	}
 	gettimeofday(&end,NULL);
 
 	time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	printf("%8i bytes - read: %8.2lf MB/s", size, 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024 * 1024));
+	printf("%8i bytes - read: %8.2lf MB/s", size, 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
 	
 	fflush(0);
 
 	gettimeofday(&start,NULL);
-	for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
-	    pcilib_write(handle, bar, 0, size, buf);
+	if (mode == ACCESS_BAR) {
+	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
+		pcilib_write(handle, bar, 0, size, buf);
+	    }
+	} else {
+	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
+		pcilib_write_fifo(handle, bar, addr, access, size / access, buf);
+	    }
 	}
+	
 	gettimeofday(&end,NULL);
 
 	time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	printf(", write: %8.2lf MB/s", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024 * 1024));
+	printf(", write: %8.2lf MB/s", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
 
-	gettimeofday(&start,NULL);
-	for (i = 0, errors = 0; i < BENCHMARK_ITERATIONS; i++) {
-	    pcilib_write(handle, bar, 0, size, buf);
-	    pcilib_read(handle, bar, 0, size, check);
-	    if (memcmp(buf, check, size)) ++errors;
+	if (mode == ACCESS_BAR) {
+	    gettimeofday(&start,NULL);
+	    for (i = 0, errors = 0; i < BENCHMARK_ITERATIONS; i++) {
+		pcilib_write(handle, bar, 0, size, buf);
+		pcilib_read(handle, bar, 0, size, check);
+		if (memcmp(buf, check, size)) ++errors;
+	    }
+	    gettimeofday(&end,NULL);
+
+	    time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
+	    printf(", write-verify: %8.2lf MB/s", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
+	    if (errors) printf(", errors: %u of %u", errors, BENCHMARK_ITERATIONS);
 	}
-	gettimeofday(&end,NULL);
-
-	time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	printf(", write-verify: %8.2lf MB/s", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024 * 1024));
-	if (errors) printf(", errors: %u of %u", errors, BENCHMARK_ITERATIONS);
 	printf("\n");
     }
     
@@ -433,9 +505,11 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_
 int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess) {
     void *buf;
     int i, err;
+    size_t ret;
     int size = n * abs(access);
     int block_width, blocks_per_line;
     int numbers_per_block, numbers_per_line; 
+    pcilib_dma_t dmaid;
     
     numbers_per_block = BLOCK_SIZE / access;
 
@@ -448,13 +522,20 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_b
     err = posix_memalign( (void**)&buf, 256, size );
     if ((err)||(!buf)) Error("Allocation of %i bytes of memory have failed", size);
     
-    if (mode == ACCESS_DMA) {
-	pcilib_dma_t dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_FROM_DEVICE, dma);
+    switch (mode) {
+      case ACCESS_DMA:
+	dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_FROM_DEVICE, dma);
 	if (dmaid == PCILIB_DMA_INVALID) Error("Invalid DMA engine (%lu) is specified", dma);
-	pcilib_read_dma(handle, dmaid, addr, size, buf);
-
+	ret = pcilib_read_dma(handle, dmaid, addr, size, buf);
+	if (ret <= 0) Error("No data is returned by DMA engine");
+	size = ret;
 	addr = 0;
-    } else {
+      break;
+      case ACCESS_FIFO:
+	pcilib_read_fifo(handle, bar, addr, access, n, buf);
+	addr = 0;
+      break;
+      default:
 	pcilib_read(handle, bar, addr, size, buf);
     }
     if (endianess) pcilib_swap(buf, buf, abs(access), n);
@@ -592,9 +673,12 @@ int ReadRegisterRange(pcilib_t *handle, pcilib_model_t model, const char *bank, 
 }
 
 int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, char ** data) {
+    int read_back = 0;
     void *buf, *check;
     int res, i, err;
     int size = n * abs(access);
+    size_t ret;
+    pcilib_dma_t dmaid;
 
     err = posix_memalign( (void**)&buf, 256, size );
     if (!err) err = posix_memalign( (void**)&check, 256, size );
@@ -611,10 +695,27 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_addr_t dma, pcilib_
     }
 
     if (endianess) pcilib_swap(buf, buf, abs(access), n);
-    pcilib_write(handle, bar, addr, size, buf);
-    pcilib_read(handle, bar, addr, size, check);
-    
-    if (memcmp(buf, check, size)) {
+
+    switch (mode) {
+      case ACCESS_DMA:
+	dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_TO_DEVICE, dma);
+	if (dmaid == PCILIB_DMA_INVALID) Error("Invalid DMA engine (%lu) is specified", dma);
+	ret = pcilib_write_dma(handle, dmaid, addr, size, buf);
+	if (ret != size) {
+	    if (!ret) Error("No data is written by DMA engine");
+	    else Error("Only %lu bytes of %lu is written by DMA engine", ret, size);
+	}
+      break;
+      case ACCESS_FIFO:
+	pcilib_write_fifo(handle, bar, addr, access, n, buf);
+      break;
+      default:
+	pcilib_write(handle, bar, addr, size, buf);
+	pcilib_read(handle, bar, addr, size, check);
+	read_back = 1;
+    }
+
+    if ((read_back)&&(memcmp(buf, check, size))) {
 	printf("Write failed: the data written and read differ, the foolowing is read back:\n");
         if (endianess) pcilib_swap(check, check, abs(access), n);
 	ReadData(handle, mode, dma, bar, addr, n, access, endianess);
@@ -730,6 +831,7 @@ int main(int argc, char **argv) {
     
     pcilib_model_t model = PCILIB_MODEL_DETECT;
     MODE mode = MODE_INVALID;
+    const char *type = NULL;
     ACCESS_MODE amode = ACCESS_BAR;
     const char *fpga_device = DEFAULT_FPGA_DEVICE;
     pcilib_bar_t bar = PCILIB_BAR_DETECT;
@@ -749,7 +851,9 @@ int main(int argc, char **argv) {
 
     pcilib_t *handle;
     
-    while ((c = getopt_long(argc, argv, "hqilpr::w::g::d:m:b:a:s:e:o:", long_options, NULL)) != (unsigned char)-1) {
+    int size_set = 0;
+    
+    while ((c = getopt_long(argc, argv, "hqilpr::w::g::d:m:t:b:a:s:e:o:", long_options, NULL)) != (unsigned char)-1) {
 	extern int optind;
 	switch (c) {
 	    case OPT_HELP:
@@ -805,7 +909,10 @@ int main(int argc, char **argv) {
 	    case OPT_MODEL:
 		if (!strcasecmp(optarg, "pci")) model = PCILIB_MODEL_PCI;
 		else if (!strcasecmp(optarg, "ipecamera")) model = PCILIB_MODEL_IPECAMERA;
-		else Usage(argc, argv, "Invalid memory model (%s) is specified", optarg);\
+		else Usage(argc, argv, "Invalid memory model (%s) is specified", optarg);
+	    break;
+	    case OPT_TYPE:
+		type = optarg;
 	    break;
 	    case OPT_BAR:
 		bank = optarg;
@@ -825,6 +932,7 @@ int main(int argc, char **argv) {
 	    case OPT_SIZE:
 		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &size) != 1))
 		    Usage(argc, argv, "Invalid size is specified (%s)", optarg);
+		size_set = 1;
 	    break;
 	    case OPT_ENDIANESS:
 		if ((*optarg == 'b')||(*optarg == 'B')) {
@@ -895,13 +1003,24 @@ int main(int argc, char **argv) {
         if (argc > optind) Usage(argc, argv, "Invalid non-option parameters are supplied");
     }
 
+    if (type) {
+	if (!strcasecmp(type, "fifo")) amode = ACCESS_FIFO;
+	else if (!strcasecmp(type, "dma")) amode = ACCESS_DMA;
+	else if ((!strcasecmp(type, "bar"))||(!strcasecmp(optarg, "bar"))) amode = ACCESS_BAR;
+	else Usage(argc, argv, "Invalid access type (%s) is specified", type);
+    }
+
     if (addr) {
-	if (!strncmp(addr, "dma", 3)) {
+	if ((!strncmp(addr, "dma", 3))&&((addr[3]==0)||isnumber(addr+3))) {
+	    if ((type)&&(amode != ACCESS_DMA)) Usage(argc, argv, "Conflicting access modes, the DMA read is requested, but access type is (%s)", type);
+	    if ((addr[3] != 0)&&(strcmp(addr + 3, bank))) Usage(argc, argv, "Conflicting DMA channels are specified in read parameter (%s) and bank parameter (%s)", addr + 3, bank);
 	    dma = atoi(addr + 3);
 	    amode = ACCESS_DMA;
-	} else if (!strncmp(addr, "bar", 3)) {
+	} else if ((!strncmp(addr, "bar", 3))&&((addr[3]==0)||isnumber(addr+3))) {
+	    if ((type)&&(amode != ACCESS_BAR)) Usage(argc, argv, "Conflicting access modes, the plain PCI read is requested, but access type is (%s)", type);
+	    if ((addr[3] != 0)&&(strcmp(addr + 3, bank))) Usage(argc, argv, "Conflicting PCI bars are specified in read parameter (%s) and bank parameter (%s)", addr + 3, bank);
 	    bar = atoi(addr + 3);
-	    amode = ACCESS_DMA;
+	    amode = ACCESS_BAR;
 	} else if ((isxnumber(addr))&&(sscanf(addr, "%lx", &start) == 1)) {
 		// check if the address in the register range
 	    pcilib_register_range_t *ranges =  pcilib_model[model].ranges;
@@ -911,7 +1030,7 @@ int main(int argc, char **argv) {
 		    if ((start >= ranges[i].start)&&(start <= ranges[i].end)) break;
 	    		
 		    // register access in plain mode
-		if (ranges[i].start != ranges[i].end) ++mode;
+		if (ranges[i].start != ranges[i].end) ++mode;	
 	    }
 	} else {
 	    if (pcilib_find_register(handle, bank, addr) == PCILIB_REGISTER_INVALID) {
@@ -923,7 +1042,12 @@ int main(int argc, char **argv) {
 	} 
     }
     
-    if (bank) {
+
+    if ((bank)&&(amode == ACCESS_DMA)) {
+	if ((!isnumber(bank))||(sscanf(bank,"%li", &itmp) != 1)||(itmp < 0)) 
+	    Usage(argc, argv, "Invalid DMA channel (%s) is specified", bank);
+	else dma = itmp;
+    } else if (bank) {
 	switch (mode) {
 	    case MODE_BENCHMARK:
 	    case MODE_READ:
@@ -937,6 +1061,7 @@ int main(int argc, char **argv) {
 		    Usage(argc, argv, "Invalid data bank (%s) is specified", bank);
 	}
     }
+    
 
     switch (mode) {
      case MODE_INFO:
@@ -946,7 +1071,7 @@ int main(int argc, char **argv) {
         List(handle, model, bank);
      break;
      case MODE_BENCHMARK:
-        Benchmark(handle, amode, dma, bar);
+        Benchmark(handle, amode, dma, bar, start, size_set?size:0, access);
      break;
      case MODE_READ:
         if (addr) {
