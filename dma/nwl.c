@@ -26,12 +26,9 @@ pcilib_register_bank_description_t ipecamera_register_banks[] = {
     { PCILIB_REGISTER_DMABANK0, PCILIB_BAR0, 128, PCILIB_DEFAULT_PROTOCOL, DMA_NWL_OFFSET, DMA_NWL_OFFSET, PCILIB_LITTLE_ENDIAN, 32, PCILIB_LITTLE_ENDIAN, "%lx", "dma", "NorthWest Logick DMA Engine" },
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL }
 };
-
-pcilib_register_description_t dma_nwl_registers[] = {
-    {0, 	0, 	32, 	0, 	PCILIB_REGISTER_R , PCILIB_REGISTER_DMABANK, "dma_capabilities",  ""},
-    {1, 	0, 	32, 	0, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_DMABANK, "dma_control",  ""},
-};
 */
+
+
 
 typedef struct {
     pcilib_dma_engine_description_t desc;
@@ -71,6 +68,7 @@ static int nwl_read_engine_config(nwl_dma_t *ctx, pcilib_nwl_engine_description_
     if ((val & DMA_ENG_PRESENT_MASK) == 0) return PCILIB_ERROR_NOTAVAILABLE;
     
     info->desc.addr = (val & DMA_ENG_NUMBER) >> DMA_ENG_NUMBER_SHIFT;
+    if ((info->desc.addr > PCILIB_MAX_DMA_ENGINES)||(info->desc.addr < 0)) return PCILIB_ERROR_INVALID_DATA;
     
     switch (val & DMA_ENG_DIRECTION_MASK) {
 	case  DMA_ENG_C2S:
