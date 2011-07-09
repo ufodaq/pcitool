@@ -22,6 +22,9 @@ SRCC = $(wildcard *.c)
 SRC += $(wildcard ipecamera/*.cpp)
 SRCC += $(wildcard ipecamera/*.c)
 
+SRC += $(wildcard dma/*.cpp)
+SRCC += $(wildcard dma/*.c)
+
 # Corresponding object files 
 OBJ = $(addprefix $(OBJDIR)/,$(SRC:.cpp=.o))
 OBJ += $(addprefix $(OBJDIR)/,$(SRCC:.c=.o))

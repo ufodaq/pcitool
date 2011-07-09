@@ -28,7 +28,7 @@ typedef unsigned long pcilib_irq_source_t;
 
 typedef uint8_t pcilib_bar_t;			/**< Type holding the PCI Bar number */
 typedef uint8_t pcilib_register_t;		/**< Type holding the register ID within the Bank */
-typedef uint8_t pcilib_register_addr_t;		/**< Type holding the register ID within the Bank */
+typedef uint32_t pcilib_register_addr_t;	/**< Type holding the register ID within the Bank */
 typedef uint8_t pcilib_register_bank_t;		/**< Type holding the register bank number */
 typedef uint8_t pcilib_register_bank_addr_t;	/**< Type holding the register bank number */
 typedef uint8_t pcilib_register_size_t;		/**< Type holding the size in bits of the register */
@@ -53,7 +53,9 @@ typedef enum {
 typedef enum {
     PCILIB_REGISTER_R = 1,
     PCILIB_REGISTER_W = 2,
-    PCILIB_REGISTER_RW = 3
+    PCILIB_REGISTER_RW = 3,
+    PCILIB_REGISTER_W1C = 4,		/**< writting 1 resets the flag */
+    PCILIB_REGISTER_RW1C = 5
 } pcilib_register_mode_t;
 
 typedef enum {
@@ -72,7 +74,8 @@ typedef enum {
 
 typedef enum {
     PCILIB_REGISTER_STANDARD = 0,
-    PCILIB_REGISTER_FIFO
+    PCILIB_REGISTER_FIFO,
+    PCILIB_REGISTER_BITS
 } pcilib_register_type_t;
 
 #define PCILIB_BAR_DETECT 		((pcilib_bar_t)-1)
@@ -126,6 +129,7 @@ typedef struct {
     pcilib_register_size_t offset;
     pcilib_register_size_t bits;
     pcilib_register_value_t defvalue;
+    pcilib_register_value_t rwmask;	/**< 1 - read before write bits, 0 - zero should be written to preserve value */
     pcilib_register_mode_t mode;
     pcilib_register_type_t type;
     
@@ -184,10 +188,6 @@ typedef struct {
     pcilib_dma_api_description_t *dma_api;    
     pcilib_event_api_description_t *event_api;
 } pcilib_model_description_t;
-
-#ifndef _PCILIB_PCI_C
-extern pcilib_model_description_t pcilib_model[];
-#endif /* ! _PCILIB_PCI_C */
 
 int pcilib_set_error_handler(void (*err)(const char *msg, ...), void (*warn)(const char *msg, ...));
 

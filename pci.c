@@ -63,8 +63,8 @@ pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
 
 	if (!model) model = pcilib_get_model(ctx);
 	
-	ctx->model_info = pcilib_model + model;
-	
+	memcpy(&ctx->model_info, pcilib_model + model, sizeof(pcilib_model_description_t));
+
 	api = pcilib_model[model].event_api;
         if ((api)&&(api->init)) ctx->event_ctx = api->init(ctx);
     }
@@ -73,7 +73,7 @@ pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
 }
 
 pcilib_model_description_t *pcilib_get_model_description(pcilib_t *ctx) {
-    return ctx->model_info;
+    return &ctx->model_info;
 }
 
 const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx) {
@@ -221,8 +221,8 @@ int pcilib_map_register_space(pcilib_t *ctx) {
     pcilib_register_bank_t i;
     
     if (!ctx->reg_bar_mapped)  {
-	pcilib_model_t model = pcilib_get_model(ctx);
-	pcilib_register_bank_description_t *banks = pcilib_model[model].banks;
+	pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+	pcilib_register_bank_description_t *banks = model_info->banks;
     
 	for (i = 0; ((banks)&&(banks[i].access)); i++) {
 //	    uint32_t buf[2];
@@ -400,12 +400,17 @@ void pcilib_close(pcilib_t *ctx) {
     pcilib_bar_t i;
     
     if (ctx) {
-	pcilib_model_t model = pcilib_get_model(ctx);
-	pcilib_event_api_description_t *eapi = pcilib_model[model].event_api;
-	pcilib_dma_api_description_t *dapi = pcilib_model[model].dma_api;
+	pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+	pcilib_event_api_description_t *eapi = model_info->event_api;
+	pcilib_dma_api_description_t *dapi = model_info->dma_api;
     
         if ((eapi)&&(eapi->free)) eapi->free(ctx->event_ctx);
         if ((dapi)&&(dapi->free)) dapi->free(ctx->dma_ctx);
+	
+	if (ctx->model_info.registers != model_info->registers) {
+	    free(ctx->model_info.registers);
+	    ctx->model_info.registers = pcilib_model[ctx->model].registers;
+	}
 	
 	while (ctx->kmem_list) {
 	    pcilib_free_kernel_memory(ctx, ctx->kmem_list);

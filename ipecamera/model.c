@@ -21,9 +21,9 @@
 //#define IPECAMERA_SIMPLIFIED_READOUT
 #define IPECAMERA_MULTIREAD
 
-static pcilib_register_value_t ipecamera_bit_mask[9] = { 0, 1, 3, 7, 15, 31, 63, 127, 255 };
+//static pcilib_register_value_t ipecamera_bit_mask[9] = { 0, 1, 3, 7, 15, 31, 63, 127, 255 };
 
-int ipecamera_read(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, uint8_t bits, pcilib_register_value_t *value) {
+int ipecamera_read(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, pcilib_register_value_t *value) {
     uint32_t val, tmp[4];
     char *wr, *rd;
     struct timeval start, cur;
@@ -107,12 +107,13 @@ retry:
 	return PCILIB_ERROR_VERIFY;
     }
 
-    *value = val&ipecamera_bit_mask[bits];
+//    *value = val&ipecamera_bit_mask[bits];
+    *value = val&0xFF;
 
     return 0;
 }
 
-int ipecamera_write(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, uint8_t bits, pcilib_register_value_t value) {
+int ipecamera_write(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, pcilib_register_value_t value) {
     uint32_t val, tmp[4];
     char *wr, *rd;
     struct timeval start, cur;
@@ -196,8 +197,8 @@ retry:
 	return PCILIB_ERROR_VERIFY;
     }
     
-    if ((val&ipecamera_bit_mask[bits]) != value) {
-	pcilib_error("Value verification failed during register read (CMOSIS %lu, value: %lu != %lu)", addr, val&ipecamera_bit_mask[bits], value);
+    if ((val&0xFF/*&ipecamera_bit_mask[bits]*/) != value) {
+	pcilib_error("Value verification failed during register read (CMOSIS %lu, value: %lu != %lu)", addr, val/*&ipecamera_bit_mask[bits]*/, value);
 	return PCILIB_ERROR_VERIFY;
     }
 

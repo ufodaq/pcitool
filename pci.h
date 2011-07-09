@@ -34,7 +34,8 @@ struct pcilib_s {
     
     pcilib_kmem_list_t *kmem_list;
 
-    pcilib_model_description_t *model_info;
+    size_t num_reg, alloc_reg;
+    pcilib_model_description_t model_info;
     
     pcilib_dma_context_t *dma_ctx;
     pcilib_context_t *event_ctx;
@@ -61,6 +62,8 @@ pcilib_protocol_description_t pcilib_protocol[3] = {
     { NULL, NULL }
 };
 #else
+extern pcilib_model_description_t pcilib_model[];
+
 extern void (*pcilib_error)(const char *msg, ...);
 extern void (*pcilib_warning)(const char *msg, ...);
 

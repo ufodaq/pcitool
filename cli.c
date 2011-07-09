@@ -172,7 +172,7 @@ void Error(const char *format, ...) {
 void Silence(const char *format, ...) {
 }
 
-void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
+void List(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, int details) {
     int i;
     pcilib_register_bank_description_t *banks;
     pcilib_register_description_t *registers;
@@ -180,7 +180,7 @@ void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
 
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
     const pcilib_dma_info_t *dma_info = pcilib_get_dma_info(handle);
-
+    
     for (i = 0; i < PCILIB_MAX_BANKS; i++) {
 	if (board_info->bar_length[i] > 0) {
 	    printf(" BAR %d - ", i);
@@ -232,7 +232,7 @@ void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
     }
 
     if ((bank)&&(bank != (char*)-1)) banks = NULL;
-    else banks = pcilib_model[model].banks;
+    else banks = model_info->banks;
     
     if (banks) {
 	printf("Banks: \n");
@@ -247,13 +247,13 @@ void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
     }
     
     if (bank == (char*)-1) registers = NULL;
-    else registers = pcilib_model[model].registers;
+    else registers = model_info->registers;
     
     if (registers) {
         pcilib_register_bank_addr_t bank_addr;
 	if (bank) {
 	    pcilib_register_bank_t bank_id = pcilib_find_bank(handle, bank);
-	    pcilib_register_bank_description_t *b = pcilib_model[model].banks + bank_id;
+	    pcilib_register_bank_description_t *b = model_info->banks + bank_id;
 
 	    bank_addr = b->addr;
 	    if (b->description) printf("%s:\n", b->description);
@@ -266,6 +266,17 @@ void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
 	    const char *mode;
 	    
 	    if ((bank)&&(registers[i].bank != bank_addr)) continue;
+	    if (registers[i].type == PCILIB_REGISTER_BITS) {
+		if (!details) continue;
+		
+		if (registers[i].bits > 1) {
+		    printf("    [%2u:%2u] - %s\n", registers[i].offset, registers[i].offset + registers[i].bits, registers[i].name);
+		} else {
+		    printf("    [   %2u] - %s\n", registers[i].offset, registers[i].name);
+		}
+		
+		continue;
+	    }
 
 	    if (registers[i].mode == PCILIB_REGISTER_RW) mode = "RW";
 	    else if (registers[i].mode == PCILIB_REGISTER_R) mode = "R ";
@@ -273,7 +284,7 @@ void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
 	    else mode = "  ";
 	    
 	    printf(" 0x%02x (%2i %s) %s", registers[i].addr, registers[i].bits, mode, registers[i].name);
-	    if ((registers[i].description)&&(registers[i].description[0])) {
+	    if ((details > 0)&&(registers[i].description)&&(registers[i].description[0])) {
 		printf(": %s", registers[i].description);
 	    }
 	    printf("\n");
@@ -283,7 +294,7 @@ void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
     }
 
     if (bank == (char*)-1) events = NULL;
-    else events = pcilib_model[model].events;
+    else events = model_info->events;
 
     if (events) {
 	printf("Events: \n");
@@ -297,11 +308,11 @@ void List(pcilib_t *handle, pcilib_model_t model, const char *bank) {
     }
 }
 
-void Info(pcilib_t *handle, pcilib_model_t model) {
+void Info(pcilib_t *handle, pcilib_model_description_t *model_info) {
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
 
     printf("Vendor: %x, Device: %x, Interrupt Pin: %i, Interrupt Line: %i\n", board_info->vendor_id, board_info->device_id, board_info->interrupt_pin, board_info->interrupt_line);
-    List(handle, model, (char*)-1);
+    List(handle, model_info, (char*)-1, 0);
 }
 
 
@@ -567,21 +578,20 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, p
 
 
 
-int ReadRegister(pcilib_t *handle, pcilib_model_t model, const char *bank, const char *reg) {
+int ReadRegister(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, const char *reg) {
     int i;
     int err;
     const char *format;
 
     pcilib_register_bank_t bank_id;
     pcilib_register_bank_addr_t bank_addr;
-    pcilib_register_description_t *registers = pcilib_model[model].registers;
 
     pcilib_register_value_t value;
     
     if (reg) {
 	pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
-        bank_id = pcilib_find_bank_by_addr(handle, registers[regid].bank);
-        format = pcilib_model[model].banks[bank_id].format;
+        bank_id = pcilib_find_bank_by_addr(handle, model_info->registers[regid].bank);
+        format = model_info->banks[bank_id].format;
         if (!format) format = "%lu";
 
         err = pcilib_read_register_by_id(handle, regid, &value);
@@ -593,32 +603,34 @@ int ReadRegister(pcilib_t *handle, pcilib_model_t model, const char *bank, const
 	    printf("\n");
 	}
     } else {
-	
-	if (registers) {
+	    // Adding DMA registers
+	pcilib_get_dma_info(handle);	
+    
+	if (model_info->registers) {
 	    if (bank) {
 		bank_id = pcilib_find_bank(handle, bank);
-		bank_addr = pcilib_model[model].banks[bank_id].addr;
+		bank_addr = model_info->banks[bank_id].addr;
 	    }
 	    
 	    printf("Registers:\n");
-	    for (i = 0; registers[i].bits; i++) {
-		if ((registers[i].mode & PCILIB_REGISTER_R)&&((!bank)||(registers[i].bank == bank_addr))) {
-		    bank_id = pcilib_find_bank_by_addr(handle, registers[i].bank);
-		    format = pcilib_model[model].banks[bank_id].format;
+	    for (i = 0; model_info->registers[i].bits; i++) {
+		if ((model_info->registers[i].mode & PCILIB_REGISTER_R)&&((!bank)||(model_info->registers[i].bank == bank_addr))&&(model_info->registers[i].type != PCILIB_REGISTER_BITS)) { 
+		    bank_id = pcilib_find_bank_by_addr(handle, model_info->registers[i].bank);
+		    format = model_info->banks[bank_id].format;
 		    if (!format) format = "%lu";
 
 		    err = pcilib_read_register_by_id(handle, i, &value);
-		    if (err) printf(" %s = error reading value", registers[i].name);
+		    if (err) printf(" %s = error reading value", model_info->registers[i].name);
 	    	    else {
-			printf(" %s = ", registers[i].name);
+			printf(" %s = ", model_info->registers[i].name);
 			printf(format, value);
 		    }
 
 		    printf(" [");
-		    printf(format, registers[i].defvalue);
+		    printf(format, model_info->registers[i].defvalue);
 		    printf("]");
+		    printf("\n");
 		}
-		printf("\n");
 	    }
 	} else {
 	    printf("No registers");
@@ -627,11 +639,11 @@ int ReadRegister(pcilib_t *handle, pcilib_model_t model, const char *bank, const
     }
 }
 
-int ReadRegisterRange(pcilib_t *handle, pcilib_model_t model, const char *bank, uintptr_t addr, size_t n) {
+int ReadRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, size_t n) {
     int err;
     int i;
 
-    pcilib_register_bank_description_t *banks = pcilib_model[model].banks;
+    pcilib_register_bank_description_t *banks = model_info->banks;
     pcilib_register_bank_t bank_id = pcilib_find_bank(handle, bank);
 
     if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
@@ -726,7 +738,7 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
     free(buf);
 }
 
-int WriteRegisterRange(pcilib_t *handle, pcilib_model_t model, const char *bank, uintptr_t addr, size_t n, char ** data) {
+int WriteRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, size_t n, char ** data) {
     pcilib_register_value_t *buf, *check;
     int res, i, err;
     unsigned long value;
@@ -750,7 +762,7 @@ int WriteRegisterRange(pcilib_t *handle, pcilib_model_t model, const char *bank,
 
     if (memcmp(buf, check, size)) {
 	printf("Write failed: the data written and read differ, the foolowing is read back:\n");
-	ReadRegisterRange(handle, model, bank, addr, n);
+	ReadRegisterRange(handle, model_info, bank, addr, n);
 	exit(-1);
     }
 
@@ -759,7 +771,7 @@ int WriteRegisterRange(pcilib_t *handle, pcilib_model_t model, const char *bank,
 
 }
 
-int WriteRegister(pcilib_t *handle, pcilib_model_t model, const char *bank, const char *reg, char ** data) {
+int WriteRegister(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, const char *reg, char ** data) {
     int err;
     int i;
 
@@ -827,9 +839,11 @@ int main(int argc, char **argv) {
     long itmp;
     unsigned char c;
 
+    int details = 0;
     int quiete = 0;
     
     pcilib_model_t model = PCILIB_MODEL_DETECT;
+    pcilib_model_description_t *model_info;
     MODE mode = MODE_INVALID;
     const char *type = NULL;
     ACCESS_MODE amode = ACCESS_BAR;
@@ -865,7 +879,8 @@ int main(int argc, char **argv) {
 		mode = MODE_INFO;
 	    break;
 	    case OPT_LIST:
-		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		if (mode == MODE_LIST) details++;
+		else if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 
 		mode = MODE_LIST;
 	    break;
@@ -966,6 +981,7 @@ int main(int argc, char **argv) {
     if (handle < 0) Error("Failed to open FPGA device: %s", fpga_device);
 
     model = pcilib_get_model(handle);
+    model_info = pcilib_get_model_description(handle);
 
     switch (mode) {
      case MODE_WRITE:
@@ -1027,7 +1043,7 @@ int main(int argc, char **argv) {
 	    amode = ACCESS_BAR;
 	} else if ((isxnumber(addr))&&(sscanf(addr, "%lx", &start) == 1)) {
 		// check if the address in the register range
-	    pcilib_register_range_t *ranges =  pcilib_model[model].ranges;
+	    pcilib_register_range_t *ranges =  model_info->ranges;
 	    
 	    if (ranges) {
 		for (i = 0; ranges[i].start != ranges[i].end; i++) 
@@ -1069,10 +1085,10 @@ int main(int argc, char **argv) {
 
     switch (mode) {
      case MODE_INFO:
-        Info(handle, model);
+        Info(handle, model_info);
      break;
      case MODE_LIST:
-        List(handle, model, bank);
+        List(handle, model_info, bank, details);
      break;
      case MODE_BENCHMARK:
         Benchmark(handle, amode, dma, bar, start, size_set?size:0, access);
@@ -1085,15 +1101,15 @@ int main(int argc, char **argv) {
 	}
      break;
      case MODE_READ_REGISTER:
-        if ((reg)||(!addr)) ReadRegister(handle, model, bank, reg);
-	else ReadRegisterRange(handle, model, bank, start, size);
+        if ((reg)||(!addr)) ReadRegister(handle, model_info, bank, reg);
+	else ReadRegisterRange(handle, model_info, bank, start, size);
      break;
      case MODE_WRITE:
 	WriteData(handle, amode, dma, bar, start, size, access, endianess, data);
      break;
      case MODE_WRITE_REGISTER:
-        if (reg) WriteRegister(handle, model, bank, reg, data);
-	else WriteRegisterRange(handle, model, bank, start, size, data);
+        if (reg) WriteRegister(handle, model_info, bank, reg, data);
+	else WriteRegisterRange(handle, model_info, bank, start, size, data);
      break;
      case MODE_RESET:
         pcilib_reset(handle);

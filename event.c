@@ -23,8 +23,8 @@ pcilib_event_t pcilib_find_event(pcilib_t *ctx, const char *event) {
     pcilib_register_bank_t res;
     unsigned long addr;
     
-    pcilib_model_t model = pcilib_get_model(ctx);
-    pcilib_event_description_t *events = pcilib_model[model].events;
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+    pcilib_event_description_t *events = model_info->events;
     
     for (i = 0; events[i].name; i++) {
 	if (!strcasecmp(events[i].name, event)) return (1<<i);
@@ -37,9 +37,9 @@ pcilib_event_t pcilib_find_event(pcilib_t *ctx, const char *event) {
 int pcilib_reset(pcilib_t *ctx) {
     pcilib_event_api_description_t *api;
     
-    pcilib_model_t model = pcilib_get_model(ctx);
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
 
-    api = pcilib_model[model].event_api;
+    api = model_info->event_api;
     if (!api) {
 	pcilib_error("Event API is not supported by the selected model");
 	return PCILIB_ERROR_NOTSUPPORTED;
@@ -54,9 +54,9 @@ int pcilib_reset(pcilib_t *ctx) {
 int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, void *callback, void *user) {
     pcilib_event_api_description_t *api;
     
-    pcilib_model_t model = pcilib_get_model(ctx);
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
 
-    api = pcilib_model[model].event_api;
+    api = model_info->event_api;
     if (!api) {
 	pcilib_error("Event API is not supported by the selected model");
 	return PCILIB_ERROR_NOTSUPPORTED;
@@ -71,9 +71,9 @@ int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, void *callback, void 
 int pcilib_stop(pcilib_t *ctx) {
     pcilib_event_api_description_t *api;
     
-    pcilib_model_t model = pcilib_get_model(ctx);
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
 
-    api = pcilib_model[model].event_api;
+    api = model_info->event_api;
     if (!api) {
 	pcilib_error("Event API is not supported by the selected model");
 	return PCILIB_ERROR_NOTSUPPORTED;
@@ -88,9 +88,9 @@ int pcilib_stop(pcilib_t *ctx) {
 pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask, const struct timespec *timeout) {
     pcilib_event_api_description_t *api;
     
-    pcilib_model_t model = pcilib_get_model(ctx);
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
 
-    api = pcilib_model[model].event_api;
+    api = model_info->event_api;
     if (!api) {
 	pcilib_error("Event API is not supported by the selected model");
 	return PCILIB_ERROR_NOTSUPPORTED;
@@ -106,9 +106,9 @@ pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask
 int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data) {
     pcilib_event_api_description_t *api;
     
-    pcilib_model_t model = pcilib_get_model(ctx);
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
 
-    api = pcilib_model[model].event_api;
+    api = model_info->event_api;
     if (!api) {
 	pcilib_error("Event API is not supported by the selected model");
 	return PCILIB_ERROR_NOTSUPPORTED;
@@ -123,7 +123,9 @@ int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, voi
 
 
 void *pcilib_get_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size) {
-    pcilib_event_api_description_t *api = pcilib_model[ctx->model].event_api;
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+
+    pcilib_event_api_description_t *api = model_info->event_api;
     if (!api) {
 	pcilib_error("Event API is not supported by the selected model");
 	return NULL;
@@ -136,7 +138,9 @@ void *pcilib_get_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, p
 }
 
 void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size) {
-    pcilib_event_api_description_t *api = pcilib_model[ctx->model].event_api;
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+
+    pcilib_event_api_description_t *api = model_info->event_api;
     if (!api) {
 	pcilib_error("Event API is not supported by the selected model");
 	return NULL;
@@ -149,7 +153,9 @@ void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_da
 }
 
 int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id) {
-    pcilib_event_api_description_t *api = pcilib_model[ctx->model].event_api;
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+    
+    pcilib_event_api_description_t *api = model_info->event_api;
     if (!api) {
 	pcilib_error("Event API is not supported by the selected model");
 	return PCILIB_ERROR_NOTSUPPORTED;

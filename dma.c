@@ -88,12 +88,12 @@ size_t pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr,
 	return 0;
     }
 
-    if (!ctx->model_info->dma_api) {
+    if (!ctx->model_info.dma_api) {
 	pcilib_error("DMA Engine is not configured in the current model");
 	return 0;
     }
     
-    if (!ctx->model_info->dma_api->stream) {
+    if (!ctx->model_info.dma_api->stream) {
 	pcilib_error("The DMA read is not supported by configured DMA engine");
 	return 0;
     }
@@ -108,7 +108,7 @@ size_t pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr,
 	return 0;
     }
 
-    return ctx->model_info->dma_api->stream(ctx->dma_ctx, dma, addr, size, flags, timeout, cb, cbattr);
+    return ctx->model_info.dma_api->stream(ctx->dma_ctx, dma, addr, size, flags, timeout, cb, cbattr);
 }
 
 size_t pcilib_read_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf) {
@@ -141,12 +141,12 @@ size_t pcilib_push_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, s
 	return 0;
     }
 
-    if (!ctx->model_info->dma_api) {
+    if (!ctx->model_info.dma_api) {
 	pcilib_error("DMA Engine is not configured in the current model");
 	return 0;
     }
     
-    if (!ctx->model_info->dma_api->push) {
+    if (!ctx->model_info.dma_api->push) {
 	pcilib_error("The DMA write is not supported by configured DMA engine");
 	return 0;
     }
@@ -161,7 +161,7 @@ size_t pcilib_push_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, s
 	return 0;
     }
     
-    return ctx->model_info->dma_api->push(ctx->dma_ctx, dma, addr, size, flags, timeout, buf);
+    return ctx->model_info.dma_api->push(ctx->dma_ctx, dma, addr, size, flags, timeout, buf);
 }
 
 
@@ -178,12 +178,12 @@ double pcilib_benchmark_dma(pcilib_t *ctx, pcilib_dma_engine_addr_t dma, uintptr
 	return 0;
     }
 
-    if (!ctx->model_info->dma_api) {
+    if (!ctx->model_info.dma_api) {
 	pcilib_error("DMA Engine is not configured in the current model");
 	return -1;
     }
     
-    if (!ctx->model_info->dma_api->benchmark) {
+    if (!ctx->model_info.dma_api->benchmark) {
 	pcilib_error("The DMA benchmark is not supported by configured DMA engine");
 	return -1;
    }
@@ -193,5 +193,5 @@ double pcilib_benchmark_dma(pcilib_t *ctx, pcilib_dma_engine_addr_t dma, uintptr
 	return -1;
     }
 
-    return ctx->model_info->dma_api->benchmark(ctx->dma_ctx, dma, addr, size, iterations, direction);
+    return ctx->model_info.dma_api->benchmark(ctx->dma_ctx, dma, addr, size, iterations, direction);
 }

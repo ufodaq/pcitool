@@ -15,19 +15,12 @@
 #include "nwl.h"
 
 #include "nwl_defines.h"
+#include "nwl_register.h"
 
 
 #define NWL_XAUI_ENGINE 0
 #define NWL_XRAWDATA_ENGINE 1
 #define NWL_FIX_EOP_FOR_BIG_PACKETS		// requires precise sizes in read requests
-
-/*
-pcilib_register_bank_description_t ipecamera_register_banks[] = {
-    { PCILIB_REGISTER_DMABANK0, PCILIB_BAR0, 128, PCILIB_DEFAULT_PROTOCOL, DMA_NWL_OFFSET, DMA_NWL_OFFSET, PCILIB_LITTLE_ENDIAN, 32, PCILIB_LITTLE_ENDIAN, "%lx", "dma", "NorthWest Logick DMA Engine" },
-    { 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL }
-};
-*/
-
 
 
 typedef struct {
@@ -57,6 +50,63 @@ struct nwl_dma_s {
 
 #define nwl_read_register(var, ctx, base, reg) pcilib_datacpy(&var, base + reg, 4, 1, ctx->dma_bank->raw_endianess)
 #define nwl_write_register(var, ctx, base, reg) pcilib_datacpy(base + reg, &var, 4, 1, ctx->dma_bank->raw_endianess)
+
+static int nwl_add_registers(nwl_dma_t *ctx) {
+    int err;
+    size_t n, i, j;
+    int length;
+    const char *names[NWL_MAX_DMA_ENGINE_REGISTERS];
+    uintptr_t addr[NWL_MAX_DMA_ENGINE_REGISTERS];
+    
+	// We don't want DMA registers
+    if (pcilib_find_bank_by_addr(ctx->pcilib, PCILIB_REGISTER_BANK_DMA) == PCILIB_REGISTER_BANK_INVALID) return 0;
+    
+    err = pcilib_add_registers(ctx->pcilib, 0, nwl_dma_registers);
+    if (err) return err;
+
+    err = pcilib_add_registers(ctx->pcilib, 0, nwl_xrawdata_registers);
+    if (err) return err;
+    
+    for (n = 0; nwl_dma_engine_registers[n].bits; n++) {
+	names[n] = nwl_dma_engine_registers[n].name;
+	addr[n] = nwl_dma_engine_registers[n].addr;
+    }
+
+    if (ctx->n_engines > 9) length = 2;
+    else length = 1;
+    
+    for (i = 0; i < ctx->n_engines; i++) {
+	for (j = 0; nwl_dma_engine_registers[j].bits; j++) {
+	    const char *direction;
+	    nwl_dma_engine_registers[j].name = nwl_dma_engine_register_names[i * NWL_MAX_DMA_ENGINE_REGISTERS + j];
+	    nwl_dma_engine_registers[j].addr = addr[j] + (ctx->engines[i].base_addr - ctx->base_addr);
+//	    printf("%lx %lx\n", (ctx->engines[i].base_addr - ctx->base_addr), nwl_dma_engine_registers[j].addr);
+	    
+	    switch (ctx->engines[i].desc.direction) {
+		case PCILIB_DMA_FROM_DEVICE:
+		    direction =  "r";
+		break;
+		case PCILIB_DMA_TO_DEVICE:
+		    direction = "w";
+		break;
+		default:
+		    direction = "";
+	    }
+	    
+	    sprintf((char*)nwl_dma_engine_registers[j].name, names[j], length, ctx->engines[i].desc.addr, direction);
+	}
+	
+        err = pcilib_add_registers(ctx->pcilib, n, nwl_dma_engine_registers);
+	if (err) return err;
+    }
+    
+    for (n = 0; nwl_dma_engine_registers[n].bits; n++) {
+	nwl_dma_engine_registers[n].name = names[n];
+	nwl_dma_engine_registers[n].addr = addr[n];
+    }
+    
+    return 0;
+}
 
 static int nwl_read_engine_config(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, char *base) {
     uint32_t val;
@@ -101,6 +151,7 @@ static int nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
     char *base = ctx->engines[dma].base_addr;
 
+    return 0;
     if (info->desc.addr == NWL_XRAWDATA_ENGINE) {
 	    // Stop Generators
 	nwl_read_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
@@ -182,6 +233,7 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib) {
 	pcilib_register_bank_t dma_bank = pcilib_find_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
 
 	if (dma_bank == PCILIB_REGISTER_BANK_INVALID) {
+	    free(ctx);
 	    pcilib_error("DMA Register Bank could not be found");
 	    return NULL;
 	}
@@ -210,6 +262,13 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib) {
 	pcilib_set_dma_engine_description(pcilib, n_engines, NULL);
 	
 	ctx->n_engines = n_engines;
+	
+	err = nwl_add_registers(ctx);
+	if (err) {
+	    free(ctx);
+	    pcilib_error("Failed to add DMA registers");
+	    return NULL;
+	}
     }
     return (pcilib_dma_context_t*)ctx;
 }
