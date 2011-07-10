@@ -162,6 +162,10 @@ int pcidriver_probe_irq(pcidriver_privdata_t *privdata)
 		return 0;
 	}
 
+	/* Enable interrupts using MSI mode */
+	if (!pci_enable_msi(privdata->pdev)) 
+		privdata->msi_mode = 1;
+	
 	/* register interrupt handler */
 	if ((err = request_irq(privdata->pdev->irq, pcidriver_irq_handler, MODNAME, privdata)) != 0) {
 		mod_info("Error registering the interrupt handler. Disabling interrupts for this device\n");
@@ -184,6 +188,11 @@ void pcidriver_remove_irq(pcidriver_privdata_t *privdata)
 	/* Release the IRQ handler */
 	if (privdata->irq_enabled != 0)
 		free_irq(privdata->pdev->irq, privdata);
+	
+	if (privdata->msi_mode) {
+		pci_disable_msi(privdata->pdev);
+		privdata->msi_mode = 0;
+	}
 
 	pcidriver_irq_unmap_bars(privdata);
 }
@@ -208,29 +217,6 @@ void pcidriver_irq_unmap_bars(pcidriver_privdata_t *privdata)
 
 /**
  *
- * Acknowledge the interrupt by ACKing the interrupt generator.
- *
- * @returns true if the channel was acknowledged and the interrupt handler is done
- *
- */
-static bool check_acknowlegde_channel(pcidriver_privdata_t *privdata, int interrupt,
-				      int channel, volatile unsigned int *bar)
-{
-	if (!(bar[ABB_INT_STAT] & interrupt))
-		return false;
-
-	bar[ABB_INT_ENABLE] &= !interrupt;
-	if (interrupt == ABB_INT_IG)
-		bar[ABB_IG_CTRL] = ABB_IG_ACK;
-
-        /* Wake up the waiting loop in ioctl.c:ioctl_wait_interrupt() */
-	atomic_inc(&(privdata->irq_outstanding[channel]));
-	wake_up_interruptible(&(privdata->irq_queues[channel]));
-	return true;
-}
-
-/**
- *
  * Acknowledges the receival of an interrupt to the card.
  *
  * @returns true if the card was acknowledget
@@ -241,38 +227,15 @@ static bool check_acknowlegde_channel(pcidriver_privdata_t *privdata, int interr
  */
 static bool pcidriver_irq_acknowledge(pcidriver_privdata_t *privdata)
 {
-	volatile unsigned int *bar;
+	int channel = 0;
+//	volatile unsigned int *bar;
+//	bar = privdata->bars_kmapped[0];
+//	mod_info_dbg("interrupt registers. ISR: %x, IER: %x\n", bar[ABB_INT_STAT], bar[ABB_INT_ENABLE]);
 
-	/* TODO: add subvendor / subsystem ids */
-	/* FIXME: guillermo: which ones? all? */
-
-	/* Test if we have to handle this interrupt */
-	return false;	// The device is not supported any more
-
-	/* Acknowledge the device */
-	/* this is for ABB / wenxue DMA engine */
-	bar = privdata->bars_kmapped[0];
-
-	mod_info_dbg("interrupt registers. ISR: %x, IER: %x\n", bar[ABB_INT_STAT], bar[ABB_INT_ENABLE]);
-
-	if (check_acknowlegde_channel(privdata, ABB_INT_CH0, ABB_IRQ_CH0, bar))
-		return true;
-
-	if (check_acknowlegde_channel(privdata, ABB_INT_CH1, ABB_IRQ_CH1, bar))
-		return true;
-
-	if (check_acknowlegde_channel(privdata, ABB_INT_IG, ABB_IRQ_IG, bar))
-		return true;
-
-        if (check_acknowlegde_channel(privdata, ABB_INT_CH0_TIMEOUT, ABB_IRQ_CH0, bar))
-                return true;
-
-        if (check_acknowlegde_channel(privdata, ABB_INT_CH1_TIMEOUT, ABB_IRQ_CH1, bar))
-                return true;
-
-	mod_info_dbg("err: interrupt registers. ISR: %x, IER: %x\n", bar[ ABB_INT_STAT ], bar[ ABB_INT_ENABLE ] );
-
-	return false;
+	atomic_inc(&(privdata->irq_outstanding[channel]));
+	wake_up_interruptible(&(privdata->irq_queues[channel]));
+	
+	return true;
 }
 
 /**

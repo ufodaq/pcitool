@@ -328,6 +328,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
     unsigned long time;
     size_t size, min_size, max_size;
     double mbs_in, mbs_out, mbs;
+    size_t irqs;
     
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
 
@@ -344,6 +345,9 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	    mbs_in = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_FROM_DEVICE);
 	    mbs_out = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_TO_DEVICE);
 	    mbs = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_BIDIRECTIONAL);
+	    err = pcilib_wait_irq(handle, 0, 0, &irqs);
+	    if (err) irqs = 0;
+	    
 	    printf("%8i KB - ", size / 1024);
 	    
 	    printf("RW: ");
@@ -357,6 +361,10 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	    printf(", W: ");
 	    if (mbs_out < 0) printf("failed ...   ");
 	    else printf("%8.2lf MB/s", mbs_out);
+	    
+	    if (irqs) {
+	        printf(", IRQs: %lu", irqs);
+	    }
 
 	    printf("\n");
 	}

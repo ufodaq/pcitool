@@ -14,7 +14,7 @@ include common.mk
 ###############################################################
 # Target definitions
 
-OBJECTS = pci.o register.o kmem.o dma.o event.o default.o tools.o dma/nwl.o ipecamera/model.o ipecamera/image.o 
+OBJECTS = pci.o register.o kmem.o irq.o dma.o event.o default.o tools.o dma/nwl.o dma/nwl_register.o dma/nwl_irq.o ipecamera/model.o ipecamera/image.o 
 
 libpcilib.so: $(OBJECTS)
 	echo -e "LD \t$@"

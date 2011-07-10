@@ -10,6 +10,7 @@
 #include "pcilib.h"
 #include "register.h"
 #include "kmem.h"
+#include "irq.h"
 #include "dma.h"
 #include "event.h"
 

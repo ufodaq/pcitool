@@ -93,17 +93,6 @@ const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx) {
 }
 
 
-int pcilib_wait_irq(pcilib_t *ctx, pcilib_irq_source_t source, unsigned long timeout) {
-    int err;
-
-    err = ioctl(ctx->handle, PCIDRIVER_IOC_WAITI, source);
-    if (err) {
-	pcilib_error("PCIDRIVER_IOC_WAITI ioctl have failed");
-	return PCILIB_ERROR_FAILED;
-    }
-    
-    return 0;
-}
 
 pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx) {
     return ctx->event_ctx;

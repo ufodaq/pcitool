@@ -335,18 +335,23 @@ static int ioctl_umem_sync(pcidriver_privdata_t *privdata, unsigned long arg)
 static int ioctl_wait_interrupt(pcidriver_privdata_t *privdata, unsigned long arg)
 {
 #ifdef ENABLE_IRQ
+	int ret;
+	unsigned long timeout;
 	unsigned int irq_source;
-	int temp;
+	unsigned long temp = 0;
 
-	if (arg >= PCIDRIVER_INT_MAXSOURCES)
+	READ_FROM_USER(interrupt_wait_t, irq_handle);
+
+	irq_source = irq_handle.source;
+
+	if (irq_source >= PCIDRIVER_INT_MAXSOURCES)
 		return -EFAULT;						/* User tried to overrun the IRQ_SOURCES array */
 
-	irq_source = arg;
+	timeout = jiffies + (irq_handle.timeout * HZ / 1000000);
 
 	/* Thanks to Joern for the correction and tips! */
 	/* done this way to avoid wrong behaviour (endless loop) of the compiler in AMD platforms */
-	temp=1;
-	while (temp) {
+	do {
 		/* We wait here with an interruptible timeout. This will be interrupted
                  * by int.c:check_acknowledge_channel() as soon as in interrupt for
                  * the specified source arrives. */
@@ -355,8 +360,17 @@ static int ioctl_wait_interrupt(pcidriver_privdata_t *privdata, unsigned long ar
 		if (atomic_add_negative( -1, &(privdata->irq_outstanding[irq_source])) )
 			atomic_inc( &(privdata->irq_outstanding[irq_source]) );
 		else
-			temp =0;
+			temp = 1;
+	} while ((!temp)&&(jiffies < timeout));
+	
+	if ((temp)&&(irq_handle.count)) {
+	    while (!atomic_add_negative( -1, &(privdata->irq_outstanding[irq_source]))) temp++;
+	    atomic_inc( &(privdata->irq_outstanding[irq_source]) );
 	}
+	
+	irq_handle.count = temp;
+
+	WRITE_TO_USER(interrupt_wait_t, irq_handle);
 
 	return 0;
 #else

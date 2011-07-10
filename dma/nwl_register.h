@@ -1,9 +1,5 @@
-/*
-pcilib_register_bank_description_t ipecamera_register_banks[] = {
-    { PCILIB_REGISTER_DMABANK0, PCILIB_BAR0, 128, PCILIB_DEFAULT_PROTOCOL, DMA_NWL_OFFSET, DMA_NWL_OFFSET, PCILIB_LITTLE_ENDIAN, 32, PCILIB_LITTLE_ENDIAN, "%lx", "dma", "NorthWest Logick DMA Engine" },
-    { 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL }
-};
-*/
+#ifndef _PCILIB_NWL_REGISTERS_H
+#define _PCILIB_NWL_REGISTERS_H 
 
   // DMA
 static pcilib_register_description_t nwl_dma_registers[] = {
@@ -92,3 +88,6 @@ static pcilib_register_description_t nwl_xrawdata_registers[] = {
     {0x910C, 	0, 	1, 	0, 	0x00000000,	PCILIB_REGISTER_R , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "xrawdata_data_mistmatch",  ""},
     {0,		0,	0,	0,	0x00000000,	0,                                            0,                        0, NULL, NULL}
 };
+
+int nwl_add_registers(nwl_dma_t *ctx);
+#endif /* _PCILIB_NWL_REGISTERS_H */

@@ -60,7 +60,7 @@ typedef struct  {
 	struct list_head umem_list;			/* List of 'umem_list_entry's associated with this device */
 	atomic_t umem_count;				/* id for next umem entry */
 
-	
+	int msi_mode;
 } pcidriver_privdata_t;
 
 

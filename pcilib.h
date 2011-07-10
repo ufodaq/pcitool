@@ -24,7 +24,7 @@ typedef void pcilib_dma_context_t;
 typedef struct pcilib_dma_api_description_s pcilib_dma_api_description_t;
 typedef struct pcilib_event_api_description_s pcilib_event_api_description_t;
 typedef struct  pcilib_protocol_description_s pcilib_protocol_description_t;
-typedef unsigned long pcilib_irq_source_t;
+typedef unsigned int pcilib_irq_source_t;
 
 typedef uint8_t pcilib_bar_t;			/**< Type holding the PCI Bar number */
 typedef uint8_t pcilib_register_t;		/**< Type holding the register ID within the Bank */
@@ -197,6 +197,9 @@ pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx);
 
 pcilib_t *pcilib_open(const char *device, pcilib_model_t model);
 void pcilib_close(pcilib_t *ctx);
+
+int pcilib_clear_irq(pcilib_t *ctx, pcilib_irq_source_t source);
+int pcilib_wait_irq(pcilib_t *ctx, pcilib_irq_source_t source, size_t timeout, size_t *count);
 
 void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar);
 void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data);

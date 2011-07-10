@@ -1,37 +1,38 @@
-#ifndef _PCILIB_DMA_NWL_H
-#define _PCILIB_DMA_NWL_H
+#ifndef _PCILIB_NWL_H
+#define _PCILIB_NWL_H
 
-#include <stdio.h>
-#include "pcilib.h"
+#include "nwl_dma.h"
+#include "nwl_irq.h"
+#include "nwl_register.h"
 
-typedef struct nwl_dma_s nwl_dma_t;
+#define nwl_read_register(var, ctx, base, reg) pcilib_datacpy(&var, base + reg, 4, 1, ctx->dma_bank->raw_endianess)
+#define nwl_write_register(var, ctx, base, reg) pcilib_datacpy(base + reg, &var, 4, 1, ctx->dma_bank->raw_endianess)
 
-/*
 typedef struct {
-    pcilib_dma_engine_info_t info;
-    // offset  
-} pcilib_dma_engine_info_t;
-*/
+    pcilib_dma_engine_description_t desc;
+    char *base_addr;
+    
+    size_t ring_size, page_size;
+    size_t head, tail;
+    pcilib_kmem_handle_t *ring;
+    pcilib_kmem_handle_t *pages;
+    
+    int started;			// indicates if DMA buffers are initialized and reading is allowed
+    int writting;			// indicates if we are in middle of writting packet
+} pcilib_nwl_engine_description_t;
 
 
-pcilib_dma_context_t *dma_nwl_init(pcilib_t *ctx);
-void  dma_nwl_free(pcilib_dma_context_t *vctx);
-
-size_t dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, void *data);
-size_t dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, pcilib_dma_callback_t cb, void *cbattr);
-double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction);
-
-#ifdef _PCILIB_DMA_NWL_C
-pcilib_dma_api_description_t nwl_dma_api = {
-    dma_nwl_init,
-    dma_nwl_free,
-    dma_nwl_write_fragment,
-    dma_nwl_stream_read,
-    dma_nwl_benchmark
+struct nwl_dma_s {
+    pcilib_t *pcilib;
+    
+    pcilib_register_bank_description_t *dma_bank;
+    char *base_addr;
+    
+    pcilib_irq_type_t irq_enabled;
+    
+    pcilib_dma_engine_t n_engines;
+    pcilib_nwl_engine_description_t engines[PCILIB_MAX_DMA_ENGINES + 1];
 };
-#else
-extern pcilib_dma_api_description_t nwl_dma_api;
-#endif
 
 
-#endif /* _PCILIB_DMA_NWL_H */
+#endif /* _PCILIB_NWL_H */
