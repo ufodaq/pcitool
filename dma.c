@@ -79,46 +79,48 @@ static int pcilib_dma_skip_callback(void *arg, pcilib_dma_flags_t flags, size_t 
     return 1;
 }
 
-size_t pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, pcilib_dma_callback_t cb, void *cbattr) {
+int pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, pcilib_dma_callback_t cb, void *cbattr) {
     int err; 
 
     const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
     if (!info) {
 	pcilib_error("DMA is not supported by the device");
-	return 0;
+	return PCILIB_ERROR_NOTSUPPORTED;
     }
 
     if (!ctx->model_info.dma_api) {
 	pcilib_error("DMA Engine is not configured in the current model");
-	return 0;
+	return PCILIB_ERROR_NOTAVAILABLE;
     }
     
     if (!ctx->model_info.dma_api->stream) {
 	pcilib_error("The DMA read is not supported by configured DMA engine");
-	return 0;
+	return PCILIB_ERROR_NOTSUPPORTED;
     }
     
     if (!info->engines[dma]) {
 	pcilib_error("The DMA engine (%i) is not supported by device", dma);
-	return 0;
+	return PCILIB_ERROR_NOTAVAILABLE;
     }
 
     if (info->engines[dma]->direction&PCILIB_DMA_FROM_DEVICE == 0) {
 	pcilib_error("The selected engine (%i) is S2C-only and does not support reading", dma);
-	return 0;
+	return PCILIB_ERROR_NOTSUPPORTED;
     }
 
     return ctx->model_info.dma_api->stream(ctx->dma_ctx, dma, addr, size, flags, timeout, cb, cbattr);
 }
 
-size_t pcilib_read_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf) {
+int pcilib_read_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf, size_t *read_bytes) {
     int err; 
 
     pcilib_dma_read_callback_context_t opts = {
 	size, buf, 0
     };
 
-    return pcilib_stream_dma(ctx, dma, addr, size, PCILIB_DMA_FLAGS_DEFAULT, PCILIB_DMA_TIMEOUT, pcilib_dma_read_callback, &opts);
+    err = pcilib_stream_dma(ctx, dma, addr, size, PCILIB_DMA_FLAGS_DEFAULT, PCILIB_DMA_TIMEOUT, pcilib_dma_read_callback, &opts);
+    if (read_bytes) *read_bytes = opts.pos;
+    return err;
 }
 
 int pcilib_skip_dma(pcilib_t *ctx, pcilib_dma_engine_t dma) {
@@ -132,41 +134,41 @@ int pcilib_skip_dma(pcilib_t *ctx, pcilib_dma_engine_t dma) {
 }
 
 
-size_t pcilib_push_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, void *buf) {
+int pcilib_push_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, void *buf, size_t *written) {
     int err; 
 
     const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
     if (!info) {
 	pcilib_error("DMA is not supported by the device");
-	return 0;
+	return PCILIB_ERROR_NOTSUPPORTED;
     }
 
     if (!ctx->model_info.dma_api) {
 	pcilib_error("DMA Engine is not configured in the current model");
-	return 0;
+	return PCILIB_ERROR_NOTAVAILABLE;
     }
     
     if (!ctx->model_info.dma_api->push) {
 	pcilib_error("The DMA write is not supported by configured DMA engine");
-	return 0;
+	return PCILIB_ERROR_NOTSUPPORTED;
     }
     
     if (!info->engines[dma]) {
 	pcilib_error("The DMA engine (%i) is not supported by device", dma);
-	return 0;
+	return PCILIB_ERROR_NOTAVAILABLE;
     }
 
     if (info->engines[dma]->direction&PCILIB_DMA_TO_DEVICE == 0) {
 	pcilib_error("The selected engine (%i) is C2S-only and does not support writes", dma);
-	return 0;
+	return PCILIB_ERROR_NOTSUPPORTED;
     }
     
-    return ctx->model_info.dma_api->push(ctx->dma_ctx, dma, addr, size, flags, timeout, buf);
+    return ctx->model_info.dma_api->push(ctx->dma_ctx, dma, addr, size, flags, timeout, buf, written);
 }
 
 
-size_t pcilib_write_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf) {
-    return pcilib_push_dma(ctx, dma, addr, size, PCILIB_DMA_FLAG_EOP, PCILIB_DMA_TIMEOUT, buf);
+int pcilib_write_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf, size_t *written_bytes) {
+    return pcilib_push_dma(ctx, dma, addr, size, PCILIB_DMA_FLAG_EOP, PCILIB_DMA_TIMEOUT, buf, written_bytes);
 }
 
 double pcilib_benchmark_dma(pcilib_t *ctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction) {

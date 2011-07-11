@@ -543,8 +543,8 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, p
       case ACCESS_DMA:
 	dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_FROM_DEVICE, dma);
 	if (dmaid == PCILIB_DMA_INVALID) Error("Invalid DMA engine (%lu) is specified", dma);
-	ret = pcilib_read_dma(handle, dmaid, addr, size, buf);
-	if (ret <= 0) Error("No data is returned by DMA engine");
+	err = pcilib_read_dma(handle, dmaid, addr, size, buf, &ret);
+	if ((err)||(ret <= 0)) Error("No data is returned by DMA engine");
 	size = ret;
 	addr = 0;
       break;
@@ -718,8 +718,8 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
       case ACCESS_DMA:
 	dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_TO_DEVICE, dma);
 	if (dmaid == PCILIB_DMA_INVALID) Error("Invalid DMA engine (%lu) is specified", dma);
-	ret = pcilib_write_dma(handle, dmaid, addr, size, buf);
-	if (ret != size) {
+	err = pcilib_write_dma(handle, dmaid, addr, size, buf, &ret);
+	if ((err)||(ret != size)) {
 	    if (!ret) Error("No data is written by DMA engine");
 	    else Error("Only %lu bytes of %lu is written by DMA engine", ret, size);
 	}
