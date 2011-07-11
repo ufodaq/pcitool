@@ -62,45 +62,6 @@ int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_descriptio
 }
 
 
-static int dma_nwl_start(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info) {
-    int err;
-    uint32_t ring_pa;
-    uint32_t val;
-
-    if (info->started) return 0;
-    
-    err = dma_nwl_allocate_engine_buffers(ctx, info);
-    if (err) return err;
-    
-    ring_pa = pcilib_kmem_get_pa(ctx->pcilib, info->ring);
-    nwl_write_register(ring_pa, ctx, info->base_addr, REG_DMA_ENG_NEXT_BD);
-    nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
-
-    __sync_synchronize();
-
-    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
-    val |= (DMA_ENG_ENABLE);
-    nwl_write_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
-
-    __sync_synchronize();
-
-    if (info->desc.direction == PCILIB_DMA_FROM_DEVICE) {
-	ring_pa += (info->ring_size - 1) * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
-    	nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
-//	nwl_read_register(val, ctx, info->base_addr, 0x18);
-
-	info->tail = 0;
-	info->head = (info->ring_size - 1);
-    } else {
-	info->tail = 0;
-	info->head = 0;
-    }
-    
-    info->started = 1;
-    
-    return 0;
-}
-
 static size_t dma_nwl_clean_buffers(nwl_dma_t * ctx, pcilib_nwl_engine_description_t *info) {
     size_t res = 0;
     uint32_t status, control;

@@ -28,7 +28,7 @@
 #define PCILIB_NWL_DMA_PAGES			512 // 1024
 
 
-static int nwl_read_engine_config(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, char *base) {
+static int dma_nwl_read_engine_config(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, char *base) {
     uint32_t val;
     
     info->base_addr = base;
@@ -60,40 +60,32 @@ static int nwl_read_engine_config(nwl_dma_t *ctx, pcilib_nwl_engine_description_
     }
     
     info->desc.addr_bits = (val & DMA_ENG_BD_MAX_BC) >> DMA_ENG_BD_MAX_BC_SHIFT;
+
+    info->base_addr = addr;
     
     return 0;
 }
 
 
-int nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
+int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
+    int err;
     uint32_t val;
+    uint32_t ring_pa;
     struct timeval start, cur;
-    
+
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
     char *base = ctx->engines[dma].base_addr;
 
-    return 0;
-    if (info->desc.addr == NWL_XRAWDATA_ENGINE) {
-	    // Stop Generators
-	nwl_read_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-	val = ~(LOOPBACK|PKTCHKR|PKTGENR);
-	nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
+    if (info->started) return 0;
 
-	nwl_read_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
-	val = ~(LOOPBACK|PKTCHKR|PKTGENR);
-	nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
+	// Disable IRQs
+    err = dma_nwl_disable_engine_irq(ctx, dma);
+    if (err) return err;
 
-	    // Skip everything in read queue (could be we need to start and skip as well)
-	if (info->started) pcilib_skip_dma(ctx->pcilib, dma);
-    }
-
-	// Disable IRQ
-    nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
-    val &= ~(DMA_ENG_INT_ENABLE);
+	// Disable Engine & Reseting 
+    val = DMA_ENG_DISABLE|DMA_ENG_USER_RESET;
     nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
 
-	// Reseting 
-    val = DMA_ENG_DISABLE|DMA_ENG_USER_RESET; nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
     gettimeofday(&start, NULL);
     do {
 	nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
@@ -105,7 +97,9 @@ int nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	return PCILIB_ERROR_TIMEOUT;
     }
 
-    val = DMA_ENG_RESET; nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+    val = DMA_ENG_RESET; 
+    nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+    
     gettimeofday(&start, NULL);
     do {
 	nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
@@ -122,7 +116,75 @@ int nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	val |= DMA_ENG_ALLINT_MASK;
 	nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
     }
+
+    err = dma_nwl_start(ctx);
+    if (err) return err;
     
+    err = dma_nwl_allocate_engine_buffers(ctx, info);
+    if (err) return err;
+    
+    ring_pa = pcilib_kmem_get_pa(ctx->pcilib, info->ring);
+    nwl_write_register(ring_pa, ctx, info->base_addr, REG_DMA_ENG_NEXT_BD);
+    nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
+
+    __sync_synchronize();
+
+    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
+    val |= (DMA_ENG_ENABLE);
+    nwl_write_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
+
+    __sync_synchronize();
+
+#ifdef NWL_GENERATE_DMA_IRQ
+    nwl_dma_enable_engine_irq(ctx, dma);
+#endif /* NWL_GENERATE_DMA_IRQ */
+
+    if (info->desc.direction == PCILIB_DMA_FROM_DEVICE) {
+	ring_pa += (info->ring_size - 1) * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
+    	nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
+
+	info->tail = 0;
+	info->head = (info->ring_size - 1);
+    } else {
+	info->tail = 0;
+	info->head = 0;
+    }
+    
+    info->started = 1;
+    
+    return 0;
+}
+
+
+int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
+    int err;
+    uint32_t val;
+    uint32_t ring_pa;
+    struct timeval start, cur;
+    
+    pcilib_nwl_engine_description_t *info = ctx->engines + dma;
+    char *base = ctx->engines[dma].base_addr;
+
+    info->started = 0;
+
+    err = dma_nwl_disable_engine_irq(ctx, dma);
+    if (err) return err;
+
+    val = DMA_ENG_DISABLE; 
+    nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+
+    if (info->ring) {
+	ring_pa = pcilib_kmem_get_pa(ctx->pcilib, info->ring);
+	nwl_write_register(ring_pa, ctx, info->base_addr, REG_DMA_ENG_NEXT_BD);
+	nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
+    }
+
+	// Acknowledge asserted engine interrupts    
+    if (val & DMA_ENG_INT_ACTIVE_MASK) {
+	val |= DMA_ENG_ALLINT_MASK;
+	nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+    }
+
 	// Clean buffers
     if (info->ring) {
 	pcilib_free_kernel_memory(ctx->pcilib, info->ring);
@@ -133,9 +195,77 @@ int nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	pcilib_free_kernel_memory(ctx->pcilib, info->pages);
 	info->pages = NULL;
     }
-    
-    info->started = 0;
 
+
+
+    return 0;
+}
+
+
+int dma_nwl_start_loopback(nwl_dma_t *ctx,  pcilib_dma_direction_t direction, size_t packet_size) {
+    uint32_t val;
+    
+    val = packet_size;
+    nwl_write_register(val, ctx, ctx->base_addr, PKT_SIZE_ADDRESS);
+
+    switch (direction) {
+      case PCILIB_DMA_BIDIRECTIONAL:
+	val = LOOPBACK;
+	break;
+      case PCILIB_DMA_TO_DEVICE:
+	return -1;
+      case PCILIB_DMA_FROM_DEVICE:
+        val = PKTGENR;
+	break;
+    }
+
+    nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
+    nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
+    
+    return 0;
+}
+
+int dma_nwl_stop_loopback(nwl_dma_t *ctx) {
+    uint32_t val;
+
+    val = 0;
+    nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
+    nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
+    
+    return 0;
+}
+
+
+int dma_nwl_start(nwl_dma_t *ctx) {
+    if (ctx->started) return 0;
+    
+#ifdef NWL_GENERATE_DMA_IRQ
+    nwl_dma_enable_irq(ctx, PCILIB_DMA_IRQ);
+#endif /* NWL_GENERATE_DMA_IRQ */
+
+    ctx->started = 1;
+
+    return 0;
+}
+
+int dma_nwl_stop(nwl_dma_t *ctx) {
+    int err;
+
+    pcilib_dma_engine_t i;
+    
+    ctx->started = 0;
+    
+    err = dma_nwl_disable_irq(ctx);
+    if (err) return err;
+    
+    err = dma_nwl_stop_loopback(ctx);
+    if (err) return err;
+    
+    for (i = 0; i < ctx->n_engines; i++) {
+	err = nwl_stop_engine(ctx, i);
+	if (err) return err;
+    }
+    
     return 0;
 }
 
@@ -152,8 +282,8 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib) {
     if (ctx) {
 	memset(ctx, 0, sizeof(nwl_dma_t));
 	ctx->pcilib = pcilib;
-	pcilib_register_bank_t dma_bank = pcilib_find_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
 
+	pcilib_register_bank_t dma_bank = pcilib_find_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
 	if (dma_bank == PCILIB_REGISTER_BANK_INVALID) {
 	    free(ctx);
 	    pcilib_error("DMA Register Bank could not be found");
@@ -163,23 +293,16 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib) {
 	ctx->dma_bank = model_info->banks + dma_bank;
 	ctx->base_addr = pcilib_resolve_register_address(pcilib, ctx->dma_bank->bar, ctx->dma_bank->read_addr);
 
-        val = 0;
-	nwl_read_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-	nwl_read_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
-
 	for (i = 0, n_engines = 0; i < 2 * PCILIB_MAX_DMA_ENGINES; i++) {
 	    char *addr = ctx->base_addr + DMA_OFFSET + i * DMA_ENGINE_PER_SIZE;
 
 	    memset(ctx->engines + n_engines, 0, sizeof(pcilib_nwl_engine_description_t));
 
 	    err = nwl_read_engine_config(ctx, ctx->engines + n_engines, addr);
-	    if (!err) err = nwl_stop_engine(ctx, n_engines);
-	    if (!err) {
-		ctx->engines[n_engines].base_addr = addr;
-		pcilib_set_dma_engine_description(pcilib, n_engines, (pcilib_dma_engine_description_t*)(ctx->engines + n_engines));
-		++n_engines;
-	    }
+	    if (err) continue;
 	    
+	    pcilib_set_dma_engine_description(pcilib, n_engines, (pcilib_dma_engine_description_t*)(ctx->engines + n_engines));
+	    ++n_engines;
 	}
 	pcilib_set_dma_engine_description(pcilib, n_engines, NULL);
 	
@@ -199,7 +322,8 @@ void  dma_nwl_free(pcilib_dma_context_t *vctx) {
     pcilib_dma_engine_t i;
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
     if (ctx) {
-	for (i = 0; i < ctx->n_engines; i++) nwl_stop_engine(vctx, i);
+	for (i = 0; i < ctx->n_engines; i++) dma_nwl_stop_engine(ctx, i);
+	dma_nwl_stop(ctx);
 	free(ctx);
     }
 }
@@ -225,7 +349,7 @@ int dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, 
 
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
 
-    err = dma_nwl_start(ctx, info);
+    err = dma_nwl_start_engine(ctx, dma);
     if (err) return err;
 
     if (data) {
@@ -271,7 +395,7 @@ int dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
 
-    err = dma_nwl_start(ctx, info);
+    err = dma_nwl_start_engine(ctx, dma);
     if (err) return err;
 
     do {
@@ -292,13 +416,11 @@ int dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	dma_nwl_return_buffer(ctx, info);
 	
 	res += bufsize;
-	
-//	printf("%i %i %i (%li)\n", ret, res, eop, size);
+
     } while (ret);
     
     return 0;
 }
-
 
 
 double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction) {
@@ -324,25 +446,8 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
     if (size%sizeof(uint32_t)) size = 1 + size / sizeof(uint32_t);
     else size /= sizeof(uint32_t);
 
-
 	// Stop Generators and drain old data
-    nwl_read_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-    val = ~(LOOPBACK|PKTCHKR|PKTGENR);
-    nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-
-    nwl_read_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
-    val = ~(LOOPBACK|PKTCHKR|PKTGENR);
-    nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
-
-/*
-    nwl_stop_engine(ctx, readid);
-    nwl_stop_engine(ctx, writeid);
-
-    err = dma_nwl_start(ctx, ctx->engines + readid);
-    if (err) return -1;
-    err = dma_nwl_start(ctx, ctx->engines + writeid);
-    if (err) return -1;
-*/
+    dma_nwl_stop_loopback(ctx);
 
     __sync_synchronize();
 
@@ -352,24 +457,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
     dma_nwl_enable_engine_irq(ctx, readid);
 #endif /* NWL_GENERATE_DMA_IRQ */
     
-	// Set size and required mode
-    val = size * sizeof(uint32_t);
-    nwl_write_register(val, ctx, ctx->base_addr, PKT_SIZE_ADDRESS);
-
-    switch (direction) {
-      case PCILIB_DMA_BIDIRECTIONAL:
-	val = LOOPBACK;
-	break;
-      case PCILIB_DMA_TO_DEVICE:
-	return -1;
-      case PCILIB_DMA_FROM_DEVICE:
-        val = PKTGENR;
-	break;
-    }
-
-    nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-    nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
-
+    dma_nwl_start_loopback(ctx, direction, size * sizeof(uint32_t));
 
 	// Allocate memory and prepare data
     buf = malloc(size * sizeof(uint32_t));
@@ -384,8 +472,6 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
 	// Benchmark
     for (i = 0; i < iterations; i++) {
-//	printf("Iteration: %i\n", i);
-
         gettimeofday(&start, NULL);
 	if (direction&PCILIB_DMA_TO_DEVICE) {
 	    memcpy(buf, cmp, size * sizeof(uint32_t));
@@ -403,9 +489,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
         gettimeofday(&cur, NULL);
 	us += ((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec));
 
-
 	if ((err)||(bytes != size * sizeof(uint32_t))) {
-//	     printf("RF: %li %li\n", bytes, size * 4);
 	     error = "Read failed";
 	     break;
 	}
@@ -424,14 +508,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
     dma_nwl_disable_irq(ctx);
 #endif /* NWL_GENERATE_DMA_IRQ */
 
-	// Stop Generators and drain data if necessary
-    nwl_read_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-    val = ~(LOOPBACK|PKTCHKR|PKTGENR);
-    nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-
-    nwl_read_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
-    val = ~(LOOPBACK|PKTCHKR|PKTGENR);
-    nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
+    dma_nwl_stop_loopback(ctx);
 
     __sync_synchronize();
     

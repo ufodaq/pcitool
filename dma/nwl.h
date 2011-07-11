@@ -29,6 +29,8 @@ struct nwl_dma_s {
     char *base_addr;
     
     pcilib_irq_type_t irq_enabled;
+
+    int started;
     
     pcilib_dma_engine_t n_engines;
     pcilib_nwl_engine_description_t engines[PCILIB_MAX_DMA_ENGINES + 1];
