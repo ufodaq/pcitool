@@ -61,7 +61,7 @@ static int dma_nwl_read_engine_config(nwl_dma_t *ctx, pcilib_nwl_engine_descript
     
     info->desc.addr_bits = (val & DMA_ENG_BD_MAX_BC) >> DMA_ENG_BD_MAX_BC_SHIFT;
 
-    info->base_addr = addr;
+    info->base_addr = base;
     
     return 0;
 }
@@ -136,7 +136,7 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     __sync_synchronize();
 
 #ifdef NWL_GENERATE_DMA_IRQ
-    nwl_dma_enable_engine_irq(ctx, dma);
+    dma_nwl_enable_engine_irq(ctx, dma);
 #endif /* NWL_GENERATE_DMA_IRQ */
 
     if (info->desc.direction == PCILIB_DMA_FROM_DEVICE) {
@@ -240,7 +240,7 @@ int dma_nwl_start(nwl_dma_t *ctx) {
     if (ctx->started) return 0;
     
 #ifdef NWL_GENERATE_DMA_IRQ
-    nwl_dma_enable_irq(ctx, PCILIB_DMA_IRQ);
+    dma_nwl_enable_irq(ctx, PCILIB_DMA_IRQ);
 #endif /* NWL_GENERATE_DMA_IRQ */
 
     ctx->started = 1;
@@ -262,7 +262,7 @@ int dma_nwl_stop(nwl_dma_t *ctx) {
     if (err) return err;
     
     for (i = 0; i < ctx->n_engines; i++) {
-	err = nwl_stop_engine(ctx, i);
+	err = dma_nwl_stop_engine(ctx, i);
 	if (err) return err;
     }
     
@@ -298,7 +298,7 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib) {
 
 	    memset(ctx->engines + n_engines, 0, sizeof(pcilib_nwl_engine_description_t));
 
-	    err = nwl_read_engine_config(ctx, ctx->engines + n_engines, addr);
+	    err = dma_nwl_read_engine_config(ctx, ctx->engines + n_engines, addr);
 	    if (err) continue;
 	    
 	    pcilib_set_dma_engine_description(pcilib, n_engines, (pcilib_dma_engine_description_t*)(ctx->engines + n_engines));

@@ -858,7 +858,7 @@ int main(int argc, char **argv) {
     pcilib_model_t model = PCILIB_MODEL_DETECT;
     pcilib_model_description_t *model_info;
     MODE mode = MODE_INVALID;
-    const char *type;
+    const char *type = NULL;
     ACCESS_MODE amode = ACCESS_BAR;
     const char *fpga_device = DEFAULT_FPGA_DEVICE;
     pcilib_bar_t bar = PCILIB_BAR_DETECT;
