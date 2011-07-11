@@ -853,6 +853,7 @@ int main(int argc, char **argv) {
     pcilib_model_t model = PCILIB_MODEL_DETECT;
     pcilib_model_description_t *model_info;
     MODE mode = MODE_INVALID;
+    const char *type;
     ACCESS_MODE amode = ACCESS_BAR;
     const char *fpga_device = DEFAULT_FPGA_DEVICE;
     pcilib_bar_t bar = PCILIB_BAR_DETECT;
@@ -872,7 +873,6 @@ int main(int argc, char **argv) {
 
     pcilib_t *handle;
     
-    int type_set = 0;
     int size_set = 0;
     
     
@@ -942,21 +942,21 @@ int main(int argc, char **argv) {
 	    break;
 	    case OPT_ACCESS:
 		if (!strncasecmp(optarg, "fifo", 4)) {
+		    type = "fifo";
 		    num_offset = optarg + 4;
 		    amode = ACCESS_FIFO;
-		    type_set = 1;
 		} else if (!strncasecmp(optarg, "dma", 3)) {
+		    type = "dma";
 		    num_offset = optarg + 3;
 		    amode = ACCESS_DMA;
-		    type_set = 1;
 		} else if (!strncasecmp(optarg, "bar", 3)) {
+		    type = "plain";
 		    num_offset = optarg + 3;
 		    amode = ACCESS_BAR;
-		    type_set = 1;
 		} else if (!strncasecmp(optarg, "plain", 5)) {
+		    type = "plain";
 		    num_offset = optarg + 5;
 		    amode = ACCESS_BAR;
-		    type_set = 1;
 		} else {
 		    num_offset = optarg;
 		}
@@ -1052,7 +1052,7 @@ int main(int argc, char **argv) {
 
     if (addr) {
 	if ((!strncmp(addr, "dma", 3))&&((addr[3]==0)||isnumber(addr+3))) {
-	    if ((type_set)&&(amode != ACCESS_DMA)) Usage(argc, argv, "Conflicting access modes, the DMA read is requested, but access type is (%u)", amode);
+	    if ((type)&&(amode != ACCESS_DMA)) Usage(argc, argv, "Conflicting access modes, the DMA read is requested, but access type is (%s)", type);
 	    if (bank) {
 		if ((addr[3] != 0)&&(strcmp(addr + 3, bank))) Usage(argc, argv, "Conflicting DMA channels are specified in read parameter (%s) and bank parameter (%s)", addr + 3, bank);
 	    } else {
@@ -1061,7 +1061,7 @@ int main(int argc, char **argv) {
 	    dma = atoi(addr + 3);
 	    amode = ACCESS_DMA;
 	} else if ((!strncmp(addr, "bar", 3))&&((addr[3]==0)||isnumber(addr+3))) {
-	    if ((type_set)&&(amode != ACCESS_BAR)) Usage(argc, argv, "Conflicting access modes, the plain PCI read is requested, but access type is (%u)", amode);
+	    if ((type)&&(amode != ACCESS_BAR)) Usage(argc, argv, "Conflicting access modes, the plain PCI read is requested, but access type is (%s)", type);
 	    if ((addr[3] != 0)&&(strcmp(addr + 3, bank))) Usage(argc, argv, "Conflicting PCI bars are specified in read parameter (%s) and bank parameter (%s)", addr + 3, bank);
 	    bar = atoi(addr + 3);
 	    amode = ACCESS_BAR;
