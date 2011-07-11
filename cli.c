@@ -63,7 +63,6 @@ typedef enum {
 typedef enum {
     OPT_DEVICE = 'd',
     OPT_MODEL = 'm',
-    OPT_TYPE = 't',
     OPT_BAR = 'b',
     OPT_ACCESS = 'a',
     OPT_ENDIANESS = 'e',
@@ -83,7 +82,6 @@ typedef enum {
 static struct option long_options[] = {
     {"device",			required_argument, 0, OPT_DEVICE },
     {"model",			required_argument, 0, OPT_MODEL },
-    {"type",			required_argument, 0, OPT_TYPE },
     {"bar",			required_argument, 0, OPT_BAR },
     {"access",			required_argument, 0, OPT_ACCESS },
     {"endianess",		required_argument, 0, OPT_ENDIANESS },
@@ -121,7 +119,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 " %s <mode> [options] [hex data]\n"
 "  Modes:\n"
 "	-i			- Device Info\n"
-"	-l			- List Data Banks & Registers\n"
+"	-l[l]			- List (detailed) Data Banks & Registers\n"
 "	-p <barX|dmaX>		- Performance Evaluation\n"
 "	-r <addr|reg|dmaX>	- Read Data/Register\n"
 "	-w <addr|reg|dmaX>	- Write Data/Register\n"
@@ -134,14 +132,14 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "	-m <model>		- Memory model (autodetected)\n"
 "	   pci			- Plain\n"
 "	   ipecamera		- IPE Camera\n"
-"	-t <plain|fifo|dma>	- Access type (default: plain)\n"
 "	-b <bank>		- PCI bar, Register bank, or DMA channel\n"
 "\n"
 "  Options:\n"
 "	-s <size>		- Number of words (default: 1)\n"
-"	-a <bitness>		- Bits per word (default: 32)\n"
+"	-a [fifo|dma]<bits>	- Access type and bits per word (default: 32)\n"
 "	-e <l|b>		- Endianess Little/Big (default: host)\n"
 "	-o <file>		- Output to file (default: stdout)\n"
+//"	-t <timeout>		- Timeout in microseconds\n"
 "\n"
 "  Information:\n"
 "	-q 			- Quiete mode (suppress warnings)\n"
@@ -847,13 +845,14 @@ int main(int argc, char **argv) {
     long itmp;
     unsigned char c;
 
+    char *num_offset;
+
     int details = 0;
     int quiete = 0;
     
     pcilib_model_t model = PCILIB_MODEL_DETECT;
     pcilib_model_description_t *model_info;
     MODE mode = MODE_INVALID;
-    const char *type = NULL;
     ACCESS_MODE amode = ACCESS_BAR;
     const char *fpga_device = DEFAULT_FPGA_DEVICE;
     pcilib_bar_t bar = PCILIB_BAR_DETECT;
@@ -873,7 +872,9 @@ int main(int argc, char **argv) {
 
     pcilib_t *handle;
     
+    int type_set = 0;
     int size_set = 0;
+    
     
     while ((c = getopt_long(argc, argv, "hqilpr::w::g::d:m:t:b:a:s:e:o:", long_options, NULL)) != (unsigned char)-1) {
 	extern int optind;
@@ -934,23 +935,44 @@ int main(int argc, char **argv) {
 		else if (!strcasecmp(optarg, "ipecamera")) model = PCILIB_MODEL_IPECAMERA;
 		else Usage(argc, argv, "Invalid memory model (%s) is specified", optarg);
 	    break;
-	    case OPT_TYPE:
-		type = optarg;
-	    break;
 	    case OPT_BAR:
 		bank = optarg;
 //		if ((sscanf(optarg,"%li", &itmp) != 1)||(itmp < 0)||(itmp >= PCILIB_MAX_BANKS)) Usage(argc, argv, "Invalid data bank (%s) is specified", optarg);
 //		else bar = itmp;
 	    break;
 	    case OPT_ACCESS:
-		if ((!isnumber(optarg))||(sscanf(optarg, "%li", &itmp) != 1)) access = 0;
-		switch (itmp) {
-		    case 8: access = 1; break;
-		    case 16: access = 2; break;
-		    case 32: access = 4; break;
-		    case 64: access = 8; break;
-		    default: Usage(argc, argv, "Invalid data width (%s) is specified", optarg);
-		}	
+		if (!strncasecmp(optarg, "fifo", 4)) {
+		    num_offset = optarg + 4;
+		    amode = ACCESS_FIFO;
+		    type_set = 1;
+		} else if (!strncasecmp(optarg, "dma", 3)) {
+		    num_offset = optarg + 3;
+		    amode = ACCESS_DMA;
+		    type_set = 1;
+		} else if (!strncasecmp(optarg, "bar", 3)) {
+		    num_offset = optarg + 3;
+		    amode = ACCESS_BAR;
+		    type_set = 1;
+		} else if (!strncasecmp(optarg, "plain", 5)) {
+		    num_offset = optarg + 5;
+		    amode = ACCESS_BAR;
+		    type_set = 1;
+		} else {
+		    num_offset = optarg;
+		}
+
+		if (*num_offset) {
+		    if ((!isnumber(num_offset))||(sscanf(num_offset, "%li", &itmp) != 1))
+			Usage(argc, argv, "Invalid access type (%s) is specified", optarg);
+
+	    	    switch (itmp) {
+			case 8: access = 1; break;
+			case 16: access = 2; break;
+			case 32: access = 4; break;
+			case 64: access = 8; break;
+			default: Usage(argc, argv, "Invalid data width (%s) is specified", num_offset);
+		    }	
+		}
 	    break;
 	    case OPT_SIZE:
 		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &size) != 1))
@@ -1027,16 +1049,10 @@ int main(int argc, char **argv) {
         if (argc > optind) Usage(argc, argv, "Invalid non-option parameters are supplied");
     }
 
-    if (type) {
-	if (!strcasecmp(type, "fifo")) amode = ACCESS_FIFO;
-	else if (!strcasecmp(type, "dma")) amode = ACCESS_DMA;
-	else if ((!strcasecmp(type, "bar"))||(!strcasecmp(optarg, "bar"))) amode = ACCESS_BAR;
-	else Usage(argc, argv, "Invalid access type (%s) is specified", type);
-    }
 
     if (addr) {
 	if ((!strncmp(addr, "dma", 3))&&((addr[3]==0)||isnumber(addr+3))) {
-	    if ((type)&&(amode != ACCESS_DMA)) Usage(argc, argv, "Conflicting access modes, the DMA read is requested, but access type is (%s)", type);
+	    if ((type_set)&&(amode != ACCESS_DMA)) Usage(argc, argv, "Conflicting access modes, the DMA read is requested, but access type is (%u)", amode);
 	    if (bank) {
 		if ((addr[3] != 0)&&(strcmp(addr + 3, bank))) Usage(argc, argv, "Conflicting DMA channels are specified in read parameter (%s) and bank parameter (%s)", addr + 3, bank);
 	    } else {
@@ -1045,7 +1061,7 @@ int main(int argc, char **argv) {
 	    dma = atoi(addr + 3);
 	    amode = ACCESS_DMA;
 	} else if ((!strncmp(addr, "bar", 3))&&((addr[3]==0)||isnumber(addr+3))) {
-	    if ((type)&&(amode != ACCESS_BAR)) Usage(argc, argv, "Conflicting access modes, the plain PCI read is requested, but access type is (%s)", type);
+	    if ((type_set)&&(amode != ACCESS_BAR)) Usage(argc, argv, "Conflicting access modes, the plain PCI read is requested, but access type is (%u)", amode);
 	    if ((addr[3] != 0)&&(strcmp(addr + 3, bank))) Usage(argc, argv, "Conflicting PCI bars are specified in read parameter (%s) and bank parameter (%s)", addr + 3, bank);
 	    bar = atoi(addr + 3);
 	    amode = ACCESS_BAR;
