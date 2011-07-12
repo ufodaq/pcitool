@@ -802,14 +802,32 @@ int WriteRegister(pcilib_t *handle, pcilib_model_description_t *model_info, cons
     unsigned long val;
     pcilib_register_value_t value;
 
-    if (!isnumber(*data)) {
+    const char *format;
+
+/*
+    pcilib_register_bank_t bank_id;
+    pcilib_register_bank_addr_t bank_addr;
+
+    pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
+    if (regid == PCILIB_REGISTER_INVALID) Error("Can't find register (%s) from bank (%s)", reg, bank?bank:"autodetected");
+    bank_id = pcilib_find_bank_by_addr(handle, model_info->registers[regid].bank);
+    if (bank_id == PCILIB_REGISTER_BANK_INVALID) Error("Can't find bank of the register (%s)", reg);
+    format = model_info->banks[bank_id].format;
+    if (!format) format = "%lu";
+*/
+
+    if (isnumber(*data)) {
 	if (sscanf(*data, "%li", &val) != 1) {
 	    Error("Can't parse data value (%s) is not valid decimal number", *data);
 	}
-    } else if (!isxnumber(*data)) {
+
+	format = "%li";
+    } else if (isxnumber(*data)) {
 	if (sscanf(*data, "%lx", &val) != 1) {
 	    Error("Can't parse data value (%s) is not valid decimal number", *data);
 	}
+	
+	format = "0x%lx";
     } else {
 	    Error("Can't parse data value (%s) is not valid decimal number", *data);
     }
@@ -825,7 +843,9 @@ int WriteRegister(pcilib_t *handle, pcilib_model_description_t *model_info, cons
     if (val != value) {
 	Error("Failed to write register %s: %lu is written and %lu is read back", reg, val, value);
     } else {
-	printf("%s = %i\n", reg, value);
+	printf("%s = ", reg);
+	printf(format, value);
+	printf("\n");
     }
     
     return 0;
