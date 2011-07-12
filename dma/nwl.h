@@ -19,6 +19,7 @@ typedef struct pcilib_nwl_engine_description_s pcilib_nwl_engine_description_t;
 #include "nwl_irq.h"
 #include "nwl_register.h"
 #include "nwl_engine.h"
+#include "nwl_loopback.h"
 
 #define nwl_read_register(var, ctx, base, reg) pcilib_datacpy(&var, base + reg, 4, 1, ctx->dma_bank->raw_endianess)
 #define nwl_write_register(var, ctx, base, reg) pcilib_datacpy(base + reg, &var, 4, 1, ctx->dma_bank->raw_endianess)
@@ -44,11 +45,12 @@ struct nwl_dma_s {
     pcilib_register_bank_description_t *dma_bank;
     char *base_addr;
 
-    int irq_init;			/**< indicates that IRQ subsystem is initialized (detecting which types should be preserverd) */    
     pcilib_irq_type_t irq_enabled;	/**< indicates that IRQs are enabled */
     pcilib_irq_type_t irq_preserve;	/**< indicates that IRQs should not be disabled during clean-up */
     int started;			/**< indicates that DMA subsystem is initialized and DMA engine can start */
-    
+    int irq_started;			/**< indicates that IRQ subsystem is initialized (detecting which types should be preserverd) */    
+    int loopback_started;		/**< indicates that benchmarking subsystem is initialized */
+
     pcilib_dma_engine_t n_engines;
     pcilib_nwl_engine_description_t engines[PCILIB_MAX_DMA_ENGINES + 1];
 };

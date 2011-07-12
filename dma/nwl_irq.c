@@ -19,16 +19,16 @@ int dma_nwl_init_irq(nwl_dma_t *ctx, uint32_t val) {
 	if (val&DMA_USER_INT_ENABLE) ctx->irq_preserve |= PCILIB_EVENT_IRQ;
     }
     
-    ctx->irq_init = 1;
+    ctx->irq_started = 1;
     return 0;
 }
 
 int dma_nwl_free_irq(nwl_dma_t *ctx) {
-    if (ctx->irq_init) {
+    if (ctx->irq_started) {
 	dma_nwl_disable_irq((pcilib_dma_context_t*)ctx, 0);
 	if (ctx->irq_preserve) dma_nwl_enable_irq((pcilib_dma_context_t*)ctx, ctx->irq_preserve, 0);
 	ctx->irq_enabled = 0;
-	ctx->irq_init = 0;
+	ctx->irq_started = 0;
     }
     return 0;
 }
@@ -39,12 +39,12 @@ int dma_nwl_enable_irq(pcilib_dma_context_t *vctx, pcilib_irq_type_t type, pcili
     
     if (flags&PCILIB_DMA_FLAG_PERMANENT) ctx->irq_preserve |= type;
 
-    if (ctx->irq_enabled == type) return 0;
+    if ((ctx->irq_enabled&type) == type) return 0;
     
     type |= ctx->irq_enabled;
     
     nwl_read_register(val, ctx, ctx->base_addr, REG_DMA_CTRL_STATUS);
-    if (!ctx->irq_init) dma_nwl_init_irq(ctx, val);
+    if (!ctx->irq_started) dma_nwl_init_irq(ctx, val);
 
     val &= ~(DMA_INT_ENABLE|DMA_USER_INT_ENABLE);
     nwl_write_register(val, ctx, ctx->base_addr, REG_DMA_CTRL_STATUS);
@@ -68,7 +68,7 @@ int dma_nwl_disable_irq(pcilib_dma_context_t *vctx, pcilib_dma_flags_t flags) {
     ctx->irq_enabled = 0;
     
     nwl_read_register(val, ctx, ctx->base_addr, REG_DMA_CTRL_STATUS);
-    if (!ctx->irq_init) dma_nwl_init_irq(ctx, val);
+    if (!ctx->irq_started) dma_nwl_init_irq(ctx, val);
     val &= ~(DMA_INT_ENABLE|DMA_USER_INT_ENABLE);
     nwl_write_register(val, ctx, ctx->base_addr, REG_DMA_CTRL_STATUS);
     
@@ -81,7 +81,7 @@ int dma_nwl_disable_irq(pcilib_dma_context_t *vctx, pcilib_dma_flags_t flags) {
 int dma_nwl_enable_engine_irq(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     uint32_t val;
     
-    dma_nwl_enable_irq(ctx, ctx->irq_enabled|PCILIB_DMA_IRQ, 0);
+    dma_nwl_enable_irq(ctx, PCILIB_DMA_IRQ, 0);
 
     nwl_read_register(val, ctx, ctx->engines[dma].base_addr, REG_DMA_ENG_CTRL_STATUS);
     val |= (DMA_ENG_INT_ENABLE);

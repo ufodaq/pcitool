@@ -1,3 +1,5 @@
+#define _BSD_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,6 +13,8 @@
 #include "nwl.h"
 
 #include "nwl_defines.h"
+
+#include "nwl_buffers.h"    
 
 int dma_nwl_read_engine_config(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, char *base) {
     uint32_t val;
@@ -58,7 +62,7 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
     char *base = ctx->engines[dma].base_addr;
-
+    
     if (info->started) return 0;
 
 	// Disable IRQs
@@ -100,9 +104,6 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
     }
 
-    err = dma_nwl_start(ctx);
-    if (err) return err;
-    
     err = dma_nwl_allocate_engine_buffers(ctx, info);
     if (err) return err;
     
@@ -182,8 +183,6 @@ int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     return 0;
 }
 
-#include "nwl_buffers.h"    
-
 int dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, void *data, size_t *written) {
     int err;
     size_t pos;
@@ -192,7 +191,7 @@ int dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, 
 
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
 
-    err = dma_nwl_start_engine(ctx, dma);
+    err = dma_nwl_start(ctx, dma, PCILIB_DMA_FLAGS_DEFAULT);
     if (err) return err;
 
     if (data) {
@@ -238,7 +237,7 @@ int dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
 
-    err = dma_nwl_start_engine(ctx, dma);
+    err = dma_nwl_start(ctx, dma, PCILIB_DMA_FLAGS_DEFAULT);
     if (err) return err;
 
     do {

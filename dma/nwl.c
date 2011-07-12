@@ -15,73 +15,62 @@
 
 #include "nwl_defines.h"
 
+int dma_nwl_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags) {
+    nwl_dma_t *ctx = (nwl_dma_t*)vctx;
 
-
-int dma_nwl_start_loopback(nwl_dma_t *ctx,  pcilib_dma_direction_t direction, size_t packet_size) {
-    uint32_t val;
-    
-    val = packet_size;
-    nwl_write_register(val, ctx, ctx->base_addr, PKT_SIZE_ADDRESS);
-
-    switch (direction) {
-      case PCILIB_DMA_BIDIRECTIONAL:
-	val = LOOPBACK;
-	break;
-      case PCILIB_DMA_TO_DEVICE:
-	return -1;
-      case PCILIB_DMA_FROM_DEVICE:
-        val = PKTGENR;
-	break;
+    if (!ctx->started) {
+	// global initialization, should we do anything?
+	ctx->started = 1;
     }
 
-    nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-    nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
-    
-    return 0;
+    if (dma == PCILIB_DMA_ENGINE_INVALID) return 0;
+    else if (dma > ctx->n_engines) return PCILIB_ERROR_INVALID_BANK;
+
+    if (flags&PCILIB_DMA_FLAG_PERMANENT) ctx->engines[dma].preserve = 1;
+    return dma_nwl_start_engine(ctx, dma);
 }
 
-int dma_nwl_stop_loopback(nwl_dma_t *ctx) {
-    uint32_t val;
-
-    val = 0;
-    nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-    nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
-    
-    return 0;
-}
-
-
-int dma_nwl_start(nwl_dma_t *ctx) {
-    if (ctx->started) return 0;
-    
-#ifdef NWL_GENERATE_DMA_IRQ
-    dma_nwl_enable_irq(ctx, PCILIB_DMA_IRQ, 0);
-#endif /* NWL_GENERATE_DMA_IRQ */
-
-    ctx->started = 1;
-
-    return 0;
-}
-
-int dma_nwl_stop(nwl_dma_t *ctx) {
+int dma_nwl_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags) {
     int err;
+    int preserving = 0;
 
-    pcilib_dma_engine_t i;
+    nwl_dma_t *ctx = (nwl_dma_t*)vctx;
     
-    ctx->started = 0;
+    if (!ctx->started) return 0;
     
-    err = dma_nwl_free_irq(ctx);
-    if (err) return err;
-    
-    err = dma_nwl_stop_loopback(ctx);
-    if (err) return err;
-    
-    for (i = 0; i < ctx->n_engines; i++) {
-	err = dma_nwl_stop_engine(ctx, i);
-	if (err) return err;
+	// stop everything
+    if (dma == PCILIB_DMA_ENGINE_INVALID) {
+        for (dma = 0; dma < ctx->n_engines; dma++) {
+	    if (flags&PCILIB_DMA_FLAG_PERMANENT) {
+		ctx->engines[dma].preserve = 0;
+	    }
+	
+	    if (ctx->engines[dma].preserve) preserving = 1;
+	    else {
+	        err = dma_nwl_stop_engine(ctx, dma);
+		if (err) return err;
+	    }
+	}
+	    
+	    // global cleanup, should we do anything?
+	if (!preserving) {
+	    ctx->started = 0;
+	}
+	
+	return 0;
     }
     
-    return 0;
+    if (dma > ctx->n_engines) return PCILIB_ERROR_INVALID_BANK;
+    
+	    // ignorign previous setting if flag specified
+    if (flags&PCILIB_DMA_FLAG_PERMANENT) {
+	ctx->engines[dma].preserve = 0;
+    }
+    
+	// Do not close DMA if preservation mode is set
+    if (ctx->engines[dma].preserve) return 0;
+    
+    return dma_nwl_stop_engine(ctx, dma);
 }
 
 
@@ -134,13 +123,16 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib) {
 }
 
 void  dma_nwl_free(pcilib_dma_context_t *vctx) {
+    int err;
+    
     pcilib_dma_engine_t i;
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
-    if (ctx) {
-	for (i = 0; i < ctx->n_engines; i++) dma_nwl_stop_engine(ctx, i);
-	dma_nwl_stop(ctx);
-	free(ctx);
-    }
+
+    dma_nwl_stop_loopback(ctx);
+    dma_nwl_free_irq(ctx);
+    dma_nwl_stop(ctx, PCILIB_DMA_ENGINE_ALL, PCILIB_DMA_FLAGS_DEFAULT);
+    
+    free(ctx);
 }
 
 

@@ -86,6 +86,8 @@ typedef enum {
 #define PCILIB_BAR0			0
 #define PCILIB_BAR1			1
 #define PCILIB_DMA_ENGINE_INVALID	((pcilib_dma_engine_t)-1)
+#define PCILIB_DMA_ENGINE_ALL		((pcilib_dma_engine_t)-1)
+#define PCILIB_DMA_FLAGS_DEFAULT	((pcilib_dma_flags_t)0)
 #define PCILIB_DMA_ENGINE_ADDR_INVALID	((pcilib_dma_engine_addr_t)-1)
 #define PCILIB_REGISTER_INVALID		((pcilib_register_t)-1)
 #define PCILIB_ADDRESS_INVALID		((uintptr_t)-1)
