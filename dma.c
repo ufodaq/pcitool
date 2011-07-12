@@ -124,11 +124,12 @@ int pcilib_read_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size
 }
 
 int pcilib_skip_dma(pcilib_t *ctx, pcilib_dma_engine_t dma) {
+    int err;
     size_t skipped;
     do {
 	    // IMMEDIATE timeout is not working properly, so default is set
-	skipped = pcilib_stream_dma(ctx, dma, 0, 0, PCILIB_DMA_FLAGS_DEFAULT, PCILIB_DMA_TIMEOUT, pcilib_dma_skip_callback, NULL);
-    } while (skipped > 0);
+	err = pcilib_stream_dma(ctx, dma, 0, 0, PCILIB_DMA_FLAGS_DEFAULT, PCILIB_DMA_TIMEOUT, pcilib_dma_skip_callback, &skipped);
+    } while ((!err)&&(skipped > 0));
     
     return 0;
 }
@@ -168,7 +169,7 @@ int pcilib_push_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size
 
 
 int pcilib_write_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf, size_t *written_bytes) {
-    return pcilib_push_dma(ctx, dma, addr, size, PCILIB_DMA_FLAG_EOP, PCILIB_DMA_TIMEOUT, buf, written_bytes);
+    return pcilib_push_dma(ctx, dma, addr, size, PCILIB_DMA_FLAG_EOP|PCILIB_DMA_FLAG_WAIT, PCILIB_DMA_TIMEOUT, buf, written_bytes);
 }
 
 double pcilib_benchmark_dma(pcilib_t *ctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction) {
