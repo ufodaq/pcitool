@@ -7,11 +7,11 @@ struct pcilib_dma_api_description_s {
     pcilib_dma_context_t *(*init)(pcilib_t *ctx);
     void (*free)(pcilib_dma_context_t *ctx);
 
-    int (*pcilib_start_dma)(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
-    int (*pcilib_stop_dma)(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
+    int (*enable_irq)(pcilib_dma_context_t *ctx, pcilib_irq_type_t irq_type, pcilib_dma_flags_t flags);
+    int (*disable_irq)(pcilib_dma_context_t *ctx, pcilib_dma_flags_t flags);
 
-    int (*pcilib_enable_irq)(pcilib_dma_context_t *ctx, pcilib_dma_flags_t flags);
-    int (*pcilib_disable_irq)(pcilib_dma_context_t *ctx, pcilib_dma_flags_t flags);
+    int (*start_dma)(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
+    int (*stop_dma)(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
 
     int (*push)(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, void *buf, size_t *written);
     int (*stream)(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, pcilib_dma_callback_t cb, void *cbattr);

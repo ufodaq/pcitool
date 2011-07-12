@@ -240,7 +240,7 @@ int dma_nwl_start(nwl_dma_t *ctx) {
     if (ctx->started) return 0;
     
 #ifdef NWL_GENERATE_DMA_IRQ
-    dma_nwl_enable_irq(ctx, PCILIB_DMA_IRQ);
+    dma_nwl_enable_irq(ctx, PCILIB_DMA_IRQ, 0);
 #endif /* NWL_GENERATE_DMA_IRQ */
 
     ctx->started = 1;
@@ -255,7 +255,7 @@ int dma_nwl_stop(nwl_dma_t *ctx) {
     
     ctx->started = 0;
     
-    err = dma_nwl_disable_irq(ctx);
+    err = dma_nwl_free_irq(ctx);
     if (err) return err;
     
     err = dma_nwl_stop_loopback(ctx);
@@ -355,7 +355,7 @@ int dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, 
     if (data) {
 	for (pos = 0; pos < size; pos += info->page_size) {
 	    int block_size = min2(size - pos, info->page_size);
-    
+	    
     	    bufnum = dma_nwl_get_next_buffer(ctx, info, 1, timeout);
 	    if (bufnum == PCILIB_DMA_BUFFER_INVALID) {
 		if (written) *written = pos;
@@ -431,6 +431,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
     uint32_t val;
     uint32_t *buf, *cmp;
     const char *error = NULL;
+//    pcilib_register_value_t regval;
 
     size_t us = 0;
     struct timeval start, cur;
@@ -446,9 +447,12 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
     if (size%sizeof(uint32_t)) size = 1 + size / sizeof(uint32_t);
     else size /= sizeof(uint32_t);
 
+	// Not supported
+    if (direction == PCILIB_DMA_TO_DEVICE) return -1.;
+
 	// Stop Generators and drain old data
     dma_nwl_stop_loopback(ctx);
-    dma_nwl_stop_engine(ctx, readid); // DS: replace with something better
+//    dma_nwl_stop_engine(ctx, readid); // DS: replace with something better
 
     __sync_synchronize();
 
@@ -456,15 +460,26 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
 #ifdef NWL_GENERATE_DMA_IRQ
     dma_nwl_enable_engine_irq(ctx, readid);
+    dma_nwl_enable_engine_irq(ctx, writeid);
 #endif /* NWL_GENERATE_DMA_IRQ */
+
 
     dma_nwl_start_loopback(ctx, direction, size * sizeof(uint32_t));
 
 /*
+    printf("Packet size: %li\n", size * sizeof(uint32_t));
+    pcilib_read_register(ctx->pcilib, NULL, "dma1w_counter", &regval);
+    printf("Count write: %lx\n", regval);
+
     nwl_read_register(val, ctx, read_base, REG_DMA_ENG_CTRL_STATUS);
     printf("Read DMA control: %lx\n", val);    
     nwl_read_register(val, ctx, write_base, REG_DMA_ENG_CTRL_STATUS);
     printf("Write DMA control: %lx\n", val);    
+
+    nwl_read_register(val, ctx, write_base, REG_DMA_ENG_NEXT_BD);
+    printf("Pointer1: %lx\n", val);    
+    nwl_read_register(val, ctx, write_base, REG_SW_NEXT_BD);
+    printf("Pointer2: %lx\n", val);    
 */
 
 	// Allocate memory and prepare data
@@ -486,11 +501,27 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
 	    err = pcilib_write_dma(ctx->pcilib, writeid, addr, size * sizeof(uint32_t), buf, &bytes);
 	    if ((err)||(bytes != size * sizeof(uint32_t))) {
-		printf("%i %lu write\n", err, bytes);
 		error = "Write failed";
 	        break;
 	    }
 	}
+/*
+    printf("RegRead: %i\n",pcilib_read_register(ctx->pcilib, NULL, "dma1w_counter", &regval));
+    printf("Count write (%i of %i): %lx\n", i, iterations, regval);
+
+    printf("RegRead: %i\n",pcilib_read_register(ctx->pcilib, NULL, "dma1r_counter", &regval));
+    printf("Count read (%i of %i): %lx\n", i, iterations, regval);
+
+
+    nwl_read_register(val, ctx, read_base, REG_DMA_ENG_COMP_BYTES);
+    printf("Compl Bytes (read): %lx\n", val);    
+
+    nwl_read_register(val, ctx, write_base, REG_DMA_ENG_COMP_BYTES);
+    printf("Compl Bytes (write): %lx\n", val);    
+
+    nwl_read_register(val, ctx, read_base, REG_DMA_ENG_CTRL_STATUS);
+    printf("Read DMA control (after write): %lx\n", val);    
+*/
 /*
     nwl_read_register(val, ctx, read_base, REG_DMA_ENG_CTRL_STATUS);
     printf("Read DMA control (after write): %lx\n", val);    
@@ -504,7 +535,23 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	us += ((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec));
 
 	if ((err)||(bytes != size * sizeof(uint32_t))) {
-	    printf("%i %lu read\n", err, bytes);
+/*
+    nwl_read_register(val, ctx, read_base, REG_DMA_ENG_CTRL_STATUS);
+    printf("Read DMA control: %lx\n", val);    
+    nwl_read_register(val, ctx, write_base, REG_DMA_ENG_CTRL_STATUS);
+    printf("Write DMA control: %lx\n", val);    
+    nwl_read_register(val, ctx, write_base, REG_DMA_ENG_NEXT_BD);
+    printf("After Pointer wr1: %lx\n", val);    
+    nwl_read_register(val, ctx, write_base, REG_SW_NEXT_BD);
+    printf("After Pointer wr2: %lx\n", val);    
+    pcilib_read_register(ctx->pcilib, NULL, "end_address", &regval);
+    printf("End address: %lx\n", regval);
+
+	nwl_read_register(val, ctx, read_base, REG_DMA_ENG_NEXT_BD);
+	printf("After Pointer read1: %lx\n", val);    
+	nwl_read_register(val, ctx, read_base, REG_SW_NEXT_BD);
+	printf("After Pointer read2: %lx\n", val);    
+*/
 	     error = "Read failed";
 	     break;
 	}
@@ -512,16 +559,33 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	if (direction == PCILIB_DMA_BIDIRECTIONAL) {
 	    res = memcmp(buf, cmp, size * sizeof(uint32_t));
 	    if (res) {
-		puts("verify");
 		error = "Written and read values does not match";
 		break;
 	    }
 	}
 	     
     }
+    
+    if (error) {
+	pcilib_warning("%s at iteration %i, error: %i, bytes: %zu", error, i, err, bytes);
+    }
+    
+/*
+    puts("Finished...");
+    nwl_read_register(val, ctx, read_base, REG_DMA_ENG_NEXT_BD);
+    printf("After Pointer read1: %lx\n", val);    
+    nwl_read_register(val, ctx, read_base, REG_SW_NEXT_BD);
+    printf("After Pointer read2: %lx\n", val);    
+
+    nwl_read_register(val, ctx, write_base, REG_DMA_ENG_NEXT_BD);
+    printf("After Pointer wr1: %lx\n", val);    
+    nwl_read_register(val, ctx, write_base, REG_SW_NEXT_BD);
+    printf("After Pointer wr2: %lx\n", val);    
+*/
 
 #ifdef NWL_GENERATE_DMA_IRQ
-    dma_nwl_disable_irq(ctx);
+    dma_nwl_disable_engine_irq(ctx, writeid);
+    dma_nwl_disable_engine_irq(ctx, readid);
 #endif /* NWL_GENERATE_DMA_IRQ */
 
     dma_nwl_stop_loopback(ctx);

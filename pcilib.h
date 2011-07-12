@@ -158,6 +158,11 @@ typedef struct {
 } pcilib_event_description_t;
 
 typedef enum {
+    PCILIB_DMA_IRQ = 1,
+    PCILIB_EVENT_IRQ = 2
+} pcilib_irq_type_t;
+
+typedef enum {
     PCILIB_DMA_FROM_DEVICE = 1,
     PCILIB_DMA_TO_DEVICE = 2,
     PCILIB_DMA_BIDIRECTIONAL = 3
@@ -204,7 +209,7 @@ void pcilib_close(pcilib_t *ctx);
 
 int pcilib_start_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
 int pcilib_stop_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
-int pcilib_enable_irq(pcilib_t *ctx, pcilib_dma_flags_t flags);
+int pcilib_enable_irq(pcilib_t *ctx, pcilib_irq_type_t irq_type, pcilib_dma_flags_t flags);
 int pcilib_disable_irq(pcilib_t *ctx, pcilib_dma_flags_t flags);
 
 int pcilib_clear_irq(pcilib_t *ctx, pcilib_irq_source_t source);

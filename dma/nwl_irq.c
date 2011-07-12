@@ -13,12 +13,39 @@
 #include "nwl.h"
 #include "nwl_defines.h"
 
-int dma_nwl_enable_irq(nwl_dma_t *ctx, pcilib_irq_type_t type) {
-    uint32_t val;
+int dma_nwl_init_irq(nwl_dma_t *ctx, uint32_t val) {
+    if (val&(DMA_INT_ENABLE|DMA_USER_INT_ENABLE)) {
+	if (val&DMA_INT_ENABLE) ctx->irq_preserve |= PCILIB_DMA_IRQ;
+	if (val&DMA_USER_INT_ENABLE) ctx->irq_preserve |= PCILIB_EVENT_IRQ;
+    }
     
-    if (ctx->irq_enabled == type) return 0;
+    ctx->irq_init = 1;
+    return 0;
+}
 
+int dma_nwl_free_irq(nwl_dma_t *ctx) {
+    if (ctx->irq_init) {
+	dma_nwl_disable_irq((pcilib_dma_context_t*)ctx, 0);
+	if (ctx->irq_preserve) dma_nwl_enable_irq((pcilib_dma_context_t*)ctx, ctx->irq_preserve, 0);
+	ctx->irq_enabled = 0;
+	ctx->irq_init = 0;
+    }
+    return 0;
+}
+
+int dma_nwl_enable_irq(pcilib_dma_context_t *vctx, pcilib_irq_type_t type, pcilib_dma_flags_t flags) {
+    uint32_t val;
+    nwl_dma_t *ctx = (nwl_dma_t*)vctx;
+    
+    if (flags&PCILIB_DMA_FLAG_PERMANENT) ctx->irq_preserve |= type;
+
+    if (ctx->irq_enabled == type) return 0;
+    
+    type |= ctx->irq_enabled;
+    
     nwl_read_register(val, ctx, ctx->base_addr, REG_DMA_CTRL_STATUS);
+    if (!ctx->irq_init) dma_nwl_init_irq(ctx, val);
+
     val &= ~(DMA_INT_ENABLE|DMA_USER_INT_ENABLE);
     nwl_write_register(val, ctx, ctx->base_addr, REG_DMA_CTRL_STATUS);
     
@@ -33,22 +60,28 @@ int dma_nwl_enable_irq(nwl_dma_t *ctx, pcilib_irq_type_t type) {
     return 0;
 }
 
-int dma_nwl_disable_irq(nwl_dma_t *ctx) {
+
+int dma_nwl_disable_irq(pcilib_dma_context_t *vctx, pcilib_dma_flags_t flags) {
     uint32_t val;
+    nwl_dma_t *ctx = (nwl_dma_t*)vctx;
     
     ctx->irq_enabled = 0;
     
     nwl_read_register(val, ctx, ctx->base_addr, REG_DMA_CTRL_STATUS);
+    if (!ctx->irq_init) dma_nwl_init_irq(ctx, val);
     val &= ~(DMA_INT_ENABLE|DMA_USER_INT_ENABLE);
     nwl_write_register(val, ctx, ctx->base_addr, REG_DMA_CTRL_STATUS);
     
+    if (flags&PCILIB_DMA_FLAG_PERMANENT) ctx->irq_preserve = 0;
+
     return 0;
 }
+
 
 int dma_nwl_enable_engine_irq(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     uint32_t val;
     
-    dma_nwl_enable_irq(ctx, ctx->irq_enabled|PCILIB_DMA_IRQ);
+    dma_nwl_enable_irq(ctx, ctx->irq_enabled|PCILIB_DMA_IRQ, 0);
 
     nwl_read_register(val, ctx, ctx->engines[dma].base_addr, REG_DMA_ENG_CTRL_STATUS);
     val |= (DMA_ENG_INT_ENABLE);
@@ -66,6 +99,7 @@ int dma_nwl_disable_engine_irq(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 
     return 0;
 }
+
 
 
 // ACK

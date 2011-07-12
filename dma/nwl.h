@@ -28,9 +28,10 @@ struct nwl_dma_s {
     
     pcilib_register_bank_description_t *dma_bank;
     char *base_addr;
-    
+
+    int irq_init;			/**< indicates that IRQ subsystem is initialized (detecting which types should be preserverd) */    
     pcilib_irq_type_t irq_enabled;	/**< indicates that IRQs are enabled */
-    int irq_preserve;			/**< indicates that IRQs should not be disabled during clean-up */
+    pcilib_irq_type_t irq_preserve;	/**< indicates that IRQs should not be disabled during clean-up */
     int started;			/**< indicates that DMA subsystem is initialized and DMA engine can start */
     
     pcilib_dma_engine_t n_engines;
