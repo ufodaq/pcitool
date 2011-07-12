@@ -128,11 +128,13 @@ void  dma_nwl_free(pcilib_dma_context_t *vctx) {
     pcilib_dma_engine_t i;
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
 
-    dma_nwl_stop_loopback(ctx);
-    dma_nwl_free_irq(ctx);
-    dma_nwl_stop(ctx, PCILIB_DMA_ENGINE_ALL, PCILIB_DMA_FLAGS_DEFAULT);
-    
-    free(ctx);
+    if (ctx) {
+	dma_nwl_stop_loopback(ctx);
+	dma_nwl_free_irq(ctx);
+	dma_nwl_stop(ctx, PCILIB_DMA_ENGINE_ALL, PCILIB_DMA_FLAGS_DEFAULT);
+	    
+	free(ctx);
+    }
 }
 
 
@@ -144,7 +146,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
     uint32_t val;
     uint32_t *buf, *cmp;
     const char *error = NULL;
-//    pcilib_register_value_t regval;
+    pcilib_register_value_t regval;
 
     size_t us = 0;
     struct timeval start, cur;
@@ -208,6 +210,11 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
 	// Benchmark
     for (i = 0; i < iterations; i++) {
+//	puts("====================================");
+	pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e1);
+//	pcilib_read_register(ctx->pcilib, NULL, "control", &regval);
+//	printf("Control: %lx\n", regval);
+
         gettimeofday(&start, NULL);
 	if (direction&PCILIB_DMA_TO_DEVICE) {
 	    memcpy(buf, cmp, size * sizeof(uint32_t));
@@ -241,6 +248,10 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
     nwl_read_register(val, ctx, write_base, REG_DMA_ENG_CTRL_STATUS);
     printf("Write DMA control (after write): %lx\n", val);    
 */
+	pcilib_write_register(ctx->pcilib, NULL, "control", 0x3e1);
+//	pcilib_read_register(ctx->pcilib, NULL, "control", &regval);
+//	printf("Control: %lx\n", regval);
+
 	memset(buf, 0, size * sizeof(uint32_t));
         
 	err = pcilib_read_dma(ctx->pcilib, readid, addr, size * sizeof(uint32_t), buf, &bytes);

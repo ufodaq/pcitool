@@ -165,6 +165,7 @@ static int pcilib_dma_read_callback(void *arg, pcilib_dma_flags_t flags, size_t 
 }
 
 static int pcilib_dma_skip_callback(void *arg, pcilib_dma_flags_t flags, size_t bufsize, void *buf) {
+//    if (arg) (*(uint32_t*)arg) += bufsize;
     return 1;
 }
 
@@ -214,7 +215,7 @@ int pcilib_read_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size
 
 int pcilib_skip_dma(pcilib_t *ctx, pcilib_dma_engine_t dma) {
     int err;
-    size_t skipped;
+    size_t skipped = 0;
     do {
 	    // IMMEDIATE timeout is not working properly, so default is set
 	err = pcilib_stream_dma(ctx, dma, 0, 0, PCILIB_DMA_FLAGS_DEFAULT, PCILIB_DMA_TIMEOUT, pcilib_dma_skip_callback, &skipped);

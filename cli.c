@@ -357,9 +357,9 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	    max_size = BENCH_MAX_DMA_SIZE;
 	}
 	
-        for (size = min_size; size < max_size; size *= 4) {
-	    mbs_in = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_FROM_DEVICE);
-	    mbs_out = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_TO_DEVICE);
+        for (size = min_size; size < min_size + 1/*max_size*/; size *= 4) {
+	    mbs_in = -1;//pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_FROM_DEVICE);
+	    mbs_out = -1;//pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_TO_DEVICE);
 	    mbs = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_BIDIRECTIONAL);
 	    err = pcilib_wait_irq(handle, 0, 0, &irqs);
 	    if (err) irqs = 0;
@@ -801,9 +801,17 @@ int WriteRegister(pcilib_t *handle, pcilib_model_description_t *model_info, cons
 
     unsigned long val;
     pcilib_register_value_t value;
-    
-    if ((!isnumber(*data))||(sscanf(*data, "%li", &val) != 1)) {
-	Error("Can't parse data value (%s) is not valid decimal number", data[i]);
+
+    if (!isnumber(*data)) {
+	if (sscanf(*data, "%li", &val) != 1) {
+	    Error("Can't parse data value (%s) is not valid decimal number", *data);
+	}
+    } else if (!isxnumber(*data)) {
+	if (sscanf(*data, "%lx", &val) != 1) {
+	    Error("Can't parse data value (%s) is not valid decimal number", *data);
+	}
+    } else {
+	    Error("Can't parse data value (%s) is not valid decimal number", *data);
     }
 
     value = val;

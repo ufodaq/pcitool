@@ -151,7 +151,7 @@ static size_t dma_nwl_get_next_buffer(nwl_dma_t * ctx, pcilib_nwl_engine_descrip
 }
 
 static int dma_nwl_push_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, size_t size, int eop, pcilib_timeout_t timeout) {
-    int flags;
+    int flags = 0;
     
     uint32_t val;
     unsigned char *ring = pcilib_kmem_get_ua(ctx->pcilib, info->ring);
