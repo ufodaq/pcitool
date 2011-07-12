@@ -2,6 +2,17 @@
 #define NWL_RING_SET(data, offset, val)  *(uint32_t*)(((char*)(data)) + (offset)) = (val)
 #define NWL_RING_UPDATE(data, offset, mask, val) *(uint32_t*)(((char*)(data)) + (offset)) = ((*(uint32_t*)(((char*)(data)) + (offset)))&(mask))|(val)
 
+int dma_nwl_sync_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, pcilib_kmem_handle_t *kmem) {
+    switch (info->desc.direction) {
+     case PCILIB_DMA_FROM_DEVICE:
+        return pcilib_sync_kernel_memory(ctx->pcilib, kmem, PCILIB_KMEM_SYNC_FROMDEVICE);
+     case PCILIB_DMA_TO_DEVICE:
+        return pcilib_sync_kernel_memory(ctx->pcilib, kmem, PCILIB_KMEM_SYNC_TODEVICE);
+    }
+    
+    return 0;
+}
+
 int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info) {
     int err = 0;
 

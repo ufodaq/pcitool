@@ -4,10 +4,6 @@
 #include <stdio.h>
 #include "pcilib.h"
 
-#define NWL_DMA_IRQ_SOURCE 0
-
-typedef struct nwl_dma_s nwl_dma_t;
-
 pcilib_dma_context_t *dma_nwl_init(pcilib_t *ctx);
 void  dma_nwl_free(pcilib_dma_context_t *vctx);
 
