@@ -12,6 +12,8 @@
 
 int pcilib_isnumber(const char *str);
 int pcilib_isxnumber(const char *str);
+int pcilib_isnumber_n(const char *str, size_t len);
+int pcilib_isxnumber_n(const char *str, size_t len);
 
 uint16_t pcilib_swap16(uint16_t x);
 uint32_t pcilib_swap32(uint32_t x);

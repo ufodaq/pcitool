@@ -26,6 +26,24 @@ int pcilib_isxnumber(const char *str) {
     return 1;
 }
 
+int pcilib_isnumber_n(const char *str, size_t len) {
+    int i = 0;
+    for (i = 0; (str[i])&&(i < len); i++) 
+	if (!isdigit(str[i])) return 0;
+    return 1;
+}
+
+int pcilib_isxnumber_n(const char *str, size_t len) {
+    int i = 0;
+    
+    if ((len > 1)&&(str[0] == '0')&&((str[1] == 'x')||(str[1] == 'X'))) i += 2;
+    
+    for (; (str[i])&&(i < len); i++) 
+	if (!isxdigit(str[i])) return 0;
+
+    return 1;
+}
+
 
 uint16_t pcilib_swap16(uint16_t x) {
     return (((x<<8)&0xFFFF) | ((x>>8)&0xFFFF));

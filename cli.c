@@ -20,6 +20,7 @@
 //#include "pci.h"
 #include "tools.h"
 #include "kernel.h"
+#include "error.h"
 
 /* defines */
 #define MAX_KBUF 14
@@ -37,7 +38,8 @@
 
 #define isnumber pcilib_isnumber
 #define isxnumber pcilib_isxnumber
-
+#define isnumber_n pcilib_isnumber_n
+#define isxnumber_n pcilib_isxnumber_n
 
 typedef uint8_t access_t;
 
@@ -51,7 +53,10 @@ typedef enum {
     MODE_WRITE,
     MODE_WRITE_REGISTER,
     MODE_RESET,
-    MODE_GRAB
+    MODE_GRAB,
+    MODE_START_DMA,
+    MODE_STOP_DMA,
+    MODE_WAIT_IRQ
 } MODE;
 
 typedef enum {
@@ -68,6 +73,7 @@ typedef enum {
     OPT_ENDIANESS = 'e',
     OPT_SIZE = 's',
     OPT_OUTPUT = 'o',
+    OPT_TIMEOUT = 't',
     OPT_INFO = 'i',
     OPT_BENCHMARK = 'p',
     OPT_LIST = 'l',
@@ -76,6 +82,9 @@ typedef enum {
     OPT_GRAB = 'g',
     OPT_QUIETE = 'q',
     OPT_RESET = 128,
+    OPT_START_DMA = 129,
+    OPT_STOP_DMA = 130,
+    OPT_WAIT_IRQ = 131,
     OPT_HELP = 'h',
 } OPTIONS;
 
@@ -87,6 +96,7 @@ static struct option long_options[] = {
     {"endianess",		required_argument, 0, OPT_ENDIANESS },
     {"size",			required_argument, 0, OPT_SIZE },
     {"output",			required_argument, 0, OPT_OUTPUT },
+    {"timeout",			required_argument, 0, OPT_TIMEOUT },
     {"info",			no_argument, 0, OPT_INFO },
     {"list",			no_argument, 0, OPT_LIST },
     {"reset",			no_argument, 0, OPT_RESET },
@@ -94,6 +104,9 @@ static struct option long_options[] = {
     {"read",			optional_argument, 0, OPT_READ },
     {"write",			optional_argument, 0, OPT_WRITE },
     {"grab",			optional_argument, 0, OPT_GRAB },
+    {"start-dma",		required_argument, 0, OPT_START_DMA },
+    {"stop-dma",		optional_argument, 0, OPT_STOP_DMA },
+    {"wait-irq",		optional_argument, 0, OPT_WAIT_IRQ },
     {"quiete",			no_argument, 0, OPT_QUIETE },
     {"help",			no_argument, 0, OPT_HELP },
     { 0, 0, 0, 0 }
@@ -128,8 +141,8 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "	--help			- Help message\n"
 "\n"
 "  DMA Modes:\n"
-"	--start-dma <num>	- Start specified DMA engine\n"
-"	--stop-dma [num]	- Stop specified engine or DMA subsystem\n"
+"	--start-dma <num>[r|w]	- Start specified DMA engine\n"
+"	--stop-dma [num][r|w]	- Stop specified engine or DMA subsystem\n"
 "	--wait-irq <source>	- Wait for IRQ\n"
 "\n"
 "  Addressing:\n"
@@ -144,7 +157,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "	-a [fifo|dma]<bits>	- Access type and bits per word (default: 32)\n"
 "	-e <l|b>		- Endianess Little/Big (default: host)\n"
 "	-o <file>		- Output to file (default: stdout)\n"
-//"	-t <timeout>		- Timeout in microseconds\n"
+"	-t <timeout>		- Timeout in microseconds\n"
 "\n"
 "  Information:\n"
 "	-q 			- Quiete mode (suppress warnings)\n"
@@ -547,7 +560,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, p
     switch (mode) {
       case ACCESS_DMA:
 	dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_FROM_DEVICE, dma);
-	if (dmaid == PCILIB_DMA_INVALID) Error("Invalid DMA engine (%lu) is specified", dma);
+	if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("Invalid DMA engine (%lu) is specified", dma);
 	err = pcilib_read_dma(handle, dmaid, addr, size, buf, &ret);
 	if ((err)||(ret <= 0)) Error("No data is returned by DMA engine");
 	size = ret;
@@ -722,7 +735,7 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
     switch (mode) {
       case ACCESS_DMA:
 	dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_TO_DEVICE, dma);
-	if (dmaid == PCILIB_DMA_INVALID) Error("Invalid DMA engine (%lu) is specified", dma);
+	if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("Invalid DMA engine (%lu) is specified", dma);
 	err = pcilib_write_dma(handle, dmaid, addr, size, buf, &ret);
 	if ((err)||(ret != size)) {
 	    if (!ret) Error("No data is written by DMA engine");
@@ -845,12 +858,73 @@ int Grab(pcilib_t *handle, const char *event, const char *output) {
     return 0;
 }
 
+
+int StartStopDMA(pcilib_t *handle,  pcilib_model_description_t *model_info, pcilib_dma_engine_addr_t dma, pcilib_dma_direction_t dma_direction, int start) {
+    int err;
+    pcilib_dma_engine_t dmaid;
+    
+    if (dma_direction&PCILIB_DMA_FROM_DEVICE) {
+        if (dma == PCILIB_DMA_ENGINE_ADDR_INVALID) {
+	    if (start) Error("DMA engine should be specified");
+	    dmaid = PCILIB_DMA_ENGINE_INVALID;
+	} else {
+	    dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_FROM_DEVICE, dma);
+	    if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("Invalid DMA engine (C2S %lu) is specified", dma);
+	}
+	
+	if (start) {
+	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_PERMANENT);
+    	    if (err) Error("Error starting DMA engine (C2S %lu)", dma);
+	} else {
+	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERMANENT);
+    	    if (err) Error("Error stopping DMA engine (C2S %lu)", dma);
+	}
+    }
+
+    if (dma_direction&PCILIB_DMA_TO_DEVICE) {
+        if (dma == PCILIB_DMA_ENGINE_ADDR_INVALID) {
+	    if (start) Error("DMA engine should be specified");
+	    dmaid = PCILIB_DMA_ENGINE_INVALID;
+	} else {
+	    dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_TO_DEVICE, dma);
+	    if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("Invalid DMA engine (S2C %lu) is specified", dma);
+	}
+	
+	if (start) {
+	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_PERMANENT);
+    	    if (err) Error("Error starting DMA engine (S2C %lu)", dma);
+	} else {
+	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERMANENT);
+    	    if (err) Error("Error stopping DMA engine (S2C %lu)", dma);
+	}
+    }
+
+    return 0;
+}
+
+int WaitIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_source_t irq_source, pcilib_timeout_t timeout) {
+    int err;
+    size_t count;
+    
+    err = pcilib_enable_irq(handle, 0);
+    if (err) Error("Error enabling IRQs");
+
+    err = pcilib_wait_irq(handle, irq_source, timeout, &count);
+    if (err) {
+	if (err == PCILIB_ERROR_TIMEOUT) Error("Timeout waiting for IRQ");
+	else Error("Error waiting for IRQ");
+    }
+
+    return 0;
+}
+
+
 int main(int argc, char **argv) {
     int i;
     long itmp;
     unsigned char c;
 
-    char *num_offset;
+    const char *num_offset;
 
     int details = 0;
     int quiete = 0;
@@ -867,13 +941,17 @@ int main(int argc, char **argv) {
     const char *bank = NULL;
     char **data = NULL;
     const char *event = NULL;
+    const char *dma_channel = NULL;
+    pcilib_irq_source_t irq_source;
+    pcilib_dma_direction_t dma_direction = PCILIB_DMA_BIDIRECTIONAL;
     
-    pcilib_dma_engine_addr_t dma;
+    pcilib_dma_engine_addr_t dma = PCILIB_DMA_ENGINE_ADDR_INVALID;
     uintptr_t start = -1;
     size_t size = 1;
     access_t access = 4;
     int skip = 0;
     int endianess = 0;
+    size_t timeout = 0;
     const char *output = NULL;
 
     pcilib_t *handle;
@@ -931,6 +1009,32 @@ int main(int argc, char **argv) {
 		mode = MODE_GRAB;
 		if (optarg) event = optarg;
 		else if ((optind < argc)&&(argv[optind][0] != '-')) event = argv[optind++];
+	    break;
+	    case OPT_START_DMA:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		
+		mode = MODE_START_DMA;
+		if (optarg) dma_channel = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-')) dma_channel = argv[optind++];
+	    break;
+	    case OPT_STOP_DMA:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		
+		mode = MODE_STOP_DMA;
+		if (optarg) dma_channel = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-')) dma_channel = argv[optind++];
+	    break;
+	    case OPT_WAIT_IRQ:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		
+		mode = MODE_WAIT_IRQ;
+		if (optarg) num_offset = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-'))  num_offset = argv[optind++];
+		
+		if ((!isnumber(num_offset))||(sscanf(num_offset, "%li", &itmp) != 1))
+		    Usage(argc, argv, "Invalid IRQ source is specified (%s)", num_offset);
+
+		irq_source = itmp;
 	    break;
 	    case OPT_DEVICE:
 		fpga_device = optarg;
@@ -994,6 +1098,10 @@ int main(int argc, char **argv) {
 		} else Usage(argc, argv, "Invalid endianess is specified (%s)", optarg);
 		
 	    break;
+	    case OPT_TIMEOUT:
+		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &timeout) != 1))
+		    Usage(argc, argv, "Invalid timeout is specified (%s)", optarg);
+	    break;
 	    case OPT_OUTPUT:
 		output = optarg;
 	    break;
@@ -1048,6 +1156,31 @@ int main(int argc, char **argv) {
 	    if (model == PCILIB_MODEL_PCI) {
 		Usage(argc, argv, "The address is not specified");
 	    } else ++mode;
+	}
+     break;
+     case MODE_START_DMA:
+     case MODE_STOP_DMA:
+        if ((dma_channel)&&(*dma_channel)) {
+	    itmp = strlen(dma_channel) - 1;
+	    if (dma_channel[itmp] == 'r') dma_direction = PCILIB_DMA_FROM_DEVICE;
+	    else if (dma_channel[itmp] == 'w') dma_direction = PCILIB_DMA_TO_DEVICE;
+
+	    if (dma_direction != PCILIB_DMA_BIDIRECTIONAL) itmp--;
+	    
+	    if (strncmp(dma_channel, "dma", 3)) num_offset = dma_channel;
+	    else {
+		num_offset = dma_channel + 3;
+		itmp -= 3;
+	    }
+	    
+	    if (bank) {
+		if (strncmp(num_offset, bank, itmp)) Usage(argc, argv, "Conflicting DMA channels are specified in mode parameter (%s) and bank parameter (%s)", dma_channel, bank);
+	    }
+		 
+	    if (!isnumber_n(num_offset, itmp))
+		 Usage(argc, argv, "Invalid DMA channel (%s) is specified", dma_channel);
+
+	    dma = atoi(num_offset);
 	}
      break;
      default:
@@ -1145,6 +1278,15 @@ int main(int argc, char **argv) {
      break;
      case MODE_GRAB:
         Grab(handle, event, output);
+     break;
+     case MODE_START_DMA:
+        StartStopDMA(handle, model_info, dma, dma_direction, 1);
+     break;
+     case MODE_STOP_DMA:
+        StartStopDMA(handle, model_info, dma, dma_direction, 0);
+     break;
+     case MODE_WAIT_IRQ:
+        WaitIRQ(handle, model_info, irq_source, timeout);
      break;
     }
 

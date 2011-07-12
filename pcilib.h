@@ -37,6 +37,7 @@ typedef uint8_t pcilib_dma_engine_addr_t;
 typedef uint8_t pcilib_dma_engine_t;
 typedef uint64_t pcilib_event_id_t;
 typedef uint32_t pcilib_event_t;
+typedef uint64_t pcilib_timeout_t;
 
 typedef enum {
     PCILIB_HOST_ENDIAN = 0,
@@ -70,7 +71,8 @@ typedef enum {
 typedef enum {
     PCILIB_DMA_FLAGS_DEFAULT = 0,
     PCILIB_DMA_FLAG_EOP = 1,
-    PCILIB_DMA_FLAG_WAIT = 2
+    PCILIB_DMA_FLAG_WAIT = 2,
+    PCILIB_DMA_FLAG_PERMANENT = 4
 } pcilib_dma_flags_t;
 
 typedef enum {
@@ -83,7 +85,8 @@ typedef enum {
 #define PCILIB_BAR_INVALID		((pcilib_bar_t)-1)
 #define PCILIB_BAR0			0
 #define PCILIB_BAR1			1
-#define PCILIB_DMA_INVALID		((pcilib_dma_engine_t)-1)
+#define PCILIB_DMA_ENGINE_INVALID	((pcilib_dma_engine_t)-1)
+#define PCILIB_DMA_ENGINE_ADDR_INVALID	((pcilib_dma_engine_addr_t)-1)
 #define PCILIB_REGISTER_INVALID		((pcilib_register_t)-1)
 #define PCILIB_ADDRESS_INVALID		((uintptr_t)-1)
 #define PCILIB_REGISTER_BANK_INVALID	((pcilib_register_bank_t)-1)
@@ -99,7 +102,7 @@ typedef enum {
 #define PCILIB_EVENTS_ALL		((pcilib_event_t)-1)
 #define PCILIB_EVENT_INVALID		((pcilib_event_t)-1)
 #define PCILIB_EVENT_ID_INVALID		0
-#define PCILIB_TIMEOUT_INFINITE		((size_t)-1)
+#define PCILIB_TIMEOUT_INFINITE		((pcilib_timeout_t)-1)
 #define PCILIB_TIMEOUT_IMMEDIATE	0
 
 typedef int (*pcilib_dma_callback_t)(void *ctx, pcilib_dma_flags_t flags, size_t bufsize, void *buf);
@@ -199,8 +202,13 @@ pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx);
 pcilib_t *pcilib_open(const char *device, pcilib_model_t model);
 void pcilib_close(pcilib_t *ctx);
 
+int pcilib_start_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
+int pcilib_stop_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
+int pcilib_enable_irq(pcilib_t *ctx, pcilib_dma_flags_t flags);
+int pcilib_disable_irq(pcilib_t *ctx, pcilib_dma_flags_t flags);
+
 int pcilib_clear_irq(pcilib_t *ctx, pcilib_irq_source_t source);
-int pcilib_wait_irq(pcilib_t *ctx, pcilib_irq_source_t source, size_t timeout, size_t *count);
+int pcilib_wait_irq(pcilib_t *ctx, pcilib_irq_source_t source, pcilib_timeout_t timeout, size_t *count);
 
 void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar);
 void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data);
@@ -220,8 +228,8 @@ int pcilib_write_fifo(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t f
 int pcilib_read_fifo(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t fifo_size, size_t n, void *buf);
 
 int pcilib_skip_dma(pcilib_t *ctx, pcilib_dma_engine_t dma);
-int pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, pcilib_dma_callback_t cb, void *cbattr);
-int pcilib_push_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, size_t timeout, void *buf, size_t *written_bytes);
+int pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, pcilib_dma_callback_t cb, void *cbattr);
+int pcilib_push_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, void *buf, size_t *written_bytes);
 int pcilib_read_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf, size_t *read_bytes);
 int pcilib_write_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf, size_t *written_bytes);
 double pcilib_benchmark_dma(pcilib_t *ctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction);

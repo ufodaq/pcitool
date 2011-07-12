@@ -1,3 +1,9 @@
+1. Read registers from XML description. It also makes sense to provide
+   formal XML-based language for DMA implementation. 
+   a) Writting/Reading register values
+   b) Wait until <register1>=<value> on <register2>=<value> report error
+   c) ... ?
 2. Hint for register value representation in the bank (hex, decimal)
 3. Implement software registers
 4. Support FIFO reads/writes from/to registers
+5. Provide OR and AND operations on registers in cli

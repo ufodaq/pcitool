@@ -17,7 +17,7 @@
 #include "tools.h"
 #include "error.h"
 
-int pcilib_wait_irq(pcilib_t *ctx, pcilib_irq_source_t source, size_t timeout, size_t *count) {
+int pcilib_wait_irq(pcilib_t *ctx, pcilib_irq_source_t source, pcilib_timeout_t timeout, size_t *count) {
     int err;
     
     interrupt_wait_t arg = { 0 };

@@ -17,8 +17,9 @@ typedef struct {
     pcilib_kmem_handle_t *ring;
     pcilib_kmem_handle_t *pages;
     
-    int started;			// indicates if DMA buffers are initialized and reading is allowed
-    int writting;			// indicates if we are in middle of writting packet
+    int started;			/**< indicates that DMA buffers are initialized and reading is allowed */
+    int writting;			/**< indicates that we are in middle of writting packet */
+    int preserve;			/**< indicates that DMA should not be stopped during clean-up */
 } pcilib_nwl_engine_description_t;
 
 
@@ -28,9 +29,9 @@ struct nwl_dma_s {
     pcilib_register_bank_description_t *dma_bank;
     char *base_addr;
     
-    pcilib_irq_type_t irq_enabled;
-
-    int started;
+    pcilib_irq_type_t irq_enabled;	/**< indicates that IRQs are enabled */
+    int irq_preserve;			/**< indicates that IRQs should not be disabled during clean-up */
+    int started;			/**< indicates that DMA subsystem is initialized and DMA engine can start */
     
     pcilib_dma_engine_t n_engines;
     pcilib_nwl_engine_description_t engines[PCILIB_MAX_DMA_ENGINES + 1];

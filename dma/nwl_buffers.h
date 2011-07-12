@@ -102,7 +102,7 @@ next_buffer:
 }
 
 
-static size_t dma_nwl_get_next_buffer(nwl_dma_t * ctx, pcilib_nwl_engine_description_t *info, size_t n_buffers, size_t timeout) {
+static size_t dma_nwl_get_next_buffer(nwl_dma_t * ctx, pcilib_nwl_engine_description_t *info, size_t n_buffers, pcilib_timeout_t timeout) {
     struct timeval start, cur;
 
     size_t res, n = 0;
@@ -139,7 +139,7 @@ static size_t dma_nwl_get_next_buffer(nwl_dma_t * ctx, pcilib_nwl_engine_descrip
     return info->head;
 }
 
-static int dma_nwl_push_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, size_t size, int eop, size_t timeout) {
+static int dma_nwl_push_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, size_t size, int eop, pcilib_timeout_t timeout) {
     int flags;
     
     uint32_t val;
@@ -178,7 +178,7 @@ static int dma_nwl_push_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *
 }
 
 
-static size_t dma_nwl_wait_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, size_t *size, int *eop, size_t timeout) {
+static size_t dma_nwl_wait_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, size_t *size, int *eop, pcilib_timeout_t timeout) {
     uint32_t val;
     struct timeval start, cur;
     uint32_t status_size, status, control;
