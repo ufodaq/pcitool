@@ -9,6 +9,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 #include <errno.h>
 #include <assert.h>
 
@@ -165,7 +166,14 @@ static int pcilib_dma_read_callback(void *arg, pcilib_dma_flags_t flags, size_t 
 }
 
 static int pcilib_dma_skip_callback(void *arg, pcilib_dma_flags_t flags, size_t bufsize, void *buf) {
-//    if (arg) (*(uint32_t*)arg) += bufsize;
+    struct timeval *tv = (struct timeval*)arg;
+    struct timeval cur;
+    
+    if (tv) {
+	gettimeofday(&cur, NULL);
+	if ((cur.tv_sec > tv->tv_sec)||((cur.tv_sec == tv->tv_sec)&&(cur.tv_usec > tv->tv_usec))) return 0;
+    }
+    
     return 1;
 }
 
@@ -215,11 +223,20 @@ int pcilib_read_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size
 
 int pcilib_skip_dma(pcilib_t *ctx, pcilib_dma_engine_t dma) {
     int err;
-    size_t skipped = 0;
+    struct timeval tv, cur;
+
+    gettimeofday(&tv, NULL);
+    tv.tv_usec += PCILIB_DMA_SKIP_TIMEOUT;
+    tv.tv_sec += tv.tv_usec / 1000000;
+    tv.tv_usec += tv.tv_usec % 1000000;
+    
     do {
 	    // IMMEDIATE timeout is not working properly, so default is set
-	err = pcilib_stream_dma(ctx, dma, 0, 0, PCILIB_DMA_FLAGS_DEFAULT, PCILIB_DMA_TIMEOUT, pcilib_dma_skip_callback, &skipped);
-    } while ((!err)&&(skipped > 0));
+	err = pcilib_stream_dma(ctx, dma, 0, 0, PCILIB_DMA_FLAGS_DEFAULT, PCILIB_DMA_TIMEOUT, pcilib_dma_skip_callback, &tv);
+	gettimeofday(&cur, NULL);
+    } while ((!err)&&((cur.tv_sec < tv.tv_sec)||((cur.tv_sec == tv.tv_sec)&&(cur.tv_usec < tv.tv_usec))));
+
+    if ((cur.tv_sec > tv.tv_sec)||((cur.tv_sec == tv.tv_sec)&&(cur.tv_usec > tv.tv_usec))) return PCILIB_ERROR_TIMEOUT;
     
     return 0;
 }
