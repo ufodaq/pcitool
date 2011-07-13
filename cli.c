@@ -85,6 +85,7 @@ typedef enum {
     OPT_START_DMA = 129,
     OPT_STOP_DMA = 130,
     OPT_WAIT_IRQ = 131,
+    OPT_ITERATIONS = 132,
     OPT_HELP = 'h',
 } OPTIONS;
 
@@ -97,6 +98,7 @@ static struct option long_options[] = {
     {"size",			required_argument, 0, OPT_SIZE },
     {"output",			required_argument, 0, OPT_OUTPUT },
     {"timeout",			required_argument, 0, OPT_TIMEOUT },
+    {"iterations",		required_argument, 0, OPT_ITERATIONS },
     {"info",			no_argument, 0, OPT_INFO },
     {"list",			no_argument, 0, OPT_LIST },
     {"reset",			no_argument, 0, OPT_RESET },
@@ -335,7 +337,7 @@ void Info(pcilib_t *handle, pcilib_model_description_t *model_info) {
 #define BENCH_MAX_DMA_SIZE 16 * 1024 * 1024
 #define BENCH_MAX_FIFO_SIZE 1024 * 1024
 
-int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access) {
+int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, size_t iterations) {
     int err;
     int i, j, errors;
     void *data, *buf, *check;
@@ -357,10 +359,10 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	    max_size = BENCH_MAX_DMA_SIZE;
 	}
 	
-        for (size = min_size; size < min_size + 1/*max_size*/; size *= 4) {
-	    mbs_in = -1;//pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_FROM_DEVICE);
-	    mbs_out = -1;//pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_TO_DEVICE);
-	    mbs = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_BIDIRECTIONAL);
+        for (size = min_size; size <= max_size; size *= 4) {
+	    mbs_in = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_FROM_DEVICE);
+	    mbs_out = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_TO_DEVICE);
+	    mbs = pcilib_benchmark_dma(handle, dma, addr, size, iterations, PCILIB_DMA_BIDIRECTIONAL);
 	    err = pcilib_wait_irq(handle, 0, 0, &irqs);
 	    if (err) irqs = 0;
 	    
@@ -981,6 +983,7 @@ int main(int argc, char **argv) {
     int endianess = 0;
     size_t timeout = 0;
     const char *output = NULL;
+    size_t iterations = BENCHMARK_ITERATIONS;
 
     pcilib_t *handle;
     
@@ -1133,6 +1136,11 @@ int main(int argc, char **argv) {
 	    case OPT_OUTPUT:
 		output = optarg;
 	    break;
+	    case OPT_ITERATIONS:
+		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &iterations) != 1))
+		    Usage(argc, argv, "Invalid number of iterations is specified (%s)", optarg);
+		size_set = 1;
+	    break;
 	    case OPT_QUIETE:
 		quiete = 1;
 	    break;
@@ -1281,7 +1289,7 @@ int main(int argc, char **argv) {
         List(handle, model_info, bank, details);
      break;
      case MODE_BENCHMARK:
-        Benchmark(handle, amode, dma, bar, start, size_set?size:0, access);
+        Benchmark(handle, amode, dma, bar, start, size_set?size:0, access, iterations);
      break;
      case MODE_READ:
         if (addr) {
