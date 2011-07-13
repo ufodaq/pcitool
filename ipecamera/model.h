@@ -109,7 +109,8 @@ pcilib_event_api_description_t ipecamera_image_api = {
     
     ipecamera_next_event,
     ipecamera_get,
-    ipecamera_return
+    ipecamera_return,
+    ipecamera_init_dma
 };
 #else
 extern pcilib_event_api_description_t ipecamera_image_api;

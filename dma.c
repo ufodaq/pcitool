@@ -20,12 +20,14 @@
 
 const pcilib_dma_info_t *pcilib_get_dma_info(pcilib_t *ctx) {
     if (!ctx->dma_ctx) {
-	pcilib_model_t model = pcilib_get_model(ctx);
-	pcilib_dma_api_description_t *api = pcilib_model[model].dma_api;
-	
-	if ((api)&&(api->init)) {
+        pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+
+	if ((ctx->event_ctx)&&(model_info->event_api->init_dma)) {
 	    pcilib_map_register_space(ctx);
-	    ctx->dma_ctx = api->init(ctx);
+	    ctx->dma_ctx = model_info->event_api->init_dma(ctx->event_ctx);
+	} else if ((model_info->dma_api)&&(model_info->dma_api->init)) {
+	    pcilib_map_register_space(ctx);
+	    ctx->dma_ctx = model_info->dma_api->init(ctx, PCILIB_DMA_MODIFICATION_DEFAULT, NULL);
 	}
 	
 	if (!ctx->dma_ctx) return NULL;

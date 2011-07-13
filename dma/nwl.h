@@ -42,6 +42,8 @@ struct pcilib_nwl_engine_description_s {
 struct nwl_dma_s {
     pcilib_t *pcilib;
     
+    pcilib_dma_modification_t type;
+    
     pcilib_register_bank_description_t *dma_bank;
     char *base_addr;
 

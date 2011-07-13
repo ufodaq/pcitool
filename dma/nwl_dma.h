@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include "pcilib.h"
 
-pcilib_dma_context_t *dma_nwl_init(pcilib_t *ctx);
+#define PCILIB_NWL_MODIFICATION_IPECAMERA 0x100
+
+pcilib_dma_context_t *dma_nwl_init(pcilib_t *ctx, pcilib_dma_modification_t type, void *arg);
 void  dma_nwl_free(pcilib_dma_context_t *vctx);
 
 int dma_nwl_enable_irq(pcilib_dma_context_t *vctx, pcilib_irq_type_t type, pcilib_dma_flags_t flags);

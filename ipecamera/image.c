@@ -16,6 +16,8 @@
 #include "model.h"
 #include "image.h"
 
+#include "dma/nwl_dma.h"
+
 #define IPECAMERA_SLEEP_TIME 250000
 #define IPECAMERA_MAX_LINES 1088
 #define IPECAMERA_DEFAULT_BUFFER_SIZE 10
@@ -170,6 +172,19 @@ void ipecamera_free(pcilib_context_t *vctx) {
 	free(ctx);
     }
 }
+
+pcilib_dma_context_t *ipecamera_init_dma(pcilib_context_t *vctx) {
+    ipecamera_t *ctx = (ipecamera_t*)vctx;
+    
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx->pcilib);
+    if ((!model_info->dma_api)||(!model_info->dma_api->init)) {
+	pcilib_error("The DMA engine is not configured in model");
+	return NULL;
+    }
+    
+    return model_info->dma_api->init(ctx->pcilib, PCILIB_DMA_MODIFICATION_DEFAULT, NULL);
+}
+
 
 int ipecamera_set_buffer_size(ipecamera_t *ctx, int size) {
     if (ctx->started) {

@@ -16,6 +16,9 @@ struct pcilib_event_api_description_s {
     pcilib_event_id_t (*next_event)(pcilib_context_t *ctx, pcilib_event_t event_mask, const struct timespec *timeout);
     void* (*get_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size);
     int (*return_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id);
+    
+    pcilib_dma_context_t *(*init_dma)(pcilib_context_t *ctx);
+
 };
 
 

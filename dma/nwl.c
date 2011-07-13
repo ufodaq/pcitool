@@ -1,5 +1,6 @@
 #define _PCILIB_DMA_NWL_C
 #define _BSD_SOURCE
+//#define DEBUG_HARDWARE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,7 +75,7 @@ int dma_nwl_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
 }
 
 
-pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib) {
+pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib, pcilib_dma_modification_t type, void *arg) {
     int i;
     int err;
     uint32_t val;
@@ -86,6 +87,7 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib) {
     if (ctx) {
 	memset(ctx, 0, sizeof(nwl_dma_t));
 	ctx->pcilib = pcilib;
+	ctx->type = type;
 
 	pcilib_register_bank_t dma_bank = pcilib_find_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
 	if (dma_bank == PCILIB_REGISTER_BANK_INVALID) {
@@ -129,7 +131,7 @@ void  dma_nwl_free(pcilib_dma_context_t *vctx) {
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
 
     if (ctx) {
-	dma_nwl_stop_loopback(ctx);
+	if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) dma_nwl_stop_loopback(ctx);
 	dma_nwl_free_irq(ctx);
 	dma_nwl_stop(ctx, PCILIB_DMA_ENGINE_ALL, PCILIB_DMA_FLAGS_DEFAULT);
 	    
@@ -164,14 +166,19 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
 	// Not supported
     if (direction == PCILIB_DMA_TO_DEVICE) return -1.;
+    else if ((direction == PCILIB_DMA_FROM_DEVICE)&&(ctx->type != PCILIB_DMA_MODIFICATION_DEFAULT)) return -1.;
 
 	// Stop Generators and drain old data
-    dma_nwl_stop_loopback(ctx);
+    if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) dma_nwl_stop_loopback(ctx);
 //    dma_nwl_stop_engine(ctx, readid); // DS: replace with something better
 
     __sync_synchronize();
 
-    pcilib_skip_dma(ctx->pcilib, readid);
+    err = pcilib_skip_dma(ctx->pcilib, readid);
+    if (err) {
+	pcilib_error("Can't start benchmark, devices continuously writes unexpected data using DMA engine");
+	return err;
+    }
 
 #ifdef NWL_GENERATE_DMA_IRQ
     dma_nwl_enable_engine_irq(ctx, readid);
@@ -179,23 +186,9 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 #endif /* NWL_GENERATE_DMA_IRQ */
 
 
-    dma_nwl_start_loopback(ctx, direction, size * sizeof(uint32_t));
-
-/*
-    printf("Packet size: %li\n", size * sizeof(uint32_t));
-    pcilib_read_register(ctx->pcilib, NULL, "dma1w_counter", &regval);
-    printf("Count write: %lx\n", regval);
-
-    nwl_read_register(val, ctx, read_base, REG_DMA_ENG_CTRL_STATUS);
-    printf("Read DMA control: %lx\n", val);    
-    nwl_read_register(val, ctx, write_base, REG_DMA_ENG_CTRL_STATUS);
-    printf("Write DMA control: %lx\n", val);    
-
-    nwl_read_register(val, ctx, write_base, REG_DMA_ENG_NEXT_BD);
-    printf("Pointer1: %lx\n", val);    
-    nwl_read_register(val, ctx, write_base, REG_SW_NEXT_BD);
-    printf("Pointer2: %lx\n", val);    
-*/
+    if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) {
+	dma_nwl_start_loopback(ctx, direction, size * sizeof(uint32_t));
+    }
 
 	// Allocate memory and prepare data
     buf = malloc(size * sizeof(uint32_t));
@@ -208,12 +201,22 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
     memset(cmp, 0x13, size * sizeof(uint32_t));
 
+
+#ifdef DEBUG_HARDWARE	     
+    if (ctx->type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
+	pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e5);
+	usleep(100000);
+	pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e1);
+    }
+#endif /* DEBUG_HARDWARE */
+
 	// Benchmark
     for (i = 0; i < iterations; i++) {
-//	puts("====================================");
-	pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e1);
-//	pcilib_read_register(ctx->pcilib, NULL, "control", &regval);
-//	printf("Control: %lx\n", regval);
+#ifdef DEBUG_HARDWARE	     
+	if (ctx->type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
+	    pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e1);
+	}
+#endif /* DEBUG_HARDWARE */
 
         gettimeofday(&start, NULL);
 	if (direction&PCILIB_DMA_TO_DEVICE) {
@@ -225,57 +228,21 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	        break;
 	    }
 	}
-/*
-    printf("RegRead: %i\n",pcilib_read_register(ctx->pcilib, NULL, "dma1w_counter", &regval));
-    printf("Count write (%i of %i): %lx\n", i, iterations, regval);
 
-    printf("RegRead: %i\n",pcilib_read_register(ctx->pcilib, NULL, "dma1r_counter", &regval));
-    printf("Count read (%i of %i): %lx\n", i, iterations, regval);
-
-
-    nwl_read_register(val, ctx, read_base, REG_DMA_ENG_COMP_BYTES);
-    printf("Compl Bytes (read): %lx\n", val);    
-
-    nwl_read_register(val, ctx, write_base, REG_DMA_ENG_COMP_BYTES);
-    printf("Compl Bytes (write): %lx\n", val);    
-
-    nwl_read_register(val, ctx, read_base, REG_DMA_ENG_CTRL_STATUS);
-    printf("Read DMA control (after write): %lx\n", val);    
-*/
-/*
-    nwl_read_register(val, ctx, read_base, REG_DMA_ENG_CTRL_STATUS);
-    printf("Read DMA control (after write): %lx\n", val);    
-    nwl_read_register(val, ctx, write_base, REG_DMA_ENG_CTRL_STATUS);
-    printf("Write DMA control (after write): %lx\n", val);    
-*/
-	pcilib_write_register(ctx->pcilib, NULL, "control", 0x3e1);
-//	pcilib_read_register(ctx->pcilib, NULL, "control", &regval);
-//	printf("Control: %lx\n", regval);
+#ifdef DEBUG_HARDWARE	     
+	if (ctx->type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
+	    //usleep(1000000);
+	    pcilib_write_register(ctx->pcilib, NULL, "control", 0x3e1);
+	}
 
 	memset(buf, 0, size * sizeof(uint32_t));
+#endif /* DEBUG_HARDWARE */
         
 	err = pcilib_read_dma(ctx->pcilib, readid, addr, size * sizeof(uint32_t), buf, &bytes);
         gettimeofday(&cur, NULL);
 	us += ((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec));
 
 	if ((err)||(bytes != size * sizeof(uint32_t))) {
-/*
-    nwl_read_register(val, ctx, read_base, REG_DMA_ENG_CTRL_STATUS);
-    printf("Read DMA control: %lx\n", val);    
-    nwl_read_register(val, ctx, write_base, REG_DMA_ENG_CTRL_STATUS);
-    printf("Write DMA control: %lx\n", val);    
-    nwl_read_register(val, ctx, write_base, REG_DMA_ENG_NEXT_BD);
-    printf("After Pointer wr1: %lx\n", val);    
-    nwl_read_register(val, ctx, write_base, REG_SW_NEXT_BD);
-    printf("After Pointer wr2: %lx\n", val);    
-    pcilib_read_register(ctx->pcilib, NULL, "end_address", &regval);
-    printf("End address: %lx\n", regval);
-
-	nwl_read_register(val, ctx, read_base, REG_DMA_ENG_NEXT_BD);
-	printf("After Pointer read1: %lx\n", val);    
-	nwl_read_register(val, ctx, read_base, REG_SW_NEXT_BD);
-	printf("After Pointer read2: %lx\n", val);    
-*/
 	     error = "Read failed";
 	     break;
 	}
@@ -287,32 +254,52 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 		break;
 	    }
 	}
-	     
+
+#ifdef DEBUG_HARDWARE	     
+	puts("====================================");
+
+	err = pcilib_read_register(ctx->pcilib, NULL, "reg9050", &regval);
+	printf("Status1: %i 0x%lx\n", err, regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "reg9080", &regval);
+	printf("Start address: %i 0x%lx\n", err,  regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "reg9090", &regval);
+	printf("End address: %i 0x%lx\n", err,  regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "reg9100", &regval);
+	printf("Status2: %i 0x%lx\n", err,  regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "reg9110", &regval);
+	printf("Status3: %i 0x%lx\n", err,  regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "reg9160", &regval);
+	printf("Add_rd_ddr: %i 0x%lx\n", err, regval);
+#endif /* DEBUG_HARDWARE */
+
     }
-    
+
+#ifdef DEBUG_HARDWARE	     
+    puts("------------------------------------------------");
+    err = pcilib_read_register(ctx->pcilib, NULL, "reg9050", &regval);
+    printf("Status1: %i 0x%lx\n", err, regval);
+    err = pcilib_read_register(ctx->pcilib, NULL, "reg9080", &regval);
+    printf("Start address: %i 0x%lx\n", err,  regval);
+    err = pcilib_read_register(ctx->pcilib, NULL, "reg9090", &regval);
+    printf("End address: %i 0x%lx\n", err,  regval);
+    err = pcilib_read_register(ctx->pcilib, NULL, "reg9100", &regval);
+    printf("Status2: %i 0x%lx\n", err,  regval);
+    err = pcilib_read_register(ctx->pcilib, NULL, "reg9110", &regval);
+    printf("Status3: %i 0x%lx\n", err,  regval);
+    err = pcilib_read_register(ctx->pcilib, NULL, "reg9160", &regval);
+    printf("Add_rd_ddr: %i 0x%lx\n", err, regval);
+#endif /* DEBUG_HARDWARE */
+
     if (error) {
 	pcilib_warning("%s at iteration %i, error: %i, bytes: %zu", error, i, err, bytes);
     }
     
-/*
-    puts("Finished...");
-    nwl_read_register(val, ctx, read_base, REG_DMA_ENG_NEXT_BD);
-    printf("After Pointer read1: %lx\n", val);    
-    nwl_read_register(val, ctx, read_base, REG_SW_NEXT_BD);
-    printf("After Pointer read2: %lx\n", val);    
-
-    nwl_read_register(val, ctx, write_base, REG_DMA_ENG_NEXT_BD);
-    printf("After Pointer wr1: %lx\n", val);    
-    nwl_read_register(val, ctx, write_base, REG_SW_NEXT_BD);
-    printf("After Pointer wr2: %lx\n", val);    
-*/
-
 #ifdef NWL_GENERATE_DMA_IRQ
     dma_nwl_disable_engine_irq(ctx, writeid);
     dma_nwl_disable_engine_irq(ctx, readid);
 #endif /* NWL_GENERATE_DMA_IRQ */
 
-    dma_nwl_stop_loopback(ctx);
+    if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) dma_nwl_stop_loopback(ctx);
 
     __sync_synchronize();
     

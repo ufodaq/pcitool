@@ -43,11 +43,12 @@ int dma_nwl_start_loopback(nwl_dma_t *ctx,  pcilib_dma_direction_t direction, si
 int dma_nwl_stop_loopback(nwl_dma_t *ctx) {
     uint32_t val = 0;
 
-    if (ctx->loopback_started) {
-	nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-	nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
-	ctx->loopback_started = 0;
-    }
+	/* Stop in any case, otherwise we can have problems in benchmark due to
+	engine initialized in previous run, and benchmark is only actual usage.
+	Otherwise, we should detect current loopback status during initialization */
+    nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
+    nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
+    ctx->loopback_started = 0;
     
     return 0;
 }

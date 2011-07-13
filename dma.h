@@ -2,9 +2,13 @@
 #define _PCILIB_DMA_H
 
 #define PCILIB_DMA_BUFFER_INVALID ((size_t)-1)
+#define PCILIB_DMA_MODIFICATION_DEFAULT 0		/**< first 0x100 are reserved */
+
+typedef uint32_t pcilib_dma_modification_t;
+
 
 struct pcilib_dma_api_description_s {
-    pcilib_dma_context_t *(*init)(pcilib_t *ctx);
+    pcilib_dma_context_t *(*init)(pcilib_t *ctx, pcilib_dma_modification_t type, void *arg);
     void (*free)(pcilib_dma_context_t *ctx);
 
     int (*enable_irq)(pcilib_dma_context_t *ctx, pcilib_irq_type_t irq_type, pcilib_dma_flags_t flags);
