@@ -106,6 +106,8 @@ typedef struct {
 	unsigned long size;
 	unsigned long align;
 	unsigned long use;
+	unsigned long item;
+	int reuse;
 	int handle_id;
 } kmem_handle_t;
 

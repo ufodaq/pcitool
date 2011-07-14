@@ -17,26 +17,36 @@ int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_descriptio
     int err = 0;
 
     int i;
+    uint16_t sub_use;
     uint32_t val;
     uint32_t buf_sz;
     uint64_t buf_pa;
+    pcilib_kmem_reuse_t reuse_ring, reuse_pages;
 
     char *base = info->base_addr;
     
     if (info->pages) return 0;
-    
-    pcilib_kmem_handle_t *ring = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE, PCILIB_NWL_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA, info->desc.addr), 0);
-    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_PAGE, PCILIB_NWL_DMA_PAGES, 0, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA, info->desc.addr), 0);
+
+	// Or bidirectional specified by 0x0|addr, or read 0x0|addr and write 0x80|addr
+    sub_use = info->desc.addr|(info->desc.direction == PCILIB_DMA_TO_DEVICE)?0x80:0x00;
+    pcilib_kmem_handle_t *ring = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE, PCILIB_NWL_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, sub_use), PCILIB_KMEM_FLAG_REUSE);
+    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_PAGE, PCILIB_NWL_DMA_PAGES, 0, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, sub_use), PCILIB_KMEM_FLAG_REUSE);
 
     if ((ring)&&(pages)) err = dma_nwl_sync_buffers(ctx, info, pages);
     else err = PCILIB_ERROR_FAILED;
 
-
     if (err) {
-	if (pages) pcilib_free_kernel_memory(ctx->pcilib, pages);
-	if (ring) pcilib_free_kernel_memory(ctx->pcilib, ring);    
+	if (pages) pcilib_free_kernel_memory(ctx->pcilib, pages, 0);
+	if (ring) pcilib_free_kernel_memory(ctx->pcilib, ring, 0);    
 	return err;
     }
+
+/*    
+    reuse_ring = pcilib_kmem_is_reused(ctx->pcilib, ring);
+    reuse_pages = pcilib_kmem_is_reused(ctx->pcilib, pages);
+    if ((reuse_ring == PCILIB_KMEM_REUSE_REUSED)&&(reuse_pages == PCILIB_KMEM_REUSE_REUSED)) info->preserve = 1;
+    else if (reuse_ring||reuse_pages) pcilib_warning("Inconsistent buffers in the kernel module are detected");
+*/
     
     unsigned char *data = (unsigned char*)pcilib_kmem_get_ua(ctx->pcilib, ring);
     uint32_t ring_pa = pcilib_kmem_get_pa(ctx->pcilib, ring);

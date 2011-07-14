@@ -16,6 +16,7 @@ typedef struct {
 	unsigned long size;
 	unsigned long type;
 	unsigned long use;
+	unsigned long item;
 	struct class_device_attribute sysfs_attr;	/* initialized when adding the entry */
 } pcidriver_kmem_entry_t;
 
@@ -56,11 +57,13 @@ typedef struct  {
 	struct list_head kmem_list;			/* List of 'kmem_list_entry's associated with this device */
 	atomic_t kmem_count;				/* id for next kmem entry */
 
+	pcidriver_kmem_entry_t *kmem_cur;		/* Currently selected kmem buffer, for mmap */
+	
 	spinlock_t umemlist_lock;			/* Spinlock to lock umem list operations */
 	struct list_head umem_list;			/* List of 'umem_list_entry's associated with this device */
 	atomic_t umem_count;				/* id for next umem entry */
 
-	int msi_mode;
+	int msi_mode;					/* Flag specifying if interrupt have been initialized in MSI mode */
 } pcidriver_privdata_t;
 
 

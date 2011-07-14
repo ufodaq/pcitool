@@ -90,14 +90,17 @@ void pcidriver_sysfs_remove(pcidriver_privdata_t *privdata, struct class_device_
 static SYSFS_GET_FUNCTION(pcidriver_show_kmem_entry)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
-//	pcidriver_privdata_t *privdata = (pcidriver_privdata_t *)cls->class_data;
+	pcidriver_privdata_t *privdata = SYSFS_GET_PRIVDATA;
 
         /* As we can be sure that attr.name contains a filename which we
          * created (see _pcidriver_sysfs_initialize), we do not need to have
          * sanity checks but can directly call simple_strtol() */
         int id = simple_strtol(attr->attr.name + strlen("kbuf"), NULL, 10);
-
-	return snprintf(buf, PAGE_SIZE, "I am in the kmem_entry show function for buffer %d\n", id);
+	pcidriver_kmem_entry_t *entry = pcidriver_kmem_find_entry_id(privdata, id);
+	if (entry)
+	    return snprintf(buf, PAGE_SIZE, "buffer: %d\ntype: %lu\nuse: 0x%lx\nitem: %lu\nsize: %lu\n", id, entry->type, entry->use, entry->item, entry->size);
+	else
+	    return snprintf(buf, PAGE_SIZE, "I am in the kmem_entry show function for buffer %d\n", id);
 #else
 	return 0;
 #endif

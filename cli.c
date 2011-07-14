@@ -146,6 +146,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "	--start-dma <num>[r|w]	- Start specified DMA engine\n"
 "	--stop-dma [num][r|w]	- Stop specified engine or DMA subsystem\n"
 "	--wait-irq <source>	- Wait for IRQ\n"
+"	--clean-kernel-memory	- Cleans lost kernel space buffers (DANGEROUS)\n"
 "\n"
 "  Addressing:\n"
 "	-d <device>		- FPGA device (/dev/fpga0)\n"
@@ -334,7 +335,7 @@ void Info(pcilib_t *handle, pcilib_model_description_t *model_info) {
 }
 
 
-#define BENCH_MAX_DMA_SIZE 16 * 1024 * 1024
+#define BENCH_MAX_DMA_SIZE 4 * 1024 * 1024
 #define BENCH_MAX_FIFO_SIZE 1024 * 1024
 
 int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, size_t iterations) {

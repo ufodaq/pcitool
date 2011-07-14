@@ -401,8 +401,12 @@ void pcilib_close(pcilib_t *ctx) {
 	    ctx->model_info.registers = pcilib_model[ctx->model].registers;
 	}
 	
-	while (ctx->kmem_list) {
-	    pcilib_free_kernel_memory(ctx, ctx->kmem_list);
+	if (ctx->kmem_list) {
+	    pcilib_warning("Not all kernel buffers are properly cleaned");
+	
+	    while (ctx->kmem_list) {
+		pcilib_free_kernel_memory(ctx, ctx->kmem_list, 0);
+	    }
 	}
 
 	for (i = 0; i < PCILIB_MAX_BANKS; i++) {

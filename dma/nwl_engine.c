@@ -65,6 +65,24 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     
     if (info->started) return 0;
 
+	// This will only successed if there are no parallel access to DMA engine
+    err = dma_nwl_allocate_engine_buffers(ctx, info);
+    if (err) return err;
+    
+	// Check if DMA engine is enabled
+    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
+    if (val&DMA_ENG_RUNNING) {	
+//	info->preserve = 1;
+	
+	// We need to positionate buffers correctly (both read and write)
+	//DSS info->tail, info->head
+    
+//	pcilib_error("Not implemented");
+	
+//        info->started = 1;
+//	return 0;
+    }
+
 	// Disable IRQs
     err = dma_nwl_disable_engine_irq(ctx, dma);
     if (err) return err;
@@ -104,9 +122,6 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
     }
 
-    err = dma_nwl_allocate_engine_buffers(ctx, info);
-    if (err) return err;
-    
     ring_pa = pcilib_kmem_get_pa(ctx->pcilib, info->ring);
     nwl_write_register(ring_pa, ctx, info->base_addr, REG_DMA_ENG_NEXT_BD);
     nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
@@ -154,13 +169,16 @@ int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     err = dma_nwl_disable_engine_irq(ctx, dma);
     if (err) return err;
 
-    val = DMA_ENG_DISABLE; 
-    nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+    if (!info->preserve) {
+	    // Stopping DMA is not enough reset is required
+	val = DMA_ENG_DISABLE|DMA_ENG_USER_RESET|DMA_ENG_RESET;
+	nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
 
-    if (info->ring) {
-	ring_pa = pcilib_kmem_get_pa(ctx->pcilib, info->ring);
-	nwl_write_register(ring_pa, ctx, info->base_addr, REG_DMA_ENG_NEXT_BD);
-	nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
+	if (info->ring) {
+	    ring_pa = pcilib_kmem_get_pa(ctx->pcilib, info->ring);
+	    nwl_write_register(ring_pa, ctx, info->base_addr, REG_DMA_ENG_NEXT_BD);
+	    nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
+	}
     }
 
 	// Acknowledge asserted engine interrupts    
@@ -171,14 +189,16 @@ int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 
 	// Clean buffers
     if (info->ring) {
-	pcilib_free_kernel_memory(ctx->pcilib, info->ring);
+	pcilib_free_kernel_memory(ctx->pcilib, info->ring, info->preserve?PCILIB_KMEM_FLAG_REUSE:0);
 	info->ring = NULL;
     }
 
     if (info->pages) {
-	pcilib_free_kernel_memory(ctx->pcilib, info->pages);
+	pcilib_free_kernel_memory(ctx->pcilib, info->pages, info->preserve?PCILIB_KMEM_FLAG_REUSE:0);
 	info->pages = NULL;
     }
+
+    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
 
     return 0;
 }

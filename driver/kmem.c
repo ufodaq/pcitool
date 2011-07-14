@@ -35,6 +35,26 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	pcidriver_kmem_entry_t *kmem_entry;
 	void *retptr;
 
+	privdata->kmem_cur = NULL;
+	
+	if (kmem_handle->reuse) {
+/*	    kmem_entry = pcidriver_kmem_find_entry_use(privdata, kmem_handle->use, kmem_handle->item);
+	    if (kmem_entry) {
+		if (kmem_handle->type != kmem_entry->type) return EINVAL;
+
+		if (kmem_handle->type == PCILIB_KMEM_TYPE_PAGE) kmem_handle->size = kmem_entry->size;
+		else if (kmem_handle->size != kmem_entry->size) return EINVAL;
+
+		kmem_handle->handle_id = kmem_entry->id;
+		kmem_handle->pa = (unsigned long)(kmem_entry->dma_handle);
+		
+		privdata->kmem_cur = kmem_entry;
+
+		return 0;
+	    }*/
+	    kmem_handle->reuse = 0;
+	}
+
 	/* First, allocate zeroed memory for the kmem_entry */
 	if ((kmem_entry = kcalloc(1, sizeof(pcidriver_kmem_entry_t), GFP_KERNEL)) == NULL)
 		goto kmem_alloc_entry_fail;
@@ -42,6 +62,7 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	/* Initialize the kmem_entry */
 	kmem_entry->id = atomic_inc_return(&privdata->kmem_count) - 1;
 	kmem_entry->use = kmem_handle->use;
+	kmem_entry->item = kmem_handle->item;
 	kmem_entry->type = kmem_handle->type;
 	kmem_handle->handle_id = kmem_entry->id;
 
@@ -101,6 +122,11 @@ kmem_alloc_entry_fail:
 int pcidriver_kmem_free( pcidriver_privdata_t *privdata, kmem_handle_t *kmem_handle )
 {
 	pcidriver_kmem_entry_t *kmem_entry;
+
+	if (kmem_handle->reuse) {
+	    // just mark free
+	    return 0;
+	}
 
 	/* Find the associated kmem_entry for this buffer */
 	if ((kmem_entry = pcidriver_kmem_find_entry(privdata, kmem_handle)) == NULL)
@@ -193,6 +219,8 @@ int pcidriver_kmem_sync( pcidriver_privdata_t *privdata, kmem_sync_t *kmem_sync 
  */
 int pcidriver_kmem_free_entry(pcidriver_privdata_t *privdata, pcidriver_kmem_entry_t *kmem_entry)
 {
+	privdata->kmem_cur = NULL;
+
 	pcidriver_sysfs_remove(privdata, &(kmem_entry->sysfs_attr));
 
 	/* Go over the pages of the kmem buffer, and mark them as not reserved */
@@ -299,6 +327,31 @@ pcidriver_kmem_entry_t *pcidriver_kmem_find_entry_id(pcidriver_privdata_t *privd
 
 /**
  *
+ * find the corresponding kmem_entry for the given use and item.
+ *
+ */
+pcidriver_kmem_entry_t *pcidriver_kmem_find_entry_use(pcidriver_privdata_t *privdata, unsigned long use, unsigned long item)
+{
+	struct list_head *ptr;
+	pcidriver_kmem_entry_t *entry, *result = NULL;
+
+	spin_lock(&(privdata->kmemlist_lock));
+	list_for_each(ptr, &(privdata->kmem_list)) {
+		entry = list_entry(ptr, pcidriver_kmem_entry_t, list);
+
+		if ((entry->use == use)&&(entry->item == item)) {
+			result = entry;
+			break;
+		}
+	}
+
+	spin_unlock(&(privdata->kmemlist_lock));
+	return result;
+}
+
+
+/**
+ *
  * mmap() kernel memory to userspace.
  *
  */
@@ -318,7 +371,8 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 		mod_info("Trying to mmap a kernel memory buffer without creating it first!\n");
 		return -EFAULT;
 	}
-	kmem_entry = list_entry(privdata->kmem_list.prev, pcidriver_kmem_entry_t, list);
+	if (privdata->kmem_cur) kmem_entry = privdata->kmem_cur;
+	else kmem_entry = list_entry(privdata->kmem_list.prev, pcidriver_kmem_entry_t, list);
 	spin_unlock(&(privdata->kmemlist_lock));
 
 	mod_info_dbg("Got kmem_entry with id: %d\n", kmem_entry->id);
