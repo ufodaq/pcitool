@@ -1,0 +1,141 @@
+DMA Access Synchronization
+==========================
+ - At driver level, few types of buffers are supported:
+    * SIMPLE - non-reusable buffers, the use infomation can be used for cleanup
+    after crashed applications.
+    * EXCLUSIVE - reusable buffers which can be mmaped by a single appliction
+    only. There is two modes of these buffers:
+	+ Buffers in a STANDARD mode are created for a single DMA operation and
+	if such buffer is detected while trying to reuse, the last operation
+	has failed and reset is needed.
+	+ Buffers in a PERSISTENT mode are preserved between invocations of
+	control application and cleaned up only after the PERSISTENT flag is 
+	removed
+    * SHARED - reusable buffers shared by multiple processes. Not really 
+    needed at the moment.
+
+    KMEM_FLAG_HW - indicates that buffer can be used by hardware, acually this
+    means that DMA will be enabled afterwards. The driver is not able to check
+    if it really was enable and therefore will block any attempt to release 
+    buffer until KMEM_HW_FLAG is passed to kmem_free routine as well. The later
+    should only called with KMEM_HW_FLAG after the DMA engine is stopped. Then,
+    the driver can be realesd by kmem_free if ref count reaches 0.
+    
+    KMEM_FLAG_EXCLUSIVE - prevents multiple processes mmaping the buffer 
+    simultaneously. This is used to prevent multiple processes use the same
+    DMA engine at the same time.
+    
+    KMEM_FLAG_REUSE - requires reuse of existing buffer. If reusable buffer is 
+    found (non-reusable buffers, i.e. allocated without KMEM_FLAG_REUSE are
+    ignored), it is returned instead of allocation. Three types of usage 
+    counters are used. At moment of allocation, the HW reference is set if 
+    neccessary. The usage counter is increased by kmem_alloc function and
+    decreased by kmem_free. Finally, the reference is obtained at returned
+    during mmap/munmap. So, on kmem_free, we do not clean
+	a) reusable buffers with reference count above zero or hardware 
+	reference set
+	b) non-exclusive buffers with usage counter above zero (For exclusive
+	buffer the value of usage counter above zero just means that application
+        have failed without cleaning buffers first. There is no easy way to 
+        detect that for shared buffers, so it is left as manual operation in
+        this case)
+        c) any buffer if KMEM_FLAG_REUSE was provided to function (I don't have
+        a clear idea why to call it at all, but I have feeling it can be useful
+    During module unload, only buffers with references can prevent cleanup. In
+    this case the only possiblity to free the driver is to call kmem_free 
+    passing FORCE flags.
+    
+    KMEM_FLAG_PERSISTENT - if passed to allocation routine, changes mode of 
+    buffer to PERSISTENT, if passed to free routine, vice-versa changes mode
+    of buffer to NORMAL. Basically, if we call 'pci --dma-start' this flag
+    should be passed to alloc and if we call 'pci --dma-stop' it should be
+    passed to free. In other case, the flag should not be present.
+
+    If application crashed, the munmap while be still called cleaning software
+    references. However, the hardware reference will stay since it is not clear
+    if hardware channel was closed or not. To lift hardware reference, the 
+    application can be re-executed (or dma_stop called, for instance).
+    * If there is no hardware reference, the buffers will be reused by next 
+    call to application and for EXCLUSIVE buffer cleaned at the end. For SHARED
+    buffers they will be cleaned during module cleanup only (no active 
+    references).
+    * The buffer will be reused by next call which can result in wrong behaviour
+    if buffer left in incoherent stage. This should be handled on upper level.
+    
+ - At pcilib/kmem level synchronization of multiple buffers is performed
+    Inconsistent buffer types:
+     * Buffers are in PRESISTENT mode, but newly allocated, OK
+     * Buffers are reused, but are not in PERSISTENT mode (for EXCLUSIVE buffers
+     this means that application has crashed during the last execution), OK
+     * Some of buffers are reused (not just REUSABLE, but actually reused), 
+     others - not, FAIL
+     * Some of buffers are REUSABLE, others - not, FAIL
+     * Some of buffers are EXCLUSIVE, others - not, FAIL
+     * Some of buffers are PERSISTENT, others - not, FAIL
+     * Some of buffers are HW, others - not, FAIL (to simplify clean-up, 
+     even if we are going to set HW flag anyway)
+     
+    On allocation error at some of the buffer, call clean routine and
+     * Preserve HW flag if buffers hold HW reference
+     * Preserve PERSISTENT flag if buffers are in PERSISTENT mode
+     * Remove REUSE flag, we want to clean if it is allowed by current buffer
+     status
+     * EXCLUSIVE flag is not important for kmem_free routine.
+    
+ - At DMA level
+    There is 4 components of DMA access:
+    * DMA engine enabled/disabled
+    * DMA engine IRQs enabled/disabled - always enabled at startup
+    * Memory buffers
+    * Ring start/stop pointers
+    
+    To prevent multiple processes accessing DMA engine in parallel, the first
+    action is buffer initialization 
+	* Always with REUSE, EXCLUSIVE, and HW flags 
+	* Optionally with PERSISTENT flag (if DMA_PERSISTENT flag is set)
+    If another DMA app is running, the buffer allocation will fail (no dma_stop 
+    is executed in this case) 
+
+    Depending on PRESERVE flag, kmem_free will be called with REUSE flag 
+    keeping buffer in memory (this is redundant since HW flag is enough) or HW
+    flag indicating that DMA engine is stopped and buffer could be cleaned.
+    PERSISTENT flag is defined by DMA_PERSISTENT flag passed to stop routine.
+    
+    PRESERVE flag is enforced if DMA_PERSISTENT is not passed to dma_stop
+    routine and either it:
+	a) Explicitely set by DMA_PERMANENT flag passed to dma_start 
+	function 
+	b) Implicitely set if DMA engine is already enabled during dma_start, 
+	all buffers are reused, and are in persistent mode.
+    If PRESERVE flag is on, the engine will not be stopped at the end of
+    execution (and buffers will stay because of HW flag).
+    
+    If buffers are reused and in PERSISTENT mode, DMA engine was on before 
+    dma_start (we not basing on PRESERVE flag, because it can be enforced), 
+    ring pointers are calculated from LAST_BD and states of ring elements.
+    If previous application crashed (i.e. buffers may be corrupted). Two
+    cases are possible:
+    * If during the call buffers were in non-PERSISTENT mode, it can be 
+    easily detected - buffers are reused, but are not in PERSISTENT mode 
+    (or at least was not before we set them to). In this case we just 
+    reinitialize all buffers.
+    * If during the call buffers were in PERSISTENT mode, it is up to 
+    user to check their consistency and restart DMA engine.]
+    
+    IRQs are enabled and disabled at each call
+    
+Register Access Synchronization
+===============================
+ We need to serialize access to the registers by the different running 
+ applications and handle case when registers are accessed indirectly by
+ writting PCI BARs (DMA implementations, for instance).
+ * An option would be to serialize at least access to CMOSIS registers
+ which are always accessed over register functions.
+
+Register/DMA Configuration
+==========================
+ - XML description of registers
+ - Formal XML-based (or non XML-based) language for DMA implementation. 
+   a) Writting/Reading register values
+   b) Wait until <register1>=<value> on <register2>=<value> report error
+   c) ... ?

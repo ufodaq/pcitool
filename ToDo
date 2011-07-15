@@ -1,9 +1,14 @@
-1. Read registers from XML description. It also makes sense to provide
-   formal XML-based language for DMA implementation. 
-   a) Writting/Reading register values
-   b) Wait until <register1>=<value> on <register2>=<value> report error
-   c) ... ?
-2. Hint for register value representation in the bank (hex, decimal)
-3. Implement software registers
-4. Support FIFO reads/writes from/to registers
-5. Provide OR and AND operations on registers in cli
+High Priority (we would need it for IPE Camera)
+=============
+ 1. Serialize access to the registers across applications
+ 2. CMake build system
+ 
+Normal Priority (it would make just few things a bit easier)
+===============
+ 1. Implement software registers (stored in kernel-memory)
+ 2. Support FIFO reads/writes from/to registers
+ 3. Provide OR and AND operations on registers in cli
+ 
+Low Priority (only as generalization for other projects)
+============
+ 1. XML configurations describing registers (and DMA engines?)
