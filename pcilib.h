@@ -72,7 +72,7 @@ typedef enum {
     PCILIB_DMA_FLAGS_DEFAULT = 0,
     PCILIB_DMA_FLAG_EOP = 1,
     PCILIB_DMA_FLAG_WAIT = 2,
-    PCILIB_DMA_FLAG_PERMANENT = 4
+    PCILIB_DMA_FLAG_PERSISTENT = 4
 } pcilib_dma_flags_t;
 
 typedef enum {

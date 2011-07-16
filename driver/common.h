@@ -6,6 +6,14 @@
 /*************************************************************************/
 /* Private data types and structures */
 
+#define KMEM_REF_HW 		0x80000000	/**< Special reference to indicate hardware access */
+#define KMEM_REF_COUNT		0x0FFFFFFF	/**< Mask of reference counter (mmap/munmap) */
+
+#define KMEM_MODE_REUSABLE	0x80000000	/**< Indicates reusable buffer */
+#define KMEM_MODE_EXCLUSIVE	0x40000000	/**< Only a single process is allowed to mmap the buffer */
+#define KMEM_MODE_PERSISTENT	0x20000000	/**< Persistent mode instructs kmem_free to preserve buffer in memory */
+#define KMEM_MODE_COUNT		0x0FFFFFFF	/**< Mask of reuse counter (alloc/free) */
+
 /* Define an entry in the kmem list (this list is per device) */
 /* This list keeps references to the allocated kernel buffers */
 typedef struct {
@@ -15,8 +23,14 @@ typedef struct {
 	unsigned long cpua;
 	unsigned long size;
 	unsigned long type;
+
 	unsigned long use;
 	unsigned long item;
+
+	spinlock_t lock;
+	unsigned long mode;
+	unsigned long refs;
+
 	struct class_device_attribute sysfs_attr;	/* initialized when adding the entry */
 } pcidriver_kmem_entry_t;
 
@@ -57,7 +71,7 @@ typedef struct  {
 	struct list_head kmem_list;			/* List of 'kmem_list_entry's associated with this device */
 	atomic_t kmem_count;				/* id for next kmem entry */
 
-	pcidriver_kmem_entry_t *kmem_cur;		/* Currently selected kmem buffer, for mmap */
+	int kmem_cur_id;				/* Currently selected kmem buffer, for mmap */
 	
 	spinlock_t umemlist_lock;			/* Spinlock to lock umem list operations */
 	struct list_head umem_list;			/* List of 'umem_list_entry's associated with this device */

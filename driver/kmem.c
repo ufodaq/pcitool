@@ -35,24 +35,48 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	pcidriver_kmem_entry_t *kmem_entry;
 	void *retptr;
 
-	privdata->kmem_cur = NULL;
-	
-	if (kmem_handle->reuse) {
+	if (kmem_handle->flags&KMEM_FLAG_REUSE) {
 /*	    kmem_entry = pcidriver_kmem_find_entry_use(privdata, kmem_handle->use, kmem_handle->item);
 	    if (kmem_entry) {
-		if (kmem_handle->type != kmem_entry->type) return EINVAL;
+		unsigned long flags = kmem_handle->flags;
+		
+		if (kmem_handle->type != kmem_entry->type) {
+			mod_info("Invalid type of reusable kmem_entry\n");
+			return -EINVAL;
+		}
 
-		if (kmem_handle->type == PCILIB_KMEM_TYPE_PAGE) kmem_handle->size = kmem_entry->size;
-		else if (kmem_handle->size != kmem_entry->size) return EINVAL;
+		if (kmem_handle->type == PCILIB_KMEM_TYPE_PAGE) {
+			kmem_handle->size = kmem_entry->size;
+		} else if (kmem_handle->size != kmem_entry->size) {
+			mod_info("Invalid size of reusable kmem_entry\n");
+			return -EINVAL;
+		}
+		
+		if (((kmem_entry->mode&KMEM_MODE_EXCLUSIVE)?1:0) != ((flags&KMEM_FLAG_EXCLUSIVE)?1:0)) {
+			mod_info("Invalid mode of reusable kmem_entry\n");
+			return -EINVAL;
+		}
 
+		if ((kmem_entry->mode&KMEM_MODE_COUNT)==KMEM_MODE_COUNT) {
+			mod_info("Reuse counter of kmem_entry is overflown");
+			return -EBUSY;
+		}
+		
 		kmem_handle->handle_id = kmem_entry->id;
 		kmem_handle->pa = (unsigned long)(kmem_entry->dma_handle);
-		
-		privdata->kmem_cur = kmem_entry;
+
+		kmem_handle->flags = KMEM_FLAG_REUSED;
+		if (kmem_entry->refs&KMEM_REF_HW) kmem_handle->flags |= KMEM_FLAG_REUSED_HW;
+		if (kmem_entry->mode&KMEM_MODE_PERSISTENT) kmem_handle->flags |= KMEM_FLAG_REUSED_PERSISTENT;
+
+		kmem_entry->mode += 1;
+		if (flags&KMEM_FLAG_HW) kmem_entry->refs |= KMEM_REF_HW;
+		if (flags&KMEM_FLAG_PERSISTENT) kmem_entry->mode |= KMEM_MODE_PERSISTENT;
+
+		privdata->kmem_cur_id = kmem_entry->id;
 
 		return 0;
 	    }*/
-	    kmem_handle->reuse = 0;
 	}
 
 	/* First, allocate zeroed memory for the kmem_entry */
@@ -61,10 +85,12 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 
 	/* Initialize the kmem_entry */
 	kmem_entry->id = atomic_inc_return(&privdata->kmem_count) - 1;
+	privdata->kmem_cur_id = kmem_entry->id;
+	kmem_handle->handle_id = kmem_entry->id;
+
 	kmem_entry->use = kmem_handle->use;
 	kmem_entry->item = kmem_handle->item;
 	kmem_entry->type = kmem_handle->type;
-	kmem_handle->handle_id = kmem_entry->id;
 
 	/* Initialize sysfs if possible */
 	if (pcidriver_sysfs_initialize_kmem(privdata, kmem_entry->id, &(kmem_entry->sysfs_attr)) != 0)
@@ -94,11 +120,23 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	}
 	if (retptr == NULL)
 		goto kmem_alloc_mem_fail;
-	
+
 	kmem_entry->size = kmem_handle->size;
 	kmem_entry->cpua = (unsigned long)retptr;
 	kmem_handle->pa = (unsigned long)(kmem_entry->dma_handle);
 
+	kmem_entry->mode = 1;
+	if (kmem_handle->flags&KMEM_FLAG_REUSE) {
+	    kmem_entry->mode |= KMEM_MODE_REUSABLE;
+	    if (kmem_handle->flags&KMEM_FLAG_EXCLUSIVE) kmem_entry->mode |= KMEM_MODE_EXCLUSIVE;
+	    if (kmem_handle->flags&KMEM_FLAG_PERSISTENT) kmem_entry->mode |= KMEM_MODE_PERSISTENT;
+	}
+	
+	kmem_entry->refs = 0;
+	if (kmem_handle->flags&KMEM_FLAG_HW) kmem_entry->refs |= KMEM_REF_HW;
+
+        kmem_handle->flags = 0;
+	
 	set_pages_reserved_compat(kmem_entry->cpua, kmem_entry->size);
 
 	/* Add the kmem_entry to the list of the device */
@@ -123,15 +161,37 @@ int pcidriver_kmem_free( pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 {
 	pcidriver_kmem_entry_t *kmem_entry;
 
-	if (kmem_handle->reuse) {
-	    // just mark free
-	    return 0;
-	}
-
 	/* Find the associated kmem_entry for this buffer */
 	if ((kmem_entry = pcidriver_kmem_find_entry(privdata, kmem_handle)) == NULL)
 		return -EINVAL;					/* kmem_handle is not valid */
 
+
+	if (kmem_entry->mode&KMEM_MODE_COUNT)
+		kmem_entry->mode -= 1;
+	
+	if (kmem_handle->flags&KMEM_FLAG_HW)
+		kmem_entry->refs &= ~KMEM_REF_HW;
+	
+	if (kmem_handle->flags&KMEM_FLAG_PERSISTENT)
+		kmem_entry->mode &= ~KMEM_MODE_PERSISTENT;
+	
+	if (kmem_handle->flags&KMEM_FLAG_REUSE) 
+		return 0;
+
+	if (kmem_entry->refs) {
+		mod_info("can't free referenced kmem_entry\n");
+		kmem_entry->mode += 1;
+		return -EBUSY;
+	}
+	
+	if (kmem_entry->mode & KMEM_MODE_PERSISTENT) {
+		mod_info("can't free persistent kmem_entry\n");
+		return -EBUSY;
+	}
+
+	if (((kmem_entry->mode&KMEM_MODE_EXCLUSIVE)==0)&&(kmem_entry->mode&KMEM_MODE_COUNT)) 
+		return 0;
+	
 	return pcidriver_kmem_free_entry(privdata, kmem_entry);
 }
 
@@ -142,14 +202,23 @@ int pcidriver_kmem_free( pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
  */
 int pcidriver_kmem_free_all(pcidriver_privdata_t *privdata)
 {
+	int failed = 0;
 	struct list_head *ptr, *next;
 	pcidriver_kmem_entry_t *kmem_entry;
 
 	/* iterate safely over the entries and delete them */
 	list_for_each_safe(ptr, next, &(privdata->kmem_list)) {
 		kmem_entry = list_entry(ptr, pcidriver_kmem_entry_t, list);
-		pcidriver_kmem_free_entry(privdata, kmem_entry); 		/* spin lock inside! */
+/*		if (kmem_entry->refs)
+			failed = 1;
+		else*/
+			pcidriver_kmem_free_entry(privdata, kmem_entry); 		/* spin lock inside! */
 	}
+	
+	if (failed) {
+		mod_info("Some kmem_entries are still referenced\n");
+		return -EBUSY;
+	}	
 
 	return 0;
 }
@@ -219,8 +288,6 @@ int pcidriver_kmem_sync( pcidriver_privdata_t *privdata, kmem_sync_t *kmem_sync 
  */
 int pcidriver_kmem_free_entry(pcidriver_privdata_t *privdata, pcidriver_kmem_entry_t *kmem_entry)
 {
-	privdata->kmem_cur = NULL;
-
 	pcidriver_sysfs_remove(privdata, &(kmem_entry->sysfs_attr));
 
 	/* Go over the pages of the kmem buffer, and mark them as not reserved */
@@ -339,7 +406,7 @@ pcidriver_kmem_entry_t *pcidriver_kmem_find_entry_use(pcidriver_privdata_t *priv
 	list_for_each(ptr, &(privdata->kmem_list)) {
 		entry = list_entry(ptr, pcidriver_kmem_entry_t, list);
 
-		if ((entry->use == use)&&(entry->item == item)) {
+		if ((entry->use == use)&&(entry->item == item)&&(entry->mode&KMEM_MODE_REUSABLE)) {
 			result = entry;
 			break;
 		}
@@ -349,6 +416,15 @@ pcidriver_kmem_entry_t *pcidriver_kmem_find_entry_use(pcidriver_privdata_t *priv
 	return result;
 }
 
+
+void pcidriver_kmem_mmap_close(struct vm_area_struct *vma) {
+    pcidriver_kmem_entry_t *kmem_entry = (pcidriver_kmem_entry_t*)vma->vm_private_data;
+    if (kmem_entry) kmem_entry->refs -= 1;
+}
+
+static struct vm_operations_struct pcidriver_kmem_mmap_ops = {
+    .close = pcidriver_kmem_mmap_close
+};
 
 /**
  *
@@ -365,15 +441,11 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 
 	/* FIXME: Is this really right? Always just the latest one? Can't we identify one? */
 	/* Get latest entry on the kmem_list */
-	spin_lock(&(privdata->kmemlist_lock));
-	if (list_empty(&(privdata->kmem_list))) {
-		spin_unlock(&(privdata->kmemlist_lock));
+	kmem_entry = pcidriver_kmem_find_entry_id(privdata, privdata->kmem_cur_id);
+	if (!kmem_entry) {
 		mod_info("Trying to mmap a kernel memory buffer without creating it first!\n");
 		return -EFAULT;
 	}
-	if (privdata->kmem_cur) kmem_entry = privdata->kmem_cur;
-	else kmem_entry = list_entry(privdata->kmem_list.prev, pcidriver_kmem_entry_t, list);
-	spin_unlock(&(privdata->kmemlist_lock));
 
 	mod_info_dbg("Got kmem_entry with id: %d\n", kmem_entry->id);
 
@@ -385,6 +457,17 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 		mod_info("kem_entry size(%lu) and vma size do not match(%lu)\n", kmem_entry->size, vma_size);
 		return -EINVAL;
 	}
+
+	/* reference counting */
+	if ((kmem_entry->mode&KMEM_MODE_EXCLUSIVE)&&(kmem_entry->refs&KMEM_REF_COUNT)) {
+		mod_info("can't make second mmaping for exclusive kmem_entry\n");
+		return -EBUSY;
+	}
+	if ((kmem_entry->refs&KMEM_REF_COUNT)==KMEM_REF_COUNT) {
+		mod_info("maximal amount of references is reached by kmem_entry\n");
+		return -EBUSY;
+	}
+	kmem_entry->refs += 1;
 
 	vma->vm_flags |= (VM_RESERVED);
 
@@ -406,8 +489,12 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 
 	if (ret) {
 		mod_info("kmem remap failed: %d (%lx)\n", ret,kmem_entry->cpua);
+		kmem_entry->refs -= 1;
 		return -EAGAIN;
 	}
+
+	vma->vm_ops = &pcidriver_kmem_mmap_ops;
+	vma->vm_private_data = (void*)kmem_entry;
 	
 	return ret;
 }

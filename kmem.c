@@ -18,11 +18,16 @@
 #include "error.h"
 
 pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type_t type, size_t nmemb, size_t size, size_t alignment, pcilib_kmem_use_t use, pcilib_kmem_flags_t flags) {
+    int err = 0;
+    const char *error = NULL;
+    
     int ret;
     int i;
     void *addr;
     
-    pcilib_kmem_reuse_t reuse = PCILIB_KMEM_REUSE_ALLOCATED;
+    pcilib_tristate_t reused = PCILIB_TRISTATE_NO;
+    int persistent = -1;
+    int hardware = -1;
 
     kmem_handle_t kh = {0};
     
@@ -52,28 +57,44 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
     
     for ( i = 0; i < nmemb; i++) {
 	kh.item = i;
-	kh.reuse = PCILIB_KMEM_FLAG_REUSE?1:0;
-
+	kh.flags = flags;
+	
         ret = ioctl(ctx->handle, PCIDRIVER_IOC_KMEM_ALLOC, &kh);
 	if (ret) {
 	    kbuf->buf.n_blocks = i;
-	    pcilib_free_kernel_memory(ctx, kbuf, 0);
-	    pcilib_error("PCIDRIVER_IOC_KMEM_ALLOC ioctl have failed");
-	    return NULL;
+	    error = "PCIDRIVER_IOC_KMEM_ALLOC ioctl have failed";
+	    break;
 	}
     
 	kbuf->buf.blocks[i].handle_id = kh.handle_id;
 	kbuf->buf.blocks[i].pa = kh.pa;
 	kbuf->buf.blocks[i].size = kh.size;
-	kbuf->buf.blocks[i].reused = kh.reuse;
 	
-	if (reuse) {
-		// if already reused, set to partial
-	    if (!kh.reuse) reuse = PCILIB_KMEM_REUSE_PARTIAL;
-	} else if (kh.reuse) {
-	    if (i) reuse = PCILIB_KMEM_REUSE_PARTIAL;
-	    else reuse =  PCILIB_KMEM_REUSE_REUSED;
+	if (!i) reused = (kh.flags&KMEM_FLAG_REUSED)?PCILIB_TRISTATE_YES:PCILIB_TRISTATE_NO;
+
+        if (kh.flags&KMEM_FLAG_REUSED) {
+	    if (!i) reused = PCILIB_TRISTATE_YES;
+	    else if (!reused) reused = PCILIB_TRISTATE_PARTIAL;
+	
+	    if (persistent) {
+		if (persistent < 0) persistent = (kh.flags&KMEM_FLAG_REUSED_PERSISTENT)?1:0;
+		else if (kh.flags&KMEM_FLAG_REUSED_PERSISTENT == 0) err = PCILIB_ERROR_INVALID_STATE;
+	    } else if (kh.flags&KMEM_FLAG_REUSED_PERSISTENT) err = PCILIB_ERROR_INVALID_STATE;
+	    
+	    if (hardware) {
+		if (hardware < 0) (kh.flags&KMEM_FLAG_REUSED_HW)?1:0;
+		else if (kh.flags&KMEM_FLAG_REUSED_HW == 0) err = PCILIB_ERROR_INVALID_STATE;
+	    } else if (kh.flags&KMEM_FLAG_REUSED_HW) err = PCILIB_ERROR_INVALID_STATE;
+	    
+	    if (err) {
+		kbuf->buf.n_blocks = i + 1;
+		break;
+	    }
+	} else {
+	    if (!i) reused = PCILIB_TRISTATE_NO;
+	    else if (reused) reused = PCILIB_TRISTATE_PARTIAL;
 	}
+	
     
         if ((alignment)&&(type != PCILIB_KMEM_TYPE_PAGE)) {
 	    if (kh.pa % alignment) kbuf->buf.blocks[i].alignment_offset = alignment - kh.pa % alignment;
@@ -83,21 +104,52 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
     	addr = mmap( 0, kh.size + kbuf->buf.blocks[i].alignment_offset, PROT_WRITE | PROT_READ, MAP_SHARED, ctx->handle, 0 );
 	if ((!addr)||(addr == MAP_FAILED)) {
 	    kbuf->buf.n_blocks = i + 1;
-	    pcilib_free_kernel_memory(ctx, kbuf, 0);
-	    pcilib_error("Failed to mmap allocated kernel memory");
-	    return NULL;
+	    error = "Failed to mmap allocated kernel memory";
+	    break;
 	}
 
 	kbuf->buf.blocks[i].ua = addr;
 	
 	kbuf->buf.blocks[i].mmap_offset = kh.pa & ctx->page_mask;
     }
+
+    if (persistent) {
+	if (persistent < 0) persistent = 0;
+	else if (flags&PCILIB_KMEM_FLAG_PERSISTENT == 0) err = PCILIB_ERROR_INVALID_STATE;
+    }
+    
+    if (hardware) {
+	if (hardware < 0) hardware = 0;
+	else if (flags&PCILIB_KMEM_FLAG_HARDWARE == 0) err = PCILIB_ERROR_INVALID_STATE;
+    }
+
+    if (err||error) {
+	pcilib_kmem_flags_t free_flags = 0;
+	
+	if ((!persistent)&&(flags&PCILIB_KMEM_FLAG_PERSISTENT)) {
+		// if last one is persistent? Ignore?
+	    free_flags |= PCILIB_KMEM_FLAG_PERSISTENT;
+	}
+
+	if ((!hardware)&&(flags&PCILIB_KMEM_FLAG_HARDWARE)) {
+		// if last one is persistent? Ignore?
+	    free_flags |= PCILIB_KMEM_FLAG_HARDWARE;
+	}
+	
+	pcilib_free_kernel_memory(ctx, kbuf, free_flags);
+
+	if (err) error = "Reused buffers are inconsistent";
+	pcilib_error(error);
+
+	return NULL;
+    }
+    
     
     if (nmemb == 1) {
 	memcpy(&kbuf->buf.addr, &kbuf->buf.blocks[0], sizeof(pcilib_kmem_addr_t));
     }
     
-    kbuf->buf.reuse = reuse;
+    kbuf->buf.reused = reused|(persistent?PCILIB_KMEM_REUSE_PERSISTENT:0)|(hardware?PCILIB_KMEM_REUSE_HARDWARE:0);
     kbuf->buf.n_blocks = nmemb;
     
     kbuf->prev = NULL;
@@ -124,7 +176,7 @@ void pcilib_free_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_km
 
         kh.handle_id = kbuf->buf.blocks[i].handle_id;
         kh.pa = kbuf->buf.blocks[i].pa;
-	kh.reuse = ((flags&PCILIB_KMEM_FLAG_REUSE)||(kbuf->buf.blocks[i].reused));
+	kh.flags = flags;
 	ret = ioctl(ctx->handle, PCIDRIVER_IOC_KMEM_FREE, &kh);
 	if ((ret)&&(!err)) err = ret;
     }
@@ -135,6 +187,7 @@ void pcilib_free_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_km
 	pcilib_error("PCIDRIVER_IOC_KMEM_FREE ioctl have failed");
     }
 }
+
 
 int pcilib_sync_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kmem_sync_direction_t dir) {
     int i;
@@ -187,7 +240,8 @@ size_t pcilib_kmem_get_block_size(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t
     return kbuf->buf.blocks[block].size;
 }
 
-pcilib_kmem_reuse_t pcilib_kmem_is_reused(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
+pcilib_kmem_reuse_state_t  pcilib_kmem_is_reused(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
-    return kbuf->buf.reuse;
+    return kbuf->buf.reused;
 }
+

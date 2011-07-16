@@ -99,6 +99,18 @@
 /* Maximum number of interrupt sources */
 #define PCIDRIVER_INT_MAXSOURCES 16
 
+
+#define KMEM_FLAG_REUSE 1	/**< Try to reuse existing buffer with the same use & item */
+#define KMEM_FLAG_EXCLUSIVE 2	/**< Allow only a single application accessing a specified use & item */
+#define KMEM_FLAG_PERSISTENT 4	/**< Sets persistent mode */
+#define KMEM_FLAG_HW 8		/**< The buffer may be accessed by hardware, the hardware access will not occur any more if passed to _free function */
+
+#define KMEM_FLAG_REUSED 1		/**< Indicates if buffer with specified use & item was already allocated and reused */
+#define KMEM_FLAG_REUSED_PERSISTENT 4	/**< Indicates that reused buffer was persistent before the call */
+#define KMEM_FLAG_REUSED_HW 8		/**< Indicates that reused buffer had a HW reference before the call */
+
+
+
 /* Types */
 typedef struct {
 	unsigned long type;
@@ -107,7 +119,7 @@ typedef struct {
 	unsigned long align;
 	unsigned long use;
 	unsigned long item;
-	int reuse;
+	int flags;
 	int handle_id;
 } kmem_handle_t;
 

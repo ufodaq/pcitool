@@ -32,15 +32,16 @@ DMA Access Synchronization
     neccessary. The usage counter is increased by kmem_alloc function and
     decreased by kmem_free. Finally, the reference is obtained at returned
     during mmap/munmap. So, on kmem_free, we do not clean
-	a) reusable buffers with reference count above zero or hardware 
-	reference set
-	b) non-exclusive buffers with usage counter above zero (For exclusive
+	a) buffers with reference count above zero or hardware reference set.
+	REUSE flag should be supplied, overwise the error is returned
+	b) PERSISTENT buffer. REUSE flash should be supplied, overwise the 
+	error is returned
+	c) non-exclusive buffers with usage counter above zero (For exclusive
 	buffer the value of usage counter above zero just means that application
         have failed without cleaning buffers first. There is no easy way to 
         detect that for shared buffers, so it is left as manual operation in
         this case)
-        c) any buffer if KMEM_FLAG_REUSE was provided to function (I don't have
-        a clear idea why to call it at all, but I have feeling it can be useful
+        d) any buffer if KMEM_FLAG_REUSE was provided to function
     During module unload, only buffers with references can prevent cleanup. In
     this case the only possiblity to free the driver is to call kmem_free 
     passing FORCE flags.
@@ -63,21 +64,29 @@ DMA Access Synchronization
     if buffer left in incoherent stage. This should be handled on upper level.
     
  - At pcilib/kmem level synchronization of multiple buffers is performed
-    Inconsistent buffer types:
+    * The HW reference and following modes should be consistent between member 
+    parts: REUSABLE, PERSISTENT, EXCLUSIVE (only HW reference and PERSISTENT 
+    mode should be checked, others are handled on dirver level)
+    * It is fine if only part of buffers are reused and others are newly 
+    allocated. However, on higher level this can be checked and resulting
+    in failure.
+    
+    Treatment of inconsistencies:
      * Buffers are in PRESISTENT mode, but newly allocated, OK
      * Buffers are reused, but are not in PERSISTENT mode (for EXCLUSIVE buffers
      this means that application has crashed during the last execution), OK
      * Some of buffers are reused (not just REUSABLE, but actually reused), 
-     others - not, FAIL
-     * Some of buffers are REUSABLE, others - not, FAIL
-     * Some of buffers are EXCLUSIVE, others - not, FAIL
-     * Some of buffers are PERSISTENT, others - not, FAIL
-     * Some of buffers are HW, others - not, FAIL (to simplify clean-up, 
-     even if we are going to set HW flag anyway)
+     others - not, OK until 
+        a) either PERSISTENT flag is set or reused buffers are non-PERSISTENT
+	b) either HW flag is set or reused buffers does not hold HW reference
+     * PERSISTENT mode inconsistency, FAIL (even if we are going to set 
+     PERSISTENT mode anyway)
+     * HW reference inconsistency, FAIL (even if we are going to set 
+     HW flag anyway)
      
     On allocation error at some of the buffer, call clean routine and
-     * Preserve HW flag if buffers hold HW reference
-     * Preserve PERSISTENT flag if buffers are in PERSISTENT mode
+     * Preserve HW reference if buffers held HW reference before
+     * Preserve PERSISTENT mode if buffers were in PERSISTENT mode before
      * Remove REUSE flag, we want to clean if it is allowed by current buffer
      status
      * EXCLUSIVE flag is not important for kmem_free routine.

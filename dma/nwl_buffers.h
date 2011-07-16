@@ -22,6 +22,7 @@ int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_descriptio
     uint32_t buf_sz;
     uint64_t buf_pa;
     pcilib_kmem_reuse_t reuse_ring, reuse_pages;
+    pcilib_kmem_flags_t flags;
 
     char *base = info->base_addr;
     
@@ -29,8 +30,9 @@ int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_descriptio
 
 	// Or bidirectional specified by 0x0|addr, or read 0x0|addr and write 0x80|addr
     sub_use = info->desc.addr|(info->desc.direction == PCILIB_DMA_TO_DEVICE)?0x80:0x00;
-    pcilib_kmem_handle_t *ring = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE, PCILIB_NWL_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, sub_use), PCILIB_KMEM_FLAG_REUSE);
-    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_PAGE, PCILIB_NWL_DMA_PAGES, 0, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, sub_use), PCILIB_KMEM_FLAG_REUSE);
+    flags = PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_EXCLUSIVE|PCILIB_KMEM_FLAG_HARDWARE|info->preserve?PCILIB_KMEM_FLAG_PRESERVE:0;
+    pcilib_kmem_handle_t *ring = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE, PCILIB_NWL_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, sub_use), flags);
+    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_PAGE, PCILIB_NWL_DMA_PAGES, 0, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, sub_use), flags);
 
     if ((ring)&&(pages)) err = dma_nwl_sync_buffers(ctx, info, pages);
     else err = PCILIB_ERROR_FAILED;
@@ -40,6 +42,7 @@ int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_descriptio
 	if (ring) pcilib_free_kernel_memory(ctx->pcilib, ring, 0);    
 	return err;
     }
+
 
 /*    
     reuse_ring = pcilib_kmem_is_reused(ctx->pcilib, ring);

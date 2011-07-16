@@ -10,6 +10,13 @@
 
 #define min2(a, b) (((a)<(b))?(a):(b))
 
+typedef enum {
+    PCILIB_TRISTATE_NO = 0,
+    PCILIB_TRISTATE_PARTIAL = 1,
+    PCILIB_TRISTATE_YES = 2
+} pcilib_tristate_t;
+
+
 int pcilib_isnumber(const char *str);
 int pcilib_isxnumber(const char *str);
 int pcilib_isnumber_n(const char *str, size_t len);

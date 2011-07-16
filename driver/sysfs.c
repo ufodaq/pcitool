@@ -98,7 +98,7 @@ static SYSFS_GET_FUNCTION(pcidriver_show_kmem_entry)
         int id = simple_strtol(attr->attr.name + strlen("kbuf"), NULL, 10);
 	pcidriver_kmem_entry_t *entry = pcidriver_kmem_find_entry_id(privdata, id);
 	if (entry)
-	    return snprintf(buf, PAGE_SIZE, "buffer: %d\ntype: %lu\nuse: 0x%lx\nitem: %lu\nsize: %lu\n", id, entry->type, entry->use, entry->item, entry->size);
+	    return snprintf(buf, PAGE_SIZE, "buffer: %d\ntype: %lu\nuse: 0x%lx\nitem: %lu\nsize: %lu\nrefs: %lu\nhw ref: %i\nmode: %lx\n", id, entry->type, entry->use, entry->item, entry->size, entry->refs&KMEM_REF_COUNT, (entry->refs&KMEM_REF_HW)?1:0, entry->mode);
 	else
 	    return snprintf(buf, PAGE_SIZE, "I am in the kmem_entry show function for buffer %d\n", id);
 #else

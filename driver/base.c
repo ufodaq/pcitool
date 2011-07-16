@@ -353,8 +353,6 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 	spin_lock_init(&(privdata->kmemlist_lock));
 	atomic_set(&privdata->kmem_count, 0);
 	
-	privdata->kmem_cur = NULL;
-
 	INIT_LIST_HEAD(&(privdata->umem_list));
 	spin_lock_init(&(privdata->umemlist_lock));
 	atomic_set(&privdata->umem_count, 0);
