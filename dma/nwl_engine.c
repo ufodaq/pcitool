@@ -161,6 +161,8 @@ int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     uint32_t val;
     uint32_t ring_pa;
     struct timeval start, cur;
+    pcilib_kmem_flags_t flags;
+    
     
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
     char *base = ctx->engines[dma].base_addr;
@@ -194,18 +196,24 @@ int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
     }
 
+    if (info->preserve) {
+	flags = PCILIB_KMEM_FLAG_REUSE;
+    } else {
+        flags = PCILIB_KMEM_FLAG_HARDWARE|PCILIB_KMEM_FLAG_PERSISTENT;
+    }
+    
+    
+    printf("%lx %i\n", flags, info->preserve);
 	// Clean buffers
     if (info->ring) {
-	pcilib_free_kernel_memory(ctx->pcilib, info->ring, info->preserve?PCILIB_KMEM_FLAG_REUSE:0);
+	pcilib_free_kernel_memory(ctx->pcilib, info->ring, flags);
 	info->ring = NULL;
     }
 
     if (info->pages) {
-	pcilib_free_kernel_memory(ctx->pcilib, info->pages, info->preserve?PCILIB_KMEM_FLAG_REUSE:0);
+	pcilib_free_kernel_memory(ctx->pcilib, info->pages, flags);
 	info->pages = NULL;
     }
-
-    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
 
     return 0;
 }

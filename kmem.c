@@ -24,7 +24,7 @@ static int pcilib_free_kernel_buffer(pcilib_t *ctx, pcilib_kmem_list_t *kbuf, si
     kh.handle_id = kbuf->buf.blocks[i].handle_id;
     kh.pa = kbuf->buf.blocks[i].pa;
     kh.flags = flags;
-
+    
     return ioctl(ctx->handle, PCIDRIVER_IOC_KMEM_FREE, &kh);
 }
 
@@ -87,6 +87,7 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	kh.size += alignment;
     }
     
+    printf("KMEM Flags: %lx\n", flags);
     for ( i = 0; i < nmemb; i++) {
 	kh.item = i;
 	kh.flags = flags;
@@ -202,7 +203,7 @@ void pcilib_free_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_km
     else if (ctx->kmem_list == kbuf) ctx->kmem_list = kbuf->next;
 
     for (i = 0; i < kbuf->buf.n_blocks; i++) {
-        ret = pcilib_free_kernel_buffer(ctx, kbuf, --kbuf->buf.n_blocks, flags);
+        ret = pcilib_free_kernel_buffer(ctx, kbuf, i, flags);
     	if ((ret)&&(!err)) err = ret;
     }
     

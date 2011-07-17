@@ -72,7 +72,6 @@ int pcilib_start_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t 
     }
     
     if (!ctx->model_info.dma_api->start_dma) {
-	//pcilib_error("The IRQs are not supported by configured DMA engine");
 	return 0;
     }
     
@@ -94,10 +93,12 @@ int pcilib_stop_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t f
     }
     
     if (!ctx->model_info.dma_api->stop_dma) {
-	//pcilib_error("The IRQs are not supported by configured DMA engine");
 	return 0;
     }
-    
+
+
+    printf("stop dma: %li\n", dma);
+
     return ctx->model_info.dma_api->stop_dma(ctx->dma_ctx, dma, flags);
 }
 
@@ -119,7 +120,7 @@ int pcilib_enable_irq(pcilib_t *ctx, pcilib_irq_type_t irq_type, pcilib_dma_flag
 	//pcilib_error("The IRQs are not supported by configured DMA engine");
 	return 0;
     }
-    
+
     return ctx->model_info.dma_api->enable_irq(ctx->dma_ctx, irq_type, flags);
 }
 

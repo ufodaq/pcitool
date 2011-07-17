@@ -894,37 +894,46 @@ int StartStopDMA(pcilib_t *handle,  pcilib_model_description_t *model_info, pcil
     int err;
     pcilib_dma_engine_t dmaid;
     
-    if (dma_direction&PCILIB_DMA_FROM_DEVICE) {
-        if (dma == PCILIB_DMA_ENGINE_ADDR_INVALID) {
-	    if (start) Error("DMA engine should be specified");
-	    dmaid = PCILIB_DMA_ENGINE_INVALID;
-	} else {
-	    dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_FROM_DEVICE, dma);
-	    if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("Invalid DMA engine (C2S %lu) is specified", dma);
+    if (dma == PCILIB_DMA_ENGINE_ADDR_INVALID) {
+        const pcilib_dma_info_t *dma_info = pcilib_get_dma_info(handle);
+
+        if (start) Error("DMA engine should be specified");
+
+	for (dmaid = 0; dma_info->engines[dmaid]; dmaid++) {
+	    err = pcilib_start_dma(handle, dmaid, 0);
+	    if (err) Error("Error starting DMA Engine (%s %i)", ((dma_info->engines[dmaid]->direction == PCILIB_DMA_FROM_DEVICE)?"C2S":"S2C"), dma_info->engines[dmaid]->addr);
+	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
+	    if (err) Error("Error stopping DMA Engine (%s %i)", ((dma_info->engines[dmaid]->direction == PCILIB_DMA_FROM_DEVICE)?"C2S":"S2C"), dma_info->engines[dmaid]->addr);
 	}
+	
+	return 0;
+    }
+    
+    if (dma_direction&PCILIB_DMA_FROM_DEVICE) {
+	dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_FROM_DEVICE, dma);
+	if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("Invalid DMA engine (C2S %lu) is specified", dma);
 	
 	if (start) {
 	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
     	    if (err) Error("Error starting DMA engine (C2S %lu)", dma);
 	} else {
+	    err = pcilib_start_dma(handle, dmaid, 0);
+    	    if (err) Error("Error starting DMA engine (C2S %lu)", dma);
 	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
     	    if (err) Error("Error stopping DMA engine (C2S %lu)", dma);
 	}
     }
-
+    
     if (dma_direction&PCILIB_DMA_TO_DEVICE) {
-        if (dma == PCILIB_DMA_ENGINE_ADDR_INVALID) {
-	    if (start) Error("DMA engine should be specified");
-	    dmaid = PCILIB_DMA_ENGINE_INVALID;
-	} else {
-	    dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_TO_DEVICE, dma);
-	    if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("Invalid DMA engine (S2C %lu) is specified", dma);
-	}
+	dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_TO_DEVICE, dma);
+	if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("Invalid DMA engine (S2C %lu) is specified", dma);
 	
 	if (start) {
 	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
     	    if (err) Error("Error starting DMA engine (S2C %lu)", dma);
 	} else {
+	    err = pcilib_start_dma(handle, dmaid, 0);
+    	    if (err) Error("Error starting DMA engine (S2C %lu)", dma);
 	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
     	    if (err) Error("Error stopping DMA engine (S2C %lu)", dma);
 	}

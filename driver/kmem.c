@@ -165,6 +165,7 @@ int pcidriver_kmem_free( pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	if ((kmem_entry = pcidriver_kmem_find_entry(privdata, kmem_handle)) == NULL)
 		return -EINVAL;					/* kmem_handle is not valid */
 
+	mod_info("1: %x %lx %lx\n", kmem_handle->flags, kmem_entry->refs, kmem_entry->mode);
 
 	if (kmem_entry->mode&KMEM_MODE_COUNT)
 		kmem_entry->mode -= 1;
@@ -174,6 +175,8 @@ int pcidriver_kmem_free( pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	
 	if (kmem_handle->flags&KMEM_FLAG_PERSISTENT)
 		kmem_entry->mode &= ~KMEM_MODE_PERSISTENT;
+
+	mod_info("2: %x %lx %lx\n", kmem_handle->flags, kmem_entry->refs, kmem_entry->mode);
 	
 	if (kmem_handle->flags&KMEM_FLAG_REUSE) 
 		return 0;
@@ -191,6 +194,9 @@ int pcidriver_kmem_free( pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 
 	if (((kmem_entry->mode&KMEM_MODE_EXCLUSIVE)==0)&&(kmem_entry->mode&KMEM_MODE_COUNT)) 
 		return 0;
+	
+	
+	mod_info("cleaned %i\n", kmem_entry->id);
 	
 	return pcidriver_kmem_free_entry(privdata, kmem_entry);
 }
