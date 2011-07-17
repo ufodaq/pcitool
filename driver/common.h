@@ -71,8 +71,12 @@ typedef struct  {
 	atomic_t umem_count;				/* id for next umem entry */
 
 	int msi_mode;					/* Flag specifying if interrupt have been initialized in MSI mode */
+	atomic_t refs;					/* Reference counter */
 } pcidriver_privdata_t;
 
+
+void pcidriver_module_get(pcidriver_privdata_t *privdata);
+void pcidriver_module_put(pcidriver_privdata_t *privdata);
 
 /*************************************************************************/
 /* Some nice defines that make code more readable */

@@ -495,6 +495,22 @@ static struct file_operations pcidriver_fops = {
 	.release = pcidriver_release,
 };
 
+void pcidriver_module_get(pcidriver_privdata_t *privdata) {
+    try_module_get(THIS_MODULE);
+    atomic_inc(&(privdata->refs));
+//    mod_info("Ref: %i\n", atomic_read(&(privdata->refs)));
+}
+
+void pcidriver_module_put(pcidriver_privdata_t *privdata) {
+    if (atomic_add_negative(-1, &(privdata->refs))) {
+	atomic_inc(&(privdata->refs));
+	mod_info("Reference counting error...");
+    } else {
+	module_put(THIS_MODULE);
+//	mod_info("Unref: %i\n", atomic_read(&(privdata->refs)));
+    }
+}
+
 /**
  *
  * Called when an application open()s a /dev/fpga*, attaches the private data
@@ -508,6 +524,8 @@ int pcidriver_open(struct inode *inode, struct file *filp)
 	/* Set the private data area for the file */
 	privdata = container_of( inode->i_cdev, pcidriver_privdata_t, cdev);
 	filp->private_data = privdata;
+
+	pcidriver_module_get(privdata);
 
 	return 0;
 }
@@ -524,6 +542,8 @@ int pcidriver_release(struct inode *inode, struct file *filp)
 
 	/* Get the private data area */
 	privdata = filp->private_data;
+
+	pcidriver_module_put(privdata);
 
 	return 0;
 }

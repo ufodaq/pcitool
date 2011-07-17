@@ -70,7 +70,12 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 		if (kmem_entry->mode&KMEM_MODE_PERSISTENT) kmem_handle->flags |= KMEM_FLAG_REUSED_PERSISTENT;
 
 		kmem_entry->mode += 1;
-		if (flags&KMEM_FLAG_HW) kmem_entry->refs |= KMEM_REF_HW;
+		if (flags&KMEM_FLAG_HW) {
+		    if ((kmem_entry->refs&KMEM_REF_HW)==0)
+			pcidriver_module_get(privdata);
+			
+		    kmem_entry->refs |= KMEM_REF_HW;
+		}
 		if (flags&KMEM_FLAG_PERSISTENT) kmem_entry->mode |= KMEM_MODE_PERSISTENT;
 
 		privdata->kmem_cur_id = kmem_entry->id;
@@ -133,7 +138,11 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	}
 	
 	kmem_entry->refs = 0;
-	if (kmem_handle->flags&KMEM_FLAG_HW) kmem_entry->refs |= KMEM_REF_HW;
+	if (kmem_handle->flags&KMEM_FLAG_HW) {
+	    pcidriver_module_get(privdata);
+
+	    kmem_entry->refs |= KMEM_REF_HW;
+	}
 
         kmem_handle->flags = 0;
 	
@@ -156,9 +165,13 @@ static int pcidriver_kmem_free_check(pcidriver_privdata_t *privdata, kmem_handle
 	if ((kmem_handle->flags & KMEM_FLAG_FORCE) == 0) {
 	    if (kmem_entry->mode&KMEM_MODE_COUNT)
 		kmem_entry->mode -= 1;
-	
-	    if (kmem_handle->flags&KMEM_FLAG_HW)
+
+	    if (kmem_handle->flags&KMEM_FLAG_HW) {
+		if (kmem_entry->refs&KMEM_REF_HW) 
+		    pcidriver_module_put(privdata);
+
 		kmem_entry->refs &= ~KMEM_REF_HW;
+	    }
 	
 	    if (kmem_handle->flags&KMEM_FLAG_PERSISTENT)
 		kmem_entry->mode &= ~KMEM_MODE_PERSISTENT;
@@ -167,18 +180,26 @@ static int pcidriver_kmem_free_check(pcidriver_privdata_t *privdata, kmem_handle
 		return 0;
 
 	    if (kmem_entry->refs) {
-		mod_info("can't free referenced kmem_entry\n");
 		kmem_entry->mode += 1;
+		mod_info("can't free referenced kmem_entry\n");
 		return -EBUSY;
 	    }
 	
 	    if (kmem_entry->mode & KMEM_MODE_PERSISTENT) {
+		kmem_entry->mode += 1;
 		mod_info("can't free persistent kmem_entry\n");
 		return -EBUSY;
 	    }
 
 	    if (((kmem_entry->mode&KMEM_MODE_EXCLUSIVE)==0)&&(kmem_entry->mode&KMEM_MODE_COUNT)&&((kmem_handle->flags&KMEM_FLAG_EXCLUSIVE)==0)) 
 		return 0;
+	} else {
+	    if (kmem_entry->refs&KMEM_REF_HW)
+		    pcidriver_module_put(privdata);
+		
+	    while (!atomic_add_negative(-1, &(privdata->refs))) pcidriver_module_put(privdata);
+	    atomic_inc(&(privdata->refs));
+		
 	}
 	
 	return 1;
@@ -245,24 +266,24 @@ int pcidriver_kmem_free( pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
  */
 int pcidriver_kmem_free_all(pcidriver_privdata_t *privdata)
 {
-	int failed = 0;
+//	int failed = 0;
 	struct list_head *ptr, *next;
 	pcidriver_kmem_entry_t *kmem_entry;
 
 	/* iterate safely over the entries and delete them */
 	list_for_each_safe(ptr, next, &(privdata->kmem_list)) {
 		kmem_entry = list_entry(ptr, pcidriver_kmem_entry_t, list);
-/*		if (kmem_entry->refs)
+		/*if (kmem_entry->refs)
 			failed = 1;
 		else*/
 			pcidriver_kmem_free_entry(privdata, kmem_entry); 		/* spin lock inside! */
 	}
-	
+/*	
 	if (failed) {
 		mod_info("Some kmem_entries are still referenced\n");
 		return -EBUSY;
 	}	
-
+*/
 	return 0;
 }
 
@@ -473,8 +494,9 @@ void pcidriver_kmem_mmap_close(struct vm_area_struct *vma) {
 
 	vma_size = (vma->vm_end - vma->vm_start);
 	
-	if (kmem_entry->refs&KMEM_REF_COUNT)
-    	kmem_entry->refs -= vma_size / PAGE_SIZE;
+	if (kmem_entry->refs&KMEM_REF_COUNT) {
+	    kmem_entry->refs -= vma_size / PAGE_SIZE;
+	}
     }
 }
 
@@ -523,6 +545,7 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 		mod_info("maximal amount of references is reached by kmem_entry\n");
 		return -EBUSY;
 	}
+	
 	kmem_entry->refs += vma_size / PAGE_SIZE;
 
 	vma->vm_flags |= (VM_RESERVED);
