@@ -1,6 +1,14 @@
 #ifndef _PCILIB_TYPES_H
 #define _PCILIB_TYPES_H
 
+#define KMEM_REF_HW 		0x80000000	/**< Special reference to indicate hardware access */
+#define KMEM_REF_COUNT		0x0FFFFFFF	/**< Mask of reference counter (mmap/munmap), couting in mmaped memory pages */
+
+#define KMEM_MODE_REUSABLE	0x80000000	/**< Indicates reusable buffer */
+#define KMEM_MODE_EXCLUSIVE	0x40000000	/**< Only a single process is allowed to mmap the buffer */
+#define KMEM_MODE_PERSISTENT	0x20000000	/**< Persistent mode instructs kmem_free to preserve buffer in memory */
+#define KMEM_MODE_COUNT		0x0FFFFFFF	/**< Mask of reuse counter (alloc/free) */
+
 typedef enum {
     PCILIB_KMEM_TYPE_CONSISTENT = 0,
     PCILIB_KMEM_TYPE_PAGE,

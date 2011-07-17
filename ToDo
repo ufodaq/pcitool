@@ -1,15 +1,21 @@
+Bugs 
+====
+ 1. For IPECamera, shall we limit DMA packet size to xdma_packet_lenght register
+ additionally to size of memory page?
+
 High Priority (we would need it for IPE Camera)
 =============
  1. Serialize access to the registers across applications
  2. Protect kmem_entries in the driver using spinlock
- 3. CMake build system
+ 3. Use bus-addresses instead of physcial addresses for DMA
+ 4. CMake build system
  
 Normal Priority (it would make just few things a bit easier)
 ===============
  1. Implement software registers (stored in kernel-memory)
  2. Support FIFO reads/writes from/to registers
  3. Provide OR and AND operations on registers in cli
- 4. Use bus-addresses instead of physcial addresses for DMA
+ 4. Support writting a data from binary file in cli
   
 Low Priority (only as generalization for other projects)
 ============

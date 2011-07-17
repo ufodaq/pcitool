@@ -14,6 +14,8 @@
 #include <errno.h>
 #include <alloca.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <dirent.h>
 
 #include <getopt.h>
 
@@ -56,7 +58,9 @@ typedef enum {
     MODE_GRAB,
     MODE_START_DMA,
     MODE_STOP_DMA,
-    MODE_WAIT_IRQ
+    MODE_WAIT_IRQ,
+    MODE_LIST_KMEM,
+    MODE_FREE_KMEM
 } MODE;
 
 typedef enum {
@@ -82,10 +86,12 @@ typedef enum {
     OPT_GRAB = 'g',
     OPT_QUIETE = 'q',
     OPT_RESET = 128,
-    OPT_START_DMA = 129,
-    OPT_STOP_DMA = 130,
-    OPT_WAIT_IRQ = 131,
-    OPT_ITERATIONS = 132,
+    OPT_START_DMA,
+    OPT_STOP_DMA,
+    OPT_WAIT_IRQ,
+    OPT_ITERATIONS,
+    OPT_LIST_KMEM,
+    OPT_FREE_KMEM,
     OPT_HELP = 'h',
 } OPTIONS;
 
@@ -109,6 +115,8 @@ static struct option long_options[] = {
     {"start-dma",		required_argument, 0, OPT_START_DMA },
     {"stop-dma",		optional_argument, 0, OPT_STOP_DMA },
     {"wait-irq",		optional_argument, 0, OPT_WAIT_IRQ },
+    {"list-kernel-memory",	no_argument, 0, OPT_LIST_KMEM },
+    {"free-kernel-memory",	optional_argument, 0, OPT_FREE_KMEM },
     {"quiete",			no_argument, 0, OPT_QUIETE },
     {"help",			no_argument, 0, OPT_HELP },
     { 0, 0, 0, 0 }
@@ -133,37 +141,40 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "Usage:\n"
 " %s <mode> [options] [hex data]\n"
 "  Modes:\n"
-"	-i			- Device Info\n"
-"	-l[l]			- List (detailed) Data Banks & Registers\n"
-"	-p <barX|dmaX>		- Performance Evaluation\n"
-"	-r <addr|reg|dmaX>	- Read Data/Register\n"
-"	-w <addr|reg|dmaX>	- Write Data/Register\n"
-"	-g [event]		- Grab Event\n"
-"	--reset			- Reset board\n"
-"	--help			- Help message\n"
+"   -i				- Device Info\n"
+"   -l[l]			- List (detailed) Data Banks & Registers\n"
+"   -p <barX|dmaX>		- Performance Evaluation\n"
+"   -r <addr|reg|dmaX>		- Read Data/Register\n"
+"   -w <addr|reg|dmaX>		- Write Data/Register\n"
+"   -g [event]			- Grab Event\n"
+"   --reset			- Reset board\n"
+"   --help			- Help message\n"
 "\n"
 "  DMA Modes:\n"
-"	--start-dma <num>[r|w]	- Start specified DMA engine\n"
-"	--stop-dma [num][r|w]	- Stop specified engine or DMA subsystem\n"
-"	--wait-irq <source>	- Wait for IRQ\n"
-"	--clean-kernel-memory	- Cleans lost kernel space buffers (DANGEROUS)\n"
+"   --start-dma <num>[r|w]	- Start specified DMA engine\n"
+"   --stop-dma [num][r|w]	- Stop specified engine or DMA subsystem\n"
+"   --wait-irq <source>		- Wait for IRQ\n"
+"\n"
+"  Kernel Modes:\n"
+"   --list-kernel-memory 	- List kernel buffers\n"
+"   --free-kernel-memory [use]	- Cleans lost kernel space buffers (DANGEROUS)\n"
 "\n"
 "  Addressing:\n"
-"	-d <device>		- FPGA device (/dev/fpga0)\n"
-"	-m <model>		- Memory model (autodetected)\n"
-"	   pci			- Plain\n"
-"	   ipecamera		- IPE Camera\n"
-"	-b <bank>		- PCI bar, Register bank, or DMA channel\n"
+"   -d <device>			- FPGA device (/dev/fpga0)\n"
+"   -m <model>			- Memory model (autodetected)\n"
+"	pci			- Plain\n"
+"	ipecamera		- IPE Camera\n"
+"   -b <bank>			- PCI bar, Register bank, or DMA channel\n"
 "\n"
 "  Options:\n"
-"	-s <size>		- Number of words (default: 1)\n"
-"	-a [fifo|dma]<bits>	- Access type and bits per word (default: 32)\n"
-"	-e <l|b>		- Endianess Little/Big (default: host)\n"
-"	-o <file>		- Output to file (default: stdout)\n"
-"	-t <timeout>		- Timeout in microseconds\n"
+"   -s <size>			- Number of words (default: 1)\n"
+"   -a [fifo|dma]<bits>		- Access type and bits per word (default: 32)\n"
+"   -e <l|b>			- Endianess Little/Big (default: host)\n"
+"   -o <file>			- Output to file (default: stdout)\n"
+"   -t <timeout> 		- Timeout in microseconds\n"
 "\n"
 "  Information:\n"
-"	-q 			- Quiete mode (suppress warnings)\n"
+"   -q				- Quiete mode (suppress warnings)\n"
 "\n"
 "  Data:\n"
 "	Data can be specified as sequence of hexdecimal number or\n"
@@ -942,6 +953,140 @@ int StartStopDMA(pcilib_t *handle,  pcilib_model_description_t *model_info, pcil
     return 0;
 }
 
+
+typedef struct {
+    unsigned long use;
+    
+    int referenced;
+    int hw_lock;
+    int reusable;
+    int persistent;
+    int open;
+    
+    size_t count;
+    size_t size;
+} kmem_use_info_t;
+
+#define MAX_USES 64
+
+size_t FindUse(size_t *n_uses, kmem_use_info_t *uses, unsigned long use) {
+    size_t i, n = *n_uses;
+    
+    if (uses[n - 1].use == use) return n - 1;
+
+    for (i = 1; i < (n - 1); i++) {
+	if (uses[i].use == use) return i;
+    }
+    
+    if (n == MAX_USES) return 0;
+
+    uses[n].use = use;
+    return (*n_uses)++;
+}
+
+char *PrintSize(char *str, size_t size) {
+    if (size >= 1073741824) sprintf(str, "%.1lf GB", 1.*size / 1073741824);
+    else if (size >= 1048576) sprintf(str, "%.1lf MB", 1.*size / 1048576);
+    else if (size >= 1024) sprintf(str, "%lu KB", size / 1024);
+    else sprintf(str, "%lu B ", size);
+    
+    return str;
+}
+
+int ListKMEM(pcilib_t *handle, const char *device) {
+    DIR *dir;
+    struct dirent *entry;
+    const char *pos;
+    char sysdir[256];
+    char fname[256];
+    char info[256];
+    char stmp[256];
+    
+    size_t useid, i, n_uses = 1;	// Use 0 is for others
+    kmem_use_info_t uses[MAX_USES];
+
+    memset(uses, 0, sizeof(uses));
+    
+    pos = strrchr(device, '/');
+    if (pos) ++pos;
+    else pos = device;
+    
+    snprintf(sysdir, 255, "/sys/class/fpga/%s", pos);
+
+    dir = opendir(sysdir);
+    if (!dir) Error("Can't open directory (%s)", sysdir);
+    
+    while ((entry = readdir(dir)) != NULL) {
+	FILE *f;
+	unsigned long use;
+	unsigned long size;
+	unsigned long refs;
+	unsigned long mode;
+	unsigned long hwref;
+	
+	if (strncmp(entry->d_name, "kbuf", 4)) continue;
+	if (!isnumber(entry->d_name+4)) continue;
+	
+	snprintf(fname, 255, "%s/%s", sysdir, entry->d_name);
+	f = fopen(fname, "r");
+	if (!f) Error("Can't access file (%s)", fname);
+
+	while(!feof(f)) {
+	    fgets(info, 256, f);
+	    if (!strncmp(info, "use:", 4)) use = strtoul(info+4, NULL, 16);
+	    if (!strncmp(info, "size:", 5)) size = strtoul(info+5, NULL, 10);
+	    if (!strncmp(info, "refs:", 5)) refs = strtoul(info+5, NULL, 10);
+	    if (!strncmp(info, "mode:", 5)) mode = strtoul(info+5, NULL, 16);
+	    if (!strncmp(info, "hw ref:", 7)) hwref = strtoul(info+7, NULL, 10);
+	}
+	fclose(f);
+	
+	useid = FindUse(&n_uses, uses, use);
+	uses[useid].count++;
+	uses[useid].size += size;
+	if (refs) uses[useid].referenced = 1;
+	if (hwref) uses[useid].hw_lock = 1;
+	if (mode&KMEM_MODE_REUSABLE) uses[useid].reusable = 1;
+	if (mode&KMEM_MODE_PERSISTENT) uses[useid].persistent = 1;
+	if (mode&KMEM_MODE_COUNT) uses[useid].open = 1;
+    }
+    closedir(dir);
+
+    printf("Use Type               Count         Total Size        REF           Mode \n");
+    printf("--------------------------------------------------------------------------------\n");
+    for (useid = 0; useid < n_uses; useid++) {
+	if (useid + 1 == n_uses) {
+	    if (!uses[0].count) continue;
+	    i = 0;
+	} else i = useid + 1;
+	
+	if (!i) printf("0x%08lx Others", 0);
+	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_RING) printf("DMA%u %s Ring    ", uses[i].use&0x7F, ((uses[i].use&0x80)?"C2S":"S2C"));
+	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_PAGES) printf("DMA%u %s Pages   ", uses[i].use&0x7F, ((uses[i].use&0x80)?"C2S":"S2C"));
+	else printf("0x%08lx       ", uses[i].use);
+	printf("    ");
+	printf("% 9lu", uses[i].count);
+	printf("     ");
+	printf("% 12s", PrintSize(stmp, uses[i].size));
+	printf("         ");
+	if (uses[i].referenced&&uses[i].hw_lock) printf("HW+SW");
+	else if (uses[i].referenced) printf("   SW");
+	else if (uses[i].hw_lock) printf("HW   ");
+	else printf("  -  ");
+	printf("         ");
+	if (uses[i].persistent) printf("Persistent");
+	else if (uses[i].open) printf("Open      ");
+	else if (uses[i].reusable) printf("Reusable  ");
+	else printf("Closed    ");
+	printf("\n");
+    }
+    printf("--------------------------------------------------------------------------------\n");
+    printf("REF - Software/Hardware Reference, MODE - Reusable/Persistent/Open\n");
+
+
+    return 0;
+}
+
 int WaitIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_source_t irq_source, pcilib_timeout_t timeout) {
     int err;
     size_t count;
@@ -982,6 +1127,7 @@ int main(int argc, char **argv) {
     char **data = NULL;
     const char *event = NULL;
     const char *dma_channel = NULL;
+    const char *use = NULL;
     pcilib_irq_source_t irq_source;
     pcilib_dma_direction_t dma_direction = PCILIB_DMA_BIDIRECTIONAL;
     
@@ -1076,6 +1222,17 @@ int main(int argc, char **argv) {
 		    Usage(argc, argv, "Invalid IRQ source is specified (%s)", num_offset);
 
 		irq_source = itmp;
+	    break;
+	    case OPT_LIST_KMEM:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		mode = MODE_LIST_KMEM;
+	    break;
+	    case OPT_FREE_KMEM:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		mode = MODE_FREE_KMEM;
+
+		if (optarg) use = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-')) use = argv[optind++];
 	    break;
 	    case OPT_DEVICE:
 		fpga_device = optarg;
@@ -1333,6 +1490,9 @@ int main(int argc, char **argv) {
      break;
      case MODE_WAIT_IRQ:
         WaitIRQ(handle, model_info, irq_source, timeout);
+     break;
+     case MODE_LIST_KMEM:
+        ListKMEM(handle, fpga_device);
      break;
     }
 
