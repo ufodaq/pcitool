@@ -613,7 +613,7 @@ static int ipecamera_resolve_event_id(ipecamera_t *ctx, pcilib_event_id_t evid) 
     return buf_ptr;
 }
 
-pcilib_event_id_t ipecamera_next_event(pcilib_context_t *vctx, pcilib_event_t event_mask, const struct timespec *timeout) {
+pcilib_event_id_t ipecamera_next_event(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_timeout_t timeout) {
     int buf_ptr;
     pcilib_event_id_t reported;
     ipecamera_t *ctx = (ipecamera_t*)vctx;

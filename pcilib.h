@@ -4,15 +4,7 @@
 #define PCILIB_MAX_BANKS 6
 #define PCILIB_MAX_DMA_ENGINES 32
 
-#include <time.h>
 #include <stdint.h>
-
-#ifndef __timespec_defined
-struct timespec {
-    time_t tv_sec;
-    long tv_nsec;
-};
-#endif /* __timespec_defined */
 
 #define pcilib_memcpy pcilib_memcpy32
 #define pcilib_datacpy pcilib_datacpy32
@@ -106,6 +98,7 @@ typedef enum {
 #define PCILIB_EVENT_ID_INVALID		0
 #define PCILIB_TIMEOUT_INFINITE		((pcilib_timeout_t)-1)
 #define PCILIB_TIMEOUT_IMMEDIATE	0
+#define PCILIB_TIMEOUT_TRIGGER		0
 
 typedef int (*pcilib_dma_callback_t)(void *ctx, pcilib_dma_flags_t flags, size_t bufsize, void *buf);
 typedef int (*pcilib_event_callback_t)(pcilib_event_t event, pcilib_event_id_t event_id, void *user);
@@ -254,7 +247,7 @@ int pcilib_stop(pcilib_t *ctx);
 
 int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
 
-pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask, const struct timespec *timeout);
+pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask, pcilib_timeout_t timeout);
 void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size);
 void *pcilib_get_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size);
 /*
@@ -268,6 +261,6 @@ int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id);
  *   In case of failure the content of data is undefined.
  * @param timeout - will be autotriggered if NULL
  */
-int pcilib_grab(pcilib_t *ctx, pcilib_event_t event_mask, size_t *size, void **data, const struct timespec *timeout);
+int pcilib_grab(pcilib_t *ctx, pcilib_event_t event_mask, size_t *size, void **data, pcilib_timeout_t timeout);
 
 #endif /* _PCITOOL_PCILIB_H */

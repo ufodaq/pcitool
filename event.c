@@ -12,11 +12,20 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <assert.h>
+#include <time.h>
 
 #include "pci.h"
 
 #include "tools.h"
 #include "error.h"
+
+#ifndef __timespec_defined
+struct timespec {
+    time_t tv_sec;
+    long tv_nsec;
+};
+#endif /* __timespec_defined */
+
 
 pcilib_event_t pcilib_find_event(pcilib_t *ctx, const char *event) {
     int i;
@@ -85,7 +94,7 @@ int pcilib_stop(pcilib_t *ctx) {
     return 0;
 }
 
-pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask, const struct timespec *timeout) {
+pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask, pcilib_timeout_t timeout) {
     pcilib_event_api_description_t *api;
     
     pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
@@ -221,15 +230,19 @@ static int pcilib_grab_callback(pcilib_event_t event, pcilib_event_id_t event_id
     return 0;
 }
 
-int pcilib_grab(pcilib_t *ctx, pcilib_event_t event_mask, size_t *size, void **data, const struct timespec *timeout) {
+int pcilib_grab(pcilib_t *ctx, pcilib_event_t event_mask, size_t *size, void **data, pcilib_timeout_t timeout) {
     int err;
+    struct timespec ts;
     
     pcilib_grab_callback_user_data_t user = {ctx, size, data};
     
     err = pcilib_start(ctx, event_mask, pcilib_grab_callback, &user);
     if (!err) {
-	if (timeout) nanosleep(timeout, NULL);
-        else err = pcilib_trigger(ctx, event_mask, 0, NULL);
+	if (timeout) {
+	    ts.tv_sec = timeout / 1000000;
+	    ts.tv_nsec = 1000 * (timeout % 1000000);
+	    nanosleep(&ts, NULL);
+        } else err = pcilib_trigger(ctx, event_mask, 0, NULL);
     }
     pcilib_stop(ctx);
     return 0;

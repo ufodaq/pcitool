@@ -13,7 +13,7 @@ struct pcilib_event_api_description_s {
     int (*stop)(pcilib_context_t *ctx);
     int (*trigger)(pcilib_context_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
     
-    pcilib_event_id_t (*next_event)(pcilib_context_t *ctx, pcilib_event_t event_mask, const struct timespec *timeout);
+    pcilib_event_id_t (*next_event)(pcilib_context_t *ctx, pcilib_event_t event_mask, pcilib_timeout_t timeout);
     void* (*get_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size);
     int (*return_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id);
     

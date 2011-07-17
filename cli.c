@@ -884,7 +884,7 @@ int Grab(pcilib_t *handle, const char *event, const char *output) {
     
     // ignoring event for now
 	
-    err = pcilib_grab(handle, PCILIB_EVENTS_ALL, &size, &data, NULL);
+    err = pcilib_grab(handle, PCILIB_EVENTS_ALL, &size, &data, PCILIB_TIMEOUT_TRIGGER);
     if (err) {
 	Error("Grabbing event is failed");
     }
