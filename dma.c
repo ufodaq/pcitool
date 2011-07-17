@@ -96,9 +96,6 @@ int pcilib_stop_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t f
 	return 0;
     }
 
-
-    printf("stop dma: %li\n", dma);
-
     return ctx->model_info.dma_api->stop_dma(ctx->dma_ctx, dma, flags);
 }
 

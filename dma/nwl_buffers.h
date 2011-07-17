@@ -21,25 +21,27 @@ static int dma_nwl_compute_read_s2c_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_d
     
     nwl_read_register(val, ctx, base, REG_SW_NEXT_BD);
     if ((val < ring_pa)||((val - ring_pa) % PCILIB_NWL_DMA_DESCRIPTOR_SIZE)) {
-	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_SW_NEXT_BD register out of range)");
+	if (val < ring_pa) pcilib_warning("Inconsistent S2C DMA Ring buffer is found (REG_SW_NEXT_BD register value (%lx) is below start of ring [%lx,%lx])", val, ring_pa, PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
+	else pcilib_warning("Inconsistent S2C DMA Ring buffer is found (REG_SW_NEXT_BD register value (%zu / %u) is fractal)", val - ring_pa, PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
 	return PCILIB_ERROR_INVALID_STATE;
     }
 
     info->head = (val - ring_pa) / PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
     if (info->head >= PCILIB_NWL_DMA_PAGES) {
-	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_SW_NEXT_BD register out of range)");
+	pcilib_warning("Inconsistent S2C DMA Ring buffer is found (REG_SW_NEXT_BD register value (%zu) out of range)", info->head);
 	return PCILIB_ERROR_INVALID_STATE;
     }
 
     nwl_read_register(val, ctx, base, REG_DMA_ENG_NEXT_BD);
     if ((val < ring_pa)||((val - ring_pa) % PCILIB_NWL_DMA_DESCRIPTOR_SIZE)) {
-	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_DMA_ENG_NEXT_BD register out of range)");
+	if (val < ring_pa) pcilib_warning("Inconsistent S2C DMA Ring buffer is found (REG_DMA_ENG_NEXT_BD register value (%lx) is below start of ring [%lx,%lx])", val, ring_pa, PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
+	else pcilib_warning("Inconsistent S2C DMA Ring buffer is found (REG_DMA_ENG_NEXT_BD register value (%zu / %u) is fractal)", val - ring_pa, PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
 	return PCILIB_ERROR_INVALID_STATE;
     }
 
     info->tail = (val - ring_pa) / PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
     if (info->tail >= PCILIB_NWL_DMA_PAGES) {
-	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_DMA_ENG_NEXT_BD register out of range)");
+	pcilib_warning("Inconsistent S2C DMA Ring buffer is found (REG_DMA_ENG_NEXT_BD register value (%zu) out of range)", info->tail);
 	return PCILIB_ERROR_INVALID_STATE;
     }
     
@@ -56,13 +58,14 @@ static int dma_nwl_compute_read_c2s_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_d
     
     nwl_read_register(val, ctx, base, REG_SW_NEXT_BD);
     if ((val < ring_pa)||((val - ring_pa) % PCILIB_NWL_DMA_DESCRIPTOR_SIZE)) {
-	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_SW_NEXT_BD register out of range)");
+	if (val < ring_pa) pcilib_warning("Inconsistent C2S DMA Ring buffer is found (REG_SW_NEXT_BD register value (%lx) is below start of the ring [%lx,%lx])", val, ring_pa, PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
+	else pcilib_warning("Inconsistent C2S DMA Ring buffer is found (REG_SW_NEXT_BD register value (%zu / %u) is fractal)", val - ring_pa, PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
 	return PCILIB_ERROR_INVALID_STATE;
     }
 
     info->head = (val - ring_pa) / PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
     if (info->head >= PCILIB_NWL_DMA_PAGES) {
-	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_SW_NEXT_BD register out of range)");
+	pcilib_warning("Inconsistent C2S DMA Ring buffer is found (REG_SW_NEXT_BD register value (%zu) out of range)", info->head);
 	return PCILIB_ERROR_INVALID_STATE;
     }
     
@@ -72,13 +75,14 @@ static int dma_nwl_compute_read_c2s_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_d
 	// Last read BD
     nwl_read_register(val, ctx, base, REG_DMA_ENG_LAST_BD);
     if ((val < ring_pa)||((val - ring_pa) % PCILIB_NWL_DMA_DESCRIPTOR_SIZE)) {
-	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_DMA_ENG_LAST_BD register out of range)");
+	if (val < ring_pa) pcilib_warning("Inconsistent C2S DMA Ring buffer is found (REG_DMA_ENG_LAST_BD register value (%lx) is below start of ring [%lx,%lx])", val, ring_pa, PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
+	else pcilib_warning("Inconsistent C2S DMA Ring buffer is found (REG_DMA_ENG_LAST_BD register value (%zu / %u) is fractal)", val - ring_pa, PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
 	return PCILIB_ERROR_INVALID_STATE;
     }
 
     prev = (val - ring_pa) / PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
     if (prev >= PCILIB_NWL_DMA_PAGES) {
-	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_DMA_ENG_LAST_BD register out of range)");
+	pcilib_warning("Inconsistent C2S DMA Ring buffer is found (REG_DMA_ENG_LAST_BD register value (%zu) out of range)", prev);
 	return PCILIB_ERROR_INVALID_STATE;
     }
     
@@ -115,7 +119,7 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
     if (info->pages) return 0;
     
 	// Or bidirectional specified by 0x0|addr, or read 0x0|addr and write 0x80|addr
-    sub_use = info->desc.addr|(info->desc.direction == PCILIB_DMA_TO_DEVICE)?0x80:0x00;
+    sub_use = info->desc.addr|((info->desc.direction == PCILIB_DMA_TO_DEVICE)?0x80:0x00);
     flags = PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_EXCLUSIVE|PCILIB_KMEM_FLAG_HARDWARE|(info->preserve?PCILIB_KMEM_FLAG_PERSISTENT:0);
     
     pcilib_kmem_handle_t *ring = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE, PCILIB_NWL_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, sub_use), flags);

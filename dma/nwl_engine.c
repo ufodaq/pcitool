@@ -202,8 +202,6 @@ int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
         flags = PCILIB_KMEM_FLAG_HARDWARE|PCILIB_KMEM_FLAG_PERSISTENT;
     }
     
-    
-    printf("%lx %i\n", flags, info->preserve);
 	// Clean buffers
     if (info->ring) {
 	pcilib_free_kernel_memory(ctx->pcilib, info->ring, flags);

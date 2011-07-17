@@ -36,7 +36,7 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	void *retptr;
 
 	if (kmem_handle->flags&KMEM_FLAG_REUSE) {
-/*	    kmem_entry = pcidriver_kmem_find_entry_use(privdata, kmem_handle->use, kmem_handle->item);
+	    kmem_entry = pcidriver_kmem_find_entry_use(privdata, kmem_handle->use, kmem_handle->item);
 	    if (kmem_entry) {
 		unsigned long flags = kmem_handle->flags;
 		
@@ -76,7 +76,7 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 		privdata->kmem_cur_id = kmem_entry->id;
 
 		return 0;
-	    }*/
+	    }
 	}
 
 	/* First, allocate zeroed memory for the kmem_entry */
@@ -165,7 +165,8 @@ int pcidriver_kmem_free( pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	if ((kmem_entry = pcidriver_kmem_find_entry(privdata, kmem_handle)) == NULL)
 		return -EINVAL;					/* kmem_handle is not valid */
 
-	mod_info("1: %x %lx %lx\n", kmem_handle->flags, kmem_entry->refs, kmem_entry->mode);
+//	if (kmem_entry->id == 0)
+//	mod_info("1: %i %x %lx %lx\n", kmem_entry->id, kmem_handle->flags, kmem_entry->refs, kmem_entry->mode);
 
 	if (kmem_entry->mode&KMEM_MODE_COUNT)
 		kmem_entry->mode -= 1;
@@ -176,7 +177,8 @@ int pcidriver_kmem_free( pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	if (kmem_handle->flags&KMEM_FLAG_PERSISTENT)
 		kmem_entry->mode &= ~KMEM_MODE_PERSISTENT;
 
-	mod_info("2: %x %lx %lx\n", kmem_handle->flags, kmem_entry->refs, kmem_entry->mode);
+//	if (kmem_entry->id == 0)
+//	mod_info("2: %i %x %lx %lx\n", kmem_entry->id, kmem_handle->flags, kmem_entry->refs, kmem_entry->mode);
 	
 	if (kmem_handle->flags&KMEM_FLAG_REUSE) 
 		return 0;
@@ -196,7 +198,8 @@ int pcidriver_kmem_free( pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 		return 0;
 	
 	
-	mod_info("cleaned %i\n", kmem_entry->id);
+//	if (kmem_entry->id == 0)
+//	mod_info("cleaned %i\n", kmem_entry->id);
 	
 	return pcidriver_kmem_free_entry(privdata, kmem_entry);
 }
@@ -424,8 +427,21 @@ pcidriver_kmem_entry_t *pcidriver_kmem_find_entry_use(pcidriver_privdata_t *priv
 
 
 void pcidriver_kmem_mmap_close(struct vm_area_struct *vma) {
+    unsigned long vma_size;
     pcidriver_kmem_entry_t *kmem_entry = (pcidriver_kmem_entry_t*)vma->vm_private_data;
-    if (kmem_entry) kmem_entry->refs -= 1;
+    if (kmem_entry) {
+/*
+	if (kmem_entry->id == 0) {
+	    mod_info("refs: %p %p %lx\n", vma, vma->vm_private_data, kmem_entry->refs);
+	    mod_info("kmem_size: %lu vma_size: %lu, s: %lx, e: %lx\n", kmem_entry->size, (vma->vm_end - vma->vm_start), vma->vm_start, vma->vm_end);
+	}
+*/
+
+	vma_size = (vma->vm_end - vma->vm_start);
+	
+	if (kmem_entry->refs&KMEM_REF_COUNT)
+    	kmem_entry->refs -= vma_size / PAGE_SIZE;
+    }
 }
 
 static struct vm_operations_struct pcidriver_kmem_mmap_ops = {
@@ -458,7 +474,7 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 	/* Check sizes */
 	vma_size = (vma->vm_end - vma->vm_start);
 	
-	if ((vma_size != kmem_entry->size) &&
+	if ((vma_size > kmem_entry->size) &&
 		((kmem_entry->size < PAGE_SIZE) && (vma_size != PAGE_SIZE))) {
 		mod_info("kem_entry size(%lu) and vma size do not match(%lu)\n", kmem_entry->size, vma_size);
 		return -EINVAL;
@@ -469,11 +485,11 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 		mod_info("can't make second mmaping for exclusive kmem_entry\n");
 		return -EBUSY;
 	}
-	if ((kmem_entry->refs&KMEM_REF_COUNT)==KMEM_REF_COUNT) {
+	if (((kmem_entry->refs&KMEM_REF_COUNT) + (vma_size / PAGE_SIZE)) > KMEM_REF_COUNT) {
 		mod_info("maximal amount of references is reached by kmem_entry\n");
 		return -EBUSY;
 	}
-	kmem_entry->refs += 1;
+	kmem_entry->refs += vma_size / PAGE_SIZE;
 
 	vma->vm_flags |= (VM_RESERVED);
 
@@ -490,7 +506,7 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 					vma,
 					vma->vm_start,
 					kmem_entry->cpua,
-					kmem_entry->size,
+					(vma_size < kmem_entry->size)?vma_size:kmem_entry->size,
 					vma->vm_page_prot );
 
 	if (ret) {

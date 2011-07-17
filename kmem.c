@@ -87,7 +87,6 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	kh.size += alignment;
     }
     
-    printf("KMEM Flags: %lx\n", flags);
     for ( i = 0; i < nmemb; i++) {
 	kh.item = i;
 	kh.flags = flags;
@@ -141,7 +140,7 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	    kbuf->buf.blocks[i].size -= alignment;
 	}
 	
-    	addr = mmap( 0, kh.size + kbuf->buf.blocks[i].alignment_offset, PROT_WRITE | PROT_READ, MAP_SHARED, ctx->handle, 0 );
+    	addr = mmap( 0, kbuf->buf.blocks[i].size + kbuf->buf.blocks[i].alignment_offset, PROT_WRITE | PROT_READ, MAP_SHARED, ctx->handle, 0 );
 	if ((!addr)||(addr == MAP_FAILED)) {
 	    kbuf->buf.n_blocks = i + 1;
 	    error = "Failed to mmap allocated kernel memory";

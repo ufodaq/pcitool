@@ -1,3 +1,12 @@
+Memory Addressing
+=================
+ There is 3 types of addresses: virtual, physical, and bus. For DMA a bus
+ address is used. However, on x86 physical and  bus addresses are the same (on
+ other architectures it is not guaranteed). Anyway, this assumption is still
+ used by xdma driver, it uses phiscal address for DMA access. I have ported
+ in the same way. Now, we need to provide additionaly bus-addresses in kmem
+ abstraction and use it in NWL DMA implementation.
+
 DMA Access Synchronization
 ==========================
  - At driver level, few types of buffers are supported:
