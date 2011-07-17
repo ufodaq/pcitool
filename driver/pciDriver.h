@@ -104,11 +104,12 @@
 #define KMEM_FLAG_EXCLUSIVE 2	/**< Allow only a single application accessing a specified use & item */
 #define KMEM_FLAG_PERSISTENT 4	/**< Sets persistent mode */
 #define KMEM_FLAG_HW 8		/**< The buffer may be accessed by hardware, the hardware access will not occur any more if passed to _free function */
+#define KMEM_FLAG_FORCE 16	/**< Force memory cleanup even if references are present */
+#define KMEM_FLAG_MASS 32	/**< Apply to all buffers of selected use */
 
 #define KMEM_FLAG_REUSED 1		/**< Indicates if buffer with specified use & item was already allocated and reused */
 #define KMEM_FLAG_REUSED_PERSISTENT 4	/**< Indicates that reused buffer was persistent before the call */
 #define KMEM_FLAG_REUSED_HW 8		/**< Indicates that reused buffer had a HW reference before the call */
-
 
 
 /* Types */

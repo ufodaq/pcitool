@@ -32,7 +32,8 @@ DMA Access Synchronization
     
     KMEM_FLAG_EXCLUSIVE - prevents multiple processes mmaping the buffer 
     simultaneously. This is used to prevent multiple processes use the same
-    DMA engine at the same time.
+    DMA engine at the same time. When passed to kmem_free, allows to clean
+    buffers with lost clients even for shared buffers.
     
     KMEM_FLAG_REUSE - requires reuse of existing buffer. If reusable buffer is 
     found (non-reusable buffers, i.e. allocated without KMEM_FLAG_REUSE are

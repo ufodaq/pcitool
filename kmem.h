@@ -9,7 +9,7 @@ typedef enum {
     PCILIB_KMEM_FLAG_EXCLUSIVE = KMEM_FLAG_EXCLUSIVE,
     PCILIB_KMEM_FLAG_PERSISTENT = KMEM_FLAG_PERSISTENT,
     PCILIB_KMEM_FLAG_HARDWARE = KMEM_FLAG_HW,
-//    PCILIB_KMEM_FLAG_FORCE = 2		/**< Force buffer 
+    PCILIB_KMEM_FLAG_FORCE = KMEM_FLAG_FORCE
 } pcilib_kmem_flags_t;
 
 
@@ -68,5 +68,7 @@ void *pcilib_kmem_get_block_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t bl
 uintptr_t pcilib_kmem_get_block_pa(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block);
 size_t pcilib_kmem_get_block_size(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block);
 pcilib_kmem_reuse_state_t pcilib_kmem_is_reused(pcilib_t *ctx, pcilib_kmem_handle_t *k);
+
+int pcilib_clean_kernel_memory(pcilib_t *ctx, pcilib_kmem_use_t use, pcilib_kmem_flags_t flags);
 
 #endif /* _PCILIB_KMEM_H */

@@ -152,6 +152,65 @@ kmem_alloc_entry_fail:
 		return -ENOMEM;
 }
 
+static int pcidriver_kmem_free_check(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_handle, pcidriver_kmem_entry_t *kmem_entry) {
+	if ((kmem_handle->flags & KMEM_FLAG_FORCE) == 0) {
+	    if (kmem_entry->mode&KMEM_MODE_COUNT)
+		kmem_entry->mode -= 1;
+	
+	    if (kmem_handle->flags&KMEM_FLAG_HW)
+		kmem_entry->refs &= ~KMEM_REF_HW;
+	
+	    if (kmem_handle->flags&KMEM_FLAG_PERSISTENT)
+		kmem_entry->mode &= ~KMEM_MODE_PERSISTENT;
+	
+	    if (kmem_handle->flags&KMEM_FLAG_REUSE) 
+		return 0;
+
+	    if (kmem_entry->refs) {
+		mod_info("can't free referenced kmem_entry\n");
+		kmem_entry->mode += 1;
+		return -EBUSY;
+	    }
+	
+	    if (kmem_entry->mode & KMEM_MODE_PERSISTENT) {
+		mod_info("can't free persistent kmem_entry\n");
+		return -EBUSY;
+	    }
+
+	    if (((kmem_entry->mode&KMEM_MODE_EXCLUSIVE)==0)&&(kmem_entry->mode&KMEM_MODE_COUNT)&&((kmem_handle->flags&KMEM_FLAG_EXCLUSIVE)==0)) 
+		return 0;
+	}
+	
+	return 1;
+}
+
+static int pcidriver_kmem_free_use(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_handle)
+{
+	int err;
+	int failed = 0;
+	struct list_head *ptr, *next;
+	pcidriver_kmem_entry_t *kmem_entry;
+
+	/* iterate safely over the entries and delete them */
+	list_for_each_safe(ptr, next, &(privdata->kmem_list)) {
+		kmem_entry = list_entry(ptr, pcidriver_kmem_entry_t, list);
+		if (kmem_entry->use == kmem_handle->use) {
+		    err = pcidriver_kmem_free_check(privdata, kmem_handle, kmem_entry);
+		    if (err > 0)
+			pcidriver_kmem_free_entry(privdata, kmem_entry); 		/* spin lock inside! */
+		    else
+			failed = 1;
+		}
+	}
+	
+	if (failed) {
+		mod_info("Some kmem_entries for use %lx are still referenced\n", kmem_handle->use);
+		return -EBUSY;
+	}	
+
+	return 0;
+}
+
 /**
  *
  * Called via sysfs, frees kernel memory and the corresponding management structure
@@ -159,49 +218,24 @@ kmem_alloc_entry_fail:
  */
 int pcidriver_kmem_free( pcidriver_privdata_t *privdata, kmem_handle_t *kmem_handle )
 {
+	int err;
 	pcidriver_kmem_entry_t *kmem_entry;
 
+	if (kmem_handle->flags&KMEM_FLAG_MASS) {
+	    kmem_handle->flags &= ~KMEM_FLAG_MASS;
+	    return pcidriver_kmem_free_use(privdata, kmem_handle);
+	}
+	
 	/* Find the associated kmem_entry for this buffer */
 	if ((kmem_entry = pcidriver_kmem_find_entry(privdata, kmem_handle)) == NULL)
 		return -EINVAL;					/* kmem_handle is not valid */
 
-//	if (kmem_entry->id == 0)
-//	mod_info("1: %i %x %lx %lx\n", kmem_entry->id, kmem_handle->flags, kmem_entry->refs, kmem_entry->mode);
-
-	if (kmem_entry->mode&KMEM_MODE_COUNT)
-		kmem_entry->mode -= 1;
+	err = pcidriver_kmem_free_check(privdata, kmem_handle, kmem_entry);
 	
-	if (kmem_handle->flags&KMEM_FLAG_HW)
-		kmem_entry->refs &= ~KMEM_REF_HW;
+	if (err > 0)
+		return pcidriver_kmem_free_entry(privdata, kmem_entry);
 	
-	if (kmem_handle->flags&KMEM_FLAG_PERSISTENT)
-		kmem_entry->mode &= ~KMEM_MODE_PERSISTENT;
-
-//	if (kmem_entry->id == 0)
-//	mod_info("2: %i %x %lx %lx\n", kmem_entry->id, kmem_handle->flags, kmem_entry->refs, kmem_entry->mode);
-	
-	if (kmem_handle->flags&KMEM_FLAG_REUSE) 
-		return 0;
-
-	if (kmem_entry->refs) {
-		mod_info("can't free referenced kmem_entry\n");
-		kmem_entry->mode += 1;
-		return -EBUSY;
-	}
-	
-	if (kmem_entry->mode & KMEM_MODE_PERSISTENT) {
-		mod_info("can't free persistent kmem_entry\n");
-		return -EBUSY;
-	}
-
-	if (((kmem_entry->mode&KMEM_MODE_EXCLUSIVE)==0)&&(kmem_entry->mode&KMEM_MODE_COUNT)) 
-		return 0;
-	
-	
-//	if (kmem_entry->id == 0)
-//	mod_info("cleaned %i\n", kmem_entry->id);
-	
-	return pcidriver_kmem_free_entry(privdata, kmem_entry);
+	return err;
 }
 
 /**

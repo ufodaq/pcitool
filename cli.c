@@ -92,6 +92,7 @@ typedef enum {
     OPT_ITERATIONS,
     OPT_LIST_KMEM,
     OPT_FREE_KMEM,
+    OPT_FORCE,
     OPT_HELP = 'h',
 } OPTIONS;
 
@@ -116,8 +117,9 @@ static struct option long_options[] = {
     {"stop-dma",		optional_argument, 0, OPT_STOP_DMA },
     {"wait-irq",		optional_argument, 0, OPT_WAIT_IRQ },
     {"list-kernel-memory",	no_argument, 0, OPT_LIST_KMEM },
-    {"free-kernel-memory",	optional_argument, 0, OPT_FREE_KMEM },
+    {"free-kernel-memory",	required_argument, 0, OPT_FREE_KMEM },
     {"quiete",			no_argument, 0, OPT_QUIETE },
+    {"force",			no_argument, 0, OPT_FORCE },
     {"help",			no_argument, 0, OPT_HELP },
     { 0, 0, 0, 0 }
 };
@@ -157,7 +159,9 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "\n"
 "  Kernel Modes:\n"
 "   --list-kernel-memory 	- List kernel buffers\n"
-"   --free-kernel-memory [use]	- Cleans lost kernel space buffers (DANGEROUS)\n"
+"   --free-kernel-memory <use>	- Cleans lost kernel space buffers (DANGEROUS)\n"
+"	dma			- Remove all buffers allocated by DMA subsystem\n"
+"	#number			- Remove all buffers with the specified use id\n"
 "\n"
 "  Addressing:\n"
 "   -d <device>			- FPGA device (/dev/fpga0)\n"
@@ -1087,6 +1091,38 @@ int ListKMEM(pcilib_t *handle, const char *device) {
     return 0;
 }
 
+int FreeKMEM(pcilib_t *handle, const char *device, const char *use, int force) {
+    int err;
+    int i;
+    
+    unsigned long useid;
+    
+    pcilib_kmem_flags_t flags = PCILIB_KMEM_FLAG_HARDWARE|PCILIB_KMEM_FLAG_PERSISTENT|PCILIB_KMEM_FLAG_EXCLUSIVE; 
+    if (force) flags |= PCILIB_KMEM_FLAG_FORCE; // this will ignore mmap locks as well.
+
+    if (!strcasecmp(use, "dma")) {
+	for (i = 0; i < PCILIB_MAX_DMA_ENGINES; i++) {
+	    err = pcilib_clean_kernel_memory(handle, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, i), flags);
+	    if (err) Error("Error cleaning DMA%i C2S Ring buffer", i);
+	    err = pcilib_clean_kernel_memory(handle, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, 0x80|i), flags);
+	    if (err) Error("Error cleaning DMA%i S2C Ring buffer", i);
+	    err = pcilib_clean_kernel_memory(handle, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, i), flags);
+	    if (err) Error("Error cleaning DMA%i C2S Page buffers", i);
+	    err = pcilib_clean_kernel_memory(handle, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, 0x80|i), flags);
+	    if (err) Error("Error cleaning DMA%i S2C Page buffers", i);
+	}
+	
+	return 0;
+    }
+    
+    if ((!isxnumber(use))||(sscanf(use, "%lx", &useid) != 1)) Error("Invalid use (%s) is specified", use);
+    
+    err = pcilib_clean_kernel_memory(handle, useid, flags);
+    if (err) Error("Error cleaning kernel buffers for use (0x%lx)", useid);
+    
+    return 0;
+}
+
 int WaitIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_source_t irq_source, pcilib_timeout_t timeout) {
     int err;
     size_t count;
@@ -1113,6 +1149,7 @@ int main(int argc, char **argv) {
 
     int details = 0;
     int quiete = 0;
+    int force = 0;
     
     pcilib_model_t model = PCILIB_MODEL_DETECT;
     pcilib_model_description_t *model_info;
@@ -1311,6 +1348,9 @@ int main(int argc, char **argv) {
 	    case OPT_QUIETE:
 		quiete = 1;
 	    break;
+	    case OPT_FORCE:
+		force = 1;
+	    break;
 	    default:
 		Usage(argc, argv, "Unknown option (%s)", argv[optind]);
 	}
@@ -1493,6 +1533,9 @@ int main(int argc, char **argv) {
      break;
      case MODE_LIST_KMEM:
         ListKMEM(handle, fpga_device);
+     break;
+     case MODE_FREE_KMEM:
+        FreeKMEM(handle, fpga_device, use, force);
      break;
     }
 
