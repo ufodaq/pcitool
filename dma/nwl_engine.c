@@ -14,7 +14,7 @@
 
 #include "nwl_defines.h"
 
-#include "nwl_buffers.h"    
+#include "nwl_engine_buffers.h"
 
 int dma_nwl_read_engine_config(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, char *base) {
     uint32_t val;

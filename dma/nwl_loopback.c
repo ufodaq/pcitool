@@ -16,7 +16,8 @@
 int dma_nwl_start_loopback(nwl_dma_t *ctx,  pcilib_dma_direction_t direction, size_t packet_size) {
     uint32_t val;
 
-	// Re-initializing always
+    ctx->loopback_started = 1;
+    dma_nwl_stop_loopback(ctx);
     
     val = packet_size;
     nwl_write_register(val, ctx, ctx->base_addr, PKT_SIZE_ADDRESS);
@@ -24,16 +25,15 @@ int dma_nwl_start_loopback(nwl_dma_t *ctx,  pcilib_dma_direction_t direction, si
     switch (direction) {
       case PCILIB_DMA_BIDIRECTIONAL:
 	val = LOOPBACK;
+	nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
 	break;
       case PCILIB_DMA_TO_DEVICE:
 	return -1;
       case PCILIB_DMA_FROM_DEVICE:
         val = PKTGENR;
+	nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
 	break;
     }
-
-    nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-    nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
 
     ctx->loopback_started = 1;
         
@@ -42,6 +42,8 @@ int dma_nwl_start_loopback(nwl_dma_t *ctx,  pcilib_dma_direction_t direction, si
 
 int dma_nwl_stop_loopback(nwl_dma_t *ctx) {
     uint32_t val = 0;
+    
+    if (!ctx->loopback_started) return 0;
 
 	/* Stop in any case, otherwise we can have problems in benchmark due to
 	engine initialized in previous run, and benchmark is only actual usage.

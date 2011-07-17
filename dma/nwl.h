@@ -16,7 +16,7 @@ typedef struct pcilib_nwl_engine_description_s pcilib_nwl_engine_description_t;
 #define PCILIB_NWL_DMA_PAGES			512 // 1024
 
 //#define DEBUG_HARDWARE
-
+//#define DEBUG_NWL
 
 #include "nwl_dma.h"
 #include "nwl_irq.h"

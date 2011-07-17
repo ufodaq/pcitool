@@ -44,7 +44,11 @@ static int dma_nwl_compute_read_s2c_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_d
 	pcilib_warning("Inconsistent S2C DMA Ring buffer is found (REG_DMA_ENG_NEXT_BD register value (%zu) out of range)", info->tail);
 	return PCILIB_ERROR_INVALID_STATE;
     }
-    
+
+#ifdef DEBUG_NWL    
+    printf("S2C: %lu %lu\n", info->tail, info->head);
+#endif /* DEBUG_NWL */
+
     return 0;
 }
 
@@ -69,34 +73,12 @@ static int dma_nwl_compute_read_c2s_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_d
 	return PCILIB_ERROR_INVALID_STATE;
     }
     
-    info->tail = info->head;
-    
-    
-	// Last read BD
-    nwl_read_register(val, ctx, base, REG_DMA_ENG_LAST_BD);
-    if ((val < ring_pa)||((val - ring_pa) % PCILIB_NWL_DMA_DESCRIPTOR_SIZE)) {
-	if (val < ring_pa) pcilib_warning("Inconsistent C2S DMA Ring buffer is found (REG_DMA_ENG_LAST_BD register value (%lx) is below start of ring [%lx,%lx])", val, ring_pa, PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
-	else pcilib_warning("Inconsistent C2S DMA Ring buffer is found (REG_DMA_ENG_LAST_BD register value (%zu / %u) is fractal)", val - ring_pa, PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
-	return PCILIB_ERROR_INVALID_STATE;
-    }
+    info->tail = info->head + 1;
+    if (info->tail == PCILIB_NWL_DMA_PAGES) info->tail = 0;
 
-    prev = (val - ring_pa) / PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
-    if (prev >= PCILIB_NWL_DMA_PAGES) {
-	pcilib_warning("Inconsistent C2S DMA Ring buffer is found (REG_DMA_ENG_LAST_BD register value (%zu) out of range)", prev);
-	return PCILIB_ERROR_INVALID_STATE;
-    }
-    
-prev_buffer:
-    val = NWL_RING_GET(ring + prev * PCILIB_NWL_DMA_DESCRIPTOR_SIZE, DMA_BD_BUFL_STATUS_OFFSET)&DMA_BD_STATUS_MASK;
-
-    if (val & (DMA_BD_ERROR_MASK|DMA_BD_COMP_MASK)) {
-	info->tail = prev;
-
-        if (prev > 0) prev -= 1;
-	else prev = PCILIB_NWL_DMA_PAGES - 1;
-	
-	if (prev != info->head)	goto prev_buffer;
-    }
+#ifdef DEBUG_NWL    
+    printf("C2S: %lu %lu\n", info->tail, info->head);
+#endif /* DEBUG_NWL */
 
     return 0;
 }
@@ -136,6 +118,7 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
 
     reuse_ring = pcilib_kmem_is_reused(ctx->pcilib, ring);
     reuse_pages = pcilib_kmem_is_reused(ctx->pcilib, pages);
+
 
     if (!info->preserve) {
 	if (reuse_ring == reuse_pages) {
