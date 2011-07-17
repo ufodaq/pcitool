@@ -129,7 +129,7 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
 		else {
 		    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
 
-		    if (val&DMA_ENG_RUNNING == 0) pcilib_warning("Lost DMA buffers are found (DMA engine is stopped), reinitializing...");
+		    if ((val&DMA_ENG_RUNNING) == 0) pcilib_warning("Lost DMA buffers are found (DMA engine is stopped), reinitializing...");
 		    else preserve = 1;
 		}
 	    } 	
