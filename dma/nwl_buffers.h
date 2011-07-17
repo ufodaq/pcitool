@@ -13,15 +13,101 @@ int dma_nwl_sync_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, 
     return 0;
 }
 
-int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info) {
+static int dma_nwl_compute_read_s2c_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, unsigned char *ring, uint32_t ring_pa) {
+    size_t pos;
+    uint32_t val;
+
+    char *base = info->base_addr;
+    
+    nwl_read_register(val, ctx, base, REG_SW_NEXT_BD);
+    if ((val < ring_pa)||((val - ring_pa) % PCILIB_NWL_DMA_DESCRIPTOR_SIZE)) {
+	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_SW_NEXT_BD register out of range)");
+	return PCILIB_ERROR_INVALID_STATE;
+    }
+
+    info->head = (val - ring_pa) / PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
+    if (info->head >= PCILIB_NWL_DMA_PAGES) {
+	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_SW_NEXT_BD register out of range)");
+	return PCILIB_ERROR_INVALID_STATE;
+    }
+
+    nwl_read_register(val, ctx, base, REG_DMA_ENG_NEXT_BD);
+    if ((val < ring_pa)||((val - ring_pa) % PCILIB_NWL_DMA_DESCRIPTOR_SIZE)) {
+	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_DMA_ENG_NEXT_BD register out of range)");
+	return PCILIB_ERROR_INVALID_STATE;
+    }
+
+    info->tail = (val - ring_pa) / PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
+    if (info->tail >= PCILIB_NWL_DMA_PAGES) {
+	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_DMA_ENG_NEXT_BD register out of range)");
+	return PCILIB_ERROR_INVALID_STATE;
+    }
+    
+    return 0;
+}
+
+static int dma_nwl_compute_read_c2s_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, unsigned char *ring, uint32_t ring_pa) {
+    size_t pos;
+    uint32_t val;
+    size_t prev;
+
+    char *base = info->base_addr;
+
+    
+    nwl_read_register(val, ctx, base, REG_SW_NEXT_BD);
+    if ((val < ring_pa)||((val - ring_pa) % PCILIB_NWL_DMA_DESCRIPTOR_SIZE)) {
+	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_SW_NEXT_BD register out of range)");
+	return PCILIB_ERROR_INVALID_STATE;
+    }
+
+    info->head = (val - ring_pa) / PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
+    if (info->head >= PCILIB_NWL_DMA_PAGES) {
+	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_SW_NEXT_BD register out of range)");
+	return PCILIB_ERROR_INVALID_STATE;
+    }
+    
+    info->tail = info->head;
+    
+    
+	// Last read BD
+    nwl_read_register(val, ctx, base, REG_DMA_ENG_LAST_BD);
+    if ((val < ring_pa)||((val - ring_pa) % PCILIB_NWL_DMA_DESCRIPTOR_SIZE)) {
+	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_DMA_ENG_LAST_BD register out of range)");
+	return PCILIB_ERROR_INVALID_STATE;
+    }
+
+    prev = (val - ring_pa) / PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
+    if (prev >= PCILIB_NWL_DMA_PAGES) {
+	pcilib_warning("Inconsistent DMA Ring buffer is found (REG_DMA_ENG_LAST_BD register out of range)");
+	return PCILIB_ERROR_INVALID_STATE;
+    }
+    
+prev_buffer:
+    val = NWL_RING_GET(ring + prev * PCILIB_NWL_DMA_DESCRIPTOR_SIZE, DMA_BD_BUFL_STATUS_OFFSET)&DMA_BD_STATUS_MASK;
+
+    if (val & (DMA_BD_ERROR_MASK|DMA_BD_COMP_MASK)) {
+	info->tail = prev;
+
+        if (prev > 0) prev -= 1;
+	else prev = PCILIB_NWL_DMA_PAGES - 1;
+	
+	if (prev != info->head)	goto prev_buffer;
+    }
+
+    return 0;
+}
+
+
+static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info) {
     int err = 0;
 
     int i;
+    int preserve = 0;
     uint16_t sub_use;
     uint32_t val;
     uint32_t buf_sz;
     uint64_t buf_pa;
-    pcilib_kmem_reuse_t reuse_ring, reuse_pages;
+    pcilib_kmem_reuse_state_t reuse_ring, reuse_pages;
     pcilib_kmem_flags_t flags;
 
     char *base = info->base_addr;
@@ -30,7 +116,7 @@ int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_descriptio
 
 	// Or bidirectional specified by 0x0|addr, or read 0x0|addr and write 0x80|addr
     sub_use = info->desc.addr|(info->desc.direction == PCILIB_DMA_TO_DEVICE)?0x80:0x00;
-    flags = PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_EXCLUSIVE|PCILIB_KMEM_FLAG_HARDWARE|info->preserve?PCILIB_KMEM_FLAG_PRESERVE:0;
+    flags = PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_EXCLUSIVE|PCILIB_KMEM_FLAG_HARDWARE|info->preserve?PCILIB_KMEM_FLAG_PERSISTENT:0;
     pcilib_kmem_handle_t *ring = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE, PCILIB_NWL_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, sub_use), flags);
     pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_PAGE, PCILIB_NWL_DMA_PAGES, 0, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, sub_use), flags);
 
@@ -43,44 +129,67 @@ int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_descriptio
 	return err;
     }
 
-
-/*    
     reuse_ring = pcilib_kmem_is_reused(ctx->pcilib, ring);
     reuse_pages = pcilib_kmem_is_reused(ctx->pcilib, pages);
-    if ((reuse_ring == PCILIB_KMEM_REUSE_REUSED)&&(reuse_pages == PCILIB_KMEM_REUSE_REUSED)) info->preserve = 1;
-    else if (reuse_ring||reuse_pages) pcilib_warning("Inconsistent buffers in the kernel module are detected");
-*/
+
+    if (!info->preserve) {
+	if (reuse_ring == reuse_pages) {
+	    if (reuse_ring & PCILIB_KMEM_REUSE_PARTIAL) pcilib_warning("Inconsistent DMA buffers are found (only part of required buffers is available), reinitializing...");
+	    else if (reuse_ring & PCILIB_KMEM_REUSE_REUSED) {
+		if (reuse_ring & PCILIB_KMEM_REUSE_PERSISTENT == 0) pcilib_warning("Lost DMA buffers are found (non-persistent mode), reinitializing...");
+		else if (reuse_ring & PCILIB_KMEM_REUSE_HARDWARE == 0) pcilib_warning("Lost DMA buffers are found (missing HW reference), reinitializing...");
+		else {
+		    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
+		    if (val&DMA_ENG_RUNNING == 0) pcilib_warning("Lost DMA buffers are found (DMA engine is stopped), reinitializing...");
+		    else preserve = 1;
+		}
+	    } 	
+	} else pcilib_warning("Inconsistent DMA buffers (modes of ring and page buffers does not match), reinitializing....");
+    }
+
     
     unsigned char *data = (unsigned char*)pcilib_kmem_get_ua(ctx->pcilib, ring);
     uint32_t ring_pa = pcilib_kmem_get_pa(ctx->pcilib, ring);
-    
-    memset(data, 0, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
 
-    for (i = 0; i < PCILIB_NWL_DMA_PAGES; i++, data += PCILIB_NWL_DMA_DESCRIPTOR_SIZE) {
-	buf_pa = pcilib_kmem_get_block_pa(ctx->pcilib, pages, i);
-	buf_sz = pcilib_kmem_get_block_size(ctx->pcilib, pages, i);
+    if (preserve) {
+	if (info->desc.direction == PCILIB_DMA_FROM_DEVICE) err = dma_nwl_compute_read_c2s_pointers(ctx, info, data, ring_pa);
+	else err = dma_nwl_compute_read_s2c_pointers(ctx, info, data, ring_pa);
 
-	NWL_RING_SET(data, DMA_BD_NDESC_OFFSET, ring_pa + ((i + 1) % PCILIB_NWL_DMA_PAGES) * PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
-	NWL_RING_SET(data, DMA_BD_BUFAL_OFFSET, buf_pa&0xFFFFFFFF);
-	NWL_RING_SET(data, DMA_BD_BUFAH_OFFSET, buf_pa>>32);
-#ifdef NWL_GENERATE_DMA_IRQ
-        NWL_RING_SET(data, DMA_BD_BUFL_CTRL_OFFSET, buf_sz | DMA_BD_INT_ERROR_MASK | DMA_BD_INT_COMP_MASK);
-#else /* NWL_GENERATE_DMA_IRQ */
-        NWL_RING_SET(data, DMA_BD_BUFL_CTRL_OFFSET, buf_sz);
-#endif /* NWL_GENERATE_DMA_IRQ */
+	if (err) preserve = 0;
     }
+    
+    if (preserve)
+	info->reused = 1;
+    else {
+	memset(data, 0, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
 
-    val = ring_pa;
-    nwl_write_register(val, ctx, base, REG_DMA_ENG_NEXT_BD);
-    nwl_write_register(val, ctx, base, REG_SW_NEXT_BD);
+	for (i = 0; i < PCILIB_NWL_DMA_PAGES; i++, data += PCILIB_NWL_DMA_DESCRIPTOR_SIZE) {
+	    buf_pa = pcilib_kmem_get_block_pa(ctx->pcilib, pages, i);
+	    buf_sz = pcilib_kmem_get_block_size(ctx->pcilib, pages, i);
+
+	    NWL_RING_SET(data, DMA_BD_NDESC_OFFSET, ring_pa + ((i + 1) % PCILIB_NWL_DMA_PAGES) * PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
+	    NWL_RING_SET(data, DMA_BD_BUFAL_OFFSET, buf_pa&0xFFFFFFFF);
+	    NWL_RING_SET(data, DMA_BD_BUFAH_OFFSET, buf_pa>>32);
+#ifdef NWL_GENERATE_DMA_IRQ
+    	    NWL_RING_SET(data, DMA_BD_BUFL_CTRL_OFFSET, buf_sz | DMA_BD_INT_ERROR_MASK | DMA_BD_INT_COMP_MASK);
+#else /* NWL_GENERATE_DMA_IRQ */
+    	    NWL_RING_SET(data, DMA_BD_BUFL_CTRL_OFFSET, buf_sz);
+#endif /* NWL_GENERATE_DMA_IRQ */
+	}
+
+	val = ring_pa;
+	nwl_write_register(val, ctx, base, REG_DMA_ENG_NEXT_BD);
+	nwl_write_register(val, ctx, base, REG_SW_NEXT_BD);
+
+        info->head = 0;
+	info->tail = 0;
+    }
     
     info->ring = ring;
     info->pages = pages;
     info->page_size = buf_sz;
     info->ring_size = PCILIB_NWL_DMA_PAGES;
     
-    info->head = 0;
-    info->tail = 0;
     
     return 0;
 }

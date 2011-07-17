@@ -904,10 +904,10 @@ int StartStopDMA(pcilib_t *handle,  pcilib_model_description_t *model_info, pcil
 	}
 	
 	if (start) {
-	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_PERMANENT);
+	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
     	    if (err) Error("Error starting DMA engine (C2S %lu)", dma);
 	} else {
-	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERMANENT);
+	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
     	    if (err) Error("Error stopping DMA engine (C2S %lu)", dma);
 	}
     }
@@ -922,10 +922,10 @@ int StartStopDMA(pcilib_t *handle,  pcilib_model_description_t *model_info, pcil
 	}
 	
 	if (start) {
-	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_PERMANENT);
+	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
     	    if (err) Error("Error starting DMA engine (S2C %lu)", dma);
 	} else {
-	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERMANENT);
+	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
     	    if (err) Error("Error stopping DMA engine (S2C %lu)", dma);
 	}
     }

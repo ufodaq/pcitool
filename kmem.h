@@ -2,18 +2,20 @@
 #define _PCILIB_KMEM_H
 
 #include "pcilib.h"
+#include "tools.h"
 
 typedef enum {
     PCILIB_KMEM_FLAG_REUSE = KMEM_FLAG_REUSE,
     PCILIB_KMEM_FLAG_EXCLUSIVE = KMEM_FLAG_EXCLUSIVE,
     PCILIB_KMEM_FLAG_PERSISTENT = KMEM_FLAG_PERSISTENT,
-    PCILIB_KMEM_FLAG_HARDWARE = KMEM_FLAG_HW
+    PCILIB_KMEM_FLAG_HARDWARE = KMEM_FLAG_HW,
 //    PCILIB_KMEM_FLAG_FORCE = 2		/**< Force buffer 
 } pcilib_kmem_flags_t;
 
+
 typedef enum {
-    PCILIB_KMEM_REUSE_REUSED = PCILIB_TRISTATE_YES,
     PCILIB_KMEM_REUSE_ALLOCATED = PCILIB_TRISTATE_NO,
+    PCILIB_KMEM_REUSE_REUSED = PCILIB_TRISTATE_YES,
     PCILIB_KMEM_REUSE_PARTIAL = PCILIB_TRISTATE_PARTIAL,
     PCILIB_KMEM_REUSE_PERSISTENT = 0x100,
     PCILIB_KMEM_REUSE_HARDWARE = 0x200
@@ -22,7 +24,8 @@ typedef enum {
 
 typedef struct {
     int handle_id;
-    int reused;
+    pcilib_kmem_reuse_state_t reused;
+    
     uintptr_t pa;
 //    uintptr_t va;
     void *ua;

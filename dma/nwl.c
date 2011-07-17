@@ -41,7 +41,7 @@ int dma_nwl_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
 	// stop everything
     if (dma == PCILIB_DMA_ENGINE_INVALID) {
         for (dma = 0; dma < ctx->n_engines; dma++) {
-	    if (flags&PCILIB_DMA_FLAG_PERMANENT) {
+	    if (flags&PCILIB_DMA_FLAG_PERSISTENT) {
 		ctx->engines[dma].preserve = 0;
 	    }
 	
@@ -62,7 +62,7 @@ int dma_nwl_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
     if (dma > ctx->n_engines) return PCILIB_ERROR_INVALID_BANK;
     
 	    // ignorign previous setting if flag specified
-    if (flags&PCILIB_DMA_FLAG_PERMANENT) {
+    if (flags&PCILIB_DMA_FLAG_PERSISTENT) {
 	ctx->engines[dma].preserve = 0;
     }
     

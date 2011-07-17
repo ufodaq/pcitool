@@ -37,7 +37,7 @@ int dma_nwl_enable_irq(pcilib_dma_context_t *vctx, pcilib_irq_type_t type, pcili
     uint32_t val;
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
     
-    if (flags&PCILIB_DMA_FLAG_PERMANENT) ctx->irq_preserve |= type;
+    if (flags&PCILIB_DMA_FLAG_PERSISTENT) ctx->irq_preserve |= type;
 
     if ((ctx->irq_enabled&type) == type) return 0;
     
@@ -72,7 +72,7 @@ int dma_nwl_disable_irq(pcilib_dma_context_t *vctx, pcilib_dma_flags_t flags) {
     val &= ~(DMA_INT_ENABLE|DMA_USER_INT_ENABLE);
     nwl_write_register(val, ctx, ctx->base_addr, REG_DMA_CTRL_STATUS);
     
-    if (flags&PCILIB_DMA_FLAG_PERMANENT) ctx->irq_preserve = 0;
+    if (flags&PCILIB_DMA_FLAG_PERSISTENT) ctx->irq_preserve = 0;
 
     return 0;
 }

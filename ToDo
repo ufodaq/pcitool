@@ -1,7 +1,8 @@
 High Priority (we would need it for IPE Camera)
 =============
  1. Serialize access to the registers across applications
- 2. CMake build system
+ 2. Protect kmem_entries in the driver using spinlock
+ 3. CMake build system
  
 Normal Priority (it would make just few things a bit easier)
 ===============
@@ -12,3 +13,4 @@ Normal Priority (it would make just few things a bit easier)
 Low Priority (only as generalization for other projects)
 ============
  1. XML configurations describing registers (and DMA engines?)
+ 2. Access register/bank lookups using hash tables

@@ -4,8 +4,6 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "pci.h"
-
 #define BIT_MASK(bits) ((1ll << (bits)) - 1)
 
 #define min2(a, b) (((a)<(b))?(a):(b))
@@ -16,6 +14,7 @@ typedef enum {
     PCILIB_TRISTATE_YES = 2
 } pcilib_tristate_t;
 
+#include "pci.h"
 
 int pcilib_isnumber(const char *str);
 int pcilib_isxnumber(const char *str);

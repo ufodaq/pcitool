@@ -38,6 +38,7 @@ struct pcilib_nwl_engine_description_s {
     
     int started;			/**< indicates that DMA buffers are initialized and reading is allowed */
     int writting;			/**< indicates that we are in middle of writting packet */
+    int reused;				/**< indicates that DMA was found intialized, buffers were reused, and no additional initialization is needed */
     int preserve;			/**< indicates that DMA should not be stopped during clean-up */
 };
 

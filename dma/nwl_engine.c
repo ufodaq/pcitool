@@ -65,88 +65,89 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     
     if (info->started) return 0;
 
+
 	// This will only successed if there are no parallel access to DMA engine
     err = dma_nwl_allocate_engine_buffers(ctx, info);
     if (err) return err;
     
-	// Check if DMA engine is enabled
-    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
-    if (val&DMA_ENG_RUNNING) {	
-//	info->preserve = 1;
-	
-	// We need to positionate buffers correctly (both read and write)
-	//DSS info->tail, info->head
-    
-//	pcilib_error("Not implemented");
-	
-//        info->started = 1;
-//	return 0;
-    }
+    if (info->reused) {
+    	info->preserve = 1;
 
-	// Disable IRQs
-    err = dma_nwl_disable_engine_irq(ctx, dma);
-    if (err) return err;
-
-	// Disable Engine & Reseting 
-    val = DMA_ENG_DISABLE|DMA_ENG_USER_RESET;
-    nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
-
-    gettimeofday(&start, NULL);
-    do {
-	nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
-        gettimeofday(&cur, NULL);
-    } while ((val & (DMA_ENG_STATE_MASK|DMA_ENG_USER_RESET))&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_REGISTER_TIMEOUT));
-    
-    if (val & (DMA_ENG_STATE_MASK|DMA_ENG_USER_RESET)) {
-	pcilib_error("Timeout during reset of DMA engine %i", info->desc.addr);
-	return PCILIB_ERROR_TIMEOUT;
-    }
-
-    val = DMA_ENG_RESET; 
-    nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
-    
-    gettimeofday(&start, NULL);
-    do {
-	nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
-        gettimeofday(&cur, NULL);
-    } while ((val & DMA_ENG_RESET)&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_REGISTER_TIMEOUT));
-    
-    if (val & DMA_ENG_RESET) {
-	pcilib_error("Timeout during reset of DMA engine %i", info->desc.addr);
-	return PCILIB_ERROR_TIMEOUT;
-    }
-    
-	// Acknowledge asserted engine interrupts    
-    if (val & DMA_ENG_INT_ACTIVE_MASK) {
-	val |= DMA_ENG_ALLINT_MASK;
-	nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
-    }
-
-    ring_pa = pcilib_kmem_get_pa(ctx->pcilib, info->ring);
-    nwl_write_register(ring_pa, ctx, info->base_addr, REG_DMA_ENG_NEXT_BD);
-    nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
-
-    __sync_synchronize();
-
-    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
-    val |= (DMA_ENG_ENABLE);
-    nwl_write_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
-
-    __sync_synchronize();
+	    // Acknowledge asserted engine interrupts    
+	if (val & DMA_ENG_INT_ACTIVE_MASK) {
+	    val |= DMA_ENG_ALLINT_MASK;
+	    nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+	}
 
 #ifdef NWL_GENERATE_DMA_IRQ
-    dma_nwl_enable_engine_irq(ctx, dma);
+	dma_nwl_enable_engine_irq(ctx, dma);
+#endif /* NWL_GENERATE_DMA_IRQ */
+    } else {
+	// Disable IRQs
+	err = dma_nwl_disable_engine_irq(ctx, dma);
+	if (err) return err;
+
+	// Disable Engine & Reseting 
+	val = DMA_ENG_DISABLE|DMA_ENG_USER_RESET;
+	nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+
+	gettimeofday(&start, NULL);
+	do {
+	    nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+    	    gettimeofday(&cur, NULL);
+	} while ((val & (DMA_ENG_STATE_MASK|DMA_ENG_USER_RESET))&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_REGISTER_TIMEOUT));
+    
+	if (val & (DMA_ENG_STATE_MASK|DMA_ENG_USER_RESET)) {
+	    pcilib_error("Timeout during reset of DMA engine %i", info->desc.addr);
+	    return PCILIB_ERROR_TIMEOUT;
+	}
+
+	val = DMA_ENG_RESET; 
+	nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+    
+	gettimeofday(&start, NULL);
+	do {
+	    nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+    	    gettimeofday(&cur, NULL);
+	} while ((val & DMA_ENG_RESET)&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_REGISTER_TIMEOUT));
+    
+	if (val & DMA_ENG_RESET) {
+	    pcilib_error("Timeout during reset of DMA engine %i", info->desc.addr);
+	    return PCILIB_ERROR_TIMEOUT;
+	}
+    
+	    // Acknowledge asserted engine interrupts    
+	if (val & DMA_ENG_INT_ACTIVE_MASK) {
+	    val |= DMA_ENG_ALLINT_MASK;
+	    nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+	}
+
+	ring_pa = pcilib_kmem_get_pa(ctx->pcilib, info->ring);
+	nwl_write_register(ring_pa, ctx, info->base_addr, REG_DMA_ENG_NEXT_BD);
+	nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
+
+	__sync_synchronize();
+
+	nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
+	val |= (DMA_ENG_ENABLE);
+	nwl_write_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
+
+	__sync_synchronize();
+
+#ifdef NWL_GENERATE_DMA_IRQ
+	dma_nwl_enable_engine_irq(ctx, dma);
 #endif /* NWL_GENERATE_DMA_IRQ */
 
-    if (info->desc.direction == PCILIB_DMA_FROM_DEVICE) {
-	ring_pa += (info->ring_size - 1) * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
-    	nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
+	if (info->desc.direction == PCILIB_DMA_FROM_DEVICE) {
+	    ring_pa += (info->ring_size - 1) * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
+    	    nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
 
-	info->tail = 0;
-	info->head = (info->ring_size - 1);
-    } else {
-	info->tail = 0;
-	info->head = 0;
+	    info->tail = 0;
+	    info->head = (info->ring_size - 1);
+	} else {
+	    info->tail = 0;
+	    info->head = 0;
+	}
     }
     
     info->started = 1;
@@ -173,6 +174,12 @@ int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	    // Stopping DMA is not enough reset is required
 	val = DMA_ENG_DISABLE|DMA_ENG_USER_RESET|DMA_ENG_RESET;
 	nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+
+	gettimeofday(&start, NULL);
+	do {
+	    nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
+    	    gettimeofday(&cur, NULL);
+	} while ((val & (DMA_ENG_RUNNING))&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_REGISTER_TIMEOUT));
 
 	if (info->ring) {
 	    ring_pa = pcilib_kmem_get_pa(ctx->pcilib, info->ring);

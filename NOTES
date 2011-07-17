@@ -85,10 +85,13 @@ DMA Access Synchronization
      HW flag anyway)
      
     On allocation error at some of the buffer, call clean routine and
-     * Preserve HW reference if buffers held HW reference before
-     * Preserve PERSISTENT mode if buffers were in PERSISTENT mode before
-     * Remove REUSE flag, we want to clean if it is allowed by current buffer
-     status
+     * Preserve PERSISTENT mode and HW reference if buffers held them before
+     unsuccessful kmem initialization. Until the last failed block, the blocks
+     of kmem should be consistent. The HW/PERSISTENT flags should be removed
+     if all reused blocks were in HW/PERSISTENT mode. The last block needs
+     special treatment. The flags may be removed for the block if it was
+     HW/PERSISTENT state (and others not).
+     * Remove REUSE flag, we want to clean if allowed by current buffer status
      * EXCLUSIVE flag is not important for kmem_free routine.
     
  - At DMA level
@@ -99,7 +102,7 @@ DMA Access Synchronization
     * Ring start/stop pointers
     
     To prevent multiple processes accessing DMA engine in parallel, the first
-    action is buffer initialization 
+    action is buffer initialization which will fail if buffers already used
 	* Always with REUSE, EXCLUSIVE, and HW flags 
 	* Optionally with PERSISTENT flag (if DMA_PERSISTENT flag is set)
     If another DMA app is running, the buffer allocation will fail (no dma_stop 
@@ -119,8 +122,8 @@ DMA Access Synchronization
     If PRESERVE flag is on, the engine will not be stopped at the end of
     execution (and buffers will stay because of HW flag).
     
-    If buffers are reused and in PERSISTENT mode, DMA engine was on before 
-    dma_start (we not basing on PRESERVE flag, because it can be enforced), 
+    If buffers are reused and are already in PERSISTENT mode, DMA engine was on 
+    before dma_start (PRESERVE flag is ignored, because it can be enforced), 
     ring pointers are calculated from LAST_BD and states of ring elements.
     If previous application crashed (i.e. buffers may be corrupted). Two
     cases are possible:
@@ -138,9 +141,35 @@ Register Access Synchronization
  We need to serialize access to the registers by the different running 
  applications and handle case when registers are accessed indirectly by
  writting PCI BARs (DMA implementations, for instance).
- * An option would be to serialize at least access to CMOSIS registers
- which are always accessed over register functions.
 
+ - Module-assisted locking:
+ * During initialization the locking context is created (which is basicaly
+ a kmem_handle of type LOCK_PAGE. 
+ * This locking context is passed to the kernel module along with lock type 
+ (LOCK_BANK) and lock item (BANK ADDRESS). If lock context is already owns
+ lock on the specified bank, just reference number is increased, otherwise
+ we are trying to obtain new lock.
+ * Kernel module just iterates over all registered lock pages and checks if
+ any holds the specified lock. if not, the lock is obtained and registered
+ in the our lock page.
+ * This allows to share access between multiple threads of single application
+ (by using the same lock page) or protect (by using own lock pages by each of
+ the threads)
+ * Either on application cleanup or if application crashed, the memory mapping
+ of lock page is removed and, hence, locks are freed.
+ 
+ - Multiple-ways of accessing registers
+ Because of reference counting, we can successfully obtain locks multiple 
+ times if necessary. The following locks are protecting register access:
+  a) Global register_read/write lock bank before executing implementation
+  b) DMA bank is locked by global DMA functions. So we can access the 
+  registers using plain PCI bar read/write.
+  c) Sequence of register operations can be protected with pcilib_lock_bank
+  function
+ Reading raw register space or PCI bank is not locked.
+  * Ok. We can detect banks which will be affected by PCI read/write and 
+  lock them. But shall we do it?
+ 
 Register/DMA Configuration
 ==========================
  - XML description of registers
