@@ -59,7 +59,7 @@ static pcilib_register_description_t nwl_dma_engine_registers[] = {
     {0x0004, 	10, 	1, 	0, 	0x0000C100,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "dma%0*u%s_running",  ""},
     {0x0004, 	11, 	1, 	0, 	0x0000C100,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "dma%0*u%s_waiting",  ""},
     {0x0004, 	14, 	1, 	0, 	0x0000C100,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "dma%0*u%s_reset_request", ""},
-    {0x0004, 	15, 	1, 	0, 	0x0000C100,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "dma%0*u%s_reset", ""},
+    {0x0004, 	15, 	1, 	0, 	0x0000C100,	PCILIB_REGISTER_W   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "dma%0*u%s_reset", ""},
     {0x0008, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "dma%0*u%s_next_descriptor",  ""},
     {0x000C, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "dma%0*u%s_sw_descriptor",  ""},
     {0x0010, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "dma%0*u%s_last_descriptor",  ""},

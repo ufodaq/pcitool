@@ -822,12 +822,13 @@ int WriteRegister(pcilib_t *handle, pcilib_model_description_t *model_info, cons
 
     const char *format;
 
+    pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
+    if (regid == PCILIB_REGISTER_INVALID) Error("Can't find register (%s) from bank (%s)", reg, bank?bank:"autodetected");
+
 /*
     pcilib_register_bank_t bank_id;
     pcilib_register_bank_addr_t bank_addr;
 
-    pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
-    if (regid == PCILIB_REGISTER_INVALID) Error("Can't find register (%s) from bank (%s)", reg, bank?bank:"autodetected");
     bank_id = pcilib_find_bank_by_addr(handle, model_info->registers[regid].bank);
     if (bank_id == PCILIB_REGISTER_BANK_INVALID) Error("Can't find bank of the register (%s)", reg);
     format = model_info->banks[bank_id].format;
@@ -855,15 +856,19 @@ int WriteRegister(pcilib_t *handle, pcilib_model_description_t *model_info, cons
     err = pcilib_write_register(handle, bank, reg, value);
     if (err) Error("Error writting register %s\n", reg);
 
-    err = pcilib_read_register(handle, bank, reg, &value);
-    if (err) Error("Error reading back register %s for verification\n", reg);
-
-    if (val != value) {
-	Error("Failed to write register %s: %lu is written and %lu is read back", reg, val, value);
+    if ((model_info->registers[regid].mode&PCILIB_REGISTER_RW) == PCILIB_REGISTER_RW) {
+	err = pcilib_read_register(handle, bank, reg, &value);
+	if (err) Error("Error reading back register %s for verification\n", reg);
+    
+	if (val != value) {
+	    Error("Failed to write register %s: %lu is written and %lu is read back", reg, val, value);
+	} else {
+	    printf("%s = ", reg);
+	    printf(format, value);
+	    printf("\n");
+	}
     } else {
-	printf("%s = ", reg);
-	printf(format, value);
-	printf("\n");
+        printf("%s is written\n ", reg);
     }
     
     return 0;
