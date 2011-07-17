@@ -128,6 +128,7 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
 		else if (reuse_ring & PCILIB_KMEM_REUSE_HARDWARE == 0) pcilib_warning("Lost DMA buffers are found (missing HW reference), reinitializing...");
 		else {
 		    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
+
 		    if (val&DMA_ENG_RUNNING == 0) pcilib_warning("Lost DMA buffers are found (DMA engine is stopped), reinitializing...");
 		    else preserve = 1;
 		}
@@ -146,9 +147,10 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
 	if (err) preserve = 0;
     }
     
-    if (preserve)
+    if (preserve) {
 	info->reused = 1;
-    else {
+        buf_sz = pcilib_kmem_get_block_size(ctx->pcilib, pages, 0);
+    } else {
 	memset(data, 0, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
 
 	for (i = 0; i < PCILIB_NWL_DMA_PAGES; i++, data += PCILIB_NWL_DMA_DESCRIPTOR_SIZE) {
@@ -177,7 +179,6 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
     info->pages = pages;
     info->page_size = buf_sz;
     info->ring_size = PCILIB_NWL_DMA_PAGES;
-    
     
     return 0;
 }
@@ -254,7 +255,7 @@ static size_t dma_nwl_get_next_buffer(nwl_dma_t * ctx, pcilib_nwl_engine_descrip
 	    n += res;
 	}
     }
-    
+
     if (n < n_buffers) return PCILIB_DMA_BUFFER_INVALID;
     
     return info->head;
@@ -278,7 +279,7 @@ static int dma_nwl_push_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *
 	flags |= DMA_BD_EOP_MASK;
 	info->writting = 0;
     }
-
+    
     NWL_RING_SET(ring, DMA_BD_BUFL_CTRL_OFFSET, size|flags);
     NWL_RING_SET(ring, DMA_BD_BUFL_STATUS_OFFSET, size);
 

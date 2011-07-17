@@ -65,6 +65,7 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     
     if (info->started) return 0;
 
+
 	// This will only successed if there are no parallel access to DMA engine
     err = dma_nwl_allocate_engine_buffers(ctx, info);
     if (err) {
@@ -77,6 +78,7 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     	info->preserve = 1;
 
 	    // Acknowledge asserted engine interrupts    
+        nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
 	if (val & DMA_ENG_INT_ACTIVE_MASK) {
 	    val |= DMA_ENG_ALLINT_MASK;
 	    nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);

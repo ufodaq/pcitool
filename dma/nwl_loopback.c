@@ -114,9 +114,6 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	return -1;
     }
 
-    memset(cmp, 0x13, size * sizeof(uint32_t));
-
-
 #ifdef DEBUG_HARDWARE	     
     if (ctx->type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
 	pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e5);
@@ -127,6 +124,8 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
 	// Benchmark
     for (i = 0; i < iterations; i++) {
+        memset(cmp, 0x13 + i, size * sizeof(uint32_t));
+
 #ifdef DEBUG_HARDWARE	     
 	if (ctx->type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
 	    pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e1);
@@ -165,6 +164,17 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	if (direction == PCILIB_DMA_BIDIRECTIONAL) {
 	    res = memcmp(buf, cmp, size * sizeof(uint32_t));
 	    if (res) {
+		for (i = 0; i < size; i++)
+		    if (buf[i] != cmp[i]) break;
+		
+		bytes = i;
+		printf("Expected: *%lx, Written:", 0x13 + i);
+		for (; (i < size)&&(i < (bytes + 16)); i++) {
+		    if (((i - bytes)%8)==0) printf("\n");
+		    printf("% 10lx", buf[i]);
+		}
+		printf("\n\n");
+		
 		error = "Written and read values does not match";
 		break;
 	    }
