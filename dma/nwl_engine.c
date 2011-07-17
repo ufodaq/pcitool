@@ -65,10 +65,13 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     
     if (info->started) return 0;
 
-
 	// This will only successed if there are no parallel access to DMA engine
     err = dma_nwl_allocate_engine_buffers(ctx, info);
-    if (err) return err;
+    if (err) {
+	info->started = 1;
+	dma_nwl_stop_engine(ctx, dma);
+	return err;
+    }
     
     if (info->reused) {
     	info->preserve = 1;
@@ -85,7 +88,11 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     } else {
 	// Disable IRQs
 	err = dma_nwl_disable_engine_irq(ctx, dma);
-	if (err) return err;
+	if (err) {
+	    info->started = 1;
+	    dma_nwl_stop_engine(ctx, dma);
+	    return err;
+	}
 
 	// Disable Engine & Reseting 
 	val = DMA_ENG_DISABLE|DMA_ENG_USER_RESET;
@@ -99,6 +106,9 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     
 	if (val & (DMA_ENG_STATE_MASK|DMA_ENG_USER_RESET)) {
 	    pcilib_error("Timeout during reset of DMA engine %i", info->desc.addr);
+
+	    info->started = 1;
+	    dma_nwl_stop_engine(ctx, dma);
 	    return PCILIB_ERROR_TIMEOUT;
 	}
 
@@ -113,6 +123,9 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     
 	if (val & DMA_ENG_RESET) {
 	    pcilib_error("Timeout during reset of DMA engine %i", info->desc.addr);
+
+	    info->started = 1;
+	    dma_nwl_stop_engine(ctx, dma);
 	    return PCILIB_ERROR_TIMEOUT;
 	}
     
@@ -167,6 +180,8 @@ int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
     char *base = ctx->engines[dma].base_addr;
 
+    if (!info->started) return 0;
+    
     info->started = 0;
 
     err = dma_nwl_disable_engine_irq(ctx, dma);
