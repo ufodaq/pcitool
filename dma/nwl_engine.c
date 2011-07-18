@@ -77,12 +77,7 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     if (info->reused) {
     	info->preserve = 1;
 
-	    // Acknowledge asserted engine interrupts    
-        nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
-	if (val & DMA_ENG_INT_ACTIVE_MASK) {
-	    val |= DMA_ENG_ALLINT_MASK;
-	    nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
-	}
+	dma_nwl_acknowledge_irq(ctx, PCILIB_DMA_IRQ, dma);
 
 #ifdef NWL_GENERATE_DMA_IRQ
 	dma_nwl_enable_engine_irq(ctx, dma);
@@ -131,11 +126,7 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	    return PCILIB_ERROR_TIMEOUT;
 	}
     
-	    // Acknowledge asserted engine interrupts    
-	if (val & DMA_ENG_INT_ACTIVE_MASK) {
-	    val |= DMA_ENG_ALLINT_MASK;
-	    nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
-	}
+    	dma_nwl_acknowledge_irq(ctx, PCILIB_DMA_IRQ, dma);
 
 	ring_pa = pcilib_kmem_get_pa(ctx->pcilib, info->ring);
 	nwl_write_register(ring_pa, ctx, info->base_addr, REG_DMA_ENG_NEXT_BD);
@@ -206,12 +197,8 @@ int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	    nwl_write_register(ring_pa, ctx, info->base_addr, REG_SW_NEXT_BD);
 	}
     }
-
-	// Acknowledge asserted engine interrupts    
-    if (val & DMA_ENG_INT_ACTIVE_MASK) {
-	val |= DMA_ENG_ALLINT_MASK;
-	nwl_write_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
-    }
+    
+    dma_nwl_acknowledge_irq(ctx, PCILIB_DMA_IRQ, dma);
 
     if (info->preserve) {
 	flags = PCILIB_KMEM_FLAG_REUSE;

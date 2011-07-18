@@ -100,6 +100,20 @@ int dma_nwl_disable_engine_irq(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     return 0;
 }
 
+int dma_nwl_acknowledge_irq(pcilib_dma_context_t *vctx, pcilib_irq_type_t irq_type, pcilib_irq_source_t irq_source) {
+    uint32_t val;
+    
+    nwl_dma_t *ctx = (nwl_dma_t*)vctx;
+    pcilib_nwl_engine_description_t *info = ctx->engines + irq_source;
 
+    if (irq_type != PCILIB_DMA_IRQ) return PCILIB_ERROR_NOTSUPPORTED;
+    if (irq_source >= ctx->n_engines) return PCILIB_ERROR_NOTAVAILABLE;
 
-// ACK
+    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
+    if (val & DMA_ENG_INT_ACTIVE_MASK) {
+	val |= DMA_ENG_ALLINT_MASK;
+	nwl_write_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
+    }
+    
+    return 0;
+}

@@ -1077,6 +1077,11 @@ int ListKMEM(pcilib_t *handle, const char *device) {
     }
     closedir(dir);
 
+    if ((n_uses == 1)&&(uses[0].count == 0)) {
+	printf("No kernel memory is allocated\n");
+	return 0;
+    }
+    
     printf("Use Type               Count         Total Size        REF           Mode \n");
     printf("--------------------------------------------------------------------------------\n");
     for (useid = 0; useid < n_uses; useid++) {
@@ -1144,7 +1149,7 @@ int FreeKMEM(pcilib_t *handle, const char *device, const char *use, int force) {
     return 0;
 }
 
-int WaitIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_source_t irq_source, pcilib_timeout_t timeout) {
+int WaitIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_hw_source_t irq_source, pcilib_timeout_t timeout) {
     int err;
     size_t count;
     
@@ -1186,7 +1191,7 @@ int main(int argc, char **argv) {
     const char *event = NULL;
     const char *dma_channel = NULL;
     const char *use = NULL;
-    pcilib_irq_source_t irq_source;
+    pcilib_irq_hw_source_t irq_source;
     pcilib_dma_direction_t dma_direction = PCILIB_DMA_BIDIRECTIONAL;
     
     pcilib_dma_engine_addr_t dma = PCILIB_DMA_ENGINE_ADDR_INVALID;

@@ -16,7 +16,8 @@ typedef void pcilib_dma_context_t;
 typedef struct pcilib_dma_api_description_s pcilib_dma_api_description_t;
 typedef struct pcilib_event_api_description_s pcilib_event_api_description_t;
 typedef struct  pcilib_protocol_description_s pcilib_protocol_description_t;
-typedef unsigned int pcilib_irq_source_t;
+typedef unsigned int pcilib_irq_hw_source_t;
+typedef uint32_t pcilib_irq_source_t;
 
 typedef uint8_t pcilib_bar_t;			/**< Type holding the PCI Bar number */
 typedef uint8_t pcilib_register_t;		/**< Type holding the register ID within the Bank */
@@ -99,6 +100,7 @@ typedef enum {
 #define PCILIB_TIMEOUT_INFINITE		((pcilib_timeout_t)-1)
 #define PCILIB_TIMEOUT_IMMEDIATE	0
 #define PCILIB_TIMEOUT_TRIGGER		0
+#define PCILIB_IRQ_SOURCE_DEFAULT	0
 
 typedef int (*pcilib_dma_callback_t)(void *ctx, pcilib_dma_flags_t flags, size_t bufsize, void *buf);
 typedef int (*pcilib_event_callback_t)(pcilib_event_t event, pcilib_event_id_t event_id, void *user);
@@ -204,11 +206,14 @@ void pcilib_close(pcilib_t *ctx);
 
 int pcilib_start_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
 int pcilib_stop_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
+
+    // Interrupt API is preliminary and can be significantly changed in future
 int pcilib_enable_irq(pcilib_t *ctx, pcilib_irq_type_t irq_type, pcilib_dma_flags_t flags);
+int pcilib_acknowledge_irq(pcilib_t *ctx, pcilib_irq_type_t irq_type, pcilib_irq_source_t irq_source);
 int pcilib_disable_irq(pcilib_t *ctx, pcilib_dma_flags_t flags);
 
-int pcilib_clear_irq(pcilib_t *ctx, pcilib_irq_source_t source);
-int pcilib_wait_irq(pcilib_t *ctx, pcilib_irq_source_t source, pcilib_timeout_t timeout, size_t *count);
+int pcilib_wait_irq(pcilib_t *ctx, pcilib_irq_hw_source_t source, pcilib_timeout_t timeout, size_t *count);
+int pcilib_clear_irq(pcilib_t *ctx, pcilib_irq_hw_source_t source);
 
 void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar);
 void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data);

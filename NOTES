@@ -187,3 +187,55 @@ Register/DMA Configuration
    a) Writting/Reading register values
    b) Wait until <register1>=<value> on <register2>=<value> report error
    c) ... ?
+
+IRQ Handling
+============
+ IRQ types: DMA IRQ, Event IRQ, other types
+ IRQ hardware source: To allow purely user-space implementation, as general
+ rule, only a  single (standard) source should be used.
+ IRQ source: The dma/event engines, however, may detail this hardware source
+ and produce real IRQ source basing on the values of registers. For example, 
+ for DMA IRQs the source may present engine number and for Event IRQs the 
+ source may present event type.
+
+ Only types can be enabled or disabled. The sources are enabled/disabled
+ by enabling/disabling correspondent DMA engines or Event types. The expected
+ workflow is following:
+ * We enabling IRQs in user-space (normally setting some registers). Normally,
+ just an Event IRQs, the DMA if necessary will be managed by DMA engine itself.
+ * We waiting for standard IRQ from hardware (driver)
+ * In the user space, we are checking registers to find out the real source
+ of IRQ (driver reports us just hardware source), generating appropriate 
+ events, and acknowledge IRQ. This is dependent on implementation and should 
+ be managed inside event API.
+ 
+ I.e. the driver implements just two methods pcilib_wait_irq(hw_source), 
+ pcilib_clear_irq(hw_source). Only a few hardware IRQ sources are defined.
+ In most cirstumances, the IRQ_SOURCE_DEFAULT is used. 
+ 
+ The DMA engine may provide 3 additional methods, to enable, disable,
+ and acknowledge IRQ.
+ 
+ ... To be decided in details upon the need...
+
+Updating Firmware
+=================
+ - JTag should be connected to left USB connector on the board
+ - The computer should be tourned off and on before programming
+ - The application is called 'impact'
+    Cancel initial proposals
+    Left click on USB connection 
+    Select "Boundary Scan" and double click
+    Click "Initiate Chain" on right element (left click)
+        Say yes, Select bit file, Cancel
+    Click "Assign new CF file" on right element (left click
+	Select the bit file
+	Select xv6vlx240t
+	Program
+ - Firmwares are in 
+    v.2: /home/uros/Repo/UFO2_last_good_version_UFO2.bit
+    v.3: /home/uros/Repo/UFO3 
+	Step5 - best working revision
+	Step6 - last revision
+
+    

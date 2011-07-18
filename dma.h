@@ -13,6 +13,7 @@ struct pcilib_dma_api_description_s {
 
     int (*enable_irq)(pcilib_dma_context_t *ctx, pcilib_irq_type_t irq_type, pcilib_dma_flags_t flags);
     int (*disable_irq)(pcilib_dma_context_t *ctx, pcilib_dma_flags_t flags);
+    int (*acknowledge_irq)(pcilib_dma_context_t *ctx, pcilib_irq_type_t irq_type, pcilib_irq_source_t irq_source);
 
     int (*start_dma)(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
     int (*stop_dma)(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);

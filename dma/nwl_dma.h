@@ -11,6 +11,7 @@ void  dma_nwl_free(pcilib_dma_context_t *vctx);
 
 int dma_nwl_enable_irq(pcilib_dma_context_t *vctx, pcilib_irq_type_t type, pcilib_dma_flags_t flags);
 int dma_nwl_disable_irq(pcilib_dma_context_t *vctx, pcilib_dma_flags_t flags);
+int dma_nwl_acknowledge_irq(pcilib_dma_context_t *ctx, pcilib_irq_type_t irq_type, pcilib_irq_source_t irq_source);
 
 int dma_nwl_start(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
 int dma_nwl_stop(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
@@ -26,6 +27,7 @@ pcilib_dma_api_description_t nwl_dma_api = {
     dma_nwl_free,
     dma_nwl_enable_irq,
     dma_nwl_disable_irq,
+    dma_nwl_acknowledge_irq,
     dma_nwl_start,
     dma_nwl_stop,
     dma_nwl_write_fragment,

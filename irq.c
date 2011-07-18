@@ -17,7 +17,7 @@
 #include "tools.h"
 #include "error.h"
 
-int pcilib_wait_irq(pcilib_t *ctx, pcilib_irq_source_t source, pcilib_timeout_t timeout, size_t *count) {
+int pcilib_wait_irq(pcilib_t *ctx, pcilib_irq_hw_source_t source, pcilib_timeout_t timeout, size_t *count) {
     int err;
     
     interrupt_wait_t arg = { 0 };
@@ -40,7 +40,7 @@ int pcilib_wait_irq(pcilib_t *ctx, pcilib_irq_source_t source, pcilib_timeout_t 
     return 0;
 }
 
-int pcilib_clear_irq(pcilib_t *ctx, pcilib_irq_source_t source) {
+int pcilib_clear_irq(pcilib_t *ctx, pcilib_irq_hw_source_t source) {
     int err;
     
     err = ioctl(ctx->handle, PCIDRIVER_IOC_CLEAR_IOQ, source);
