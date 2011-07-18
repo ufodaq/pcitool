@@ -22,7 +22,7 @@ pci -w xrawdata_enable_loopback 1
 
 for i in `seq 1 10`; do
     pci -w dma1 -s $size "*$i"
-    pci -r dma1 -s $size
+    pci -r dma1 -s $size -o bench.out
 done
 
 pci --stop-dma dma1

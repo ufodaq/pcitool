@@ -174,7 +174,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   -s <size>			- Number of words (default: 1)\n"
 "   -a [fifo|dma]<bits>		- Access type and bits per word (default: 32)\n"
 "   -e <l|b>			- Endianess Little/Big (default: host)\n"
-"   -o <file>			- Output to file (default: stdout)\n"
+"   -o <file>			- Append output to file (default: stdout)\n"
 "   -t <timeout> 		- Timeout in microseconds\n"
 "\n"
 "  Information:\n"
@@ -555,7 +555,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 #define pci2host16(endianess, value) endianess?
 
 
-int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess) {
+int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, FILE *o) {
     void *buf;
     int i, err;
     size_t ret;
@@ -591,27 +591,33 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, p
       default:
 	pcilib_read(handle, bar, addr, size, buf);
     }
+    
     if (endianess) pcilib_swap(buf, buf, abs(access), n);
 
-    for (i = 0; i < n; i++) {
-	if (i) {
-	    if (i%numbers_per_line == 0) printf("\n");
-	    else {
-		printf("%*s", SEPARATOR_WIDTH, "");
-		if (i%numbers_per_block == 0) printf("%*s", BLOCK_SEPARATOR_WIDTH, "");
+    if (o) {
+	printf("Writting output (%zu bytes) to file (append to the end)...\n", n * abs(access));
+	fwrite(buf, abs(access), n, o);
+    } else {
+	for (i = 0; i < n; i++) {
+	    if (i) {
+		if (i%numbers_per_line == 0) printf("\n");
+		else {
+		    printf("%*s", SEPARATOR_WIDTH, "");
+		    if (i%numbers_per_block == 0) printf("%*s", BLOCK_SEPARATOR_WIDTH, "");
+		}
+	    }
+	    
+	    if (i%numbers_per_line == 0) printf("%8lx:  ", addr + i * abs(access));
+
+	    switch (access) {
+		case 1: printf("%0*hhx", access * 2, ((uint8_t*)buf)[i]); break;
+		case 2: printf("%0*hx", access * 2, ((uint16_t*)buf)[i]); break;
+		case 4: printf("%0*x", access * 2, ((uint32_t*)buf)[i]); break;
+		case 8: printf("%0*lx", access * 2, ((uint64_t*)buf)[i]); break;
 	    }
 	}
-	    
-	if (i%numbers_per_line == 0) printf("%8lx:  ", addr + i * abs(access));
-
-	switch (access) {
-	    case 1: printf("%0*hhx", access * 2, ((uint8_t*)buf)[i]); break;
-	    case 2: printf("%0*hx", access * 2, ((uint16_t*)buf)[i]); break;
-	    case 4: printf("%0*x", access * 2, ((uint32_t*)buf)[i]); break;
-	    case 8: printf("%0*lx", access * 2, ((uint64_t*)buf)[i]); break;
-	}
+	printf("\n\n");
     }
-    printf("\n\n");
 
     
     free(buf);
@@ -681,7 +687,15 @@ int ReadRegister(pcilib_t *handle, pcilib_model_description_t *model_info, const
     }
 }
 
-int ReadRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, size_t n) {
+#define WRITE_REGVAL(buf, n, access, o) {\
+    uint##access##_t tbuf[n]; \
+    for (i = 0; i < n; i++) { \
+	tbuf[i] = (uint##access##_t)buf[i]; \
+    } \
+    fwrite(tbuf, access/8, n, o); \
+}
+
+int ReadRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, size_t n, FILE *o) {
     int err;
     int i;
 
@@ -711,19 +725,31 @@ int ReadRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, 
     if (err) Error("Error reading register space for bank \"%s\" at address %lx, size %lu", bank?bank:"default", addr, n);
 
 
-    for (i = 0; i < n; i++) {
-	if (i) {
-	    if (i%numbers_per_line == 0) printf("\n");
-	    else {
-		printf("%*s", SEPARATOR_WIDTH, "");
-		if (i%numbers_per_block == 0) printf("%*s", BLOCK_SEPARATOR_WIDTH, "");
-	    }
+    if (o) {
+	printf("Writting output (%zu bytes) to file (append to the end)...\n", n * abs(access));
+	switch (access) {
+	    case 1: WRITE_REGVAL(buf, n, 8, o) break;
+	    case 2: WRITE_REGVAL(buf, n, 16, o) break;
+	    case 4: WRITE_REGVAL(buf, n, 32, o) break;
+	    case 8: WRITE_REGVAL(buf, n, 64, o) break;
 	}
+    } else {
+	for (i = 0; i < n; i++) {
+	    if (i) {
+		if (i%numbers_per_line == 0) printf("\n");
+		else {
+		    printf("%*s", SEPARATOR_WIDTH, "");
+		    if (i%numbers_per_block == 0) printf("%*s", BLOCK_SEPARATOR_WIDTH, "");
+		}
+	    }
 	    
-	if (i%numbers_per_line == 0) printf("%4lx:  ", addr + i);
-	printf("%0*lx", access * 2, (unsigned long)buf[i]);
+	    if (i%numbers_per_line == 0) printf("%4lx:  ", addr + i);
+	    printf("%0*lx", access * 2, (unsigned long)buf[i]);
+	}
+	printf("\n\n");
     }
-    printf("\n\n");
+    
+    return 0;
 }
 
 int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, char ** data) {
@@ -772,7 +798,7 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
     if ((read_back)&&(memcmp(buf, check, size))) {
 	printf("Write failed: the data written and read differ, the foolowing is read back:\n");
         if (endianess) pcilib_swap(check, check, abs(access), n);
-	ReadData(handle, mode, dma, bar, addr, n, access, endianess);
+	ReadData(handle, mode, dma, bar, addr, n, access, endianess, NULL);
 	exit(-1);
     }
 
@@ -804,7 +830,7 @@ int WriteRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info,
 
     if (memcmp(buf, check, size)) {
 	printf("Write failed: the data written and read differ, the foolowing is read back:\n");
-	ReadRegisterRange(handle, model_info, bank, addr, n);
+	ReadRegisterRange(handle, model_info, bank, addr, n, NULL);
 	exit(-1);
     }
 
@@ -874,13 +900,11 @@ int WriteRegister(pcilib_t *handle, pcilib_model_description_t *model_info, cons
     return 0;
 }
 
-int Grab(pcilib_t *handle, const char *event, const char *output) {
+int Grab(pcilib_t *handle, const char *event, FILE *o) {
     int err;
     
     void *data = NULL;
     size_t size, written;
-    
-    FILE *o;
     
     // ignoring event for now
 	
@@ -889,14 +913,8 @@ int Grab(pcilib_t *handle, const char *event, const char *output) {
 	Error("Grabbing event is failed");
     }
 
-    if (output) {
-	o = fopen(output, "w");
-	if (!o) {
-	    Error("Failed to open file \"%s\"", output);
-	}
-	
-	printf("Writting %zu bytes into %s...\n", size, output);
-    } else o = stdout;
+    if (o) printf("Writting %zu bytes into file...\n", size);
+    else o = stdout;
     
     written = fwrite(data, 1, size, o);
     if (written != size) {
@@ -904,8 +922,6 @@ int Grab(pcilib_t *handle, const char *event, const char *output) {
 	else Error("Write failed");
     }
     
-    if (o != stdout) fclose(o);
-
     return 0;
 }
 
@@ -1181,6 +1197,7 @@ int main(int argc, char **argv) {
     int endianess = 0;
     size_t timeout = 0;
     const char *output = NULL;
+    FILE *ofile = NULL;
     size_t iterations = BENCHMARK_ITERATIONS;
 
     pcilib_t *handle;
@@ -1491,7 +1508,13 @@ int main(int argc, char **argv) {
 		    Usage(argc, argv, "Invalid data bank (%s) is specified", bank);
 	}
     }
-    
+
+    if (output) {
+	ofile = fopen(output, "a+");
+	if (!ofile) {
+	    Error("Failed to open file \"%s\"", output);
+	}
+    }    
 
     switch (mode) {
      case MODE_INFO:
@@ -1504,15 +1527,15 @@ int main(int argc, char **argv) {
         Benchmark(handle, amode, dma, bar, start, size_set?size:0, access, iterations);
      break;
      case MODE_READ:
-        if (addr) {
-	    ReadData(handle, amode, dma, bar, start, size, access, endianess);
+        if ((addr)||(amode == ACCESS_DMA)) {
+	    ReadData(handle, amode, dma, bar, start, size, access, endianess, ofile);
 	} else {
 	    Error("Address to read is not specified");
 	}
      break;
      case MODE_READ_REGISTER:
         if ((reg)||(!addr)) ReadRegister(handle, model_info, bank, reg);
-	else ReadRegisterRange(handle, model_info, bank, start, size);
+	else ReadRegisterRange(handle, model_info, bank, start, size, ofile);
      break;
      case MODE_WRITE:
 	WriteData(handle, amode, dma, bar, start, size, access, endianess, data);
@@ -1525,7 +1548,7 @@ int main(int argc, char **argv) {
         pcilib_reset(handle);
      break;
      case MODE_GRAB:
-        Grab(handle, event, output);
+        Grab(handle, event, ofile);
      break;
      case MODE_START_DMA:
         StartStopDMA(handle, model_info, dma, dma_direction, 1);
@@ -1543,6 +1566,8 @@ int main(int argc, char **argv) {
         FreeKMEM(handle, fpga_device, use, force);
      break;
     }
+
+    if (ofile) fclose(ofile);
 
     pcilib_close(handle);
     
