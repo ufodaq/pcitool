@@ -489,7 +489,11 @@ static void __devexit pcidriver_remove(struct pci_dev *pdev)
  */
 static struct file_operations pcidriver_fops = {
 	.owner = THIS_MODULE,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,11)
 	.ioctl = pcidriver_ioctl,
+#else
+	.unlocked_ioctl = pcidriver_ioctl,
+#endif 
 	.mmap = pcidriver_mmap,
 	.open = pcidriver_open,
 	.release = pcidriver_release,

@@ -52,7 +52,10 @@ static int _pcidriver_sysfs_initialize(pcidriver_privdata_t *privdata,
 		return -ENOMEM;
 
 	sysfs_attr->attr.mode = S_IRUGO;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+	    // DS: Shall we lock now while accessing driver data structures???
 	sysfs_attr->attr.owner = THIS_MODULE;
+#endif
 	sysfs_attr->show = callback;
 	sysfs_attr->store = NULL;
 			
