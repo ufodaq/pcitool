@@ -220,19 +220,21 @@ IRQ Handling
 
 Updating Firmware
 =================
- - JTag should be connected to left USB connector on the board
+ - JTag should be connected to USB connector on the board (next to Ethernet)
  - The computer should be tourned off and on before programming
+ - The environment variable should be loaded
+    . /home/uros/.bashrc
  - The application is called 'impact'
-    Cancel initial proposals
-    Left click on USB connection 
-    Select "Boundary Scan" and double click
-    Click "Initiate Chain" on right element (left click)
-        Say yes, Select bit file, Cancel
-    Click "Assign new CF file" on right element (left click
-	Select the bit file
-	Select xv6vlx240t
-	Program
- - Firmwares are in 
+    No project is needed, cancel initial proposals (No/Cancel)
+    Double-click on "Boundary Scan"
+    Right click in the right window and select "Init Chain"
+    We don't want to select bit file now (Yes and, then, click Cancel)
+    Right click on second (right) item and choose "Assign new CF file"
+    Select a bit file. Answer No, we don't want to attach SPI to SPI Prom
+    Select xv6vlx240t and program it
+ - Shutdown and start computer
+ 
+ Firmware are in
     v.2: /home/uros/Repo/UFO2_last_good_version_UFO2.bit
     v.3: /home/uros/Repo/UFO3 
 	Step5 - best working revision
