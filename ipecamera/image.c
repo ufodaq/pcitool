@@ -181,8 +181,12 @@ pcilib_dma_context_t *ipecamera_init_dma(pcilib_context_t *vctx) {
 	pcilib_error("The DMA engine is not configured in model");
 	return NULL;
     }
-    
+
+#ifdef IPECAMERA_DMA_R3
+    return model_info->dma_api->init(ctx->pcilib, PCILIB_NWL_MODIFICATION_IPECAMERA, NULL);
+#else
     return model_info->dma_api->init(ctx->pcilib, PCILIB_DMA_MODIFICATION_DEFAULT, NULL);
+#endif
 }
 
 

@@ -782,7 +782,9 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("Invalid DMA engine (%lu) is specified", dma);
 	err = pcilib_write_dma(handle, dmaid, addr, size, buf, &ret);
 	if ((err)||(ret != size)) {
-	    if (!ret) Error("No data is written by DMA engine");
+	    if (err == PCILIB_ERROR_TIMEOUT) Error("Timeout writting the data to DMA"); 
+	    else if (err) Error("DMA engine returned a error while writing the data");
+	    else if (!ret) Error("No data is written by DMA engine");
 	    else Error("Only %lu bytes of %lu is written by DMA engine", ret, size);
 	}
       break;

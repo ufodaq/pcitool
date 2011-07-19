@@ -6,6 +6,8 @@
 #include "pcilib.h"
 #include "image.h"
 
+//#define IPECAMERA_DMA_R3
+
 //#define IPECAMERA_REGISTER_SPACE 0xfeaffc00
 #define IPECAMERA_REGISTER_SPACE 0x9000
 #define IPECAMERA_REGISTER_WRITE (IPECAMERA_REGISTER_SPACE + 0)

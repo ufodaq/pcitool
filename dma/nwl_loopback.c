@@ -1,3 +1,4 @@
+#define _BSD_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,17 +23,19 @@ int dma_nwl_start_loopback(nwl_dma_t *ctx,  pcilib_dma_direction_t direction, si
     val = packet_size;
     nwl_write_register(val, ctx, ctx->base_addr, PKT_SIZE_ADDRESS);
 
-    switch (direction) {
-      case PCILIB_DMA_BIDIRECTIONAL:
-	val = LOOPBACK;
-	nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-	break;
-      case PCILIB_DMA_TO_DEVICE:
-	return -1;
-      case PCILIB_DMA_FROM_DEVICE:
-        val = PKTGENR;
-	nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
-	break;
+    if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) {
+	switch (direction) {
+          case PCILIB_DMA_BIDIRECTIONAL:
+	    val = LOOPBACK;
+	    nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
+	    break;
+          case PCILIB_DMA_TO_DEVICE:
+	    return -1;
+	  case PCILIB_DMA_FROM_DEVICE:
+    	    val = PKTGENR;
+	    nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
+	    break;
+	}
     }
 
     ctx->loopback_started = 1;
@@ -48,15 +51,19 @@ int dma_nwl_stop_loopback(nwl_dma_t *ctx) {
 	/* Stop in any case, otherwise we can have problems in benchmark due to
 	engine initialized in previous run, and benchmark is only actual usage.
 	Otherwise, we should detect current loopback status during initialization */
-    nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
-    nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
+
+    if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) {
+	nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
+	nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
+    }
+    
     ctx->loopback_started = 0;
     
     return 0;
 }
 
 double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction) {
-    int i;
+    int iter, i;
     int res;
     int err;
     size_t bytes;
@@ -100,10 +107,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
     dma_nwl_enable_engine_irq(ctx, writeid);
 #endif /* NWL_GENERATE_DMA_IRQ */
 
-
-    if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) {
-	dma_nwl_start_loopback(ctx, direction, size * sizeof(uint32_t));
-    }
+    dma_nwl_start_loopback(ctx, direction, size * sizeof(uint32_t));
 
 	// Allocate memory and prepare data
     buf = malloc(size * sizeof(uint32_t));
@@ -114,23 +118,23 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	return -1;
     }
 
-#ifdef DEBUG_HARDWARE	     
+//#ifdef DEBUG_HARDWARE	     
     if (ctx->type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
 	pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e5);
 	usleep(100000);
 	pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e1);
     }
-#endif /* DEBUG_HARDWARE */
+//#endif /* DEBUG_HARDWARE */
 
 	// Benchmark
-    for (i = 0; i < iterations; i++) {
-        memset(cmp, 0x13 + i, size * sizeof(uint32_t));
+    for (iter = 0; iter < iterations; iter++) {
+        memset(cmp, 0x13 + iter, size * sizeof(uint32_t));
 
-#ifdef DEBUG_HARDWARE	     
+//#ifdef DEBUG_HARDWARE	     
 	if (ctx->type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
 	    pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e1);
 	}
-#endif /* DEBUG_HARDWARE */
+//#endif /* DEBUG_HARDWARE */
 
         gettimeofday(&start, NULL);
 	if (direction&PCILIB_DMA_TO_DEVICE) {
@@ -143,14 +147,13 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	    }
 	}
 
-#ifdef DEBUG_HARDWARE	     
+//#ifdef DEBUG_HARDWARE	     
 	if (ctx->type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
-	    //usleep(1000000);
 	    pcilib_write_register(ctx->pcilib, NULL, "control", 0x3e1);
 	}
+//#endif /* DEBUG_HARDWARE */
 
 	memset(buf, 0, size * sizeof(uint32_t));
-#endif /* DEBUG_HARDWARE */
         
 	err = pcilib_read_dma(ctx->pcilib, readid, addr, size * sizeof(uint32_t), buf, &bytes);
         gettimeofday(&cur, NULL);
@@ -168,12 +171,12 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 		    if (buf[i] != cmp[i]) break;
 		
 		bytes = i;
-		printf("Expected: *%lx, Written:", 0x13 + i);
+		printf("Expected: *%lx, Written at position %lu:", 0x13 + iter, bytes);
 		for (; (i < size)&&(i < (bytes + 16)); i++) {
 		    if (((i - bytes)%8)==0) printf("\n");
 		    printf("% 10lx", buf[i]);
 		}
-		printf("\n\n");
+		printf("\n");
 		
 		error = "Written and read values does not match";
 		break;
@@ -216,7 +219,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 #endif /* DEBUG_HARDWARE */
 
     if (error) {
-	pcilib_warning("%s at iteration %i, error: %i, bytes: %zu", error, i, err, bytes);
+	pcilib_warning("%s at iteration %i, error: %i, bytes: %zu", error, iter, err, bytes);
     }
     
 #ifdef NWL_GENERATE_DMA_IRQ
@@ -224,7 +227,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
     dma_nwl_disable_engine_irq(ctx, readid);
 #endif /* NWL_GENERATE_DMA_IRQ */
 
-    if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) dma_nwl_stop_loopback(ctx);
+    dma_nwl_stop_loopback(ctx);
 
     __sync_synchronize();
     
