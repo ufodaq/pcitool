@@ -34,6 +34,7 @@
 //#define IPECAMERA_FRAME_REQUEST 0x149
 //#define IPECAMERA_IDLE 		0x141
 #define IPECAMERA_FRAME_REQUEST 0x1E9
+#define IPECAMERA_READOUT	0x3E1
 #define IPECAMERA_IDLE 		0x1E1
 
 #define IPECAMERA_WRITE_RAW
@@ -52,7 +53,9 @@ typedef uint32_t ipecamera_payload_t;
 struct ipecamera_s {
     pcilib_t *pcilib;
 
+#ifndef IPECAMERA_DMA_ADDRESS    
     char *data;
+#endif /* IPECAMERA_DMA_ADDRESS */
     size_t size;
 
     pcilib_event_callback_t cb;
@@ -60,7 +63,12 @@ struct ipecamera_s {
 
     pcilib_event_id_t event_id;
     pcilib_event_id_t reported_id;
+    
+#ifdef IPECAMERA_DMA_ADDRESS
+    pcilib_dma_engine_t rdma, wdma;
+#endif /* IPECAMERA_DMA_ADDRESS */
 
+    pcilib_register_t packet_len_reg;
     pcilib_register_t control_reg, status_reg;
     pcilib_register_t start_reg, end_reg;
     pcilib_register_t n_lines_reg;
@@ -90,16 +98,20 @@ struct ipecamera_s {
     
 
 #define GET_REG(reg, var) \
-    err = pcilib_read_register_by_id(pcilib, ctx->reg, &var); \
-    if (err) { \
-	pcilib_error("Error reading %s register", ipecamera_registers[ctx->reg].name); \
+    if (!err) { \
+	err = pcilib_read_register_by_id(pcilib, ctx->reg, &var); \
+	if (err) { \
+	    pcilib_error("Error reading %s register", ipecamera_registers[ctx->reg].name); \
+	} \
     }
 
 #define SET_REG(reg, val) \
-    err = pcilib_write_register_by_id(pcilib, ctx->reg, val); \
-    if (err) { \
-	pcilib_error("Error writting %s register", ipecamera_registers[ctx->reg].name); \
-    } \
+    if (!err) { \
+	err = pcilib_write_register_by_id(pcilib, ctx->reg, val); \
+	if (err) { \
+	    pcilib_error("Error writting %s register", ipecamera_registers[ctx->reg].name); \
+	} \
+    }
 
 #define CHECK_REG(reg, check) \
     if (!err) { \
@@ -138,13 +150,14 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 
 	ctx->buffer_size = IPECAMERA_DEFAULT_BUFFER_SIZE;
 	ctx->dim.bpp = sizeof(ipecamera_pixel_t) * 8;
-/*
+
+#ifndef IPECAMERA_DMA_ADDRESS
 	ctx->data = pcilib_resolve_data_space(pcilib, 0, &ctx->size);
 	if (!ctx->data) {
 	    err = -1;
 	    pcilib_error("Unable to resolve the data space");
 	}
-*/
+#endif /* IPECAMERA_DMA_ADDRESS */
 	
 	FIND_REG(status_reg, "fpga", "status");
 	FIND_REG(control_reg, "fpga", "control");
@@ -155,6 +168,12 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	FIND_REG(line_reg, "cmosis", "start1");
 	FIND_REG(exposure_reg, "cmosis", "exp_time");
 	FIND_REG(flip_reg, "cmosis", "image_flipping");
+	
+	FIND_REG(packet_len_reg, "dma", "xrawdata_packet_length");
+
+	ctx->rdma = PCILIB_DMA_ENGINE_INVALID;
+	ctx->wdma = PCILIB_DMA_ENGINE_INVALID;
+
 
 	if (err) {
 	    free(ctx);
@@ -259,9 +278,6 @@ int ipecamera_reset(pcilib_context_t *vctx) {
     SET_REG(control_reg, IPECAMERA_IDLE);
     if (err) return err;
     
-	// This is temporary for verification purposes
-    if (ctx->data) memset(ctx->data, 0, ctx->size);
-
     usleep(10000);
     
     err = pcilib_read_register_by_id(pcilib, status, &value);
@@ -299,6 +315,12 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     usleep(IPECAMERA_SLEEP_TIME);
     CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
     if (err) return err;
+
+
+#ifdef IPECAMERA_DMA_ADDRESS
+    SET_REG(packet_len_reg, IPECAMERA_DMA_PACKET_LENGTH);
+    if (err) return err;
+#endif /* IPECAMERA_DMA_ADDRESS */
     
     ctx->cb = cb;
     ctx->cb_user = user;
@@ -321,6 +343,38 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
 	err = PCILIB_ERROR_MEMORY;
 	pcilib_error("Unable to allocate change-mask buffer");
     }
+
+#ifdef IPECAMERA_DMA_ADDRESS
+    if (!err) {
+	ctx->rdma = pcilib_find_dma_by_addr(ctx->pcilib, PCILIB_DMA_FROM_DEVICE, IPECAMERA_DMA_ADDRESS);
+	if (ctx->rdma == PCILIB_DMA_ENGINE_INVALID) {
+	    err = PCILIB_ERROR_NOTFOUND;
+	    pcilib_error("The C2S channel of IPECamera DMA Engine (%u) is not found", IPECAMERA_DMA_ADDRESS);
+	} else {
+	    err = pcilib_start_dma(ctx->pcilib, ctx->rdma, PCILIB_DMA_FLAGS_DEFAULT);
+	    if (err) {
+		ctx->rdma = PCILIB_DMA_ENGINE_INVALID;
+		pcilib_error("Failed to initialize C2S channel of IPECamera DMA Engine (%u)", IPECAMERA_DMA_ADDRESS);
+	    }
+	}
+    }
+    
+/*    
+    if (!err) {
+	ctx->wdma = pcilib_find_dma_by_addr(ctx->pcilib, PCILIB_DMA_TO_DEVICE, IPECAMERA_DMA_ADDRESS);
+	if (ctx->wdma == PCILIB_DMA_ENGINE_INVALID) {
+	    err = PCILIB_ERROR_NOTFOUND;
+	    pcilib_error("The S2C channel of IPECamera DMA Engine (%u) is not found", IPECAMERA_DMA_ADDRESS);
+	} else {
+	    err = pcilib_start_dma(ctx->pcilib, ctx->wdma, PCILIB_DMA_FLAGS_DEFAULT);
+	    if (err) {
+		ctx->wdma = PCILIB_DMA_ENGINE_INVALID;
+		pcilib_error("Failed to initialize S2C channel of IPECamera DMA Engine (%u)", IPECAMERA_DMA_ADDRESS);
+	    }
+	}
+    }
+*/    
+#endif /* IPECAMERA_DMA_ADDRESS */
     
     if (err) {
 	ipecamera_stop(vctx);
@@ -342,6 +396,18 @@ int ipecamera_stop(pcilib_context_t *vctx) {
     }
 
     ctx->started = 0;   
+
+#ifdef IPECAMERA_DMA_ADDRESS
+    if (ctx->wdma != PCILIB_DMA_ENGINE_INVALID) {
+	pcilib_stop_dma(ctx->pcilib, ctx->wdma, PCILIB_DMA_FLAGS_DEFAULT);
+	ctx->wdma = PCILIB_DMA_ENGINE_INVALID;
+    }
+
+    if (ctx->rdma != PCILIB_DMA_ENGINE_INVALID) {
+	pcilib_stop_dma(ctx->pcilib, ctx->rdma, PCILIB_DMA_FLAGS_DEFAULT);
+	ctx->rdma = PCILIB_DMA_ENGINE_INVALID;
+    }
+#endif /* IPECAMERA_DMA_ADDRESS */
 
     if (ctx->buffer) {
 	free(ctx->buffer);
@@ -385,7 +451,6 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
 #ifdef IPECAMERA_REORDER_CHANNELS
     channel = ipecamera_channel_order[channel];
 #endif 
-
 
     //printf("channel[%x] = %x (line: %i, pixels: %i)\n", info, channel, line_req, pixels);
     CHECK_FLAG("payload header magick", header == 2, header);
@@ -450,21 +515,23 @@ static int ipecamera_parse_image(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
     int line = first_line;
     pcilib_register_value_t pos, advance;
 
-    if (size < 8) {
-	pcilib_error("The payload is tool small, we should have at least 6 header dwords and 2 footer.");
+    if (size < 16) {
+	pcilib_error("The payload is tool small, we should have at least 8 header dwords and 8 footer.");
 	return PCILIB_ERROR_INVALID_DATA;
     }
-
+    
     CHECK_VALUE(linebuf[0], 0x51111111);
     CHECK_VALUE(linebuf[1], 0x52222222);
     CHECK_VALUE(linebuf[2], 0x53333333);
     CHECK_VALUE(linebuf[3], 0x54444444);
     CHECK_VALUE(linebuf[4], 0x55555555);
     CHECK_VALUE(linebuf[5], 0x56666666);
+    CHECK_VALUE(linebuf[6], 0x57777777);
+    CHECK_VALUE(linebuf[7], 0x58888888);
     if (err) return err;
 
-    pos = 6;
-    size -= 8;
+    pos = 8;
+    size -= 16;
 
     while (size > 0) {
 	err = ipecamera_get_payload(ctx, pbuf + line * ctx->dim.width, cbuf + line, line - first_line, size, linebuf + pos, &advance);
@@ -480,6 +547,12 @@ static int ipecamera_parse_image(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
 
     CHECK_VALUE(linebuf[pos  ], 0x0AAAAAAA);
     CHECK_VALUE(linebuf[pos+1], 0x0BBBBBBB);
+    CHECK_VALUE(linebuf[pos+2], 0x0CCCCCCC);
+    CHECK_VALUE(linebuf[pos+3], 0x0DDDDDDD);
+    CHECK_VALUE(linebuf[pos+4], 0x0EEEEEEE);
+    CHECK_VALUE(linebuf[pos+5], 0x0FFFFFFF);
+    CHECK_VALUE(linebuf[pos+6], 0x00000000);
+    CHECK_VALUE(linebuf[pos+7], 0x01111111);
 
     return err;
 }
@@ -488,19 +561,28 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
     int err;
     int i;
     int buf_ptr;
+    size_t bytes_read;
     pcilib_t *pcilib = ctx->pcilib;
 
     int num_lines;
-    const int max_lines = 89;
-    const int max_size = 8 + max_lines * (IPECAMERA_MAX_CHANNELS * (2 + IPECAMERA_PIXELS_PER_CHANNEL / 3));
+    const int max_lines = 1; //IPECAMERA_MAX_LINES;
+    const size_t line_size = (IPECAMERA_MAX_CHANNELS * (2 + IPECAMERA_PIXELS_PER_CHANNEL / 3));
+    const size_t hf_size = 16;
+    const size_t max_size = hf_size + max_lines * line_size;
+    size_t max_packet_size;
 
     pcilib_register_value_t ptr, size, pos, advance, value;
 
-    ipecamera_payload_t *linebuf = (ipecamera_payload_t*)malloc(max_size * sizeof(ipecamera_payload_t));
+    ipecamera_payload_t *linebuf;
+    
+    if (max_size%IPECAMERA_DMA_PACKET_LENGTH) max_packet_size = max_size + IPECAMERA_DMA_PACKET_LENGTH - (max_size%IPECAMERA_DMA_PACKET_LENGTH);
+    else max_packet_size = max_size;
+    
+    max_packet_size += 4096;	// Some extra data?
+    
+    linebuf = (ipecamera_payload_t*)malloc(max_packet_size * sizeof(ipecamera_payload_t));
     if (!linebuf) return PCILIB_ERROR_MEMORY;
 
-    if (!ctx->data) return PCILIB_ERROR_NOTSUPPORTED;
-    
 #ifdef IPECAMERA_WRITE_RAW
     FILE *f = fopen("raw/image.raw", "w");
     if (f) fclose(f);
@@ -526,7 +608,9 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
 	SET_REG(control_reg, IPECAMERA_FRAME_REQUEST);
 	usleep(IPECAMERA_SLEEP_TIME);
 	CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
+	SET_REG(control_reg, IPECAMERA_IDLE);
 
+#ifndef IPECAMERA_DMA_ADDRESS	
 	GET_REG(start_reg, ptr);
 	GET_REG(end_reg, size);
 
@@ -534,13 +618,41 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
 	size *= 2;
 	
 	CHECK_FLAG("data size", (size > 0)&&(size <= max_size), size);
+#endif /* IPECAMERA_DMA_ADDRESS */
 
-	if (!err) {
-	    pcilib_warning("Reading lines %i to %i: %i %i", i, i + num_lines - 1, ptr, size);  
-	    pcilib_datacpy(linebuf, ctx->data + ptr, sizeof(ipecamera_payload_t), size, pcilib_model[PCILIB_MODEL_IPECAMERA].endianess);
+	
+	if (err) break;
+	
+	SET_REG(control_reg, IPECAMERA_READOUT);
+		
+#ifdef IPECAMERA_DMA_ADDRESS
+	size = 0;
+	do {
+	    err = pcilib_read_dma(ctx->pcilib, ctx->rdma, 0, max_packet_size - size, linebuf + size, &bytes_read);
+	    size += bytes_read;
+	} while ((err == 0)&&(size < max_packet_size));
+	
+	if (err) {
+	    if (err == PCILIB_ERROR_TIMEOUT) {
+		if (size > 0) err = 0;
+		else pcilib_error("There is no data received from IPE Camera");
+	    } else pcilib_error("DMA read from IPE Camera have failed");
 	}
 
-	usleep(IPECAMERA_SLEEP_TIME);
+        pcilib_warning("Reading lines %i to %i: got %i bytes from DMA", i, i + num_lines - 1, size);  
+	
+	if (size < (hf_size + max_lines * line_size)) {
+	    pcilib_error("We are expecting at least %zu bytes, but only %lu are read", hf_size + num_lines * line_size, size);
+	    err = PCILIB_ERROR_INVALID_DATA;
+	}
+
+	size = hf_size + max_lines * line_size;
+	
+#else /* IPECAMERA_DMA_ADDRESS */
+        pcilib_warning("Reading lines %i to %i: %i %i", i, i + num_lines - 1, ptr, size);  
+	pcilib_datacpy(linebuf, ctx->data + ptr, sizeof(ipecamera_payload_t), size, pcilib_model[PCILIB_MODEL_IPECAMERA].endianess);
+#endif /* IPECAMERA_DMA_ADDRESS */
+
 	SET_REG(control_reg, IPECAMERA_IDLE);
 	usleep(IPECAMERA_SLEEP_TIME);
 	CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
