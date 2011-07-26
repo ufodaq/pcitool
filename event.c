@@ -245,5 +245,5 @@ int pcilib_grab(pcilib_t *ctx, pcilib_event_t event_mask, size_t *size, void **d
         } else err = pcilib_trigger(ctx, event_mask, 0, NULL);
     }
     pcilib_stop(ctx);
-    return 0;
+    return err;
 }
