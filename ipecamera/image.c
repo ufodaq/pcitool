@@ -18,6 +18,11 @@
 
 #include "dma/nwl_dma.h"
 
+#ifdef IPECAMERA_DEBUG
+#include "dma/nwl.h"
+#endif /* IPECAMERA_DEBUG */
+
+
 #define IPECAMERA_SLEEP_TIME 250000
 #define IPECAMERA_MAX_LINES 1088
 #define IPECAMERA_DEFAULT_BUFFER_SIZE 10
@@ -451,6 +456,7 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
 #ifdef IPECAMERA_REORDER_CHANNELS
     channel = ipecamera_channel_order[channel];
 #endif 
+//    printf("payload, channel: %i, magick: %i, all: %lx\n", channel, header, info);
 
     //printf("channel[%x] = %x (line: %i, pixels: %i)\n", info, channel, line_req, pixels);
     CHECK_FLAG("payload header magick", header == 2, header);
@@ -565,20 +571,22 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
     pcilib_t *pcilib = ctx->pcilib;
 
     int num_lines;
-    const int max_lines = 1; //IPECAMERA_MAX_LINES;
+    const int max_lines = 1;//1088;//IPECAMERA_MAX_LINES;
     const size_t line_size = (IPECAMERA_MAX_CHANNELS * (2 + IPECAMERA_PIXELS_PER_CHANNEL / 3));
     const size_t hf_size = 16;
     const size_t max_size = hf_size + max_lines * line_size;
+    const size_t dma_packet_len = IPECAMERA_DMA_PACKET_LENGTH / sizeof(ipecamera_payload_t);
     size_t max_packet_size;
 
     pcilib_register_value_t ptr, size, pos, advance, value;
 
     ipecamera_payload_t *linebuf;
     
-    if (max_size%IPECAMERA_DMA_PACKET_LENGTH) max_packet_size = max_size + IPECAMERA_DMA_PACKET_LENGTH - (max_size%IPECAMERA_DMA_PACKET_LENGTH);
+    if (max_size%dma_packet_len) max_packet_size = max_size + dma_packet_len - (max_size%dma_packet_len);
     else max_packet_size = max_size;
-    
+
     max_packet_size += 4096;	// Some extra data?
+    
     
     linebuf = (ipecamera_payload_t*)malloc(max_packet_size * sizeof(ipecamera_payload_t));
     if (!linebuf) return PCILIB_ERROR_MEMORY;
@@ -628,26 +636,46 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
 #ifdef IPECAMERA_DMA_ADDRESS
 	size = 0;
 	do {
-	    err = pcilib_read_dma(ctx->pcilib, ctx->rdma, 0, max_packet_size - size, linebuf + size, &bytes_read);
+	    err = pcilib_read_dma(ctx->pcilib, ctx->rdma, 0, max_packet_size * sizeof(ipecamera_payload_t) - size, ((uint8_t*)linebuf) + size, &bytes_read);
 	    size += bytes_read;
-	} while ((err == 0)&&(size < max_packet_size));
-	
+//	    printf("%lu %lu\n", bytes_read, size);
+	} while ((err == 0)&&(size < max_packet_size * sizeof(ipecamera_payload_t)));
+
+#ifdef DEBUG_HARDWARE
+	uint32_t regval;
+	printf("===========Lines: %i - %i =========================\n", i, i + num_lines - 1);
+	err = pcilib_read_register(ctx->pcilib, NULL, "reg9050", &regval);
+	printf("Status1: %i 0x%lx\n", err, regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "reg9080", &regval);
+	printf("Start address: %i 0x%lx\n", err,  regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "reg9090", &regval);
+	printf("End address: %i 0x%lx\n", err,  regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "reg9100", &regval);
+	printf("Status2: %i 0x%lx\n", err,  regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "reg9110", &regval);
+	printf("Status3: %i 0x%lx\n", err,  regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "reg9160", &regval);
+	printf("Add_rd_ddr: %i 0x%lx\n", err, regval);
+#endif /* DEBUG_HARDWARE */
+
 	if (err) {
 	    if (err == PCILIB_ERROR_TIMEOUT) {
 		if (size > 0) err = 0;
-		else pcilib_error("There is no data received from IPE Camera");
+		else {
+//		    pcilib_error("There is no data received from IPE Camera");
+		    pcilib_warning("There is no data received from IPE Camera for lines: %i to %i", i, i + num_lines - 1);
+		    err = 0;
+		    SET_REG(control_reg, IPECAMERA_IDLE);
+		    continue;
+		}
 	    } else pcilib_error("DMA read from IPE Camera have failed");
+	} else if (!size) {
+		pcilib_warning("There is no data received from IPE Camera for lines: %i to %i", i, i + num_lines - 1);
+		SET_REG(control_reg, IPECAMERA_IDLE);
+		continue;
 	}
 
         pcilib_warning("Reading lines %i to %i: got %i bytes from DMA", i, i + num_lines - 1, size);  
-	
-	if (size < (hf_size + max_lines * line_size)) {
-	    pcilib_error("We are expecting at least %zu bytes, but only %lu are read", hf_size + num_lines * line_size, size);
-	    err = PCILIB_ERROR_INVALID_DATA;
-	}
-
-	size = hf_size + max_lines * line_size;
-	
 #else /* IPECAMERA_DMA_ADDRESS */
         pcilib_warning("Reading lines %i to %i: %i %i", i, i + num_lines - 1, ptr, size);  
 	pcilib_datacpy(linebuf, ctx->data + ptr, sizeof(ipecamera_payload_t), size, pcilib_model[PCILIB_MODEL_IPECAMERA].endianess);
@@ -664,10 +692,24 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
 	sprintf(fname, "raw/line%04i", i);
 	FILE *f = fopen(fname, "w");
 	if (f) {
+#ifdef IPECAMERA_DMA_ADDRESS
+	    (void)fwrite(linebuf, sizeof(ipecamera_payload_t), size / sizeof(ipecamera_payload_t), f);
+#else /* IPECAMERA_DMA_ADDRESS */
 	    (void)fwrite(linebuf, sizeof(ipecamera_payload_t), size, f);
+#endif /* IPECAMERA_DMA_ADDRESS */
 	    fclose(f);
 	}
 #endif
+
+#ifdef IPECAMERA_DMA_ADDRESS
+	if (size < (hf_size + max_lines * line_size) * sizeof(ipecamera_payload_t)) {
+	    pcilib_error("We are expecting at least %zu bytes, but only %lu are read", (hf_size + num_lines * line_size)*sizeof(ipecamera_payload_t), size);
+	    err = PCILIB_ERROR_INVALID_DATA;
+	}
+
+	bytes_read = size;
+	size = hf_size + max_lines * line_size;
+#endif /* IPECAMERA_DMA_ADDRESS */
 
 
         err = ipecamera_parse_image(ctx, ctx->buffer + buf_ptr * ctx->dim.width * ctx->dim.height,  ctx->cmask + buf_ptr * ctx->dim.height, i, num_lines, size, linebuf);

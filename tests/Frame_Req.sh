@@ -17,7 +17,7 @@ pci -w 0xd2009000 d207
 pci -r 0xd2009000 -s 10
 usleep 1000
 echo " Number of rows set here "
-pci -w 0xd2009000 8110
+pci -w 0xd2009000 8102
 pci -r 0xd2009000 -s 10
 
 usleep 1000

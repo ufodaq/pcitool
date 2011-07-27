@@ -6,6 +6,8 @@
 #include "pcilib.h"
 #include "image.h"
 
+#define IPECAMERA_DEBUG
+
 #define IPECAMERA_DMA_R3
 #define IPECAMERA_DMA_ADDRESS 1
 #define IPECAMERA_DMA_PACKET_LENGTH 4096 
