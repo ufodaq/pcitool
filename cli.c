@@ -582,6 +582,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, p
 	err = pcilib_read_dma(handle, dmaid, addr, size, buf, &ret);
 	if ((err)||(ret <= 0)) Error("No data is returned by DMA engine");
 	size = ret;
+	n = ret / abs(access);
 	addr = 0;
       break;
       case ACCESS_FIFO:
