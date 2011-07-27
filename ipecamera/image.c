@@ -662,17 +662,26 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
 	    if (err == PCILIB_ERROR_TIMEOUT) {
 		if (size > 0) err = 0;
 		else {
-//		    pcilib_error("There is no data received from IPE Camera");
+#ifdef IPECAMERA_DEBUG
 		    pcilib_warning("There is no data received from IPE Camera for lines: %i to %i", i, i + num_lines - 1);
 		    err = 0;
 		    SET_REG(control_reg, IPECAMERA_IDLE);
 		    continue;
+#else /* IPECAMERA_DEBUG */
+    		    pcilib_error("There is no data received from IPE Camera");
+    		    return err;
+#endif /* IPECAMERA_DEBUG */
 		}
 	    } else pcilib_error("DMA read from IPE Camera have failed");
 	} else if (!size) {
+#ifdef IPECAMERA_DEBUG
 		pcilib_warning("There is no data received from IPE Camera for lines: %i to %i", i, i + num_lines - 1);
 		SET_REG(control_reg, IPECAMERA_IDLE);
 		continue;
+#else /* IPECAMERA_DEBUG */
+		pcilib_warning("There is no data received from IPE Camera for lines: %i to %i", i, i + num_lines - 1);
+    		return err;
+#endif /* IPECAMERA_DEBUG */
 	}
 
         pcilib_warning("Reading lines %i to %i: got %i bytes from DMA", i, i + num_lines - 1, size);  
