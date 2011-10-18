@@ -259,11 +259,12 @@ init_alloc_fail:
  */
 static void pcidriver_exit(void)
 {
+	pci_unregister_driver(&pcidriver_driver);
+	unregister_chrdev_region(pcidriver_devt, MAXDEVICES);
+
 	if (pcidriver_class != NULL)
 		class_destroy(pcidriver_class);
 
-	pci_unregister_driver(&pcidriver_driver);
-	unregister_chrdev_region(pcidriver_devt, MAXDEVICES);
 	mod_info("Module unloaded\n");
 }
 
