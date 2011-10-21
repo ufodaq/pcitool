@@ -7,9 +7,25 @@
 typedef uint32_t pcilib_dma_modification_t;
 
 
+typedef struct {
+    int started;
+    size_t ring_size, buffer_size;
+    size_t ring_head, ring_tail;
+} pcilib_dma_engine_status_t;
+
+typedef struct {
+    int used;
+    int error;
+    int first;
+    int last;
+    size_t size;
+} pcilib_dma_buffer_status_t;
+
 struct pcilib_dma_api_description_s {
     pcilib_dma_context_t *(*init)(pcilib_t *ctx, pcilib_dma_modification_t type, void *arg);
     void (*free)(pcilib_dma_context_t *ctx);
+    
+    int (*status)(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers);
 
     int (*enable_irq)(pcilib_dma_context_t *ctx, pcilib_irq_type_t irq_type, pcilib_dma_flags_t flags);
     int (*disable_irq)(pcilib_dma_context_t *ctx, pcilib_dma_flags_t flags);
@@ -25,5 +41,6 @@ struct pcilib_dma_api_description_s {
 };
 
 int pcilib_set_dma_engine_description(pcilib_t *ctx, pcilib_dma_engine_t engine, pcilib_dma_engine_description_t *desc);
+int pcilib_get_dma_status(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers);
 
 #endif /* _PCILIB_DMA_H */

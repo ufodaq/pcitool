@@ -58,6 +58,9 @@ typedef enum {
     MODE_GRAB,
     MODE_START_DMA,
     MODE_STOP_DMA,
+    MODE_LIST_DMA,
+    MODE_LIST_DMA_BUFFERS,
+    MODE_READ_DMA_BUFFER,
     MODE_WAIT_IRQ,
     MODE_LIST_KMEM,
     MODE_READ_KMEM,
@@ -85,8 +88,12 @@ typedef enum {
     OPT_WRITE = 'w',
     OPT_GRAB = 'g',
     OPT_QUIETE = 'q',
+    OPT_HELP = 'h',
     OPT_RESET = 128,
     OPT_BENCHMARK,
+    OPT_LIST_DMA,
+    OPT_LIST_DMA_BUFFERS,
+    OPT_READ_DMA_BUFFER,
     OPT_START_DMA,
     OPT_STOP_DMA,
     OPT_WAIT_IRQ,
@@ -94,8 +101,7 @@ typedef enum {
     OPT_LIST_KMEM,
     OPT_FREE_KMEM,
     OPT_READ_KMEM,
-    OPT_FORCE,
-    OPT_HELP = 'h',
+    OPT_FORCE
 } OPTIONS;
 
 static struct option long_options[] = {
@@ -117,6 +123,9 @@ static struct option long_options[] = {
     {"grab",			optional_argument, 0, OPT_GRAB },
     {"start-dma",		required_argument, 0, OPT_START_DMA },
     {"stop-dma",		optional_argument, 0, OPT_STOP_DMA },
+    {"list-dma-engines",	no_argument, 0, OPT_LIST_DMA },
+    {"list-dma-buffers",	required_argument, 0, OPT_LIST_DMA_BUFFERS },
+    {"read-dma-buffer",		required_argument, 0, OPT_READ_DMA_BUFFER },
     {"wait-irq",		optional_argument, 0, OPT_WAIT_IRQ },
     {"list-kernel-memory",	no_argument, 0, OPT_LIST_KMEM },
     {"read-kernel-memory",	required_argument, 0, OPT_READ_KMEM },
@@ -157,7 +166,10 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "\n"
 "  DMA Modes:\n"
 "   --start-dma <num>[r|w]	- Start specified DMA engine\n"
-"   --stop-dma [num][r|w]	- Stop specified engine or DMA subsystem\n"
+"   --stop-dma [num[r|w]]	- Stop specified engine or DMA subsystem\n"
+"   --list-dma-engines		- List active DMA engines\n"
+"   --list-dma-buffers <dma>	- List buffers for specified DMA engine\n"
+"   --read-dma-buffer <dma:buf>	- Read the specified buffer\n"
 "   --wait-irq <source>		- Wait for IRQ\n"
 "\n"
 "  Kernel Modes:\n"
@@ -1073,7 +1085,7 @@ int ListKMEM(pcilib_t *handle, const char *device) {
 	    if (!strncmp(info, "hw ref:", 7)) hwref = strtoul(info+7, NULL, 10);
 	}
 	fclose(f);
-	
+
 	useid = FindUse(&n_uses, uses, use);
 	uses[useid].count++;
 	uses[useid].size += size;
@@ -1126,7 +1138,7 @@ int ListKMEM(pcilib_t *handle, const char *device) {
     return 0;
 }
 
-int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t block, FILE *o) {
+int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t block, size_t max_size, FILE *o) {
     void *data;
     size_t size;
     pcilib_kmem_handle_t *kbuf;
@@ -1140,6 +1152,7 @@ int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t
     data = pcilib_kmem_get_block_ua(handle, kbuf, block);
     if (data) {
 	size = pcilib_kmem_get_block_size(handle, kbuf, block);
+	if ((max_size)&&(size > max_size)) size = max_size;
 	fwrite(data, 1, size, o?o:stdout);
     } else {
 	printf("The specified block is not existing\n");
@@ -1179,6 +1192,193 @@ int FreeKMEM(pcilib_t *handle, const char *device, const char *use, int force) {
     
     return 0;
 }
+
+int ListDMA(pcilib_t *handle, const char *device, pcilib_model_description_t *model_info) {
+    int err;
+    
+    DIR *dir;
+    struct dirent *entry;
+    const char *pos;
+    char sysdir[256];
+    char fname[256];
+    char info[256];
+    char stmp[256];
+
+    pcilib_dma_engine_t dmaid;
+    pcilib_dma_engine_status_t status;
+    
+    pos = strrchr(device, '/');
+    if (pos) ++pos;
+    else pos = device;
+    
+    snprintf(sysdir, 255, "/sys/class/fpga/%s", pos);
+
+    dir = opendir(sysdir);
+    if (!dir) Error("Can't open directory (%s)", sysdir);
+    
+    printf("DMA Engine     Status      Total Size         Buffer Ring\n");
+    printf("--------------------------------------------------------------------------------\n");
+    while ((entry = readdir(dir)) != NULL) {
+	FILE *f;
+	unsigned long use;
+	unsigned long size;
+	unsigned long refs;
+	unsigned long mode;
+	unsigned long hwref;
+	
+	if (strncmp(entry->d_name, "kbuf", 4)) continue;
+	if (!isnumber(entry->d_name+4)) continue;
+	
+	snprintf(fname, 255, "%s/%s", sysdir, entry->d_name);
+	f = fopen(fname, "r");
+	if (!f) Error("Can't access file (%s)", fname);
+
+	while(!feof(f)) {
+	    fgets(info, 256, f);
+	    if (!strncmp(info, "use:", 4)) use = strtoul(info+4, NULL, 16);
+	    if (!strncmp(info, "size:", 5)) size = strtoul(info+5, NULL, 10);
+	    if (!strncmp(info, "refs:", 5)) refs = strtoul(info+5, NULL, 10);
+	    if (!strncmp(info, "mode:", 5)) mode = strtoul(info+5, NULL, 16);
+	    if (!strncmp(info, "hw ref:", 7)) hwref = strtoul(info+7, NULL, 10);
+	}
+	fclose(f);
+	
+	if ((mode&(KMEM_MODE_REUSABLE|KMEM_MODE_PERSISTENT|KMEM_MODE_COUNT)) == 0) continue;	// closed
+	if ((use >> 16) != PCILIB_KMEM_USE_DMA_RING) continue;
+
+	if (use&0x80) {
+	    dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_TO_DEVICE, use&0x7F);
+	} else {
+	    dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_FROM_DEVICE, use&0x7F);
+	}
+	
+	if (dmaid == PCILIB_DMA_ENGINE_INVALID) continue;
+	
+	
+	printf("DMA%u %s         ", use&0x7F, (use&0x80)?"S2C":"C2S");
+        err = pcilib_start_dma(handle, dmaid, 0);
+        if (err) {
+    	    printf("-- Wrong state, start is failed\n");
+	    continue;
+	}
+	
+	err = pcilib_get_dma_status(handle, dmaid, &status, 0, NULL);
+	if (err) {
+	    printf("-- Wrong state, failed to obtain status\n");
+	    pcilib_stop_dma(handle, dmaid, 0);
+	    continue;
+	}
+
+	pcilib_stop_dma(handle, dmaid, 0);
+	
+	if (status.started) printf("S");
+	else printf(" ");
+	
+	if (status.ring_head == status.ring_tail) printf(" ");
+	else printf("D");
+
+	printf("        ");
+	printf("% 10s", PrintSize(stmp, status.ring_size * status.buffer_size));
+	
+	printf("         ");
+	printf("%zu - %zu (of %zu)", status.ring_tail, status.ring_head, status.ring_size);
+
+	printf("\n");
+	
+    }
+    closedir(dir);
+
+    printf("--------------------------------------------------------------------------------\n");
+    printf("S - Started, D - Data in buffers\n");
+
+    return 0;
+}
+
+int ListBuffers(pcilib_t *handle, const char *device, pcilib_model_description_t *model_info, pcilib_dma_engine_addr_t dma, pcilib_dma_direction_t dma_direction) {
+    int err;
+    size_t i;
+    pcilib_dma_engine_t dmaid;
+    pcilib_dma_engine_status_t status;
+    pcilib_dma_buffer_status_t *buffer;
+    char stmp[256];
+
+    dmaid = pcilib_find_dma_by_addr(handle, dma_direction, dma);
+    if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("The specified DMA engine is not found");
+    
+    err = pcilib_start_dma(handle, dmaid, 0);
+    if (err) Error("Error starting the specified DMA engine");
+    
+    err = pcilib_get_dma_status(handle, dmaid, &status, 0, NULL);
+    if (err) Error("Failed to obtain status of the specified DMA engine");
+    
+    buffer = (pcilib_dma_buffer_status_t*)malloc(status.ring_size*sizeof(pcilib_dma_buffer_status_t));
+    if (!buffer) Error("Failed to allocate memory for status buffer");
+    
+    err = pcilib_get_dma_status(handle, dmaid, &status, status.ring_size, buffer);
+    if (err) Error("Failed to obtain extended status of the specified DMA engine");
+    
+    
+    printf("Buffer      Status      Total Size         \n");
+    printf("--------------------------------------------------------------------------------\n");
+    
+    for (i = 0; i < status.ring_size; i++) {
+	printf("%8zu    ", i);
+        printf("%c%c %c%c ", buffer[i].used?'U':' ',  buffer[i].error?'E':' ', buffer[i].first?'F':' ', buffer[i].last?'L':' ');
+	printf("% 10s", PrintSize(stmp, buffer[i].size));
+	printf("\n");
+    }
+    
+    printf("--------------------------------------------------------------------------------\n");
+    printf("U - Used, E - Error, F - First block, L - Last Block\n");
+    
+    free(buffer);
+
+    pcilib_stop_dma(handle, dmaid, 0);
+
+}
+
+int ReadBuffer(pcilib_t *handle, const char *device, pcilib_model_description_t *model_info, pcilib_dma_engine_addr_t dma, pcilib_dma_direction_t dma_direction, size_t block, FILE *o) {
+    int err;
+    size_t i;
+    pcilib_dma_engine_t dmaid;
+    pcilib_dma_engine_status_t status;
+    pcilib_dma_buffer_status_t *buffer;
+    size_t size;
+    char stmp[256];
+
+    dmaid = pcilib_find_dma_by_addr(handle, dma_direction, dma);
+    if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("The specified DMA engine is not found");
+
+    err = pcilib_start_dma(handle, dmaid, 0);
+    if (err) Error("Error starting the specified DMA engine");
+    
+    err = pcilib_get_dma_status(handle, dmaid, &status, 0, NULL);
+    if (err) Error("Failed to obtain status of the specified DMA engine");
+    
+    buffer = (pcilib_dma_buffer_status_t*)malloc(status.ring_size*sizeof(pcilib_dma_buffer_status_t));
+    if (!buffer) Error("Failed to allocate memory for status buffer");
+
+    err = pcilib_get_dma_status(handle, dmaid, &status, status.ring_size, buffer);
+    if (err) Error("Failed to obtain extended status of the specified DMA engine");
+
+    if (block == (size_t)-1) {
+	// get current 
+    }
+
+    size = buffer[block].size;
+
+    free(buffer);
+
+    pcilib_stop_dma(handle, dmaid, 0);
+
+
+
+//    printf("%i %i\n", dma, buffer);
+//    printf("%lx\n", ((dma&0x7F)|((dma_direction == PCILIB_DMA_TO_DEVICE)?0x80:0x00))|(PCILIB_KMEM_USE_DMA_PAGES<<16));
+    return ReadKMEM(handle, device, ((dma&0x7F)|((dma_direction == PCILIB_DMA_TO_DEVICE)?0x80:0x00))|(PCILIB_KMEM_USE_DMA_PAGES<<16), block, size, o);
+}
+
+
 
 int WaitIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_hw_source_t irq_source, pcilib_timeout_t timeout) {
     int err;
@@ -1294,6 +1494,33 @@ int main(int argc, char **argv) {
 		mode = MODE_GRAB;
 		if (optarg) event = optarg;
 		else if ((optind < argc)&&(argv[optind][0] != '-')) event = argv[optind++];
+	    break;
+	    case OPT_LIST_DMA:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		
+		mode = MODE_LIST_DMA;
+	    break;
+	    case OPT_LIST_DMA_BUFFERS:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		
+		mode = MODE_LIST_DMA_BUFFERS;
+		dma_channel = optarg;
+	    break;
+	    case OPT_READ_DMA_BUFFER:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		
+		mode = MODE_READ_DMA_BUFFER;
+
+		num_offset = strchr(optarg, ':');
+
+		if (num_offset) {
+		    if (sscanf(num_offset + 1, "%zu", &block) != 1)
+			Usage(argc, argv, "Invalid buffer is specified (%s)", num_offset + 1);
+
+		    *(char*)num_offset = 0;
+		} else block = (size_t)-1;
+		
+		dma_channel = optarg;
 	    break;
 	    case OPT_START_DMA:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
@@ -1434,7 +1661,7 @@ int main(int argc, char **argv) {
 		force = 1;
 	    break;
 	    default:
-		Usage(argc, argv, "Unknown option (%s)", argv[optind]);
+		Usage(argc, argv, "Unknown option (%s) with argument (%s)", optarg?argv[optind-2]:argv[optind-1], optarg?optarg:"(null)");
 	}
     }
 
@@ -1485,6 +1712,8 @@ int main(int argc, char **argv) {
      break;
      case MODE_START_DMA:
      case MODE_STOP_DMA:
+     case MODE_LIST_DMA_BUFFERS:
+     case MODE_READ_DMA_BUFFER:
         if ((dma_channel)&&(*dma_channel)) {
 	    itmp = strlen(dma_channel) - 1;
 	    if (dma_channel[itmp] == 'r') dma_direction = PCILIB_DMA_FROM_DEVICE;
@@ -1617,6 +1846,15 @@ int main(int argc, char **argv) {
      case MODE_GRAB:
         Grab(handle, event, ofile);
      break;
+     case MODE_LIST_DMA:
+        ListDMA(handle, fpga_device, model_info);
+     break;
+     case MODE_LIST_DMA_BUFFERS:
+        ListBuffers(handle, fpga_device, model_info, dma, dma_direction);
+     break;
+     case MODE_READ_DMA_BUFFER:
+        ReadBuffer(handle, fpga_device, model_info, dma, dma_direction, block, ofile);
+     break;
      case MODE_START_DMA:
         StartStopDMA(handle, model_info, dma, dma_direction, 1);
      break;
@@ -1630,7 +1868,7 @@ int main(int argc, char **argv) {
         ListKMEM(handle, fpga_device);
      break;
      case MODE_READ_KMEM:
-        ReadKMEM(handle, fpga_device, use_id, block, ofile);
+        ReadKMEM(handle, fpga_device, use_id, block, 0, ofile);
      break;
      case MODE_FREE_KMEM:
         FreeKMEM(handle, fpga_device, use, force);

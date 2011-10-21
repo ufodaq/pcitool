@@ -235,7 +235,7 @@ int pcilib_read_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size
     pcilib_dma_read_callback_context_t opts = {
 	size, buf, 0
     };
-
+    
     err = pcilib_stream_dma(ctx, dma, addr, size, PCILIB_DMA_FLAGS_DEFAULT, PCILIB_DMA_TIMEOUT, pcilib_dma_read_callback, &opts);
     if (read_bytes) *read_bytes = opts.pos;
     return err;
@@ -324,4 +324,32 @@ double pcilib_benchmark_dma(pcilib_t *ctx, pcilib_dma_engine_addr_t dma, uintptr
     }
 
     return ctx->model_info.dma_api->benchmark(ctx->dma_ctx, dma, addr, size, iterations, direction);
+}
+
+int pcilib_get_dma_status(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers) {
+    int err; 
+
+    const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
+    if (!info) {
+	pcilib_error("DMA is not supported by the device");
+	return 0;
+    }
+
+    if (!ctx->model_info.dma_api) {
+	pcilib_error("DMA Engine is not configured in the current model");
+	return -1;
+    }
+    
+    if (!ctx->model_info.dma_api->status) {
+	memset(status, 0, sizeof(pcilib_dma_engine_status_t));
+	return -1;
+   }
+    
+    if (!info->engines[dma]) {
+	pcilib_error("The DMA engine (%i) is not supported by device", dma);
+	return -1;
+    }
+
+    return ctx->model_info.dma_api->status(ctx->dma_ctx, dma, status, n_buffers, buffers);
+
 }

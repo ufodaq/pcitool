@@ -375,3 +375,37 @@ static int dma_nwl_return_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t
     info->tail++;
     if (info->tail == info->ring_size) info->tail = 0;
 }
+
+int dma_nwl_get_status(pcilib_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers) {
+    size_t i;
+    nwl_dma_t *ctx = (nwl_dma_t*)vctx;
+    pcilib_nwl_engine_description_t *info = ctx->engines + dma;
+    uint32_t bstatus;
+
+    if (!status) return -1;
+    
+    status->started = info->started;
+    status->ring_size = info->ring_size;
+    status->buffer_size = info->page_size;
+    status->ring_head = info->head;
+    status->ring_tail = info->tail;
+    
+    if (buffers) {
+        unsigned char *ring = (unsigned char*)pcilib_kmem_get_ua(ctx->pcilib, info->ring);
+	
+	for (i = 0; (i < info->ring_size)&&(i < n_buffers); i++) {
+	    bstatus = NWL_RING_GET(ring, DMA_BD_BUFL_STATUS_OFFSET);
+
+	    buffers[i].error = bstatus & (DMA_BD_ERROR_MASK/*|DMA_BD_SHORT_MASK*/);
+	    buffers[i].used = bstatus & DMA_BD_COMP_MASK;
+	    buffers[i].size = bstatus & DMA_BD_BUFL_MASK;
+	    buffers[i].first = bstatus & DMA_BD_SOP_MASK;
+	    buffers[i].last = bstatus & DMA_BD_EOP_MASK;
+
+	    ring += PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
+	}
+    }
+    
+    return 0;
+}
+
