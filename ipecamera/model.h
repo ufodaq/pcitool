@@ -72,7 +72,7 @@ pcilib_register_description_t ipecamera_registers[] = {
 {112, 	0, 	2, 	0, 	0, PCILIB_REGISTER_RW, PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK0, "adc_resolution", ""},
 {115, 	0, 	1, 	1, 	0, PCILIB_REGISTER_RW, PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK0, "special_115", ""},
 /*{126, 	0, 	16, 	0, 	PCILIB_REGISTER_RW, PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK0, "temp", ""},*/
-{0,	0, 	32,	0,	0, PCILIB_REGISTER_RW, PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "spi_conf_input", ""},
+{0x00,	0, 	32,	0,	0, PCILIB_REGISTER_RW, PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "spi_conf_input", ""},
 {0x10,	0, 	32,	0,	0, PCILIB_REGISTER_R,  PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "spi_conf_output", ""},
 {0x20,	0, 	32,	0,	0, PCILIB_REGISTER_RW, PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "spi_clk_speed", ""},
 {0x30,	0, 	32,	0,	0, PCILIB_REGISTER_R,  PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "firmware_version", ""},
@@ -88,7 +88,9 @@ pcilib_register_description_t ipecamera_registers[] = {
 };
 
 pcilib_register_range_t ipecamera_register_ranges[] = {
-    {0, 128, PCILIB_REGISTER_BANK0}, {0, 0, 0}
+    {0, 	128, 	PCILIB_REGISTER_BANK0, 0},
+    {0x9000,	0x9FFF,	PCILIB_REGISTER_BANK1, -0x9000},
+    {0, 0, 0, 0}
 };
 
 pcilib_event_description_t ipecamera_events[] = {

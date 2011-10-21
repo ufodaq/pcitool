@@ -145,7 +145,10 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
     assert(bits < 8 * sizeof(pcilib_register_value_t));
     
     if (((addr + n) > b->size)||(((addr + n) == b->size)&&(bits))) {
-	pcilib_error("Accessing register (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
+	if ((b->format)&&(strchr(b->format, 'x')))
+	    pcilib_error("Accessing register (%u regs at addr 0x%x) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
+	else 
+	    pcilib_error("Accessing register (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
 	return PCILIB_ERROR_OUTOFRANGE;
     }
 
@@ -250,7 +253,10 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
     assert(bits < 8 * sizeof(pcilib_register_value_t));
 
     if (((addr + n) > b->size)||(((addr + n) == b->size)&&(bits))) {
-	pcilib_error("Accessing register (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
+	if ((b->format)&&(strchr(b->format, 'x')))
+	    pcilib_error("Accessing register (%u regs at addr 0x%x) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
+	else 
+	    pcilib_error("Accessing register (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
 	return PCILIB_ERROR_OUTOFRANGE;
     }
 

@@ -1537,7 +1537,14 @@ int main(int argc, char **argv) {
 		    if ((start >= ranges[i].start)&&(start <= ranges[i].end)) break;
 	    		
 		    // register access in plain mode
-		if (ranges[i].start != ranges[i].end) ++mode;	
+		if (ranges[i].start != ranges[i].end) {
+		    pcilib_register_bank_t regbank = pcilib_find_bank_by_addr(handle, ranges[i].bank);
+		    if (regbank == PCILIB_REGISTER_BANK_INVALID) Error("Configuration error: register bank specified in the address range is not found");
+		    
+		    bank = model_info->banks[regbank].name;
+		    start += ranges[i].addr_shift;
+		    ++mode;
+		}
 	    }
 	} else {
 	    if (pcilib_find_register(handle, bank, addr) == PCILIB_REGISTER_INVALID) {

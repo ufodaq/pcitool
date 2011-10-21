@@ -146,7 +146,8 @@ typedef struct {
 typedef struct {
     uintptr_t start;
     uintptr_t end;
-    pcilib_register_bank_t bank;
+    pcilib_register_bank_addr_t bank;
+    long addr_shift;
 } pcilib_register_range_t;
 
 typedef struct {
