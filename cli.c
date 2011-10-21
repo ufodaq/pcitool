@@ -81,12 +81,12 @@ typedef enum {
     OPT_TIMEOUT = 't',
     OPT_INFO = 'i',
     OPT_LIST = 'l',
-    OPT_BENCHMARK = 'p',
     OPT_READ = 'r',
     OPT_WRITE = 'w',
     OPT_GRAB = 'g',
     OPT_QUIETE = 'q',
     OPT_RESET = 128,
+    OPT_BENCHMARK,
     OPT_START_DMA,
     OPT_STOP_DMA,
     OPT_WAIT_IRQ,
@@ -148,10 +148,10 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "  Modes:\n"
 "   -i				- Device Info\n"
 "   -l[l]			- List (detailed) Data Banks & Registers\n"
-"   -p <barX|dmaX>		- Performance Evaluation\n"
 "   -r <addr|reg|dmaX>		- Read Data/Register\n"
 "   -w <addr|reg|dmaX>		- Write Data/Register\n"
 "   -g [event]			- Grab Event\n"
+"   --benchmark <barX|dmaX>	- Performance Evaluation\n"
 "   --reset			- Reset board\n"
 "   --help			- Help message\n"
 "\n"
@@ -1244,7 +1244,7 @@ int main(int argc, char **argv) {
     int size_set = 0;
     
     
-    while ((c = getopt_long(argc, argv, "hqilpr::w::g::d:m:t:b:a:s:e:o:", long_options, NULL)) != (unsigned char)-1) {
+    while ((c = getopt_long(argc, argv, "hqilr::w::g::d:m:t:b:a:s:e:o:", long_options, NULL)) != (unsigned char)-1) {
 	extern int optind;
 	switch (c) {
 	    case OPT_HELP:
