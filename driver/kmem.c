@@ -40,27 +40,40 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	    if (kmem_entry) {
 		unsigned long flags = kmem_handle->flags;
 		
-		if (kmem_handle->type != kmem_entry->type) {
-			mod_info("Invalid type of reusable kmem_entry\n");
+		if (flags&KMEM_FLAG_TRY) {
+		    kmem_handle->type = kmem_entry->type;
+		    kmem_handle->size = kmem_entry->size;
+		    kmem_handle->align = kmem_entry->align;
+		} else {
+		    if (kmem_handle->type != kmem_entry->type) {
+		    	mod_info("Invalid type of reusable kmem_entry\n");
 			return -EINVAL;
-		}
+		    }
 
-		if (kmem_handle->type == PCILIB_KMEM_TYPE_PAGE) {
-			kmem_handle->size = kmem_entry->size;
-		} else if (kmem_handle->size != kmem_entry->size) {
+		    if (kmem_handle->type == PCILIB_KMEM_TYPE_PAGE) {
+			    kmem_handle->size = kmem_entry->size;
+		    } else if (kmem_handle->size != kmem_entry->size) {
 			mod_info("Invalid size of reusable kmem_entry\n");
 			return -EINVAL;
-		}
-		
-		if (((kmem_entry->mode&KMEM_MODE_EXCLUSIVE)?1:0) != ((flags&KMEM_FLAG_EXCLUSIVE)?1:0)) {
+		    }
+		    
+		    if (kmem_handle->align != kmem_entry->align) {
+			mod_info("Invalid alignment of reusable kmem_entry\n");
+			return -EINVAL;
+		    }
+
+		    if (((kmem_entry->mode&KMEM_MODE_EXCLUSIVE)?1:0) != ((flags&KMEM_FLAG_EXCLUSIVE)?1:0)) {
 			mod_info("Invalid mode of reusable kmem_entry\n");
 			return -EINVAL;
+		    }
 		}
+		
 
 		if ((kmem_entry->mode&KMEM_MODE_COUNT)==KMEM_MODE_COUNT) {
 			mod_info("Reuse counter of kmem_entry is overflown");
 			return -EBUSY;
 		}
+		
 		
 		kmem_handle->handle_id = kmem_entry->id;
 		kmem_handle->pa = (unsigned long)(kmem_entry->dma_handle);
@@ -79,9 +92,11 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 		if (flags&KMEM_FLAG_PERSISTENT) kmem_entry->mode |= KMEM_MODE_PERSISTENT;
 
 		privdata->kmem_cur_id = kmem_entry->id;
-
+		
 		return 0;
 	    }
+	    
+	    if (kmem_handle->flags&KMEM_FLAG_TRY) return -ENOENT;
 	}
 
 	/* First, allocate zeroed memory for the kmem_entry */
@@ -96,6 +111,7 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	kmem_entry->use = kmem_handle->use;
 	kmem_entry->item = kmem_handle->item;
 	kmem_entry->type = kmem_handle->type;
+	kmem_entry->align = kmem_handle->align;
 
 	/* Initialize sysfs if possible */
 	if (pcidriver_sysfs_initialize_kmem(privdata, kmem_entry->id, &(kmem_entry->sysfs_attr)) != 0)

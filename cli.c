@@ -60,6 +60,7 @@ typedef enum {
     MODE_STOP_DMA,
     MODE_WAIT_IRQ,
     MODE_LIST_KMEM,
+    MODE_READ_KMEM,
     MODE_FREE_KMEM
 } MODE;
 
@@ -79,8 +80,8 @@ typedef enum {
     OPT_OUTPUT = 'o',
     OPT_TIMEOUT = 't',
     OPT_INFO = 'i',
-    OPT_BENCHMARK = 'p',
     OPT_LIST = 'l',
+    OPT_BENCHMARK = 'p',
     OPT_READ = 'r',
     OPT_WRITE = 'w',
     OPT_GRAB = 'g',
@@ -92,6 +93,7 @@ typedef enum {
     OPT_ITERATIONS,
     OPT_LIST_KMEM,
     OPT_FREE_KMEM,
+    OPT_READ_KMEM,
     OPT_FORCE,
     OPT_HELP = 'h',
 } OPTIONS;
@@ -117,6 +119,7 @@ static struct option long_options[] = {
     {"stop-dma",		optional_argument, 0, OPT_STOP_DMA },
     {"wait-irq",		optional_argument, 0, OPT_WAIT_IRQ },
     {"list-kernel-memory",	no_argument, 0, OPT_LIST_KMEM },
+    {"read-kernel-memory",	required_argument, 0, OPT_READ_KMEM },
     {"free-kernel-memory",	required_argument, 0, OPT_FREE_KMEM },
     {"quiete",			no_argument, 0, OPT_QUIETE },
     {"force",			no_argument, 0, OPT_FORCE },
@@ -159,6 +162,8 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "\n"
 "  Kernel Modes:\n"
 "   --list-kernel-memory 	- List kernel buffers\n"
+"   --read-kernel-memory <blk>	- Read the specified block of the kernel memory,\n"
+"				  block is specified as: use:block_number\n"
 "   --free-kernel-memory <use>	- Cleans lost kernel space buffers (DANGEROUS)\n"
 "	dma			- Remove all buffers allocated by DMA subsystem\n"
 "	#number			- Remove all buffers with the specified use id\n"
@@ -1085,7 +1090,7 @@ int ListKMEM(pcilib_t *handle, const char *device) {
 	return 0;
     }
     
-    printf("Use Type               Count         Total Size        REF           Mode \n");
+    printf("Use      Type                  Count      Total Size       REF       Mode \n");
     printf("--------------------------------------------------------------------------------\n");
     for (useid = 0; useid < n_uses; useid++) {
 	if (useid + 1 == n_uses) {
@@ -1093,20 +1098,21 @@ int ListKMEM(pcilib_t *handle, const char *device) {
 	    i = 0;
 	} else i = useid + 1;
 	
-	if (!i) printf("0x%08lx Others", 0);
-	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_RING) printf("DMA%u %s Ring    ", uses[i].use&0x7F, ((uses[i].use&0x80)?"C2S":"S2C"));
-	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_PAGES) printf("DMA%u %s Pages   ", uses[i].use&0x7F, ((uses[i].use&0x80)?"C2S":"S2C"));
-	else printf("0x%08lx       ", uses[i].use);
-	printf("    ");
-	printf("% 9lu", uses[i].count);
+	printf("%08lx  ", uses[i].use);
+	if (!i) printf("All Others         ");
+	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_RING) printf("DMA%u %s Ring      ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
+	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_PAGES) printf("DMA%u %s Pages     ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
+	else printf ("                   ", uses[i].use);
+	printf("  ");
+	printf("% 6lu", uses[i].count);
 	printf("     ");
-	printf("% 12s", PrintSize(stmp, uses[i].size));
-	printf("         ");
+	printf("% 10s", PrintSize(stmp, uses[i].size));
+	printf("      ");
 	if (uses[i].referenced&&uses[i].hw_lock) printf("HW+SW");
 	else if (uses[i].referenced) printf("   SW");
 	else if (uses[i].hw_lock) printf("HW   ");
 	else printf("  -  ");
-	printf("         ");
+	printf("      ");
 	if (uses[i].persistent) printf("Persistent");
 	else if (uses[i].open) printf("Open      ");
 	else if (uses[i].reusable) printf("Reusable  ");
@@ -1118,6 +1124,28 @@ int ListKMEM(pcilib_t *handle, const char *device) {
 
 
     return 0;
+}
+
+int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t block, FILE *o) {
+    void *data;
+    size_t size;
+    pcilib_kmem_handle_t *kbuf;
+    
+    kbuf = pcilib_alloc_kernel_memory(handle, 0, block + 1, 0, 0, use, PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_TRY);
+    if (!kbuf) {
+	printf("The specified kernel buffer is not allocated\n");
+	return 0;
+    }
+    
+    data = pcilib_kmem_get_block_ua(handle, kbuf, block);
+    if (data) {
+	size = pcilib_kmem_get_block_size(handle, kbuf, block);
+	fwrite(data, 1, size, o?o:stdout);
+    } else {
+	printf("The specified block is not existing\n");
+    }
+    
+    pcilib_free_kernel_memory(handle, kbuf, KMEM_FLAG_REUSE);
 }
 
 int FreeKMEM(pcilib_t *handle, const char *device, const char *use, int force) {
@@ -1172,6 +1200,7 @@ int WaitIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq
 int main(int argc, char **argv) {
     int i;
     long itmp;
+    unsigned long utmp;
     unsigned char c;
 
     const char *num_offset;
@@ -1194,6 +1223,8 @@ int main(int argc, char **argv) {
     const char *event = NULL;
     const char *dma_channel = NULL;
     const char *use = NULL;
+    pcilib_kmem_use_t use_id;
+    size_t block = 0;
     pcilib_irq_hw_source_t irq_source;
     pcilib_dma_direction_t dma_direction = PCILIB_DMA_BIDIRECTIONAL;
     
@@ -1293,6 +1324,27 @@ int main(int argc, char **argv) {
 	    case OPT_LIST_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 		mode = MODE_LIST_KMEM;
+	    break;
+	    case OPT_READ_KMEM:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		mode = MODE_READ_KMEM;
+
+		num_offset = strchr(optarg, ':');
+
+		if (num_offset) {
+		    if (sscanf(num_offset + 1, "%zu", &block) != 1)
+			Usage(argc, argv, "Invalid block number is specified (%s)", num_offset + 1);
+
+		    *(char*)num_offset = 0;
+		}
+		
+		if (sscanf(optarg, "%lx", &utmp) != 1)
+		    Usage(argc, argv, "Invalid USE number is specified (%s)", optarg);
+		
+		if (!utmp)
+		    Usage(argc, argv, "Can't read buffer with the unspecific use (use number is 0)");
+		    
+		use_id = utmp;
 	    break;
 	    case OPT_FREE_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
@@ -1569,6 +1621,9 @@ int main(int argc, char **argv) {
      break;
      case MODE_LIST_KMEM:
         ListKMEM(handle, fpga_device);
+     break;
+     case MODE_READ_KMEM:
+        ReadKMEM(handle, fpga_device, use_id, block, ofile);
      break;
      case MODE_FREE_KMEM:
         FreeKMEM(handle, fpga_device, use, force);

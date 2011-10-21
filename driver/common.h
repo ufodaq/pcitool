@@ -16,6 +16,7 @@ typedef struct {
 	unsigned long cpua;
 	unsigned long size;
 	unsigned long type;
+	unsigned long align;
 
 	unsigned long use;
 	unsigned long item;

@@ -144,9 +144,9 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	    break;
 	}
     
-        if ((alignment)&&(type != PCILIB_KMEM_TYPE_PAGE)) {
-	    if (kh.pa % alignment) kbuf->buf.blocks[i].alignment_offset = alignment - kh.pa % alignment;
-	    kbuf->buf.blocks[i].size -= alignment;
+        if ((kh.align)&&(type != PCILIB_KMEM_TYPE_PAGE)) {
+	    if (kh.pa % kh.align) kbuf->buf.blocks[i].alignment_offset = kh.align - kh.pa % kh.align;
+	    kbuf->buf.blocks[i].size -= kh.align;
 	}
 	
     	addr = mmap( 0, kbuf->buf.blocks[i].size + kbuf->buf.blocks[i].alignment_offset, PROT_WRITE | PROT_READ, MAP_SHARED, ctx->handle, 0 );
@@ -157,6 +157,9 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	}
 
 	kbuf->buf.blocks[i].ua = addr;
+//	if (use == PCILIB_KMEM_USE_DMA_PAGES) {
+//	memset(addr, 10, kbuf->buf.blocks[i].size + kbuf->buf.blocks[i].alignment_offset);
+//	}
 	
 	kbuf->buf.blocks[i].mmap_offset = kh.pa & ctx->page_mask;
     }

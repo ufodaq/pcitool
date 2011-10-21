@@ -106,6 +106,7 @@
 #define KMEM_FLAG_HW 8		/**< The buffer may be accessed by hardware, the hardware access will not occur any more if passed to _free function */
 #define KMEM_FLAG_FORCE 16	/**< Force memory cleanup even if references are present */
 #define KMEM_FLAG_MASS 32	/**< Apply to all buffers of selected use */
+#define KMEM_FLAG_TRY 64	/**< Do not allocate buffers, try to reuse and fail if not possible */
 
 #define KMEM_FLAG_REUSED 1		/**< Indicates if buffer with specified use & item was already allocated and reused */
 #define KMEM_FLAG_REUSED_PERSISTENT 4	/**< Indicates that reused buffer was persistent before the call */
