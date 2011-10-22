@@ -1216,7 +1216,7 @@ int ListDMA(pcilib_t *handle, const char *device, pcilib_model_description_t *mo
     dir = opendir(sysdir);
     if (!dir) Error("Can't open directory (%s)", sysdir);
     
-    printf("DMA Engine     Status      Total Size         Buffer Ring\n");
+    printf("DMA Engine     Status      Total Size         Buffer Ring (1st used - 1st free)\n");
     printf("--------------------------------------------------------------------------------\n");
     while ((entry = readdir(dir)) != NULL) {
 	FILE *f;
