@@ -225,6 +225,7 @@ void pcilib_free_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_km
     }
 }
 
+/*
 int pcilib_sync_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kmem_sync_direction_t dir) {
     int i;
     int ret;
@@ -232,7 +233,7 @@ int pcilib_sync_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kme
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
     
     ks.dir = dir;
-    
+
     for (i = 0; i < kbuf->buf.n_blocks; i++) {
         ks.handle.handle_id = kbuf->buf.blocks[i].handle_id;
 	ks.handle.pa = kbuf->buf.blocks[i].pa;
@@ -241,15 +242,29 @@ int pcilib_sync_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kme
 	    pcilib_error("PCIDRIVER_IOC_KMEM_SYNC ioctl have failed");
 	    return PCILIB_ERROR_FAILED;
 	}
-	
-	if (!kbuf->buf.blocks[i].pa) {
-	    kbuf->buf.blocks[i].pa = ks.handle.pa;
-	}
     }
     
     return 0;    
 }
 
+*/
+
+int pcilib_kmem_sync_block(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kmem_sync_direction_t dir, size_t block) {
+    int ret;
+    kmem_sync_t ks;
+    pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
+
+    ks.dir = dir;
+    ks.handle.handle_id = kbuf->buf.blocks[block].handle_id;
+    ks.handle.pa = kbuf->buf.blocks[block].pa;
+    ret = ioctl(ctx->handle, PCIDRIVER_IOC_KMEM_SYNC, &ks);
+    if (ret) {
+	pcilib_error("PCIDRIVER_IOC_KMEM_SYNC ioctl have failed");
+	return PCILIB_ERROR_FAILED;
+    }
+    
+    return 0;
+}
 
 void *pcilib_kmem_get_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
@@ -280,4 +295,3 @@ pcilib_kmem_reuse_state_t  pcilib_kmem_is_reused(pcilib_t *ctx, pcilib_kmem_hand
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
     return kbuf->buf.reused;
 }
-

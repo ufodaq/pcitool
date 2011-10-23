@@ -2,17 +2,6 @@
 #define NWL_RING_SET(data, offset, val)  *(uint32_t*)(((char*)(data)) + (offset)) = (val)
 #define NWL_RING_UPDATE(data, offset, mask, val) *(uint32_t*)(((char*)(data)) + (offset)) = ((*(uint32_t*)(((char*)(data)) + (offset)))&(mask))|(val)
 
-int dma_nwl_sync_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, pcilib_kmem_handle_t *kmem) {
-    switch (info->desc.direction) {
-     case PCILIB_DMA_FROM_DEVICE:
-        return pcilib_sync_kernel_memory(ctx->pcilib, kmem, PCILIB_KMEM_SYNC_FROMDEVICE);
-     case PCILIB_DMA_TO_DEVICE:
-        return pcilib_sync_kernel_memory(ctx->pcilib, kmem, PCILIB_KMEM_SYNC_TODEVICE);
-    }
-    
-    return 0;
-}
-
 static int dma_nwl_compute_read_s2c_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, unsigned char *ring, uint32_t ring_pa) {
     size_t pos;
     uint32_t val;
@@ -108,9 +97,6 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
     
     pcilib_kmem_handle_t *ring = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE, PCILIB_NWL_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, sub_use), flags);
     pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->pcilib, type, PCILIB_NWL_DMA_PAGES, 0, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, sub_use), flags);
-
-//    if ((ring)&&(pages)) err = dma_nwl_sync_buffers(ctx, info, pages);
-//    else err = PCILIB_ERROR_FAILED;
 
     if (err) {
 	if (pages) pcilib_free_kernel_memory(ctx->pcilib, pages, 0);

@@ -289,10 +289,10 @@ int dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	}
 #endif /*  NWL_FIX_EOP_FOR_BIG_PACKETS */
 	
-	pcilib_sync_kernel_memory(ctx->pcilib, info->pages, PCILIB_KMEM_SYNC_FROMDEVICE);
+	pcilib_kmem_sync_block(ctx->pcilib, info->pages, PCILIB_KMEM_SYNC_FROMDEVICE, bufnum);
         void *buf = pcilib_kmem_get_block_ua(ctx->pcilib, info->pages, bufnum);
 	ret = cb(cbattr, eop?PCILIB_DMA_FLAG_EOP:0, bufsize, buf);
-	pcilib_sync_kernel_memory(ctx->pcilib, info->pages, PCILIB_KMEM_SYNC_TODEVICE);
+	pcilib_kmem_sync_block(ctx->pcilib, info->pages, PCILIB_KMEM_SYNC_TODEVICE, bufnum);
 	dma_nwl_return_buffer(ctx, info);
 
 	
