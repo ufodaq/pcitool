@@ -161,8 +161,8 @@ typedef enum {
 } pcilib_irq_type_t;
 
 typedef enum {
-    PCILIB_DMA_FROM_DEVICE = 1,
-    PCILIB_DMA_TO_DEVICE = 2,
+    PCILIB_DMA_TO_DEVICE = 1,
+    PCILIB_DMA_FROM_DEVICE = 2,
     PCILIB_DMA_BIDIRECTIONAL = 3
 } pcilib_dma_direction_t;
 

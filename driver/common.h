@@ -11,6 +11,8 @@
 /* This list keeps references to the allocated kernel buffers */
 typedef struct {
 	int id;
+	enum dma_data_direction direction;
+	
 	struct list_head list;
 	dma_addr_t dma_handle;
 	unsigned long cpua;
