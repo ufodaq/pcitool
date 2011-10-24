@@ -242,7 +242,10 @@ int dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, 
 	    }
 	
     	    void *buf = pcilib_kmem_get_block_ua(ctx->pcilib, info->pages, bufnum);
+
+	    pcilib_kmem_sync_block(ctx->pcilib, info->pages, PCILIB_KMEM_SYNC_FROMDEVICE, bufnum);
 	    memcpy(buf, data, block_size);
+	    pcilib_kmem_sync_block(ctx->pcilib, info->pages, PCILIB_KMEM_SYNC_TODEVICE, bufnum);
 
 	    err = dma_nwl_push_buffer(ctx, info, block_size, (flags&PCILIB_DMA_FLAG_EOP)&&((pos + block_size) == size), timeout);
 	    if (err) {
