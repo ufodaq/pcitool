@@ -74,6 +74,11 @@ typedef enum {
 } ACCESS_MODE;
 
 typedef enum {
+    FLAG_MULTIPACKET = 1,
+    FLAG_WAIT = 2
+} FLAGS;
+
+typedef enum {
     OPT_DEVICE = 'd',
     OPT_MODEL = 'm',
     OPT_BAR = 'b',
@@ -101,7 +106,9 @@ typedef enum {
     OPT_LIST_KMEM,
     OPT_FREE_KMEM,
     OPT_READ_KMEM,
-    OPT_FORCE
+    OPT_FORCE,
+    OPT_WAIT,
+    OPT_MULTIPACKET
 } OPTIONS;
 
 static struct option long_options[] = {
@@ -132,6 +139,8 @@ static struct option long_options[] = {
     {"free-kernel-memory",	required_argument, 0, OPT_FREE_KMEM },
     {"quiete",			no_argument, 0, OPT_QUIETE },
     {"force",			no_argument, 0, OPT_FORCE },
+    {"multipacket",		no_argument, 0, OPT_MULTIPACKET },
+    {"wait",			no_argument, 0, OPT_WAIT },
     {"help",			no_argument, 0, OPT_HELP },
     { 0, 0, 0, 0 }
 };
@@ -193,6 +202,10 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   -e <l|b>			- Endianess Little/Big (default: host)\n"
 "   -o <file>			- Append output to file (default: stdout)\n"
 "   -t <timeout> 		- Timeout in microseconds\n"
+"\n"
+"  DMA Options:\n"
+"   --multipacket		- Read multiple packets\n"
+"   --wait			- Wait until data arrives\n"
 "\n"
 "  Information:\n"
 "   -q				- Quiete mode (suppress warnings)\n"
@@ -393,8 +406,8 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	}
 	
         for (size = min_size; size <= max_size; size *= 4) {
-	    mbs_in = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_FROM_DEVICE);
-	    mbs_out = pcilib_benchmark_dma(handle, dma, addr, size, BENCHMARK_ITERATIONS, PCILIB_DMA_TO_DEVICE);
+	    mbs_in = pcilib_benchmark_dma(handle, dma, addr, size, iterations, PCILIB_DMA_FROM_DEVICE);
+	    mbs_out = pcilib_benchmark_dma(handle, dma, addr, size, iterations, PCILIB_DMA_TO_DEVICE);
 	    mbs = pcilib_benchmark_dma(handle, dma, addr, size, iterations, PCILIB_DMA_BIDIRECTIONAL);
 	    err = pcilib_wait_irq(handle, 0, 0, &irqs);
 	    if (err) irqs = 0;
@@ -571,15 +584,45 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 
 #define pci2host16(endianess, value) endianess?
 
+/*
+typedef struct {
+    size_t size;
+    void *data;
+    size_t pos;
 
-int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, FILE *o) {
+    int multi_mode;
+} DMACallbackContext;
+
+static int DMACallback(void *arg, pcilib_dma_flags_t flags, size_t bufsize, void *buf) {
+    DMACallbackContext *ctx = (DMACallbackContext*)arg;
+    
+    if ((ctx->pos + bufsize > ctx->size)||(!ctx->data)) {
+	ctx->size *= 2;
+	ctx->data = realloc(ctx->data, ctx->size);
+	if (!ctx->data) {
+	    Error("Allocation of %i bytes of memory have failed", ctx->size);
+	    return 0;
+	}
+    }
+    
+    memcpy(ctx->data + ctx->pos, buf, bufsize);
+    ctx->pos += bufsize;
+
+    if (flags & PCILIB_DMA_FLAG_EOP) return 0;
+    return 1;
+}
+*/
+
+
+int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, size_t timeout, FILE *o) {
     void *buf;
     int i, err;
-    size_t ret;
+    size_t ret, bytes;
     int size = n * abs(access);
     int block_width, blocks_per_line;
     int numbers_per_block, numbers_per_line; 
     pcilib_dma_engine_t dmaid;
+    pcilib_dma_flags_t dma_flags = 0;
     
     numbers_per_block = BLOCK_SIZE / access;
 
@@ -588,18 +631,45 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, p
     if ((blocks_per_line > 1)&&(blocks_per_line % 2)) --blocks_per_line;
     numbers_per_line = blocks_per_line * numbers_per_block;
 
-//    buf = alloca(size);
-    err = posix_memalign( (void**)&buf, 256, size );
-    if ((err)||(!buf)) Error("Allocation of %i bytes of memory have failed", size);
+    if (size) {
+	buf = malloc(size);
+        if (!buf) Error("Allocation of %i bytes of memory have failed", size);
+    } else {
+	buf = NULL;
+    }
     
     switch (mode) {
       case ACCESS_DMA:
+        if (timeout == (size_t)-1) timeout = PCILIB_DMA_TIMEOUT;
+    
 	dmaid = pcilib_find_dma_by_addr(handle, PCILIB_DMA_FROM_DEVICE, dma);
 	if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("Invalid DMA engine (%lu) is specified", dma);
-	err = pcilib_read_dma(handle, dmaid, addr, size, buf, &ret);
-	if ((err)||(ret <= 0)) Error("No data is returned by DMA engine");
-	size = ret;
-	n = ret / abs(access);
+	
+	if (flags&FLAG_MULTIPACKET) dma_flags |= PCILIB_DMA_FLAG_MULTIPACKET;
+	if (flags&FLAG_WAIT) dma_flags |= PCILIB_DMA_FLAG_WAIT;
+	
+	if (size) {
+	    err = pcilib_read_dma_custom(handle, dmaid, addr, size, dma_flags, timeout, buf, &bytes);
+	    if (err) Error("Error (%i) is reported by DMA engine", err);
+	} else {
+	    dma_flags |= PCILIB_DMA_FLAG_IGNORE_ERRORS;
+	    
+	    size = 2048; bytes = 0;
+	    do {
+		size *= 2;
+		buf = realloc(buf, size);
+	        err = pcilib_read_dma_custom(handle, dmaid, addr, size - bytes, dma_flags, timeout, buf + bytes, &ret);
+		bytes += ret;
+		
+		if ((!err)&&(flags&FLAG_MULTIPACKET)) {
+		    err = PCILIB_ERROR_TOOBIG;
+		    if ((flags&FLAG_WAIT)==0) timeout = 0;
+		}
+	    } while (err == PCILIB_ERROR_TOOBIG);
+	}
+	if (bytes <= 0) Error("No data is returned by DMA engine");
+	size = bytes;
+	n = bytes / abs(access);
 	addr = 0;
       break;
       case ACCESS_FIFO:
@@ -639,6 +709,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, p
 
     
     free(buf);
+    return 0;
 }
 
 
@@ -703,6 +774,8 @@ int ReadRegister(pcilib_t *handle, pcilib_model_description_t *model_info, const
 	}
 	printf("\n");
     }
+    
+    return 0;
 }
 
 #define WRITE_REGVAL(buf, n, access, o) {\
@@ -818,12 +891,14 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
     if ((read_back)&&(memcmp(buf, check, size))) {
 	printf("Write failed: the data written and read differ, the foolowing is read back:\n");
         if (endianess) pcilib_swap(check, check, abs(access), n);
-	ReadData(handle, mode, dma, bar, addr, n, access, endianess, NULL);
+	ReadData(handle, mode, 0, dma, bar, addr, n, access, endianess, (size_t)-1, NULL);
 	exit(-1);
     }
 
     free(check);
     free(buf);
+    
+    return 0;
 }
 
 int WriteRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, size_t n, char ** data) {
@@ -856,6 +931,8 @@ int WriteRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info,
 
     free(check);
     free(buf);
+    
+    return 0;
 
 }
 
@@ -1412,6 +1489,7 @@ int main(int argc, char **argv) {
     pcilib_model_t model = PCILIB_MODEL_DETECT;
     pcilib_model_description_t *model_info;
     MODE mode = MODE_INVALID;
+    FLAGS flags = 0;
     const char *type = NULL;
     ACCESS_MODE amode = ACCESS_BAR;
     const char *fpga_device = DEFAULT_FPGA_DEVICE;
@@ -1442,7 +1520,7 @@ int main(int argc, char **argv) {
     pcilib_t *handle;
     
     int size_set = 0;
-    
+    int timeout_set = 0;
     
     while ((c = getopt_long(argc, argv, "hqilr::w::g::d:m:t:b:a:s:e:o:", long_options, NULL)) != (unsigned char)-1) {
 	extern int optind;
@@ -1645,6 +1723,7 @@ int main(int argc, char **argv) {
 	    case OPT_TIMEOUT:
 		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &timeout) != 1))
 		    Usage(argc, argv, "Invalid timeout is specified (%s)", optarg);
+		timeout_set = 1;
 	    break;
 	    case OPT_OUTPUT:
 		output = optarg;
@@ -1652,13 +1731,18 @@ int main(int argc, char **argv) {
 	    case OPT_ITERATIONS:
 		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &iterations) != 1))
 		    Usage(argc, argv, "Invalid number of iterations is specified (%s)", optarg);
-		size_set = 1;
 	    break;
 	    case OPT_QUIETE:
 		quiete = 1;
 	    break;
 	    case OPT_FORCE:
 		force = 1;
+	    break;
+	    case OPT_MULTIPACKET:
+		flags |= FLAG_MULTIPACKET;
+	    break;
+	    case OPT_WAIT:
+		flags |= FLAG_WAIT;
 	    break;
 	    default:
 		Usage(argc, argv, "Unknown option (%s) with argument (%s)", optarg?argv[optind-2]:argv[optind-1], optarg?optarg:"(null)");
@@ -1823,8 +1907,10 @@ int main(int argc, char **argv) {
         Benchmark(handle, amode, dma, bar, start, size_set?size:0, access, iterations);
      break;
      case MODE_READ:
-        if ((addr)||(amode == ACCESS_DMA)) {
-	    ReadData(handle, amode, dma, bar, start, size, access, endianess, ofile);
+	if (amode == ACCESS_DMA) {
+	    ReadData(handle, amode, flags, dma, bar, start, size_set?size:0, access, endianess, timeout_set?timeout:(size_t)-1, ofile);
+	} else if (addr) {
+	    ReadData(handle, amode, flags, dma, bar, start, size, access, endianess, (size_t)-1, ofile);
 	} else {
 	    Error("Address to read is not specified");
 	}

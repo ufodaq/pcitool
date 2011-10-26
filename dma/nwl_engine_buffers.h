@@ -276,13 +276,6 @@ static int dma_nwl_push_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *
     
     val = ring_pa + info->head * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
     nwl_write_register(val, ctx, info->base_addr, REG_SW_NEXT_BD);
-//    nwl_read_register(val, ctx, info->base_addr, 0x18);
-
-//    usleep(10000);
-
-//    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_LAST_BD);
-//    printf("Last BD(Write): %lx %lx\n", ring, val);
-    
     
     return 0;
 }
@@ -293,27 +286,16 @@ static size_t dma_nwl_wait_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_
     struct timeval start, cur;
     uint32_t status_size, status, control;
 
-//    usleep(10000);
-    
     unsigned char *ring = pcilib_kmem_get_ua(ctx->pcilib, info->ring);
     
-//    status_size = NWL_RING_GET(ring, DMA_BD_BUFL_STATUS_OFFSET);
-//    printf("Status0: %lx\n", status_size);
-
     ring += info->tail * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
 
     gettimeofday(&start, NULL);
     
-//    printf("Waiting %li\n", info->tail);
-//    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_LAST_BD);
-//    printf("Last BD(Read): %lx %lx\n", ring, val);
-
     do {
 	status_size = NWL_RING_GET(ring, DMA_BD_BUFL_STATUS_OFFSET);
 	status = status_size & DMA_BD_STATUS_MASK;
 	
-//	printf("%i: %lx\n", info->tail, status_size);
-    
 	if (status & DMA_BD_ERROR_MASK) {
     	    pcilib_error("NWL DMA Engine reported error in ring descriptor");
     	    return (size_t)-1;
@@ -322,10 +304,17 @@ static size_t dma_nwl_wait_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_
 	if (status & DMA_BD_COMP_MASK) {
 	    if (status & DMA_BD_EOP_MASK) *eop = 1;
 	    else *eop = 0;
-        
+	            
 	    *size = status_size & DMA_BD_BUFL_MASK;
+
+/*	    
+	    if (mrd) {
+		if ((info->tail + 1) == info->ring_size) ring -= info->tail * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
+		else ring += PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
+		*mrd = NWL_RING_GET(ring, DMA_BD_BUFL_STATUS_OFFSET)&DMA_BD_COMP_MASK;
+	    }
+*/
 	
-//	    printf("Status: %lx\n", status_size);
 	    return info->tail;
 	}
 	
@@ -333,9 +322,17 @@ static size_t dma_nwl_wait_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_
         gettimeofday(&cur, NULL);
     } while ((timeout == PCILIB_TIMEOUT_INFINITE)||(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < timeout));
 
-//    printf("Final status: %lx\n", status_size);
-    
     return (size_t)-1;
+}
+
+static int dma_nwl_is_overflown(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info) {
+    uint32_t status;
+    unsigned char *ring = pcilib_kmem_get_ua(ctx->pcilib, info->ring);
+    if (info->tail > 0) ring += (info->tail - 1) * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
+    else ring += (info->ring_size - 1) * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
+
+    status = NWL_RING_GET(ring, DMA_BD_BUFL_STATUS_OFFSET);
+    return status&DMA_BD_COMP_MASK?1:0;
 }
 
 static int dma_nwl_return_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info) {
@@ -346,7 +343,6 @@ static int dma_nwl_return_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t
     size_t bufsz = pcilib_kmem_get_block_size(ctx->pcilib, info->pages, info->tail);
 
     ring += info->tail * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
-//    printf("Returning: %i\n", info->tail);
 
 #ifdef NWL_GENERATE_DMA_IRQ    
     NWL_RING_SET(ring, DMA_BD_BUFL_CTRL_OFFSET, bufsz | DMA_BD_INT_ERROR_MASK | DMA_BD_INT_COMP_MASK);
@@ -358,13 +354,12 @@ static int dma_nwl_return_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t
 
     val = ring_pa + info->tail * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
     nwl_write_register(val, ctx, info->base_addr, REG_SW_NEXT_BD);
-//    nwl_read_register(val, ctx, info->base_addr, 0x18);
     
     info->tail++;
     if (info->tail == info->ring_size) info->tail = 0;
 }
 
-int dma_nwl_get_status(pcilib_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers) {
+int dma_nwl_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers) {
     size_t i;
     uint32_t bstatus;
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
@@ -410,43 +405,3 @@ int dma_nwl_get_status(pcilib_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_engin
     
     return 0;
 }
-
-/*
-    unsigned char *ring = pcilib_kmem_get_ua(ctx->pcilib, info->ring);
-    
-//    status_size = NWL_RING_GET(ring, DMA_BD_BUFL_STATUS_OFFSET);
-//    printf("Status0: %lx\n", status_size);
-
-    ring += info->tail * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
-
-    gettimeofday(&start, NULL);
-    
-//    printf("Waiting %li\n", info->tail);
-//    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_LAST_BD);
-//    printf("Last BD(Read): %lx %lx\n", ring, val);
-
-    do {
-	status_size = NWL_RING_GET(ring, DMA_BD_BUFL_STATUS_OFFSET);
-	status = status_size & DMA_BD_STATUS_MASK;
-	
-//	printf("%i: %lx\n", info->tail, status_size);
-    
-	if (status & DMA_BD_ERROR_MASK) {
-    	    pcilib_error("NWL DMA Engine reported error in ring descriptor");
-    	    return (size_t)-1;
-	}	
-	
-	if (status & DMA_BD_COMP_MASK) {
-	    if (status & DMA_BD_EOP_MASK) *eop = 1;
-	    else *eop = 0;
-        
-	    *size = status_size & DMA_BD_BUFL_MASK;
-	
-//	    printf("Status: %lx\n", status_size);
-	    return info->tail;
-	}
-	
-	usleep(10);
-        gettimeofday(&cur, NULL);
-    } while ((timeout == PCILIB_TIMEOUT_INFINITE)||(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < timeout));
-*/

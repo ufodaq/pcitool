@@ -77,7 +77,7 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     if (info->reused) {
     	info->preserve = 1;
 
-	dma_nwl_acknowledge_irq(ctx, PCILIB_DMA_IRQ, dma);
+	dma_nwl_acknowledge_irq((pcilib_dma_context_t*)ctx, PCILIB_DMA_IRQ, dma);
 
 #ifdef NWL_GENERATE_DMA_IRQ
 	dma_nwl_enable_engine_irq(ctx, dma);
@@ -126,7 +126,7 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	    return PCILIB_ERROR_TIMEOUT;
 	}
     
-    	dma_nwl_acknowledge_irq(ctx, PCILIB_DMA_IRQ, dma);
+    	dma_nwl_acknowledge_irq((pcilib_dma_context_t*)ctx, PCILIB_DMA_IRQ, dma);
 
 	ring_pa = pcilib_kmem_get_pa(ctx->pcilib, info->ring);
 	nwl_write_register(ring_pa, ctx, info->base_addr, REG_DMA_ENG_NEXT_BD);
@@ -198,7 +198,7 @@ int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	}
     }
     
-    dma_nwl_acknowledge_irq(ctx, PCILIB_DMA_IRQ, dma);
+    dma_nwl_acknowledge_irq((pcilib_dma_context_t*)ctx, PCILIB_DMA_IRQ, dma);
 
     if (info->preserve) {
 	flags = PCILIB_KMEM_FLAG_REUSE;
@@ -228,7 +228,7 @@ int dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, 
 
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
 
-    err = dma_nwl_start(ctx, dma, PCILIB_DMA_FLAGS_DEFAULT);
+    err = dma_nwl_start(vctx, dma, PCILIB_DMA_FLAGS_DEFAULT);
     if (err) return err;
 
     if (data) {
@@ -266,7 +266,7 @@ int dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, 
 }
 
 int dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, pcilib_dma_callback_t cb, void *cbattr) {
-    int err, ret;
+    int err, ret = 1;
     size_t res = 0;
     size_t bufnum;
     size_t bufsize;
@@ -277,28 +277,31 @@ int dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
 
-    err = dma_nwl_start(ctx, dma, PCILIB_DMA_FLAGS_DEFAULT);
+    err = dma_nwl_start(vctx, dma, PCILIB_DMA_FLAGS_DEFAULT);
     if (err) return err;
-
+    
     do {
-        bufnum = dma_nwl_wait_buffer(ctx, info, &bufsize, &eop, timeout);
-	if (bufnum == PCILIB_DMA_BUFFER_INVALID) return PCILIB_ERROR_TIMEOUT;
-
-#ifdef NWL_FIX_EOP_FOR_BIG_PACKETS
-	if (size > 65536) {
-//	    printf("%i %i\n", res + bufsize, size);
-	    if ((res+bufsize) < size) eop = 0;
-	    else if ((res+bufsize) == size) eop = 1;
+	if (ret > 2) {
+	    bufnum = dma_nwl_wait_buffer(ctx, info, &bufsize, &eop, 0);
+	    if (bufnum == PCILIB_DMA_BUFFER_INVALID) return 0;
+	} else {
+	    bufnum = dma_nwl_wait_buffer(ctx, info, &bufsize, &eop, timeout);
+	    if (bufnum == PCILIB_DMA_BUFFER_INVALID) {
+		if (ret == 1) return PCILIB_ERROR_TIMEOUT;
+		return 0;
+	    }
 	}
-#endif /*  NWL_FIX_EOP_FOR_BIG_PACKETS */
+
+	    // EOP is not respected in IPE Camera
+	if (ctx->dmactx.ignore_eop) eop = 1;
 	
 	pcilib_kmem_sync_block(ctx->pcilib, info->pages, PCILIB_KMEM_SYNC_FROMDEVICE, bufnum);
         void *buf = pcilib_kmem_get_block_ua(ctx->pcilib, info->pages, bufnum);
-	ret = cb(cbattr, eop?PCILIB_DMA_FLAG_EOP:0, bufsize, buf);
+	ret = cb(cbattr, (eop?PCILIB_DMA_FLAG_EOP:0), bufsize, buf);
 //	DS: Fixme, it looks like we can avoid calling this for the sake of performance
 //	pcilib_kmem_sync_block(ctx->pcilib, info->pages, PCILIB_KMEM_SYNC_TODEVICE, bufnum);
+	if (ret < 0) return -ret;
 	dma_nwl_return_buffer(ctx, info);
-
 	
 	res += bufsize;
 
@@ -306,3 +309,9 @@ int dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
     
     return 0;
 }
+
+int dma_nwl_wait_completion(nwl_dma_t * ctx, pcilib_dma_engine_t dma, pcilib_timeout_t timeout) {
+    if (dma_nwl_get_next_buffer(ctx, ctx->engines + dma, PCILIB_NWL_DMA_PAGES - 1, PCILIB_DMA_TIMEOUT) == (PCILIB_NWL_DMA_PAGES - 1)) return 0;
+    else return PCILIB_ERROR_TIMEOUT;
+}
+

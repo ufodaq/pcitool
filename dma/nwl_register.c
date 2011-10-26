@@ -26,8 +26,10 @@ int nwl_add_registers(nwl_dma_t *ctx) {
     err = pcilib_add_registers(ctx->pcilib, 0, nwl_dma_registers);
     if (err) return err;
 
-    err = pcilib_add_registers(ctx->pcilib, 0, nwl_xrawdata_registers);
-    if (err) return err;
+    if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) {
+	err = pcilib_add_registers(ctx->pcilib, 0, nwl_xrawdata_registers);
+	if (err) return err;
+    }
 
     
     for (n = 0; nwl_dma_engine_registers[n].bits; n++) {

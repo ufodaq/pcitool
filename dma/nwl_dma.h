@@ -9,7 +9,7 @@
 pcilib_dma_context_t *dma_nwl_init(pcilib_t *ctx, pcilib_dma_modification_t type, void *arg);
 void  dma_nwl_free(pcilib_dma_context_t *vctx);
 
-int dma_nwl_get_status(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers);
+int dma_nwl_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers);
 
 int dma_nwl_enable_irq(pcilib_dma_context_t *vctx, pcilib_irq_type_t type, pcilib_dma_flags_t flags);
 int dma_nwl_disable_irq(pcilib_dma_context_t *vctx, pcilib_dma_flags_t flags);

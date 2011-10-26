@@ -81,7 +81,7 @@ int dma_nwl_disable_irq(pcilib_dma_context_t *vctx, pcilib_dma_flags_t flags) {
 int dma_nwl_enable_engine_irq(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     uint32_t val;
     
-    dma_nwl_enable_irq(ctx, PCILIB_DMA_IRQ, 0);
+    dma_nwl_enable_irq((pcilib_dma_context_t*)ctx, PCILIB_DMA_IRQ, 0);
 
     nwl_read_register(val, ctx, ctx->engines[dma].base_addr, REG_DMA_ENG_CTRL_STATUS);
     val |= (DMA_ENG_INT_ENABLE);

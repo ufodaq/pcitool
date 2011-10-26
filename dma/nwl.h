@@ -8,7 +8,7 @@ typedef struct pcilib_nwl_engine_description_s pcilib_nwl_engine_description_t;
 
 #define NWL_XAUI_ENGINE 0
 #define NWL_XRAWDATA_ENGINE 1
-#define NWL_FIX_EOP_FOR_BIG_PACKETS		// requires precise sizes in read requests
+#define NWL_MAX_PACKET_SIZE 4096 //16384
 //#define NWL_GENERATE_DMA_IRQ
 
 #define PCILIB_NWL_ALIGNMENT 			64  // in bytes
@@ -44,6 +44,8 @@ struct pcilib_nwl_engine_description_s {
 
 
 struct nwl_dma_s {
+    struct pcilib_dma_context_s dmactx;
+    
     pcilib_t *pcilib;
     
     pcilib_dma_modification_t type;

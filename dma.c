@@ -168,20 +168,29 @@ typedef struct {
     size_t size;
     void *data;
     size_t pos;
+    
+    pcilib_dma_flags_t flags;
 } pcilib_dma_read_callback_context_t;
 
 static int pcilib_dma_read_callback(void *arg, pcilib_dma_flags_t flags, size_t bufsize, void *buf) {
     pcilib_dma_read_callback_context_t *ctx = (pcilib_dma_read_callback_context_t*)arg;
     
     if (ctx->pos + bufsize > ctx->size) {
-	pcilib_error("Buffer size (%li) is not large enough for DMA packet, at least %li bytes is required", ctx->size, ctx->pos + bufsize); 
-	return PCILIB_ERROR_INVALID_DATA;
+	if ((ctx->flags&PCILIB_DMA_FLAG_IGNORE_ERRORS) == 0)
+	    pcilib_error("Buffer size (%li) is not large enough for DMA packet, at least %li bytes is required", ctx->size, ctx->pos + bufsize); 
+	return -PCILIB_ERROR_TOOBIG;
     }
     
     memcpy(ctx->data + ctx->pos, buf, bufsize);
     ctx->pos += bufsize;
 
-    if (flags & PCILIB_DMA_FLAG_EOP) return 0;
+    if (flags & PCILIB_DMA_FLAG_EOP) {
+	if ((ctx->pos < ctx->size)&&(ctx->flags&PCILIB_DMA_FLAG_MULTIPACKET)) {
+	    if (ctx->flags&PCILIB_DMA_FLAG_WAIT) return 2;
+	    else return 3;
+	}
+	return 0;
+    }
     return 1;
 }
 
@@ -229,17 +238,30 @@ int pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, si
     return ctx->model_info.dma_api->stream(ctx->dma_ctx, dma, addr, size, flags, timeout, cb, cbattr);
 }
 
+int pcilib_read_dma_custom(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, void *buf, size_t *read_bytes) {
+    int err; 
+
+    pcilib_dma_read_callback_context_t opts = {
+	size, buf, 0, flags
+    };
+    
+    err = pcilib_stream_dma(ctx, dma, addr, size, flags, timeout, pcilib_dma_read_callback, &opts);
+    if (read_bytes) *read_bytes = opts.pos;
+    return err;
+}
+
 int pcilib_read_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf, size_t *read_bytes) {
     int err; 
 
     pcilib_dma_read_callback_context_t opts = {
-	size, buf, 0
+	size, buf, 0, 0
     };
     
     err = pcilib_stream_dma(ctx, dma, addr, size, PCILIB_DMA_FLAGS_DEFAULT, PCILIB_DMA_TIMEOUT, pcilib_dma_read_callback, &opts);
     if (read_bytes) *read_bytes = opts.pos;
     return err;
 }
+
 
 int pcilib_skip_dma(pcilib_t *ctx, pcilib_dma_engine_t dma) {
     int err;

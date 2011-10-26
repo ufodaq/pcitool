@@ -11,7 +11,8 @@
 
 typedef struct pcilib_s pcilib_t;
 typedef void pcilib_context_t;
-typedef void pcilib_dma_context_t;
+typedef struct pcilib_dma_context_s pcilib_dma_context_t;
+
 
 typedef struct pcilib_dma_api_description_s pcilib_dma_api_description_t;
 typedef struct pcilib_event_api_description_s pcilib_event_api_description_t;
@@ -63,9 +64,11 @@ typedef enum {
 
 typedef enum {
     PCILIB_DMA_FLAGS_DEFAULT = 0,
-    PCILIB_DMA_FLAG_EOP = 1,
-    PCILIB_DMA_FLAG_WAIT = 2,
-    PCILIB_DMA_FLAG_PERSISTENT = 4
+    PCILIB_DMA_FLAG_EOP = 1,		/**< last buffer of the packet */
+    PCILIB_DMA_FLAG_WAIT = 2,		/**< wait completion of write operation / wait for data during read operation */
+    PCILIB_DMA_FLAG_MULTIPACKET = 4,	/**< read multiple packets */
+    PCILIB_DMA_FLAG_PERSISTENT = 8,	/**< do not stop DMA engine on application termination / permanently close DMA engine on dma_stop */
+    PCILIB_DMA_FLAG_IGNORE_ERRORS = 16	/**< do not crash on errors, but return appropriate error codes */
 } pcilib_dma_flags_t;
 
 typedef enum {
@@ -102,7 +105,20 @@ typedef enum {
 #define PCILIB_TIMEOUT_TRIGGER		0
 #define PCILIB_IRQ_SOURCE_DEFAULT	0
 
-typedef int (*pcilib_dma_callback_t)(void *ctx, pcilib_dma_flags_t flags, size_t bufsize, void *buf);
+/**<
+ * Callback function called when new data is read by DMA streaming function
+ * @ctx - DMA Engine context
+ * @flags - DMA Flags
+ * @bufsize - size of data in bytes
+ * @buf - data
+ * @returns 
+ * <0 - error, stop streaming (the value is negative error code)
+ *  0 - stop streaming
+ *  1 - wait & read next buffer, fail if no data
+ *  2 - wait & read next buffer, but don't fail if timeout expired
+ *  3 - read next buffer if available (don't wait), don't fail
+ */
+typedef int (*pcilib_dma_callback_t)(void *ctx, pcilib_dma_flags_t flags, size_t bufsize, void *buf); 
 typedef int (*pcilib_event_callback_t)(pcilib_event_t event, pcilib_event_id_t event_id, void *user);
 
 typedef struct {
@@ -237,6 +253,7 @@ int pcilib_skip_dma(pcilib_t *ctx, pcilib_dma_engine_t dma);
 int pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, pcilib_dma_callback_t cb, void *cbattr);
 int pcilib_push_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, void *buf, size_t *written_bytes);
 int pcilib_read_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf, size_t *read_bytes);
+int pcilib_read_dma_custom(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, void *buf, size_t *read_bytes);
 int pcilib_write_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, void *buf, size_t *written_bytes);
 double pcilib_benchmark_dma(pcilib_t *ctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction);
 

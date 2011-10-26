@@ -88,6 +88,10 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib, pcilib_dma_modification_t t
 	ctx->pcilib = pcilib;
 	ctx->type = type;
 
+	if (type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
+	    ctx->dmactx.ignore_eop = 1;
+	}
+
 	pcilib_register_bank_t dma_bank = pcilib_find_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
 	if (dma_bank == PCILIB_REGISTER_BANK_INVALID) {
 	    free(ctx);
@@ -132,7 +136,7 @@ void  dma_nwl_free(pcilib_dma_context_t *vctx) {
     if (ctx) {
 	if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) dma_nwl_stop_loopback(ctx);
 	dma_nwl_free_irq(ctx);
-	dma_nwl_stop(ctx, PCILIB_DMA_ENGINE_ALL, PCILIB_DMA_FLAGS_DEFAULT);
+	dma_nwl_stop(vctx, PCILIB_DMA_ENGINE_ALL, PCILIB_DMA_FLAGS_DEFAULT);
 	    
 	free(ctx);
     }
