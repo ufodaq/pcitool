@@ -145,6 +145,30 @@ DMA Access Synchronization
     user to check their consistency and restart DMA engine.]
     
     IRQs are enabled and disabled at each call
+
+DMA Reads
+=========
+standard: 		default reading mode, reads a single full packet
+multipacket:		reads all available packets
+waiting multipacket:	reads all available packets, after finishing the
+			last one waiting if new data arrives
+exact read:		read exactly specified number of bytes (should be
+			only supported if it is multiple of packets, otherwise
+			error should be returned)
+ignore packets:		autoterminate each buffer, depends on engine 
+			configuration
+autogrow:		automatic memory allocation, only through streaming
+
+			first |  new_pkt  | bufer 
+			--------------------------	
+standard		wait  | term      | wait  
+multiple packets	wait  | check	  | wait 	- DMA_READ_FLAG_MULTIPACKET 	
+waiting multipacket	wait  | wait      | wait 	- DMA_READ_FLAG_WAIT
+exact			wait  | wait/term | wait	- limited by size parameter
+ignore packets		wait  | check	  | check 	- just autoterminated
+autogrow						
+
+Shall we do a special handling in case of overflow?
     
 Register Access Synchronization
 ===============================
