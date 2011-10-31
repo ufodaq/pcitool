@@ -84,6 +84,7 @@ pcilib_register_description_t ipecamera_registers[] = {
 {0x90,	0, 	32, 	0,	0, PCILIB_REGISTER_R,  PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "end_address", ""},
 {0x100,	0, 	32, 	0,	0, PCILIB_REGISTER_R,  PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "last_write_address", ""},
 {0x110,	0, 	32, 	0,	0, PCILIB_REGISTER_R,  PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "last_write_value", ""},
+{0x160,	0, 	32, 	0, 	0, PCILIB_REGISTER_R , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "reg9160",  ""},
 {0,	0,	0,	0,	0, 0,                  0,                        0,                     NULL, NULL}
 };
 

@@ -23,31 +23,36 @@
 #endif /* IPECAMERA_DEBUG */
 
 
-#define IPECAMERA_SLEEP_TIME 250000
+#define IPECAMERA_SLEEP_TIME 250000 // Michele thinks 250 should be enough, but reset failing in this case
+#define IPECAMERA_NEXT_FRAME_DELAY 30000 // please don't change this value --> sync between End Of Readout and next Frame Req, by Michele 
+#define IPECAMERA_WAIT_FRAME_RCVD_TIME 0 /* by Uros ,wait 6 ms */
 #define IPECAMERA_MAX_LINES 1088
 #define IPECAMERA_DEFAULT_BUFFER_SIZE 10
 #define IPECAMERA_EXPECTED_STATUS 0x08409FFFF
-//#define IPECAMERA_EXPECTED_STATUS 0x0049FFFF
+#define IPECAMERA_END_OF_SEQUENCE 0x1F001001
 
 #define IPECAMERA_MAX_CHANNELS 16
 #define IPECAMERA_PIXELS_PER_CHANNEL 128
 #define IPECAMERA_WIDTH (IPECAMERA_MAX_CHANNELS * IPECAMERA_PIXELS_PER_CHANNEL)
-#define IPECAMERA_HEIGHT 1088
+#define IPECAMERA_HEIGHT 1088 //1088
+
+#if IPECAMERA_HEIGHT < IPECAMERA_MAX_LINES
+# undef IPECAMERA_MAX_LINES
+# define IPECAMERA_MAX_LINES IPECAMERA_HEIGHT
+#endif 
 
 //#define IPECAMERA_MEMORY 
 
-//#define IPECAMERA_FRAME_REQUEST 0x149
-//#define IPECAMERA_IDLE 		0x141
-#define IPECAMERA_FRAME_REQUEST 0x1E9
-#define IPECAMERA_READOUT	0x3E1
-#define IPECAMERA_IDLE 		0x1E1
+#define IPECAMERA_FRAME_REQUEST 		0x1E9
+#define IPECAMERA_READOUT			0x3E1
+#define IPECAMERA_IDLE 				0x1E1
+#define IPECAMERA_START_INTERNAL_STIMULI 	0x1F1
+
 
 #define IPECAMERA_WRITE_RAW
 #define IPECAMERA_REORDER_CHANNELS
 
-
 #ifdef IPECAMERA_REORDER_CHANNELS
-//int ipecamera_channel_order[10] = { 9, 7, 8, 6, 4, 2, 5, 1, 3, 0 };
 int ipecamera_channel_order[IPECAMERA_MAX_CHANNELS] = { 15, 13, 14, 12, 10, 8, 11, 7, 9, 6, 5, 2, 4, 3, 0, 1 };
 #endif 
 
@@ -156,7 +161,10 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	ctx->buffer_size = IPECAMERA_DEFAULT_BUFFER_SIZE;
 	ctx->dim.bpp = sizeof(ipecamera_pixel_t) * 8;
 
-#ifndef IPECAMERA_DMA_ADDRESS
+#ifdef IPECAMERA_DMA_ADDRESS
+	    // We need DMA engine initialized to resolve DMA registers
+//	FIND_REG(packet_len_reg, "fpga", "xrawdata_packet_length");
+#else  /* IPECAMERA_DMA_ADDRESS */
 	ctx->data = pcilib_resolve_data_space(pcilib, 0, &ctx->size);
 	if (!ctx->data) {
 	    err = -1;
@@ -174,8 +182,6 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	FIND_REG(exposure_reg, "cmosis", "exp_time");
 	FIND_REG(flip_reg, "cmosis", "image_flipping");
 	
-	FIND_REG(packet_len_reg, "dma", "xrawdata_packet_length");
-
 	ctx->rdma = PCILIB_DMA_ENGINE_INVALID;
 	ctx->wdma = PCILIB_DMA_ENGINE_INVALID;
 
@@ -205,6 +211,7 @@ pcilib_dma_context_t *ipecamera_init_dma(pcilib_context_t *vctx) {
 	pcilib_error("The DMA engine is not configured in model");
 	return NULL;
     }
+
 
 #ifdef IPECAMERA_DMA_R3
     return model_info->dma_api->init(ctx->pcilib, PCILIB_NWL_MODIFICATION_IPECAMERA, NULL);
@@ -322,10 +329,10 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     if (err) return err;
 
 
-#ifdef IPECAMERA_DMA_ADDRESS
-    SET_REG(packet_len_reg, IPECAMERA_DMA_PACKET_LENGTH);
-    if (err) return err;
-#endif /* IPECAMERA_DMA_ADDRESS */
+//#ifdef IPECAMERA_DMA_ADDRESS
+//    SET_REG(packet_len_reg, IPECAMERA_DMA_PACKET_LENGTH);
+//    if (err) return err;
+//#endif /* IPECAMERA_DMA_ADDRESS */
     
     ctx->cb = cb;
     ctx->cb_user = user;
@@ -440,10 +447,10 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
 
     ipecamera_payload_t info = payload[0];
     int channel = info&0x0F;		// 4 bits
-    int line = (info>>4)&0x7FF;		// 11 bits
+    const int line = (info>>4)&0x7FF;	// 11 bits
 					// 1 bit is reserved
-    int bpp = (info>>16)&0x0F;		// 4 bits
-    int pixels = (info>>20)&0xFF;	// 8 bits
+    const int bpp = (info>>16)&0x0F;	// 4 bits
+    const int pixels = (info>>20)&0xFF;	// 8 bits
 					// 2 bits are reserved
     int header = (info>>30)&0x03;	// 2 bits
 
@@ -451,6 +458,9 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
     
     int pix;
     int pix_offset = 0;
+    
+    const int chan_offset = channel * IPECAMERA_PIXELS_PER_CHANNEL;
+    
     ipecamera_payload_t data;
 
 #ifdef IPECAMERA_REORDER_CHANNELS
@@ -466,9 +476,10 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
     CHECK_FLAG("channel, duplicate entry for channel", ((*cbuf)&(1<<channel)) == 0, channel);
 
 	// Fixing first lines bug
+	// Matthias: Using unlikely() saves 1ms 
     if ((line < 2)&&(pixels == (IPECAMERA_PIXELS_PER_CHANNEL - 1))) {
 	pix_offset = 1;
-	pbuf[channel*IPECAMERA_PIXELS_PER_CHANNEL] = 0;
+	pbuf[chan_offset] = 0;
     } else {
 	CHECK_FLAG("number of pixels, %li is expected", pixels == IPECAMERA_PIXELS_PER_CHANNEL, pixels, IPECAMERA_PIXELS_PER_CHANNEL);
     }
@@ -488,8 +499,9 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
         CHECK_FLAG("payload data magick", header == 3, header);
 	if (err) return err;
 
+	    // DS: Unroll
         for (j = 0; j < 3; j++, pix++) {
-            pbuf[channel*IPECAMERA_PIXELS_PER_CHANNEL + pix] = (data >> (10 * (2 - j))) & 0x3FF;
+            pbuf[chan_offset + pix] = (data >> (10 * (2 - j))) & 0x3FF;
         }
     }
 
@@ -505,7 +517,7 @@ static int ipecamera_get_payload(ipecamera_t *ctx, ipecamera_pixel_t *pbuf, ipec
 
     for (j = 0; j < ppw; j++, pix++) {
 //	pbuf[channel*IPECAMERA_PIXELS_PER_CHANNEL + pix] = (data >> (10 * (ppw - j - 1))) & 0x3FF;
-        pbuf[channel*IPECAMERA_PIXELS_PER_CHANNEL + pix] = (data >> (10 * (ppw - j))) & 0x3FF;
+        pbuf[chan_offset + pix] = (data >> (10 * (ppw - j))) & 0x3FF;
     }    
 
     *cbuf |= (1 << channel);
@@ -571,7 +583,7 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
     pcilib_t *pcilib = ctx->pcilib;
 
     int num_lines;
-    const int max_lines = 1;//1088;//IPECAMERA_MAX_LINES;
+    const int max_lines = IPECAMERA_MAX_LINES;
     const size_t line_size = (IPECAMERA_MAX_CHANNELS * (2 + IPECAMERA_PIXELS_PER_CHANNEL / 3));
     const size_t hf_size = 16;
     const size_t max_size = hf_size + max_lines * line_size;
@@ -590,6 +602,14 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
     
     linebuf = (ipecamera_payload_t*)malloc(max_packet_size * sizeof(ipecamera_payload_t));
     if (!linebuf) return PCILIB_ERROR_MEMORY;
+
+	// DS: test
+    err = pcilib_skip_dma(ctx->pcilib, ctx->rdma);
+    if (err) {
+	pcilib_error("Can't start benchmark, devices continuously writes unexpected data using DMA engine");
+	return err;
+    }
+
 
 #ifdef IPECAMERA_WRITE_RAW
     FILE *f = fopen("raw/image.raw", "w");
@@ -614,7 +634,7 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
 	SET_REG(line_reg, i);
 
 	SET_REG(control_reg, IPECAMERA_FRAME_REQUEST);
-	usleep(IPECAMERA_SLEEP_TIME);
+	usleep(IPECAMERA_WAIT_FRAME_RCVD_TIME);
 	CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
 	SET_REG(control_reg, IPECAMERA_IDLE);
 
@@ -632,7 +652,16 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
 	if (err) break;
 	
 	SET_REG(control_reg, IPECAMERA_READOUT);
-		
+	    // sync between End Of Readout and next Frame Req
+	usleep(IPECAMERA_NEXT_FRAME_DELAY);  
+
+//	usleep(1000000);
+	
+//	pcilib_start_dma(ctx->pcilib, ctx->rdma, PCILIB_DMA_FLAG_PERSISTENT);
+//	pcilib_stop_dma(ctx->pcilib, ctx->rdma, PCILIB_DMA_FLAGS_DEFAULT);
+//	pcilib_start_dma(ctx->pcilib, ctx->rdma, PCILIB_DMA_FLAGS_DEFAULT);
+
+	
 #ifdef IPECAMERA_DMA_ADDRESS
 	size = 0;
 	do {
@@ -641,18 +670,19 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
 //	    printf("%lu %lu\n", bytes_read, size);
 	} while ((err == 0)&&(size < max_packet_size * sizeof(ipecamera_payload_t)));
 
+
 #ifdef DEBUG_HARDWARE
 	uint32_t regval;
 	printf("===========Lines: %i - %i =========================\n", i, i + num_lines - 1);
-	err = pcilib_read_register(ctx->pcilib, NULL, "reg9050", &regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "status", &regval);
 	printf("Status1: %i 0x%lx\n", err, regval);
-	err = pcilib_read_register(ctx->pcilib, NULL, "reg9080", &regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "start_address", &regval);
 	printf("Start address: %i 0x%lx\n", err,  regval);
-	err = pcilib_read_register(ctx->pcilib, NULL, "reg9090", &regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "end_address", &regval);
 	printf("End address: %i 0x%lx\n", err,  regval);
-	err = pcilib_read_register(ctx->pcilib, NULL, "reg9100", &regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "last_write_address", &regval);
 	printf("Status2: %i 0x%lx\n", err,  regval);
-	err = pcilib_read_register(ctx->pcilib, NULL, "reg9110", &regval);
+	err = pcilib_read_register(ctx->pcilib, NULL, "last_write_value", &regval);
 	printf("Status3: %i 0x%lx\n", err,  regval);
 	err = pcilib_read_register(ctx->pcilib, NULL, "reg9160", &regval);
 	printf("Add_rd_ddr: %i 0x%lx\n", err, regval);
@@ -691,7 +721,7 @@ static int ipecamera_get_image(ipecamera_t *ctx) {
 #endif /* IPECAMERA_DMA_ADDRESS */
 
 	SET_REG(control_reg, IPECAMERA_IDLE);
-	usleep(IPECAMERA_SLEEP_TIME);
+//	usleep(IPECAMERA_SLEEP_TIME);
 	CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
 
 	if (err) break;
