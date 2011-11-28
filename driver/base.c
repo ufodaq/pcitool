@@ -501,7 +501,6 @@ static struct file_operations pcidriver_fops = {
 };
 
 void pcidriver_module_get(pcidriver_privdata_t *privdata) {
-    try_module_get(THIS_MODULE);
     atomic_inc(&(privdata->refs));
 //    mod_info("Ref: %i\n", atomic_read(&(privdata->refs)));
 }
@@ -511,7 +510,6 @@ void pcidriver_module_put(pcidriver_privdata_t *privdata) {
 	atomic_inc(&(privdata->refs));
 	mod_info("Reference counting error...");
     } else {
-	module_put(THIS_MODULE);
 //	mod_info("Unref: %i\n", atomic_read(&(privdata->refs)));
     }
 }
