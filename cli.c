@@ -618,7 +618,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
     void *buf;
     int i, err;
     size_t ret, bytes;
-    int size = n * abs(access);
+    size_t size = n * abs(access);
     int block_width, blocks_per_line;
     int numbers_per_block, numbers_per_line; 
     pcilib_dma_engine_t dmaid;
@@ -633,7 +633,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
 
     if (size) {
 	buf = malloc(size);
-        if (!buf) Error("Allocation of %i bytes of memory have failed", size);
+        if (!buf) Error("Allocation of %zu bytes of memory has failed", size);
     } else {
 	buf = NULL;
     }
@@ -658,6 +658,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
 	    do {
 		size *= 2;
 		buf = realloc(buf, size);
+		if (!buf) Error("Allocation of %zu bytes of memory has failed", size);
 	        err = pcilib_read_dma_custom(handle, dmaid, addr, size - bytes, dma_flags, timeout, buf + bytes, &ret);
 		bytes += ret;
 		
