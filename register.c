@@ -141,6 +141,8 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
     
     pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
     pcilib_register_bank_description_t *b = model_info->banks + bank;
+    
+    int access = b->access / 8;
 
     assert(bits < 8 * sizeof(pcilib_register_value_t));
     
@@ -162,13 +164,13 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
     //bits %= b->access; 
     
     for (i = 0; i < n; i++) {
-	err = pcilib_protocol[b->protocol].read(ctx, b, addr + i, buf + i);
+	err = pcilib_protocol[b->protocol].read(ctx, b, addr + i * access, buf + i);
 	if (err) break;
     }
     
     if ((bits > 0)&&(!err)) {
 	pcilib_register_value_t val = 0;
-	err = pcilib_protocol[b->protocol].read(ctx, b, addr + n, &val);
+	err = pcilib_protocol[b->protocol].read(ctx, b, addr + n * access, &val);
 
 	val = (val >> offset)&BIT_MASK(bits);
 	memcpy(buf + n, &val, sizeof(pcilib_register_value_t));
@@ -250,6 +252,8 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
     pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
     pcilib_register_bank_description_t *b = model_info->banks + bank;
 
+    int access = b->access / 8;
+
     assert(bits < 8 * sizeof(pcilib_register_value_t));
 
     if (((addr + n) > b->size)||(((addr + n) == b->size)&&(bits))) {
@@ -270,7 +274,7 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
     //bits %= b->access; 
     
     for (i = 0; i < n; i++) {
-	err = pcilib_protocol[b->protocol].write(ctx, b, addr + i, buf[i]);
+	err = pcilib_protocol[b->protocol].write(ctx, b, addr + i * access, buf[i]);
 	if (err) break;
     }
     
@@ -281,13 +285,13 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
 	if (~mask&rwmask) {
 	    pcilib_register_value_t rval;
 	    
-	    err = pcilib_protocol[b->protocol].read(ctx, b, addr + n, &rval); 
+	    err = pcilib_protocol[b->protocol].read(ctx, b, addr + n * access, &rval); 
 	    if (err) return err;
 	    
 	    val |= (rval & rwmask & ~mask);
 	}
 	
-	err = pcilib_protocol[b->protocol].write(ctx, b, addr + n, val);
+	err = pcilib_protocol[b->protocol].write(ctx, b, addr + n * access, val);
     }
     
     return err;
