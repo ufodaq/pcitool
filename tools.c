@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 
 #include "tools.h"
 
@@ -238,7 +239,6 @@ void *pcilib_datacpy32(void * dst, void const * src, uint8_t size, size_t n, pci
     }
 } 
 
-
 int pcilib_get_page_mask() {
     int pagesize,pagemask,temp;
 
@@ -249,4 +249,41 @@ int pcilib_get_page_mask() {
 	pagemask = (pagemask << 1)+1;
     }
     return pagemask;
+}
+
+int calc_deadline(struct timeval *tv, pcilib_timeout_t timeout) {
+    gettimeofday(tv, NULL);
+    tv->tv_usec += timeout%1000000;
+    if (tv->tv_usec > 999999) {
+	tv->tv_usec -= 1000000;
+	tv->tv_sec = 1 + timeout/1000000;
+    } else {
+	tv->tv_sec = timeout/1000000;
+    }
+    
+    return 0;
+}
+
+int check_deadline(struct timeval *tve, pcilib_timeout_t timeout) {
+    int64_t res;
+    struct timeval tvs;
+    
+    if (!tve->tv_sec) return 0;
+    
+    gettimeofday(&tvs, NULL);
+    res = ((tve->tv_sec - tvs.tv_sec)*1000000 + (tve->tv_usec - tvs.tv_usec));
+    if (res < timeout) return 1;
+
+    return 0;
+}
+
+pcilib_timeout_t calc_time_to_deadline(struct timeval *tve) {
+    int64_t res;
+    struct timeval tvs;
+    
+    gettimeofday(&tvs, NULL);
+    res = ((tve->tv_sec - tvs.tv_sec)*1000000 + (tve->tv_usec - tvs.tv_usec));
+    
+    if (res < 0) return 0;
+    return res;
 }

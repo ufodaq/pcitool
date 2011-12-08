@@ -53,9 +53,9 @@ struct pcilib_s {
 # include "default.h"
 
 pcilib_model_description_t pcilib_model[3] = {
-    { 4, PCILIB_HOST_ENDIAN, 	NULL, NULL, NULL, NULL, NULL },
-    { 4, PCILIB_HOST_ENDIAN, 	NULL, NULL, NULL, NULL, NULL },
-    { 4, PCILIB_LITTLE_ENDIAN,	ipecamera_registers, ipecamera_register_banks, ipecamera_register_ranges, ipecamera_events, &nwl_dma_api, &ipecamera_image_api }
+    { 4, PCILIB_HOST_ENDIAN, 	NULL, NULL, NULL, NULL, NULL, NULL },
+    { 4, PCILIB_HOST_ENDIAN, 	NULL, NULL, NULL, NULL, NULL, NULL },
+    { 4, PCILIB_LITTLE_ENDIAN,	ipecamera_registers, ipecamera_register_banks, ipecamera_register_ranges, ipecamera_events, ipecamera_data_types, &nwl_dma_api, &ipecamera_image_api }
 };
 
 pcilib_protocol_description_t pcilib_protocol[3] = {

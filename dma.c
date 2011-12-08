@@ -186,12 +186,13 @@ static int pcilib_dma_read_callback(void *arg, pcilib_dma_flags_t flags, size_t 
 
     if (flags & PCILIB_DMA_FLAG_EOP) {
 	if ((ctx->pos < ctx->size)&&(ctx->flags&PCILIB_DMA_FLAG_MULTIPACKET)) {
-	    if (ctx->flags&PCILIB_DMA_FLAG_WAIT) return 2;
-	    else return 3;
+	    if (ctx->flags&PCILIB_DMA_FLAG_WAIT) return PCILIB_STREAMING_WAIT;
+	    else return PCILIB_STREAMING_CONTINUE;
 	}
-	return 0;
+	return PCILIB_STREAMING_STOP;
     }
-    return 1;
+    
+    return PCILIB_STREAMING_REQ_FRAGMENT;
 }
 
 static int pcilib_dma_skip_callback(void *arg, pcilib_dma_flags_t flags, size_t bufsize, void *buf) {
@@ -200,10 +201,10 @@ static int pcilib_dma_skip_callback(void *arg, pcilib_dma_flags_t flags, size_t 
     
     if (tv) {
 	gettimeofday(&cur, NULL);
-	if ((cur.tv_sec > tv->tv_sec)||((cur.tv_sec == tv->tv_sec)&&(cur.tv_usec > tv->tv_usec))) return 0;
+	if ((cur.tv_sec > tv->tv_sec)||((cur.tv_sec == tv->tv_sec)&&(cur.tv_usec > tv->tv_usec))) return PCILIB_STREAMING_STOP;
     }
     
-    return 1;
+    return PCILIB_STREAMING_REQ_PACKET;
 }
 
 int pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, pcilib_dma_callback_t cb, void *cbattr) {

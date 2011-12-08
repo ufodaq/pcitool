@@ -157,19 +157,47 @@ exact read:		read exactly specified number of bytes (should be
 			error should be returned)
 ignore packets:		autoterminate each buffer, depends on engine 
 			configuration
-autogrow:		automatic memory allocation, only through streaming
+
+ To handle differnt cases, the value returned by callback function instructs
+the DMA library how long to wait for the next data to appear before timing 
+out. The following variants are possible:
+terminate:		just bail out
+check:			no timeout, just check if there is data, otherwise 
+			terminate
+timeout:		standard DMA timeout, normaly used while receiving
+			fragments of packet: in this case it is expected 
+			that device has already prepared data and only
+			the performance of DMA engine limits transfer speed
+wait:			wait until the data is prepared by the device, this
+			timeout is specified as argument to the dma_stream
+			function (standard DMA timeout is used by default)
 
 			first |  new_pkt  | bufer 
 			--------------------------	
-standard		wait  | term      | wait  
-multiple packets	wait  | check	  | wait 	- DMA_READ_FLAG_MULTIPACKET 	
-waiting multipacket	wait  | wait      | wait 	- DMA_READ_FLAG_WAIT
-exact			wait  | wait/term | wait	- limited by size parameter
-ignore packets		wait  | check	  | check 	- just autoterminated
-autogrow						
+standard		wait  | term      | timeout  
+multiple packets	wait  | check	  | timeout 	- DMA_READ_FLAG_MULTIPACKET 	
+waiting multipacket	wait  | wait      | timeout 	- DMA_READ_FLAG_WAIT
+exact			wait  | wait/term | timeout	- limited by size parameter
+ignore packets		wait  | wait/check| wait/check 	- just autoterminated
 
 Shall we do a special handling in case of overflow?
     
+
+Buffering
+=========
+ The DMA addresses are limited to 32 bits (~4GB for everything). This means we 
+ can't really use DMA pages are sole buffers. Therefore,
+ 1. In streaming mode a second thread will be spawned copying the data from the
+    DMA pages into the allocated buffers. On duration expiration this thread
+    will be stopped but processing will continue until all copyied data is 
+    passed to the callbacks.
+ 2. In synchronous mode, a single event will be extracted from the the DMA
+    memory.
+
+ - Actually, we can make another in-module buffering. But this hopefully can
+ be avoided.
+
+
 Register Access Synchronization
 ===============================
  We need to serialize access to the registers by the different running 

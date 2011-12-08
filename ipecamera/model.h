@@ -10,7 +10,7 @@
 
 #define IPECAMERA_DMA_R3
 #define IPECAMERA_DMA_ADDRESS 1
-#define IPECAMERA_DMA_PACKET_LENGTH 4096 
+#define IPECAMERA_DMA_PACKET_LENGTH 4096
 
 //#define IPECAMERA_REGISTER_SPACE 0xfeaffc00
 #define IPECAMERA_REGISTER_SPACE 0x9000
@@ -96,8 +96,14 @@ pcilib_register_range_t ipecamera_register_ranges[] = {
 };
 
 pcilib_event_description_t ipecamera_events[] = {
-    {"new_frame", ""},
-    {NULL, NULL}
+    {PCILIB_EVENT0, "new_frame", ""},
+    {0, NULL, NULL}
+};
+
+pcilib_event_data_type_description_t ipecamera_data_types[] = {
+    {IPECAMERA_IMAGE_DATA, PCILIB_EVENT0, "image", "16 bit pixel data" },
+    {IPECAMERA_RAW_DATA, PCILIB_EVENT0, "raw", "raw data from camera" },
+    {0, 0, NULL, NULL}
 };
 
 #else
@@ -105,6 +111,7 @@ extern pcilib_register_description_t ipecamera_registers[];
 extern pcilib_register_bank_description_t ipecamera_register_banks[];
 extern pcilib_register_range_t ipecamera_register_ranges[];
 extern pcilib_event_description_t ipecamera_events[];
+extern pcilib_event_data_type_description_t ipecamera_data_types[];
 #endif 
 
 #ifdef _IPECAMERA_IMAGE_C
@@ -117,7 +124,8 @@ pcilib_event_api_description_t ipecamera_image_api = {
     ipecamera_stop,
     ipecamera_trigger,
     
-    ipecamera_next_event,
+    ipecamera_stream,
+    NULL, //ipecamera_next_event,
     ipecamera_get,
     ipecamera_return,
     ipecamera_init_dma

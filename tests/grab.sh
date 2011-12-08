@@ -5,7 +5,7 @@ function pci {
     LD_LIBRARY_PATH="$PCILIB_PATH" $PCILIB_PATH/pci $*
 }
 
-rm image.raw
+rm -f image.raw
 
 echo "Reset..."
 pci --reset

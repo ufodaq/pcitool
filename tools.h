@@ -33,4 +33,9 @@ void * pcilib_datacpy32(void * dst, void const * src, uint8_t size, size_t n, pc
 
 int pcilib_get_page_mask();
 
+
+int calc_deadline(struct timeval *tv, pcilib_timeout_t timeout);
+int check_deadline(struct timeval *tve, pcilib_timeout_t timeout);
+pcilib_timeout_t calc_time_to_deadline(struct timeval *tve);
+
 #endif /* _PCITOOL_TOOS_H */

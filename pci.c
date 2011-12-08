@@ -45,7 +45,6 @@ int pcilib_set_error_handler(void (*err)(const char *msg, ...), void (*warn)(con
 }
 
 pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
-    pcilib_event_api_description_t *api;
     pcilib_t *ctx = malloc(sizeof(pcilib_t));
 
     if (ctx) {
@@ -65,8 +64,7 @@ pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
 	
 	memcpy(&ctx->model_info, pcilib_model + model, sizeof(pcilib_model_description_t));
 
-	api = pcilib_model[model].event_api;
-        if ((api)&&(api->init)) ctx->event_ctx = api->init(ctx);
+	pcilib_init_event_engine(ctx);
     }
 
     return ctx;

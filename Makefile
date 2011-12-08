@@ -2,7 +2,8 @@ BINARIES += pci
 
 INCDIR += ./
 LDINC += $(addprefix -L ,$(LIBDIR))
-LDFLAGS += 
+LDFLAGS += -pthread
+CFLAGS += -pthread
 DESTDIR ?= /usr/local
 
 all: $(BINARIES)
@@ -14,13 +15,13 @@ include common.mk
 ###############################################################
 # Target definitions
 
-OBJECTS = pci.o register.o kmem.o irq.o dma.o event.o default.o tools.o dma/nwl.o dma/nwl_register.o dma/nwl_irq.o dma/nwl_engine.o dma/nwl_loopback.o ipecamera/model.o ipecamera/image.o 
+OBJECTS = pci.o pcitool/sysinfo.o register.o kmem.o irq.o dma.o event.o default.o tools.o dma/nwl.o dma/nwl_register.o dma/nwl_irq.o dma/nwl_engine.o dma/nwl_loopback.o ipecamera/model.o ipecamera/image.o 
 
 libpcilib.so: $(OBJECTS)
 	echo -e "LD \t$@"
 	$(Q)$(CC) $(LDINC) $(LDFLAGS) $(CFLAGS) -shared -o $@ $(OBJECTS)
 
-pci: cli.o libpcilib.so
+pci: cli.o pcitool/sysinfo.o libpcilib.so
 	echo -e "LD \t$@"
 	$(Q)$(CC) $(LDINC) $(LDFLAGS) $(CFLAGS) -L. -lpcilib -o $@ $<
 

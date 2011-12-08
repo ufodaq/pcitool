@@ -16,8 +16,11 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <pthread.h>
 
 #include <getopt.h>
+
+#include "pcitool/sysinfo.h"
 
 //#include "pci.h"
 #include "tools.h"
@@ -44,6 +47,11 @@
 #define isxnumber_n pcilib_isxnumber_n
 
 typedef uint8_t access_t;
+
+typedef enum {
+    GRAB_MODE_GRAB = 1,
+    GRAB_MODE_TRIGGER = 2
+} GRAB_MODE;
 
 typedef enum {
     MODE_INVALID,
@@ -78,6 +86,19 @@ typedef enum {
     FLAG_WAIT = 2
 } FLAGS;
 
+
+typedef enum {
+    FORMAT_RAW,
+    FORMAT_HEADER,
+    FORMAT_RINGFS
+} FORMAT;
+
+typedef enum {
+    PARTITION_UNKNOWN,
+    PARTITION_RAW,
+    PARTITION_EXT4
+} PARTITION;
+
 typedef enum {
     OPT_DEVICE = 'd',
     OPT_MODEL = 'm',
@@ -96,6 +117,14 @@ typedef enum {
     OPT_HELP = 'h',
     OPT_RESET = 128,
     OPT_BENCHMARK,
+    OPT_TRIGGER,
+    OPT_DATA_TYPE,
+    OPT_EVENT,
+    OPT_TRIGGER_RATE,
+    OPT_TRIGGER_TIME,
+    OPT_RUN_TIME,
+    OPT_FORMAT,
+    OPT_BUFFER,
     OPT_LIST_DMA,
     OPT_LIST_DMA_BUFFERS,
     OPT_READ_DMA_BUFFER,
@@ -128,6 +157,14 @@ static struct option long_options[] = {
     {"read",			optional_argument, 0, OPT_READ },
     {"write",			optional_argument, 0, OPT_WRITE },
     {"grab",			optional_argument, 0, OPT_GRAB },
+    {"trigger",			optional_argument, 0, OPT_TRIGGER },
+    {"data",			required_argument, 0, OPT_DATA_TYPE },
+    {"event",			required_argument, 0, OPT_EVENT },
+    {"run-time",		required_argument, 0, OPT_RUN_TIME },
+    {"trigger-rate",		required_argument, 0, OPT_TRIGGER_RATE },
+    {"trigger-time",		required_argument, 0, OPT_TRIGGER_TIME },
+    {"format",			required_argument, 0, OPT_FORMAT },
+    {"buffer",			optional_argument, 0, OPT_BUFFER },
     {"start-dma",		required_argument, 0, OPT_START_DMA },
     {"stop-dma",		optional_argument, 0, OPT_STOP_DMA },
     {"list-dma-engines",	no_argument, 0, OPT_LIST_DMA },
@@ -168,10 +205,13 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   -l[l]			- List (detailed) Data Banks & Registers\n"
 "   -r <addr|reg|dmaX>		- Read Data/Register\n"
 "   -w <addr|reg|dmaX>		- Write Data/Register\n"
-"   -g [event]			- Grab Event\n"
 "   --benchmark <barX|dmaX>	- Performance Evaluation\n"
 "   --reset			- Reset board\n"
 "   --help			- Help message\n"
+"\n"
+"  Event Modes:\n"
+"   --trigger [event]		- Trigger Events\n"
+"   -g [event]			- Grab Events\n"
 "\n"
 "  DMA Modes:\n"
 "   --start-dma <num>[r|w]	- Start specified DMA engine\n"
@@ -183,7 +223,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "\n"
 "  Kernel Modes:\n"
 "   --list-kernel-memory 	- List kernel buffers\n"
-"   --read-kernel-memory <blk>	- Read the specified block of the kernel memory,\n"
+"   --read-kernel-memory <blk>	- Read the specified block of the kernel memory\n"
 "				  block is specified as: use:block_number\n"
 "   --free-kernel-memory <use>	- Cleans lost kernel space buffers (DANGEROUS)\n"
 "	dma			- Remove all buffers allocated by DMA subsystem\n"
@@ -202,6 +242,19 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   -e <l|b>			- Endianess Little/Big (default: host)\n"
 "   -o <file>			- Append output to file (default: stdout)\n"
 "   -t <timeout> 		- Timeout in microseconds\n"
+"\n"
+"  Event Options:\n"
+"   --event <evt>		- Specifies event for trigger and grab modes\n"
+"   --data <type>		- Data type to request for the events\n"
+"   --run-time <us>		- Grab/trigger events during the specified time\n"
+"   --trigger-rate <tps>	- Generate tps triggers per second\n"
+"   --trigger-time <us>		- Specifies delay between triggers in microseconds\n"
+"   -s <num|unlimited> 		- Number of events to grab and trigger\n"
+"   --format [type]		- Specifies how event data should be stored\n"
+"	raw			- Just write all events sequentially\n"
+"	add_header		- Prefix events with 256 bit header\n"
+"	ringfs			- Write to RingFS\n"
+"   --buffer [size]		- Request data buffering, size in MB\n"
 "\n"
 "  DMA Options:\n"
 "   --multipacket		- Read multiple packets\n"
@@ -237,10 +290,11 @@ void Silence(const char *format, ...) {
 }
 
 void List(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, int details) {
-    int i;
+    int i,j;
     pcilib_register_bank_description_t *banks;
     pcilib_register_description_t *registers;
     pcilib_event_description_t *events;
+    pcilib_event_data_type_description_t *types;
 
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
     const pcilib_dma_info_t *dma_info = pcilib_get_dma_info(handle);
@@ -358,7 +412,10 @@ void List(pcilib_t *handle, pcilib_model_description_t *model_info, const char *
     }
 
     if (bank == (char*)-1) events = NULL;
-    else events = model_info->events;
+    else {
+	events = model_info->events;
+	types = model_info->data_types;
+    }
 
     if (events) {
 	printf("Events: \n");
@@ -366,6 +423,17 @@ void List(pcilib_t *handle, pcilib_model_description_t *model_info, const char *
 	    printf(" %s", events[i].name);
 	    if ((events[i].description)&&(events[i].description[0])) {
 		printf(": %s", events[i].description);
+	    }
+	    
+	    if (types) {
+		for (j = 0; types[j].name; j++) {
+		    if (types[j].evid & events[i].evid) {
+			printf("\n    %s", types[j].name);
+			if ((types[j].description)&&(types[j].description[0])) {
+			    printf(": %s", types[j].description);
+			}
+		    }
+		}
 	    }
 	}
 	printf("\n");
@@ -998,18 +1066,29 @@ int WriteRegister(pcilib_t *handle, pcilib_model_description_t *model_info, cons
     return 0;
 }
 
-int Grab(pcilib_t *handle, const char *event, FILE *o) {
-    int err;
+typedef struct {
+    pcilib_t *handle;
+    pcilib_event_t event;
+    pcilib_event_data_type_t data;
+    FILE *output;
+
+    size_t run_time;
+    size_t trigger_time;    
     
-    void *data = NULL;
+    int run_flag;
+} GRABContext;
+
+int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user) {
+/*    int err;
+    void *data;
     size_t size, written;
     
-    // ignoring event for now
-	
-    err = pcilib_grab(handle, PCILIB_EVENTS_ALL, &size, &data, PCILIB_TIMEOUT_TRIGGER);
-    if (err) {
-	Error("Grabbing event is failed");
-    }
+    GRABContext *ctx = (GRABContext*)user;
+    pcilib_t *handle = ctx->handle;
+    FILE *o = ctx->output;
+    
+    data = pcilib_get_data(handle, ctx->event, ctx->data, &size);
+    if (!data) Error("Internal Error: No data is provided to event callback");
 
     if (o) printf("Writting %zu bytes into file...\n", size);
     else o = stdout;
@@ -1020,10 +1099,75 @@ int Grab(pcilib_t *handle, const char *event, FILE *o) {
 	else Error("Write failed");
     }
     
+    pcilib_return_data(handle, ctx->event, data);
+*/
+
+    printf("data callback: %lu\n", event_id);    
+}
+
+int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event_flags_t flags, size_t size, void *data, void *user) {
+//    printf("%i\n", event_id);
+}
+
+void *Trigger(void *user) {
+    GRABContext *ctx = (GRABContext*)user;
+    
+    pcilib_trigger(ctx->handle, PCILIB_EVENT0, 0, NULL);
+    usleep(3000);
+    pcilib_trigger(ctx->handle, PCILIB_EVENT0, 0, NULL);
+    
+    return NULL;
+}
+
+int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, const char *data_type, size_t num, size_t run_time, size_t trigger_time, PARTITION partition, FORMAT format, size_t buffer_size, FILE *ofile) {
+    int err;
+    GRABContext ctx;    
+    void *data = NULL;
+    size_t size, written;
+
+    pthread_t trigger_thread;
+
+    ctx.handle = handle;
+    ctx.output = ofile;
+    ctx.event = PCILIB_EVENT0;
+    ctx.run_time = run_time;
+    ctx.trigger_time = trigger_time;
+    
+    ctx.run_flag = 1;
+    
+    // ignoring event for now
+    pcilib_configure_autostop(handle, 2, 1000000);//PCILIB_TIMEOUT_TRIGGER);
+    pcilib_configure_rawdata_callback(handle, &raw_data, NULL);
+
+    err = pcilib_start(handle, PCILIB_EVENTS_ALL, PCILIB_EVENT_FLAGS_DEFAULT);
+    if (err) Error("Failed to start event engine, error %i", err);
+    
+    if (pthread_create(&trigger_thread, NULL, Trigger, (void*)&ctx))
+	Error("Error starting trigger thread");
+
+//    sleep(1);
+    err = pcilib_stream(handle, &GrabCallback, &ctx);
+    if (err) Error("Error streaming events, error %i", err);
+    
+    pcilib_stop(handle, PCILIB_EVENT_FLAGS_DEFAULT);
+
+/*	
+    err = pcilib_grab(handle, PCILIB_EVENTS_ALL, &size, &data, PCILIB_TIMEOUT_TRIGGER);
+    if (err) {
+	Error("Grabbing event is failed");
+    }
+*/
+    ctx.run_flag = 0;
+    pthread_join(trigger_thread, NULL);
+    
     return 0;
 }
 
-
+/*
+int Trigger(pcilib_t *handle, const char *event, size_t triggers, size_t run_time, size_t trigger_time) {
+    //
+}
+*/
 int StartStopDMA(pcilib_t *handle,  pcilib_model_description_t *model_info, pcilib_dma_engine_addr_t dma, pcilib_dma_direction_t dma_direction, int start) {
     int err;
     pcilib_dma_engine_t dmaid;
@@ -1479,8 +1623,10 @@ int main(int argc, char **argv) {
     int i;
     long itmp;
     unsigned long utmp;
+    size_t ztmp;
     unsigned char c;
 
+    const char *stmp;
     const char *num_offset;
 
     int details = 0;
@@ -1490,6 +1636,12 @@ int main(int argc, char **argv) {
     pcilib_model_t model = PCILIB_MODEL_DETECT;
     pcilib_model_description_t *model_info;
     MODE mode = MODE_INVALID;
+    GRAB_MODE grab_mode = 0;
+    size_t trigger_time = 0;
+    size_t run_time = 0;
+    size_t buffer = 0;
+    FORMAT format = FORMAT_RAW;
+    PARTITION partition = PARTITION_UNKNOWN;
     FLAGS flags = 0;
     const char *type = NULL;
     ACCESS_MODE amode = ACCESS_BAR;
@@ -1500,6 +1652,7 @@ int main(int argc, char **argv) {
     const char *bank = NULL;
     char **data = NULL;
     const char *event = NULL;
+    const char *data_type = NULL;
     const char *dma_channel = NULL;
     const char *use = NULL;
     pcilib_kmem_use_t use_id;
@@ -1568,11 +1721,34 @@ int main(int argc, char **argv) {
 		else if ((optind < argc)&&(argv[optind][0] != '-')) addr = argv[optind++];
 	    break;
 	    case OPT_GRAB:
-		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		if ((mode != MODE_INVALID)&&((mode != MODE_GRAB)||(grab_mode&GRAB_MODE_GRAB))) Usage(argc, argv, "Multiple operations are not supported");
 
 		mode = MODE_GRAB;
-		if (optarg) event = optarg;
-		else if ((optind < argc)&&(argv[optind][0] != '-')) event = argv[optind++];
+		grab_mode |= GRAB_MODE_GRAB;
+		
+		stmp = NULL;
+		if (optarg) stmp = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-')) stmp = argv[optind++];
+
+		if (stmp) {
+		    if ((event)&&(strcasecmp(stmp,event))) Usage(argc, argv, "Redefinition of considered event");
+		    event = stmp;
+		}
+	    break;
+	    case OPT_TRIGGER:
+		if ((mode != MODE_INVALID)&&((mode != MODE_GRAB)||(grab_mode&GRAB_MODE_TRIGGER))) Usage(argc, argv, "Multiple operations are not supported");
+
+		mode = MODE_GRAB;
+		grab_mode |= GRAB_MODE_TRIGGER;
+		
+		stmp = NULL;
+		if (optarg) stmp = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-')) stmp = argv[optind++];
+
+		if (stmp) {
+		    if ((event)&&(strcasecmp(stmp,event))) Usage(argc, argv, "Redefinition of considered event");
+		    event = stmp;
+		}
 	    break;
 	    case OPT_LIST_DMA:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
@@ -1708,7 +1884,11 @@ int main(int argc, char **argv) {
 	    break;
 	    case OPT_SIZE:
 		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &size) != 1))
-		    Usage(argc, argv, "Invalid size is specified (%s)", optarg);
+		    if (strcasecmp(optarg, "unlimited"))
+			Usage(argc, argv, "Invalid size is specified (%s)", optarg);
+		    else
+			size = (size_t)-1;
+			
 		size_set = 1;
 	    break;
 	    case OPT_ENDIANESS:
@@ -1733,6 +1913,47 @@ int main(int argc, char **argv) {
 		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &iterations) != 1))
 		    Usage(argc, argv, "Invalid number of iterations is specified (%s)", optarg);
 	    break;
+	    case OPT_EVENT:
+		event = optarg;
+	    break;
+	    case OPT_DATA_TYPE:
+		data_type = optarg;
+	    break;
+	    case OPT_RUN_TIME:
+		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &run_time) != 1))
+		    Usage(argc, argv, "Invalid timeout is specified (%s)", optarg);
+	    break;
+	    case OPT_TRIGGER_TIME:
+		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &trigger_time) != 1))
+		    Usage(argc, argv, "Invalid trigger-time is specified (%s)", optarg);
+	    break;	    
+	    case OPT_TRIGGER_RATE:
+		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &ztmp) != 1))
+		    Usage(argc, argv, "Invalid trigger-rate is specified (%s)", optarg);
+		    
+		    trigger_time = 1000000 / ztmp + (1000000 % ztmp)?1:0;
+	    break;
+	    case OPT_BUFFER:
+		if (optarg) num_offset = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-')) num_offset = argv[optind++];
+		else num_offset = NULL;
+		
+		if (num_offset) {
+		    if ((!isnumber(num_offset))||(sscanf(num_offset, "%zu", &buffer) != 1))
+			Usage(argc, argv, "Invalid buffer size is specified (%s)", num_offset);
+		    buffer *= 1024 * 1024;
+		} else {
+		    buffer = get_free_memory();
+		    if (buffer < 256) Error("Not enough free memory (%lz MB) for buffering", buffer / 1024 / 1024);
+		    
+		    buffer -= 128 + buffer/16;
+		}
+	    break;	   
+	    case OPT_FORMAT:
+		if (!strcasecmp(optarg, "add_header")) format =  FORMAT_HEADER;
+		else if (!strcasecmp(optarg, "ringfs")) format =  FORMAT_RINGFS;
+		else if (strcasecmp(optarg, "raw")) Error("Invalid format (%s) is specified", optarg);
+	    break; 
 	    case OPT_QUIETE:
 		quiete = 1;
 	    break;
@@ -1869,6 +2090,21 @@ int main(int argc, char **argv) {
 	    }
 	} 
     }
+	
+    if (mode == MODE_GRAB) {
+	if (output) {
+	    char fsname[128];
+	    if (!get_file_fs(output, 127, fsname)) {
+		if (!strcmp(fsname, "ext4")) partition = PARTITION_EXT4;
+		else if (!strcmp(fsname, "raw")) partition = PARTITION_RAW;
+	    }
+	}
+    }
+    
+    if (mode != MODE_GRAB) {
+	if (size == (size_t)-1)
+	    Usage(argc, argv, "Unlimited size is not supported in selected operation mode");
+    }
     
 
     if ((bank)&&(amode == ACCESS_DMA)) {
@@ -1931,7 +2167,7 @@ int main(int argc, char **argv) {
         pcilib_reset(handle);
      break;
      case MODE_GRAB:
-        Grab(handle, event, ofile);
+        TriggerAndGrab(handle, grab_mode, event, data_type, size, run_time, trigger_time, partition, format, buffer, ofile);
      break;
      case MODE_LIST_DMA:
         ListDMA(handle, fpga_device, model_info);

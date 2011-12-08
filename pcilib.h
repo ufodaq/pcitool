@@ -4,13 +4,14 @@
 #define PCILIB_MAX_BANKS 6
 #define PCILIB_MAX_DMA_ENGINES 32
 
+#include <sys/time.h>
 #include <stdint.h>
 
 #define pcilib_memcpy pcilib_memcpy32
 #define pcilib_datacpy pcilib_datacpy32
 
 typedef struct pcilib_s pcilib_t;
-typedef void pcilib_context_t;
+typedef struct pcilib_event_context_s pcilib_context_t;
 typedef struct pcilib_dma_context_s pcilib_dma_context_t;
 
 
@@ -72,6 +73,24 @@ typedef enum {
 } pcilib_dma_flags_t;
 
 typedef enum {
+    PCILIB_STREAMING_STOP = 0, 		/**< stop streaming */
+    PCILIB_STREAMING_CONTINUE = 1, 	/**< wait the default DMA timeout for a new data */
+    PCILIB_STREAMING_WAIT = 2,		/**< wait the specified timeout for a new data */
+    PCILIB_STREAMING_CHECK = 3,		/**< do not wait for the data, bail out imideatly if no data ready */
+    PCILIB_STREAMING_FAIL = 4,		/**< fail if data is not available on timeout */
+    PCILIB_STREAMING_REQ_FRAGMENT = 5,	/**< only fragment of a packet is read, wait for next fragment and fail if no data during DMA timeout */
+    PCILIB_STREAMING_REQ_PACKET = 6,	/**< wait for next packet and fail if no data during the specified timeout */
+    PCILIB_STREAMING_TIMEOUT_MASK = 3	/**< mask specifying all timeout modes */
+} pcilib_streaming_action;
+
+
+typedef enum {
+    PCILIB_EVENT_FLAGS_DEFAULT = 0,
+    PCILIB_EVENT_FLAG_RAW_DATA_ONLY = 1,
+    PCILIB_EVENT_FLAG_EOF = 2
+} pcilib_event_flags_t;
+
+typedef enum {
     PCILIB_REGISTER_STANDARD = 0,
     PCILIB_REGISTER_FIFO,
     PCILIB_REGISTER_BITS
@@ -99,11 +118,19 @@ typedef enum {
 #define PCILIB_EVENT3			8
 #define PCILIB_EVENTS_ALL		((pcilib_event_t)-1)
 #define PCILIB_EVENT_INVALID		((pcilib_event_t)-1)
-#define PCILIB_EVENT_ID_INVALID		0
+//#define PCILIB_EVENT_ID_INVALID		0
 #define PCILIB_TIMEOUT_INFINITE		((pcilib_timeout_t)-1)
 #define PCILIB_TIMEOUT_IMMEDIATE	0
 #define PCILIB_TIMEOUT_TRIGGER		0
 #define PCILIB_IRQ_SOURCE_DEFAULT	0
+
+
+typedef struct {
+    pcilib_event_t type;
+    uint64_t seqnum;		/* we will add seqnum_overflow if required */
+    uint64_t offset;		/* nanoseconds */
+    struct timeval timestamp;	/* most accurate timestamp */
+} pcilib_event_info_t;
 
 /**<
  * Callback function called when new data is read by DMA streaming function
@@ -113,13 +140,16 @@ typedef enum {
  * @buf - data
  * @returns 
  * <0 - error, stop streaming (the value is negative error code)
- *  0 - stop streaming
- *  1 - wait & read next buffer, fail if no data
- *  2 - wait & read next buffer, but don't fail if timeout expired
- *  3 - read next buffer if available (don't wait), don't fail
+ *  0 - stop streaming (PCILIB_STREAMING_STOP)
+ *  1 - wait DMA timeout and return gracefuly if no data (PCILIB_STREAMING_CONTINUE)
+ *  2 - wait the specified timeout and return gracefuly if no data (PCILIB_STREAMING_WAIT)
+ *  3 - check if more data is available without waiting, return gracefuly if not (PCILIB_STREAMING_CHECK)
+ *  5 - wait DMA timeout and fail if no data (PCILIB_STREAMING_REQ_FRAGMENT)
+ *  6 - wait the specified timeout and fail if no data (PCILIB_STREAMING_REQ_PACKET)
  */
 typedef int (*pcilib_dma_callback_t)(void *ctx, pcilib_dma_flags_t flags, size_t bufsize, void *buf); 
-typedef int (*pcilib_event_callback_t)(pcilib_event_t event, pcilib_event_id_t event_id, void *user);
+typedef int (*pcilib_event_callback_t)(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user);
+typedef int (*pcilib_event_rawdata_callback_t)(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event_flags_t flags, size_t size, void *data, void *user);
 
 typedef struct {
     pcilib_register_bank_addr_t addr;
@@ -167,9 +197,17 @@ typedef struct {
 } pcilib_register_range_t;
 
 typedef struct {
+    pcilib_event_t evid;
     const char *name;
     const char *description;
 } pcilib_event_description_t;
+
+typedef struct {
+    pcilib_event_data_type_t data_type;
+    pcilib_event_t evid;
+    const char *name;
+    const char *description;
+} pcilib_event_data_type_description_t;
 
 typedef enum {
     PCILIB_DMA_IRQ = 1,
@@ -207,6 +245,7 @@ typedef struct {
     pcilib_register_bank_description_t *banks;
     pcilib_register_range_t *ranges;
     pcilib_event_description_t *events;
+    pcilib_event_data_type_description_t *data_types;
 
     pcilib_dma_api_description_t *dma_api;    
     pcilib_event_api_description_t *event_api;
@@ -242,6 +281,7 @@ pcilib_register_bank_t pcilib_find_bank_by_name(pcilib_t *ctx, const char *bankn
 pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, const char *bank);
 pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const char *reg);
 pcilib_event_t pcilib_find_event(pcilib_t *ctx, const char *event);
+pcilib_event_data_type_t pcilib_find_event_data_type(pcilib_t *ctx, pcilib_event_t event, const char *data_type);
 pcilib_dma_engine_t pcilib_find_dma_by_addr(pcilib_t *ctx, pcilib_dma_direction_t direction, pcilib_dma_engine_addr_t dma);
 
 int pcilib_read(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf);
@@ -265,19 +305,44 @@ int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, p
 int pcilib_write_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t value);
 
 int pcilib_reset(pcilib_t *ctx);
-int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, void *callback, void *user);
-int pcilib_stop(pcilib_t *ctx);
-
 int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
 
-pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask, pcilib_timeout_t timeout);
+/*
+ * The recording of new events will be stopped after reaching max_events records
+ * or when the specified amount of time is elapsed. However, the @pcilib_stop
+ * function should be called still. 
+ * NOTE: This options may not be respected if the PCILIB_EVENT_FLAG_RAW_DATA_ONLY
+ * is specified.
+ */
+int pcilib_configure_autostop(pcilib_t *ctx, size_t max_events, pcilib_timeout_t duration);
+/*
+ * Request streaming the rawdata from the event engine. It is fastest way to acuqire data.
+ * No memory copies will be performed and DMA buffers will be directly passed to the user
+ * callback. However, to prevent data loss, no processing should be done on the data. The
+ * user callback is only expected to copy data into the appropriate place and return control
+ * to the event engine.
+ * The performance can be boosted further by disabling any data processing within the event
+ * engine. Just pass PCILIB_EVENT_FLAG_RAW_DATA_ONLY flag to the @pcilib_start function.
+ */
+int pcilib_configure_rawdata_callback(pcilib_t *ctx, pcilib_event_rawdata_callback_t callback, void *user);
+
+int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, pcilib_event_flags_t flags);
+int pcilib_stop(pcilib_t *ctx, pcilib_event_flags_t flags);
+int pcilib_stream(pcilib_t *ctx, pcilib_event_callback_t callback, void *user);
+
+int pcilib_get_next_event(pcilib_t *ctx, pcilib_timeout_t timeout, pcilib_event_id_t *evid, pcilib_event_info_t **info);
+int pcilib_copy_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t size, void *buf, size_t *retsize);
+int pcilib_copy_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t size, void *buf, size_t *retsize);
 void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size);
 void *pcilib_get_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size);
+
 /*
  * This function is provided to find potentially corrupted data. If the data is overwritten by 
- * the time return_data is called it will return error.
+ * the time return_data is called it will return error. 
  */
-int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id);
+int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id, void *data);
+
+
 
 /*
  * @param data - will be allocated and shuld be freed if NULL, otherwise used and size should contain correct size.

@@ -36,12 +36,43 @@ pcilib_event_t pcilib_find_event(pcilib_t *ctx, const char *event) {
     pcilib_event_description_t *events = model_info->events;
     
     for (i = 0; events[i].name; i++) {
-	if (!strcasecmp(events[i].name, event)) return (1<<i);
+	if (!strcasecmp(events[i].name, event)) return events[i].evid;
     }
 
     return (pcilib_event_t)-1;
 }
 
+pcilib_event_data_type_t pcilib_find_event_data_type(pcilib_t *ctx, pcilib_event_t event, const char *data_type) {
+    int i;
+    pcilib_register_bank_t res;
+    unsigned long addr;
+    
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+    pcilib_event_data_type_description_t *data_types = model_info->data_types;
+    
+    for (i = 0; data_types[i].name; i++) {
+	if ((data_types[i].evid&event)&&(!strcasecmp(data_types[i].name, data_type))) return data_types[i].data_type;
+    }
+
+    return (pcilib_event_data_type_t)-1;
+}
+
+int pcilib_init_event_engine(pcilib_t *ctx) {
+    pcilib_event_api_description_t *api;
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+
+    api = model_info->event_api;
+
+//    api = pcilib_model[model].event_api;
+    if ((api)&&(api->init)) {
+	ctx->event_ctx = api->init(ctx);
+	if (ctx->event_ctx) {
+	    ctx->event_ctx->pcilib = ctx;
+	}
+    }
+    
+    return 0;
+}
 
 int pcilib_reset(pcilib_t *ctx) {
     pcilib_event_api_description_t *api;
@@ -60,7 +91,41 @@ int pcilib_reset(pcilib_t *ctx) {
     return 0;
 }
 
-int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, void *callback, void *user) {
+int pcilib_configure_rawdata_callback(pcilib_t *ctx, pcilib_event_rawdata_callback_t callback, void *user) {
+    pcilib_event_api_description_t *api;
+    
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+
+    api = model_info->event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    ctx->event_ctx->params.rawdata.callback = callback;
+    ctx->event_ctx->params.rawdata.user = user;
+    
+    return 0;    
+}
+
+int pcilib_configure_autostop(pcilib_t *ctx, size_t max_events, pcilib_timeout_t duration) {
+    pcilib_event_api_description_t *api;
+    
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+
+    api = model_info->event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    ctx->event_ctx->params.autostop.max_events = max_events;
+    ctx->event_ctx->params.autostop.duration = duration;
+    
+    return 0;    
+}
+
+int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, pcilib_event_flags_t flags) {
     pcilib_event_api_description_t *api;
     
     pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
@@ -72,12 +137,12 @@ int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, void *callback, void 
     }
 
     if (api->start) 
-	return api->start(ctx->event_ctx, event_mask, callback, user);
+	return api->start(ctx->event_ctx, event_mask, flags);
 
     return 0;
 }
 
-int pcilib_stop(pcilib_t *ctx) {
+int pcilib_stop(pcilib_t *ctx, pcilib_event_flags_t flags) {
     pcilib_event_api_description_t *api;
     
     pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
@@ -89,12 +154,12 @@ int pcilib_stop(pcilib_t *ctx) {
     }
 
     if (api->stop) 
-	return api->stop(ctx->event_ctx);
+	return api->stop(ctx->event_ctx, flags);
 
     return 0;
 }
 
-pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask, pcilib_timeout_t timeout) {
+int pcilib_stream(pcilib_t *ctx, pcilib_event_callback_t callback, void *user) {
     pcilib_event_api_description_t *api;
     
     pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
@@ -105,11 +170,59 @@ pcilib_event_id_t pcilib_get_next_event(pcilib_t *ctx, pcilib_event_t event_mask
 	return PCILIB_ERROR_NOTSUPPORTED;
     }
 
-    if (api->next_event) 
-	return api->next_event(ctx->event_ctx, event_mask, timeout);
+    if (api->stream)
+	return api->stream(ctx->event_ctx, callback, user);
+
+    if (api->next_event) {
+	pcilib_error("Streaming using next_event API is not implemented yet");
+    }
 
     pcilib_error("Event enumeration is not suppored by API");
-    return PCILIB_EVENT_ID_INVALID;
+    return PCILIB_ERROR_NOTSUPPORTED;
+}
+/*
+typedef struct {
+    pcilib_event_id_t event_id;
+    pcilib_event_info_t *info;
+} pcilib_return_event_callback_context_t;
+
+static int pcilib_return_event_callback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user) {
+    pcilib_return_event_callback_context_t *ctx = (pcilib_return_event_callback_context_t*)user;
+    ctx->event_id = event_id;
+    ctx->info = info;
+}
+*/
+
+int pcilib_get_next_event(pcilib_t *ctx, pcilib_timeout_t timeout, pcilib_event_id_t *evid, pcilib_event_info_t **info) {
+    int err;
+    pcilib_event_api_description_t *api;
+//    pcilib_return_event_callback_context_t user;
+    
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+
+    api = model_info->event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    if (api->next_event) 
+	return api->next_event(ctx->event_ctx, timeout, evid, info);
+
+/*	
+    if (api->stream) {
+	err = api->stream(ctx->event_ctx, 1, timeout, pcilib_return_event_callback, &user);
+	if (err) return err;
+	
+	if (evid) *evid = user->event_id;
+	if (info) *info = user->info;
+
+	return 0;
+    }
+*/
+
+    pcilib_error("Event enumeration is not suppored by API");
+    return PCILIB_ERROR_NOTSUPPORTED;
 }
 
 int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data) {
@@ -141,10 +254,32 @@ void *pcilib_get_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, p
     }
 
     if (api->get_data) 
-	return api->get_data(ctx->event_ctx, event_id, data_type, arg_size, arg, size);
+	return api->get_data(ctx->event_ctx, event_id, data_type, arg_size, arg, size, NULL);
 
     return NULL;
 }
+
+int pcilib_copy_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t size, void *buf, size_t *retsize) {
+    void *res;
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+
+    pcilib_event_api_description_t *api = model_info->event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    if (api->get_data) {
+	res = api->get_data(ctx->event_ctx, event_id, data_type, arg_size, arg, &size, buf);
+	if (!res) return PCILIB_ERROR_FAILED;
+	
+	if (retsize) *retsize = size;
+	return 0;
+    }	
+
+    return PCILIB_ERROR_NOTSUPPORTED;
+}
+
 
 void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size) {
     pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
@@ -156,12 +291,33 @@ void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_da
     }
 
     if (api->get_data) 
-	return api->get_data(ctx->event_ctx, event_id, data_type, 0, NULL, size);
+	return api->get_data(ctx->event_ctx, event_id, data_type, 0, NULL, size, NULL);
 
     return NULL;
 }
 
-int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id) {
+int pcilib_copy_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t size, void *buf, size_t *ret_size) {
+    void *res;
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+
+    pcilib_event_api_description_t *api = model_info->event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    if (api->get_data) {
+	res = api->get_data(ctx->event_ctx, event_id, data_type, 0, NULL, &size, buf);
+	if (!res) return PCILIB_ERROR_FAILED;
+	
+	if (ret_size) *ret_size = size;
+	return 0;
+    }
+
+    return PCILIB_ERROR_NOTSUPPORTED;
+}
+
+int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id, void *data) {
     pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
     
     pcilib_event_api_description_t *api = model_info->event_api;
@@ -171,7 +327,7 @@ int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id) {
     }
 
     if (api->return_data) 
-	return api->return_data(ctx->event_ctx, event_id);
+	return api->return_data(ctx->event_ctx, event_id, data);
 
     return 0;
 }
@@ -183,6 +339,7 @@ typedef struct {
     size_t *size;
     void **data;
 } pcilib_grab_callback_user_data_t;
+
 
 static int pcilib_grab_callback(pcilib_event_t event, pcilib_event_id_t event_id, void *vuser) {
     int err;
@@ -217,7 +374,7 @@ static int pcilib_grab_callback(pcilib_event_t event, pcilib_event_id_t event_id
     
     memcpy(*(user->data), data, size);
     
-    err = pcilib_return_data(user->ctx, event_id);
+    err = pcilib_return_data(user->ctx, event_id, data);
     if (err) {
 	if (allocated) {
 	    free(*(user->data));
@@ -233,17 +390,16 @@ static int pcilib_grab_callback(pcilib_event_t event, pcilib_event_id_t event_id
 int pcilib_grab(pcilib_t *ctx, pcilib_event_t event_mask, size_t *size, void **data, pcilib_timeout_t timeout) {
     int err;
     struct timespec ts;
+    pcilib_event_id_t eid;
     
     pcilib_grab_callback_user_data_t user = {ctx, size, data};
     
-    err = pcilib_start(ctx, event_mask, pcilib_grab_callback, &user);
+    err = pcilib_start(ctx, event_mask, PCILIB_EVENT_FLAGS_DEFAULT);
+    if (!err) err = pcilib_trigger(ctx, event_mask, 0, NULL);
     if (!err) {
-	if (timeout) {
-	    ts.tv_sec = timeout / 1000000;
-	    ts.tv_nsec = 1000 * (timeout % 1000000);
-	    nanosleep(&ts, NULL);
-        } else err = pcilib_trigger(ctx, event_mask, 0, NULL);
+	err = pcilib_get_next_event(ctx, timeout, &eid, NULL);
+	if (!err) pcilib_grab_callback(event_mask, eid, &user);
     }
-    pcilib_stop(ctx);
+    pcilib_stop(ctx, PCILIB_EVENT_FLAGS_DEFAULT);
     return err;
 }
