@@ -372,18 +372,37 @@ static int ipecamera_resolve_event_id(ipecamera_t *ctx, pcilib_event_id_t evid) 
     return (evid - 1) % ctx->buffer_size;
 }
 
-static inline void ipecamera_new_frame(ipecamera_t *ctx) {
+static inline int ipecamera_new_frame(ipecamera_t *ctx) {
     ctx->buffer_pos = (++ctx->event_id) % ctx->buffer_size;
     ctx->cur_size = 0;
 
     ctx->frame_info[ctx->buffer_pos].info.type = PCILIB_EVENT0;
 //	memset(ctx->cmask + ctx->buffer_pos * ctx->dim.height, 0, ctx->dim.height * sizeof(ipecamera_change_mask_t));
+
+    if ((ctx->event_id == ctx->autostop.evid)&&(ctx->event_id)) {
+	ctx->run_reader = 0;
+	return 1;
+    }
+	
+    if (check_deadline(&ctx->autostop.timestamp, PCILIB_DMA_TIMEOUT)) {
+	ctx->run_reader = 0;
+	return 1;
+    }
+    
+    return 0;
 }
 
 static uint32_t frame_magic[6] = { 0x51111111, 0x52222222, 0x53333333, 0x54444444, 0x55555555, 0x56666666 };
 
+#define IPECAMERA_BUG_MULTIFRAME_PACKETS
+
 static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t bufsize, void *buf) {
     int eof = 0;
+
+#ifdef IPECAMERA_BUG_MULTIFRAME_PACKETS
+    size_t extra_data = 0;
+#endif /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
+
     ipecamera_t *ctx = (ipecamera_t*)user;
 
 
@@ -393,6 +412,22 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	ctx->frame_info[ctx->buffer_pos].info.offset = ((uint32_t*)buf)[7] & 0xF0000000;
 	gettimeofday(&ctx->frame_info[ctx->buffer_pos].info.timestamp, NULL);
     }
+
+#ifdef IPECAMERA_BUG_MULTIFRAME_PACKETS
+    if (ctx->cur_size + bufsize > ctx->raw_size) {
+        size_t need;
+	
+	for (need = ctx->raw_size - ctx->cur_size; need < bufsize; need += sizeof(uint32_t)) {
+	    if (*(uint32_t*)(buf + need) == frame_magic[0]) break;
+	}
+	
+	if (need < bufsize) {
+	    extra_data = bufsize - need;
+	    bufsize = need;
+	    eof = 1;
+	}
+    }
+#endif /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
 
     if (ctx->parse_data) {
 	if (ctx->cur_size + bufsize > ctx->full_size) {
@@ -413,17 +448,15 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
     }
     
     if (eof) {
-	ipecamera_new_frame(ctx);
-	
-	if ((ctx->event_id == ctx->autostop.evid)&&(ctx->event_id)) {
-	    ctx->run_reader = 0;
+	if (ipecamera_new_frame(ctx)) {
 	    return PCILIB_STREAMING_STOP;
 	}
 	
-	if (check_deadline(&ctx->autostop.timestamp, PCILIB_DMA_TIMEOUT)) {
-	    ctx->run_reader = 0;
-	    return PCILIB_STREAMING_STOP;
+#ifdef IPECAMERA_BUG_MULTIFRAME_PACKETS
+	if (extra_data) {
+	    return ipecamera_data_callback(user, flags, extra_data, buf + bufsize);
 	}
+#endif /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
     }
 
     return PCILIB_STREAMING_REQ_FRAGMENT;
@@ -437,6 +470,7 @@ static void *ipecamera_reader_thread(void *user) {
 	err = pcilib_stream_dma(ctx->event.pcilib, ctx->rdma, 0, 0, PCILIB_DMA_FLAG_MULTIPACKET, PCILIB_DMA_TIMEOUT, &ipecamera_data_callback, user);
 	if (err) {
 	    if (err == PCILIB_ERROR_TIMEOUT) {
+		if (ctx->cur_size > ctx->raw_size) ipecamera_new_frame(ctx);
 		if (check_deadline(&ctx->autostop.timestamp, PCILIB_DMA_TIMEOUT)) {
 		    ctx->run_reader = 0;
 		    break;
@@ -450,7 +484,8 @@ static void *ipecamera_reader_thread(void *user) {
     
     ctx->run_streamer = 0;
     
-    if (ctx->cur_size) pcilib_error("partialy read frame after stop signal, %zu bytes in the buffer", ctx->cur_size);
+    if (ctx->cur_size)
+	pcilib_error("partialy read frame after stop signal, %zu bytes in the buffer", ctx->cur_size);
 
     return NULL;
 }
