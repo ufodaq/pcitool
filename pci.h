@@ -1,6 +1,8 @@
 #ifndef _PCITOOL_PCI_H
 #define _PCITOOL_PCI_H
 
+#define PCILIB_EVENT_TIMEOUT 1000000		/**< us */
+#define PCILIB_TRIGGER_TIMEOUT 100000		/**< us */
 #define PCILIB_DMA_TIMEOUT 10000		/**< us */
 #define PCILIB_DMA_SKIP_TIMEOUT 1000000		/**< us */
 #define PCILIB_REGISTER_TIMEOUT 10000		/**< us */

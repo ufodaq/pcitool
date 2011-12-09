@@ -23,6 +23,10 @@ typedef enum {
 typedef uint16_t ipecamera_change_mask_t;
 typedef uint16_t ipecamera_pixel_t;
 
+typedef struct {
+    pcilib_event_info_t info;
+    size_t raw_size;		/**< Indicates the actual size of raw data */
+} ipecamera_event_info_t;
 
 int ipecamera_set_buffer_size(ipecamera_t *ctx, int size);
 

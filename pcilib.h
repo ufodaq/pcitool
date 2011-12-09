@@ -86,9 +86,14 @@ typedef enum {
 
 typedef enum {
     PCILIB_EVENT_FLAGS_DEFAULT = 0,
-    PCILIB_EVENT_FLAG_RAW_DATA_ONLY = 1,
-    PCILIB_EVENT_FLAG_EOF = 2
+    PCILIB_EVENT_FLAG_RAW_DATA_ONLY = 1,	/**< Do not parse data, just read raw and pass it to rawdata callback */
+    PCILIB_EVENT_FLAG_STOP_ONLY = 1,		/**< Do not cleanup, just stop acquiring new frames, the cleanup should be requested afterwards */
+    PCILIB_EVENT_FLAG_EOF = 2			/**< Indicates that it is the last part of the frame (not required) */
 } pcilib_event_flags_t;
+
+typedef enum {
+    PCILIB_EVENT_INFO_FLAG_BROKEN = 1		/**< Indicates broken frames (if this flag is fales, the frame still can be broken) */
+} pcilib_event_info_flags_t;
 
 typedef enum {
     PCILIB_REGISTER_STANDARD = 0,
@@ -118,18 +123,16 @@ typedef enum {
 #define PCILIB_EVENT3			8
 #define PCILIB_EVENTS_ALL		((pcilib_event_t)-1)
 #define PCILIB_EVENT_INVALID		((pcilib_event_t)-1)
-//#define PCILIB_EVENT_ID_INVALID		0
 #define PCILIB_TIMEOUT_INFINITE		((pcilib_timeout_t)-1)
 #define PCILIB_TIMEOUT_IMMEDIATE	0
-#define PCILIB_TIMEOUT_TRIGGER		0
 #define PCILIB_IRQ_SOURCE_DEFAULT	0
-
 
 typedef struct {
     pcilib_event_t type;
-    uint64_t seqnum;		/* we will add seqnum_overflow if required */
-    uint64_t offset;		/* nanoseconds */
-    struct timeval timestamp;	/* most accurate timestamp */
+    uint64_t seqnum;			/**< we will add seqnum_overflow if required */
+    uint64_t offset;			/**< nanoseconds */
+    struct timeval timestamp;		/**< most accurate timestamp */
+    pcilib_event_info_flags_t flags;	/**< flags */
 } pcilib_event_info_t;
 
 /**<

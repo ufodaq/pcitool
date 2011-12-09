@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
+#define _BSD_SOURCE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -241,14 +242,15 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   -a [fifo|dma]<bits>		- Access type and bits per word (default: 32)\n"
 "   -e <l|b>			- Endianess Little/Big (default: host)\n"
 "   -o <file>			- Append output to file (default: stdout)\n"
-"   -t <timeout> 		- Timeout in microseconds\n"
+"   -t <timeout|unlimited> 	- Timeout in microseconds\n"
 "\n"
 "  Event Options:\n"
 "   --event <evt>		- Specifies event for trigger and grab modes\n"
 "   --data <type>		- Data type to request for the events\n"
-"   --run-time <us>		- Grab/trigger events during the specified time\n"
-"   --trigger-rate <tps>	- Generate tps triggers per second\n"
-"   --trigger-time <us>		- Specifies delay between triggers in microseconds\n"
+"   --run-time <us>		- Limit time to grab/trigger events\n"
+"   -t <timeout|unlimited>	- Timeout to stop if no events triggered\n"
+"   --trigger-rate <tps>		- Generate tps triggers per second\n"
+"   --trigger-time <us>		- Specifies delay between triggers (us)\n"
 "   -s <num|unlimited> 		- Number of events to grab and trigger\n"
 "   --format [type]		- Specifies how event data should be stored\n"
 "	raw			- Just write all events sequentially\n"
@@ -1072,19 +1074,41 @@ typedef struct {
     pcilib_event_data_type_t data;
     FILE *output;
 
+    pcilib_timeout_t timeout;
     size_t run_time;
     size_t trigger_time;    
+    size_t max_triggers;
+    
+    int event_pending;			/**< Used to detect that we have read previously triggered event */
+    int trigger_thread_started;		/**< Indicates that trigger thread is ready and we can't procced to start event recording */
+    int started;			/**< Indicates that recording is started */
     
     int run_flag;
+    
+    struct timeval last_frame;
+    size_t trigger_count;
+    size_t frame_count;
+    size_t broken_count;
+    
+    struct timeval stop_time;
 } GRABContext;
 
 int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user) {
-/*    int err;
+    int err;
     void *data;
     size_t size, written;
     
     GRABContext *ctx = (GRABContext*)user;
     pcilib_t *handle = ctx->handle;
+
+    gettimeofday(&ctx->last_frame, NULL);
+    
+    ctx->event_pending = 0;
+    ctx->frame_count++;
+
+    if (info->flags&PCILIB_EVENT_INFO_FLAG_BROKEN) ctx->broken_count++;
+
+/*
     FILE *o = ctx->output;
     
     data = pcilib_get_data(handle, ctx->event, ctx->data, &size);
@@ -1109,47 +1133,171 @@ int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event
 //    printf("%i\n", event_id);
 }
 
+
 void *Trigger(void *user) {
+    struct timeval start;
+
     GRABContext *ctx = (GRABContext*)user;
+    size_t trigger_time = ctx->trigger_time;
+    size_t max_triggers = ctx->max_triggers;
     
-    pcilib_trigger(ctx->handle, PCILIB_EVENT0, 0, NULL);
-    usleep(3000);
-    pcilib_trigger(ctx->handle, PCILIB_EVENT0, 0, NULL);
+    ctx->trigger_thread_started = 1;
+    ctx->event_pending = 1;
+    
+    while (!ctx->started);
+
+    gettimeofday(&start, NULL);
+    do {
+        pcilib_trigger(ctx->handle, PCILIB_EVENT0, 0, NULL);
+	if ((++ctx->trigger_count == max_triggers)&&(max_triggers)) break;
+	
+	if (trigger_time) {
+	    pcilib_add_timeout(&start, trigger_time);
+	    if ((ctx->stop_time.tv_sec)&&(pcilib_timecmp(&start, &ctx->stop_time)>0)) break;
+	    pcilib_sleep_until_deadline(&start);
+	}  else {
+	    while ((ctx->event_pending)&&(ctx->run_flag)) usleep(10);
+	    ctx->event_pending = 1;
+	}
+    } while (ctx->run_flag);
+
+    ctx->trigger_thread_started = 0;
+
+    return NULL;
+}
+
+void *Monitor(void *user) {
+    struct timeval deadline;
+    
+    GRABContext *ctx = (GRABContext*)user;
+    pcilib_timeout_t timeout = ctx->timeout;
+    
+    if (timeout == PCILIB_TIMEOUT_INFINITE) timeout = 0;
+
+//    while (!ctx->started);
+    
+    if (timeout) {
+	memcpy(&deadline, &ctx->last_frame, sizeof(struct timeval));
+	pcilib_add_timeout(&deadline, timeout);
+    }
+    
+    while (ctx->run_flag) {
+	if (timeout) {
+	    if (pcilib_calc_time_to_deadline(&deadline) == 0) {
+		memcpy(&deadline, &ctx->last_frame, sizeof(struct timeval));
+		pcilib_add_timeout(&deadline, timeout);
+		
+		if (pcilib_calc_time_to_deadline(&deadline) == 0) {
+		    pcilib_stop(ctx->handle, PCILIB_EVENT_FLAG_STOP_ONLY);
+		    break;
+		}
+	    }
+	}
+	
+	usleep(100000);
+    }
     
     return NULL;
 }
 
-int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, const char *data_type, size_t num, size_t run_time, size_t trigger_time, PARTITION partition, FORMAT format, size_t buffer_size, FILE *ofile) {
+int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, const char *data_type, size_t num, size_t run_time, size_t trigger_time, pcilib_timeout_t timeout, PARTITION partition, FORMAT format, size_t buffer_size, FILE *ofile) {
     int err;
     GRABContext ctx;    
     void *data = NULL;
     size_t size, written;
 
+    pthread_t monitor_thread;
     pthread_t trigger_thread;
+    pthread_attr_t attr;
+    struct sched_param sched;
+
+    struct timeval start, end;
+    pcilib_event_flags_t flags;
 
     ctx.handle = handle;
     ctx.output = ofile;
     ctx.event = PCILIB_EVENT0;
     ctx.run_time = run_time;
-    ctx.trigger_time = trigger_time;
+    ctx.timeout = timeout;
     
+    ctx.frame_count = 0;
+    
+    ctx.started = 0;
+    ctx.trigger_thread_started = 0;
     ctx.run_flag = 1;
     
-    // ignoring event for now
-    pcilib_configure_autostop(handle, 2, 1000000);//PCILIB_TIMEOUT_TRIGGER);
+    memset(&ctx.stop_time, 0, sizeof(struct timeval));
+    
+//    printf("Limits: %lu %lu %lu\n", num, run_time, timeout);
+    pcilib_configure_autostop(handle, num, run_time);//PCILIB_TIMEOUT_TRIGGER);
     pcilib_configure_rawdata_callback(handle, &raw_data, NULL);
-
-    err = pcilib_start(handle, PCILIB_EVENTS_ALL, PCILIB_EVENT_FLAGS_DEFAULT);
-    if (err) Error("Failed to start event engine, error %i", err);
     
-    if (pthread_create(&trigger_thread, NULL, Trigger, (void*)&ctx))
-	Error("Error starting trigger thread");
-
-//    sleep(1);
-    err = pcilib_stream(handle, &GrabCallback, &ctx);
-    if (err) Error("Error streaming events, error %i", err);
+    flags = PCILIB_EVENT_FLAGS_DEFAULT;
+    // PCILIB_EVENT_FLAG_RAW_DATA_ONLY
     
-    pcilib_stop(handle, PCILIB_EVENT_FLAGS_DEFAULT);
+    if (grab_mode&GRAB_MODE_TRIGGER) {
+	if (!trigger_time) {
+		// Otherwise, we will trigger next event after previous one is read
+	    if (((grab_mode&GRAB_MODE_GRAB) == 0)&&((flags&PCILIB_EVENT_FLAG_RAW_DATA_ONLY)==0)) trigger_time = PCILIB_TRIGGER_TIMEOUT;
+	}
+	
+	ctx.max_triggers = num;
+	ctx.trigger_count = 0;
+	ctx.trigger_time = trigger_time;
+    
+	    // We don't really care if RT priority is imposible
+	pthread_attr_init(&attr);
+	if (!pthread_attr_setschedpolicy(&attr, SCHED_FIFO)) {
+	    sched.sched_priority = sched_get_priority_min(SCHED_FIFO);
+	    pthread_attr_setschedparam(&attr, &sched);
+	}
+    
+	    // Start triggering thread and wait until it is schedulled
+	if (pthread_create(&trigger_thread, &attr, Trigger, (void*)&ctx))
+	    Error("Error spawning trigger thread");
+
+	while (!ctx.trigger_thread_started) usleep(10);
+    }
+
+    gettimeofday(&start, NULL);
+
+    if (grab_mode&GRAB_MODE_GRAB) {
+	err = pcilib_start(handle, PCILIB_EVENTS_ALL, PCILIB_EVENT_FLAGS_DEFAULT);
+	if (err) Error("Failed to start event engine, error %i", err);
+    }
+    
+    ctx.started = 1;
+    
+    if (run_time) {
+	ctx.stop_time.tv_usec = start.tv_usec + run_time%1000000;
+	if (ctx.stop_time.tv_usec > 999999) {
+	    ctx.stop_time.tv_usec -= 1000000;
+	    __sync_synchronize();
+	    ctx.stop_time.tv_sec = start.tv_sec + 1 + run_time / 1000000;
+	} else {
+	    __sync_synchronize();
+	    ctx.stop_time.tv_sec = start.tv_sec + run_time / 1000000;
+	}
+    }
+    
+    memcpy(&ctx.last_frame, &start, sizeof(struct timeval));
+    if (pthread_create(&monitor_thread, NULL, Monitor, (void*)&ctx))
+	Error("Error spawning monitoring thread");
+
+    if (grab_mode&GRAB_MODE_GRAB) {
+	err = pcilib_stream(handle, &GrabCallback, &ctx);
+	if (err) Error("Error streaming events, error %i", err);
+    }
+    
+    ctx.run_flag = 0;
+
+    if (grab_mode&GRAB_MODE_TRIGGER) {
+	while (ctx.trigger_thread_started) usleep(10);
+    }
+    
+    if (grab_mode&GRAB_MODE_GRAB) {
+        pcilib_stop(handle, PCILIB_EVENT_FLAGS_DEFAULT);
+    }
 
 /*	
     err = pcilib_grab(handle, PCILIB_EVENTS_ALL, &size, &data, PCILIB_TIMEOUT_TRIGGER);
@@ -1157,8 +1305,14 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, con
 	Error("Grabbing event is failed");
     }
 */
-    ctx.run_flag = 0;
-    pthread_join(trigger_thread, NULL);
+
+    pthread_join(monitor_thread, NULL);
+
+    if (grab_mode&GRAB_MODE_TRIGGER) {
+	pthread_join(trigger_thread, NULL);
+    }
+
+    // print information
     
     return 0;
 }
@@ -1675,6 +1829,7 @@ int main(int argc, char **argv) {
     
     int size_set = 0;
     int timeout_set = 0;
+    int run_time_set = 0;
     
     while ((c = getopt_long(argc, argv, "hqilr::w::g::d:m:t:b:a:s:e:o:", long_options, NULL)) != (unsigned char)-1) {
 	extern int optind;
@@ -1887,7 +2042,7 @@ int main(int argc, char **argv) {
 		    if (strcasecmp(optarg, "unlimited"))
 			Usage(argc, argv, "Invalid size is specified (%s)", optarg);
 		    else
-			size = (size_t)-1;
+			size = 0;//(size_t)-1;
 			
 		size_set = 1;
 	    break;
@@ -1903,7 +2058,10 @@ int main(int argc, char **argv) {
 	    break;
 	    case OPT_TIMEOUT:
 		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &timeout) != 1))
-		    Usage(argc, argv, "Invalid timeout is specified (%s)", optarg);
+		    if (strcasecmp(optarg, "unlimited"))
+			Usage(argc, argv, "Invalid timeout is specified (%s)", optarg);
+		    else
+			timeout = PCILIB_TIMEOUT_INFINITE;
 		timeout_set = 1;
 	    break;
 	    case OPT_OUTPUT:
@@ -1921,7 +2079,11 @@ int main(int argc, char **argv) {
 	    break;
 	    case OPT_RUN_TIME:
 		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &run_time) != 1))
-		    Usage(argc, argv, "Invalid timeout is specified (%s)", optarg);
+		    if (strcasecmp(optarg, "unlimited"))
+			Usage(argc, argv, "Invalid run-time is specified (%s)", optarg);
+		    else
+			run_time = 0;
+		run_time_set = 1;
 	    break;
 	    case OPT_TRIGGER_TIME:
 		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &trigger_time) != 1))
@@ -1931,7 +2093,7 @@ int main(int argc, char **argv) {
 		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &ztmp) != 1))
 		    Usage(argc, argv, "Invalid trigger-rate is specified (%s)", optarg);
 		    
-		    trigger_time = 1000000 / ztmp + (1000000 % ztmp)?1:0;
+		    trigger_time = (1000000 / ztmp) + ((1000000 % ztmp)?1:0);
 	    break;
 	    case OPT_BUFFER:
 		if (optarg) num_offset = optarg;
@@ -2099,6 +2261,11 @@ int main(int argc, char **argv) {
 		else if (!strcmp(fsname, "raw")) partition = PARTITION_RAW;
 	    }
 	}
+
+	if (!timeout_set) {
+	    if (run_time) timeout = PCILIB_TIMEOUT_INFINITE;
+	    else timeout = PCILIB_EVENT_TIMEOUT;
+	}
     }
     
     if (mode != MODE_GRAB) {
@@ -2167,7 +2334,7 @@ int main(int argc, char **argv) {
         pcilib_reset(handle);
      break;
      case MODE_GRAB:
-        TriggerAndGrab(handle, grab_mode, event, data_type, size, run_time, trigger_time, partition, format, buffer, ofile);
+        TriggerAndGrab(handle, grab_mode, event, data_type, size, run_time, trigger_time, timeout, partition, format, buffer, ofile);
      break;
      case MODE_LIST_DMA:
         ListDMA(handle, fpga_device, model_info);

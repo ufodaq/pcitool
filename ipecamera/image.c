@@ -70,9 +70,6 @@ int ipecamera_channel_order[IPECAMERA_MAX_CHANNELS] = { 15, 13, 14, 12, 10, 8, 1
 
 typedef uint32_t ipecamera_payload_t;
 
-typedef struct {
-    pcilib_event_info_t info;
-} ipecamera_event_info_t;
 
 typedef struct {
     pcilib_event_id_t evid;
@@ -114,14 +111,9 @@ struct ipecamera_s {
     ipecamera_autostop_t autostop;
 
     struct timeval autostop_time;
-//    int ready;			/**< New frame is ready */
-//    int check_time;		/**< Streaming is time-limited */
 
     size_t buffer_size;		/**< How many images to store */
     size_t buffer_pos;		/**< Current image offset in the buffer, due to synchronization reasons should not be used outside of reader_thread */
-//    size_t stream_count;	/**< Number of images read so far */
-//    size_t stream_max;		/**< Maximum number of images to read */
-//    struct timeval stream_stop;	/**< Time to stop streaming */
     size_t cur_size;		/**< Already written part of data in bytes */
     size_t raw_size;		/**< Size of raw data in bytes */
     size_t full_size;		/**< Size of raw data including the padding */
@@ -373,10 +365,14 @@ static int ipecamera_resolve_event_id(ipecamera_t *ctx, pcilib_event_id_t evid) 
 }
 
 static inline int ipecamera_new_frame(ipecamera_t *ctx) {
+    ctx->frame_info[ctx->buffer_pos].raw_size =ctx->cur_size;
+    if (ctx->cur_size < ctx->raw_size) ctx->frame_info[ctx->buffer_pos].info.flags |= PCILIB_EVENT_INFO_FLAG_BROKEN;
+    
     ctx->buffer_pos = (++ctx->event_id) % ctx->buffer_size;
     ctx->cur_size = 0;
 
     ctx->frame_info[ctx->buffer_pos].info.type = PCILIB_EVENT0;
+    ctx->frame_info[ctx->buffer_pos].info.flags = 0;
 //	memset(ctx->cmask + ctx->buffer_pos * ctx->dim.height, 0, ctx->dim.height * sizeof(ipecamera_change_mask_t));
 
     if ((ctx->event_id == ctx->autostop.evid)&&(ctx->event_id)) {
@@ -384,7 +380,7 @@ static inline int ipecamera_new_frame(ipecamera_t *ctx) {
 	return 1;
     }
 	
-    if (check_deadline(&ctx->autostop.timestamp, PCILIB_DMA_TIMEOUT)) {
+    if (pcilib_check_deadline(&ctx->autostop.timestamp, PCILIB_DMA_TIMEOUT)) {
 	ctx->run_reader = 0;
 	return 1;
     }
@@ -395,6 +391,7 @@ static inline int ipecamera_new_frame(ipecamera_t *ctx) {
 static uint32_t frame_magic[6] = { 0x51111111, 0x52222222, 0x53333333, 0x54444444, 0x55555555, 0x56666666 };
 
 #define IPECAMERA_BUG_MULTIFRAME_PACKETS
+#define IPECAMERA_BUG_INCOMPLETE_PACKETS
 
 static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t bufsize, void *buf) {
     int eof = 0;
@@ -405,12 +402,28 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 
     ipecamera_t *ctx = (ipecamera_t*)user;
 
+    if (!ctx->cur_size) {
+#if defined(IPECAMERA_BUG_INCOMPLETE_PACKETS)||defined(IPECAMERA_BUG_MULTIFRAME_PACKETS)
+	size_t startpos;
+	for (startpos = 0; (startpos + 8) < bufsize; startpos++) {
+	    if (!memcmp(buf + startpos, frame_magic, sizeof(frame_magic))) break;
+	}
+	
+	if (startpos) {
+	    buf += startpos;
+	    bufsize -= startpos;
+	}
+#endif /* IPECAMERA_BUG_INCOMPLETE_PACKETS */
 
-    if ((bufsize >= 8)&&(!memcmp(buf, frame_magic, sizeof(frame_magic)))) {
-	//if (ctx->cur_size) ipecamera_new_frame(ctx);
-	ctx->frame_info[ctx->buffer_pos].info.seqnum = ((uint32_t*)buf)[6] & 0xF0000000;
-	ctx->frame_info[ctx->buffer_pos].info.offset = ((uint32_t*)buf)[7] & 0xF0000000;
-	gettimeofday(&ctx->frame_info[ctx->buffer_pos].info.timestamp, NULL);
+	if ((bufsize >= 8)&&(!memcmp(buf, frame_magic, sizeof(frame_magic)))) {
+	    //if (ctx->cur_size) ipecamera_new_frame(ctx);
+	    ctx->frame_info[ctx->buffer_pos].info.seqnum = ((uint32_t*)buf)[6] & 0xF0000000;
+	    ctx->frame_info[ctx->buffer_pos].info.offset = ((uint32_t*)buf)[7] & 0xF0000000;
+	    gettimeofday(&ctx->frame_info[ctx->buffer_pos].info.timestamp, NULL);
+	} else {
+//	    pcilib_warning("Frame magic is not found, ignoring broken data...");
+	    return PCILIB_STREAMING_CONTINUE;
+	}
     }
 
 #ifdef IPECAMERA_BUG_MULTIFRAME_PACKETS
@@ -423,9 +436,12 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	
 	if (need < bufsize) {
 	    extra_data = bufsize - need;
-	    bufsize = need;
+	    //bufsize = need;
 	    eof = 1;
 	}
+	
+	    // just rip of padding
+	bufsize = ctx->raw_size - ctx->cur_size;
     }
 #endif /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
 
@@ -471,15 +487,18 @@ static void *ipecamera_reader_thread(void *user) {
 	if (err) {
 	    if (err == PCILIB_ERROR_TIMEOUT) {
 		if (ctx->cur_size > ctx->raw_size) ipecamera_new_frame(ctx);
-		if (check_deadline(&ctx->autostop.timestamp, PCILIB_DMA_TIMEOUT)) {
+#ifdef IPECAMERA_BUG_INCOMPLETE_PACKETS
+		else if (ctx->cur_size > 0) ipecamera_new_frame(ctx);
+#endif /* IPECAMERA_BUG_INCOMPLETE_PACKETS */
+		if (pcilib_check_deadline(&ctx->autostop.timestamp, PCILIB_DMA_TIMEOUT)) {
 		    ctx->run_reader = 0;
 		    break;
 		}
 		usleep(IPECAMERA_NOFRAME_SLEEP);
 	    } else pcilib_error("DMA error while reading IPECamera frames, error: %i", err);
-	}
+	} else printf("no error\n");
 
-	usleep(1000);
+	//usleep(1000);
     }
     
     ctx->run_streamer = 0;
@@ -667,6 +686,11 @@ int ipecamera_stop(pcilib_context_t *vctx, pcilib_event_flags_t flags) {
 	return PCILIB_ERROR_NOTINITIALIZED;
     }
 
+    if (flags&PCILIB_EVENT_FLAG_STOP_ONLY) {
+	ctx->run_reader = 0;
+	return 0;
+    }
+    
     if (ctx->started) {
 	ctx->run_reader = 0;
 	err = pthread_join(ctx->rthread, &retcode);
@@ -734,22 +758,10 @@ int ipecamera_trigger(pcilib_context_t *vctx, pcilib_event_t event, size_t trigg
     SET_REG(control_reg, IPECAMERA_IDLE|IPECAMERA_READOUT_FLAG);
 
 
-//    SET_REG(control_reg, IPECAMERA_READOUT);
+	// DS: Just measure when next trigger is allowed instead and wait in the beginning
     usleep(IPECAMERA_NEXT_FRAME_DELAY);  // minimum delay between End Of Readout and next Frame Req
 
-	// DS: check for overflow    
-/*
-
-    err = ipecamera_get_image(ctx);
-    if (!err) {
-	if (ctx->cb) {
-	    err = ctx->cb(event, ctx->event_id, ctx->cb_user);
-	    ctx->reported_id = ctx->event_id;
-	}
-    }
-
-    return err;
-*/
+    return 0;
 }
 
 int ipecamera_stream(pcilib_context_t *vctx, pcilib_event_callback_t callback, void *user) {
@@ -798,8 +810,7 @@ int ipecamera_stream(pcilib_context_t *vctx, pcilib_event_callback_t callback, v
 	ipecamera_stop(vctx, PCILIB_EVENT_FLAGS_DEFAULT);
     }
     
-    
-    
+
     return err;
 }
 
@@ -820,9 +831,9 @@ int ipecamera_next_event(pcilib_context_t *vctx, pcilib_event_t event_mask, pcil
 
     if (ctx->reported_id == ctx->event_id) {
 	if (timeout) {
-	    calc_deadline(&tv, timeout);
+	    pcilib_calc_deadline(&tv, timeout);
 	    
-	    while ((calc_time_to_deadline(&tv) > 0)&&(ctx->reported_id == ctx->event_id))
+	    while ((pcilib_calc_time_to_deadline(&tv) > 0)&&(ctx->reported_id == ctx->event_id))
 		usleep(IPECAMERA_NOFRAME_SLEEP);
 	}
 	
