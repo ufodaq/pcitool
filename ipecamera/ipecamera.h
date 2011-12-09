@@ -10,8 +10,8 @@ typedef  struct {
 } ipecamera_image_dimensions_t;
 
 typedef enum {
-    IPECAMERA_RAW_DATA = 0,
-    IPECAMERA_IMAGE_DATA = 1,
+    IPECAMERA_IMAGE_DATA = 0,
+    IPECAMERA_RAW_DATA = 1,
     IPECAMERA_DIMENSIONS = 0x8000,
     IPECAMERA_IMAGE_REGION = 0x8010,
     IPECAMERA_PACKED_IMAGE = 0x8020,

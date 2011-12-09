@@ -418,6 +418,7 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 
 	if ((bufsize >= 8)&&(!memcmp(buf, frame_magic, sizeof(frame_magic)))) {
 	    //if (ctx->cur_size) ipecamera_new_frame(ctx);
+//	    printf("%lx\n", ((uint32_t*)buf)[7] & 0xF0000000);
 	    ctx->frame_info[ctx->buffer_pos].info.seqnum = ((uint32_t*)buf)[6] & 0xF0000000;
 	    ctx->frame_info[ctx->buffer_pos].info.offset = ((uint32_t*)buf)[7] & 0xF0000000;
 	    gettimeofday(&ctx->frame_info[ctx->buffer_pos].info.timestamp, NULL);
@@ -865,6 +866,9 @@ void* ipecamera_get(pcilib_context_t *vctx, pcilib_event_id_t event_id, pcilib_e
     if (buf_ptr < 0) return NULL;
     
     switch ((ipecamera_data_type_t)data_type) {
+	case IPECAMERA_RAW_DATA:
+	    if (size) *size = ctx->frame_info[buf_ptr].raw_size;
+	    return ctx->buffer + buf_ptr * ctx->padded_size;
 	case IPECAMERA_IMAGE_DATA:
 	    if (size) *size = ctx->dim.width * ctx->dim.height * sizeof(ipecamera_pixel_t);
 	    return ctx->buffer + buf_ptr * ctx->dim.width * ctx->dim.height;

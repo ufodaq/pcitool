@@ -168,6 +168,5 @@ nextline:
 clean:  
   if (fn != fname) free(fn);
 
-puts(fs);
   return err;
 }

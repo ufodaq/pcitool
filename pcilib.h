@@ -60,7 +60,8 @@ typedef enum {
 } pcilib_register_protocol_t;
 
 typedef enum {
-    PCILIB_EVENT_DATA
+    PCILIB_EVENT_DATA = 0,		/**< default data format */
+    PCILIB_EVENT_RAW_DATA = 1		/**< raw data */
 } pcilib_event_data_type_t;
 
 typedef enum {
@@ -123,6 +124,7 @@ typedef enum {
 #define PCILIB_EVENT3			8
 #define PCILIB_EVENTS_ALL		((pcilib_event_t)-1)
 #define PCILIB_EVENT_INVALID		((pcilib_event_t)-1)
+#define PCILIB_EVENT_DATA_TYPE_INVALID	((pcilib_event_data_type_t)-1)
 #define PCILIB_TIMEOUT_INFINITE		((pcilib_timeout_t)-1)
 #define PCILIB_TIMEOUT_IMMEDIATE	0
 #define PCILIB_IRQ_SOURCE_DEFAULT	0

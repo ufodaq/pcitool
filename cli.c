@@ -97,7 +97,8 @@ typedef enum {
 typedef enum {
     PARTITION_UNKNOWN,
     PARTITION_RAW,
-    PARTITION_EXT4
+    PARTITION_EXT4,
+    PARTITION_NULL
 } PARTITION;
 
 typedef enum {
@@ -1116,6 +1117,17 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
     ctx->event_count++;
     
     if (info->flags&PCILIB_EVENT_INFO_FLAG_BROKEN) ctx->broken_count++;
+
+    data = pcilib_get_data(handle, ctx->event, ctx->data, &size);
+    if (!data) Error("Internal Error: No data is provided to event callback");
+
+    written = fwrite(data, 1, size, ctx->output);
+    if (written != size) {
+	if (written > 0) Error("Write failed, only %z bytes out of %z are stored", written, size);
+	else Error("Write failed");
+    }
+
+    pcilib_return_data(handle, ctx->event, data);
     
 //    printf("%lu %lu\n", info->seqnum, info->offset);
 
@@ -1161,7 +1173,7 @@ void *Trigger(void *user) {
 
     gettimeofday(&start, NULL);
     do {
-        pcilib_trigger(ctx->handle, PCILIB_EVENT0, 0, NULL);
+        pcilib_trigger(ctx->handle, ctx->event, 0, NULL);
 	if ((++ctx->trigger_count == max_triggers)&&(max_triggers)) break;
 	
 	if (trigger_time) {
@@ -1240,11 +1252,15 @@ void *Monitor(void *user) {
     return NULL;
 }
 
-int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, const char *data_type, size_t num, size_t run_time, size_t trigger_time, pcilib_timeout_t timeout, PARTITION partition, FORMAT format, size_t buffer_size, FILE *ofile) {
+int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, const char *data_type, size_t num, size_t run_time, size_t trigger_time, pcilib_timeout_t timeout, PARTITION partition, FORMAT format, size_t buffer_size, FILE *ofile) {
     int err;
     GRABContext ctx;    
-    void *data = NULL;
-    size_t size, written;
+//    void *data = NULL;
+//    size_t size, written;
+
+    pcilib_event_t event;
+    pcilib_event_t listen_events;
+    pcilib_event_data_type_t data;
 
     pthread_t monitor_thread;
     pthread_t trigger_thread;
@@ -1254,9 +1270,29 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, con
     struct timeval end_time;
     pcilib_event_flags_t flags;
 
+    if (evname) {
+	event = pcilib_find_event(handle, evname);
+	if (event == PCILIB_EVENT_INVALID) 
+	    Error("Can't find event (%s)", evname);
+
+	listen_events = event;
+    } else {
+	listen_events = PCILIB_EVENTS_ALL;
+	event = PCILIB_EVENT0;
+    }
+    
+    if (data_type) {
+	data = pcilib_find_event_data_type(handle, event, data_type);
+	if (data == PCILIB_EVENT_DATA_TYPE_INVALID)
+	    Error("Can't find data type (%s)", data_type);
+    } else {
+	data = PCILIB_EVENT_DATA;
+    }
+
     ctx.handle = handle;
     ctx.output = ofile;
-    ctx.event = PCILIB_EVENT0;
+    ctx.event = event;
+    ctx.data = data;
     ctx.run_time = run_time;
     ctx.timeout = timeout;
     
@@ -1268,6 +1304,8 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, con
     ctx.run_flag = 1;
     
     memset(&ctx.stop_time, 0, sizeof(struct timeval));
+
+
     
 //    printf("Limits: %lu %lu %lu\n", num, run_time, timeout);
     pcilib_configure_autostop(handle, num, run_time);//PCILIB_TIMEOUT_TRIGGER);
@@ -1303,7 +1341,7 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, con
     gettimeofday(&ctx.start_time, NULL);
 
     if (grab_mode&GRAB_MODE_GRAB) {
-	err = pcilib_start(handle, PCILIB_EVENTS_ALL, PCILIB_EVENT_FLAGS_DEFAULT);
+	err = pcilib_start(handle, listen_events, flags);
 	if (err) Error("Failed to start event engine, error %i", err);
     }
     
@@ -2307,6 +2345,9 @@ int main(int argc, char **argv) {
 		if (!strcmp(fsname, "ext4")) partition = PARTITION_EXT4;
 		else if (!strcmp(fsname, "raw")) partition = PARTITION_RAW;
 	    }
+	} else {
+	    output = "/dev/null";
+	    partition = PARTITION_NULL;
 	}
 
 	if (!timeout_set) {
