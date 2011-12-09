@@ -1116,10 +1116,19 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
     ctx->event_pending = 0;
     ctx->event_count++;
     
-    if (info->flags&PCILIB_EVENT_INFO_FLAG_BROKEN) ctx->broken_count++;
+    if (info->flags&PCILIB_EVENT_INFO_FLAG_BROKEN) {
+	ctx->broken_count++;
+	return 0;
+    }
 
     data = pcilib_get_data(handle, ctx->event, ctx->data, &size);
-    if (!data) Error("Internal Error: No data is provided to event callback");
+    if (!data) {
+	ctx->broken_count++;
+	return 0;
+    }
+    
+    
+    //Error("Internal Error: No data is provided to event callback");
 
     written = fwrite(data, 1, size, ctx->output);
     if (written != size) {
@@ -1152,6 +1161,7 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 */
 
 //    printf("data callback: %lu\n", event_id);    
+    return 0;
 }
 
 int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event_flags_t flags, size_t size, void *data, void *user) {

@@ -2,7 +2,7 @@ BINARIES += pci
 
 INCDIR += ./
 LDINC += $(addprefix -L ,$(LIBDIR))
-LDFLAGS += -pthread
+LDFLAGS += -pthread -lufodecode
 CFLAGS += -pthread
 DESTDIR ?= /usr/local
 

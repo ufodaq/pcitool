@@ -9,6 +9,8 @@
 #include <pthread.h>
 #include <assert.h>
 
+#include <ufodecode.h>
+
 #include "../tools.h"
 #include "../error.h"
 
@@ -26,6 +28,8 @@
 
 
 #define IPECAMERA_BUG_EXTRA_DATA
+#define IPECAMERA_BUG_MULTIFRAME_PACKETS
+#define IPECAMERA_BUG_INCOMPLETE_PACKETS
 
 #define IPECAMERA_DEFAULT_BUFFER_SIZE 64  	//**< should be power of 2 */
 #define IPECAMERA_RESERVE_BUFFERS 2		//**< Return Frame is Lost error, if requested frame will be overwritten after specified number of frames
@@ -59,17 +63,7 @@
 #define IPECAMERA_START_INTERNAL_STIMULI 	0x1F1
 
 
-#define IPECAMERA_WRITE_RAW
-#define IPECAMERA_REORDER_CHANNELS
-
-#ifdef IPECAMERA_REORDER_CHANNELS
-int ipecamera_channel_order[IPECAMERA_MAX_CHANNELS] = { 15, 13, 14, 12, 10, 8, 11, 7, 9, 6, 5, 2, 4, 3, 0, 1 };
-#endif 
-
-
-
 typedef uint32_t ipecamera_payload_t;
-
 
 typedef struct {
     pcilib_event_id_t evid;
@@ -78,10 +72,10 @@ typedef struct {
 
 struct ipecamera_s {
     pcilib_context_t event;
+    ufo_decoder ipedec;
 
-#ifndef IPECAMERA_DMA_ADDRESS    
     char *data;
-#endif /* IPECAMERA_DMA_ADDRESS */
+    ipecamera_pixel_t *image;
     size_t size;
 
     pcilib_event_callback_t cb;
@@ -90,9 +84,7 @@ struct ipecamera_s {
     pcilib_event_id_t event_id;
     pcilib_event_id_t reported_id;
     
-#ifdef IPECAMERA_DMA_ADDRESS
     pcilib_dma_engine_t rdma, wdma;
-#endif /* IPECAMERA_DMA_ADDRESS */
 
     pcilib_register_t packet_len_reg;
     pcilib_register_t control_reg, status_reg;
@@ -196,16 +188,8 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	ctx->buffer_size = IPECAMERA_DEFAULT_BUFFER_SIZE;
 	ctx->dim.bpp = sizeof(ipecamera_pixel_t) * 8;
 
-#ifdef IPECAMERA_DMA_ADDRESS
 	    // We need DMA engine initialized to resolve DMA registers
 //	FIND_REG(packet_len_reg, "fpga", "xrawdata_packet_length");
-#else  /* IPECAMERA_DMA_ADDRESS */
-	ctx->data = pcilib_resolve_data_space(pcilib, 0, &ctx->size);
-	if (!ctx->data) {
-	    err = -1;
-	    pcilib_error("Unable to resolve the data space");
-	}
-#endif /* IPECAMERA_DMA_ADDRESS */
 	
 	FIND_REG(status_reg, "fpga", "status");
 	FIND_REG(control_reg, "fpga", "control");
@@ -219,7 +203,6 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 
 	ctx->rdma = PCILIB_DMA_ENGINE_INVALID;
 	ctx->wdma = PCILIB_DMA_ENGINE_INVALID;
-
 
 	if (err) {
 	    free(ctx);
@@ -374,7 +357,7 @@ static inline int ipecamera_new_frame(ipecamera_t *ctx) {
 
     ctx->frame_info[ctx->buffer_pos].info.type = PCILIB_EVENT0;
     ctx->frame_info[ctx->buffer_pos].info.flags = 0;
-//	memset(ctx->cmask + ctx->buffer_pos * ctx->dim.height, 0, ctx->dim.height * sizeof(ipecamera_change_mask_t));
+    ctx->frame_info[ctx->buffer_pos].image_ready = 0;
 
     if ((ctx->event_id == ctx->autostop.evid)&&(ctx->event_id)) {
 	ctx->run_reader = 0;
@@ -390,9 +373,6 @@ static inline int ipecamera_new_frame(ipecamera_t *ctx) {
 }
 
 static uint32_t frame_magic[6] = { 0x51111111, 0x52222222, 0x53333333, 0x54444444, 0x55555555, 0x56666666 };
-
-#define IPECAMERA_BUG_MULTIFRAME_PACKETS
-#define IPECAMERA_BUG_INCOMPLETE_PACKETS
 
 static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t bufsize, void *buf) {
     int eof = 0;
@@ -417,10 +397,11 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 #endif /* IPECAMERA_BUG_INCOMPLETE_PACKETS */
 
 	if ((bufsize >= 8)&&(!memcmp(buf, frame_magic, sizeof(frame_magic)))) {
-	    //if (ctx->cur_size) ipecamera_new_frame(ctx);
-//	    printf("%lx\n", ((uint32_t*)buf)[7] & 0xF0000000);
+/*
+		// Not implemented in hardware yet
 	    ctx->frame_info[ctx->buffer_pos].info.seqnum = ((uint32_t*)buf)[6] & 0xF0000000;
 	    ctx->frame_info[ctx->buffer_pos].info.offset = ((uint32_t*)buf)[7] & 0xF0000000;
+*/
 	    gettimeofday(&ctx->frame_info[ctx->buffer_pos].info.timestamp, NULL);
 	} else {
 //	    pcilib_warning("Frame magic is not found, ignoring broken data...");
@@ -519,8 +500,8 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     
     const size_t chan_size = (2 + IPECAMERA_PIXELS_PER_CHANNEL / 3) * sizeof(ipecamera_payload_t);
     const size_t line_size = (IPECAMERA_MAX_CHANNELS * chan_size);
-    const size_t header_size = 8;
-    const size_t footer_size = 8;
+    const size_t header_size = 8 * sizeof(ipecamera_payload_t);
+    const size_t footer_size = 8 * sizeof(ipecamera_payload_t);
     size_t raw_size;
     size_t padded_blocks;
     
@@ -557,7 +538,7 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     raw_size = header_size + ctx->dim.height * line_size + footer_size;
     padded_blocks = raw_size / IPECAMERA_DMA_PACKET_LENGTH + ((raw_size % IPECAMERA_DMA_PACKET_LENGTH)?1:0);
     
-    ctx->image_size = ctx->dim.width * ctx->dim.height * sizeof(ipecamera_pixel_t);
+    ctx->image_size = ctx->dim.width * ctx->dim.height;
     ctx->raw_size = raw_size;
     ctx->full_size = padded_blocks * IPECAMERA_DMA_PACKET_LENGTH;
 
@@ -575,6 +556,13 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
 	return err;
     }
 
+    ctx->image = (ipecamera_pixel_t*)malloc(ctx->image_size * ctx->buffer_size * sizeof(ipecamera_pixel_t));
+    if (!ctx->image) {
+	err = PCILIB_ERROR_MEMORY;
+	pcilib_error("Unable to allocate image buffer (%lu bytes)", ctx->image_size * ctx->buffer_size * sizeof(ipecamera_pixel_t));
+	return err;
+    }
+
     ctx->cmask = malloc(ctx->dim.height * ctx->buffer_size * sizeof(ipecamera_change_mask_t));
     if (!ctx->cmask) {
 	err = PCILIB_ERROR_MEMORY;
@@ -588,8 +576,13 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
 	pcilib_error("Unable to allocate frame-info buffer");
 	return err;
     }
+    
+    ctx->ipedec = ufo_decoder_new(ctx->dim.height, ctx->dim.width, NULL, 0);
+    if (!ctx->ipedec) {
+	pcilib_error("Unable to initialize IPECamera decoder library");
+	return PCILIB_ERROR_FAILED;
+    }
 
-#ifdef IPECAMERA_DMA_ADDRESS
     if (!err) {
 	ctx->rdma = pcilib_find_dma_by_addr(vctx->pcilib, PCILIB_DMA_FROM_DEVICE, IPECAMERA_DMA_ADDRESS);
 	if (ctx->rdma == PCILIB_DMA_ENGINE_INVALID) {
@@ -632,8 +625,6 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
 	return err;
     }
 
-#endif /* IPECAMERA_DMA_ADDRESS */
-    
     if (err) {
 	ipecamera_stop(vctx, PCILIB_EVENT_FLAGS_DEFAULT);
 	return err;
@@ -699,7 +690,6 @@ int ipecamera_stop(pcilib_context_t *vctx, pcilib_event_flags_t flags) {
 	if (err) pcilib_error("Error joining the reader thread");
     }
 
-#ifdef IPECAMERA_DMA_ADDRESS
     if (ctx->wdma != PCILIB_DMA_ENGINE_INVALID) {
 	pcilib_stop_dma(vctx->pcilib, ctx->wdma, PCILIB_DMA_FLAGS_DEFAULT);
 	ctx->wdma = PCILIB_DMA_ENGINE_INVALID;
@@ -709,11 +699,25 @@ int ipecamera_stop(pcilib_context_t *vctx, pcilib_event_flags_t flags) {
 	pcilib_stop_dma(vctx->pcilib, ctx->rdma, PCILIB_DMA_FLAGS_DEFAULT);
 	ctx->rdma = PCILIB_DMA_ENGINE_INVALID;
     }
-#endif /* IPECAMERA_DMA_ADDRESS */
+    
+    if (ctx->ipedec) {
+	ufo_decoder_free(ctx->ipedec);
+	ctx->ipedec = NULL;
+    }
 
     if (ctx->frame_info) {
 	free(ctx->frame_info);
 	ctx->frame_info = NULL;
+    }
+
+    if (ctx->cmask) {
+	free(ctx->cmask);
+	ctx->cmask = NULL;
+    }
+
+    if (ctx->image) {
+	free(ctx->image);
+	ctx->image = NULL;
     }
 
     if (ctx->buffer) {
@@ -721,10 +725,6 @@ int ipecamera_stop(pcilib_context_t *vctx, pcilib_event_flags_t flags) {
 	ctx->buffer = NULL;
     }
     
-    if (ctx->cmask) {
-	free(ctx->cmask);
-	ctx->cmask = NULL;
-    }
 
     memset(&ctx->autostop, 0, sizeof(ipecamera_autostop_t));
 
@@ -816,7 +816,6 @@ int ipecamera_stream(pcilib_context_t *vctx, pcilib_event_callback_t callback, v
     return err;
 }
 
-
 int ipecamera_next_event(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_timeout_t timeout, pcilib_event_id_t *evid, pcilib_event_info_t **info) {
     struct timeval tv;
     ipecamera_t *ctx = (ipecamera_t*)vctx;
@@ -852,9 +851,40 @@ int ipecamera_next_event(pcilib_context_t *vctx, pcilib_event_t event_mask, pcil
 }
 
 
+inline static int ipecamera_decode_frame(ipecamera_t *ctx, pcilib_event_id_t event_id) {
+    int err;
+    uint32_t tmp;
+    uint16_t *pixels;
+    
+    int buf_ptr = (event_id - 1) % ctx->buffer_size;
+    
+    if (!ctx->frame_info[buf_ptr].image_ready) {
+	if (ctx->frame_info[buf_ptr].info.flags&PCILIB_EVENT_INFO_FLAG_BROKEN) return PCILIB_ERROR_INVALID_DATA;
+	
+	ufo_decoder_set_raw_data(ctx->ipedec, ctx->buffer + buf_ptr * ctx->padded_size, ctx->raw_size);
+		
+	pixels = ctx->image + buf_ptr * ctx->image_size;
+	memset(ctx->cmask + ctx->buffer_pos * ctx->dim.height, 0, ctx->dim.height * sizeof(ipecamera_change_mask_t));
+	err = ufo_decoder_get_next_frame(ctx->ipedec, &pixels, &tmp, &tmp, ctx->cmask + ctx->buffer_pos * ctx->dim.height);
+	if (err) return PCILIB_ERROR_FAILED;
+	    
+	ctx->frame_info[buf_ptr].image_ready = 1;
+
+	if (ipecamera_resolve_event_id(ctx, event_id) < 0) {
+	    ctx->frame_info[buf_ptr].image_ready = 0;
+	    return PCILIB_ERROR_TIMEOUT;
+	}
+    }
+    
+    return 0;
+}
+
 void* ipecamera_get(pcilib_context_t *vctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size, void *data) {
+    int err;
     int buf_ptr;
+    size_t raw_size;
     ipecamera_t *ctx = (ipecamera_t*)vctx;
+    uint16_t *pixels;
 
     if (!ctx) {
 	pcilib_error("IPECamera imaging is not initialized");
@@ -867,12 +897,43 @@ void* ipecamera_get(pcilib_context_t *vctx, pcilib_event_id_t event_id, pcilib_e
     
     switch ((ipecamera_data_type_t)data_type) {
 	case IPECAMERA_RAW_DATA:
-	    if (size) *size = ctx->frame_info[buf_ptr].raw_size;
+	    raw_size = ctx->frame_info[buf_ptr].raw_size;
+	    if (data) {
+		if ((!size)||(*size < raw_size)) return NULL;
+		memcpy(data, ctx->buffer + buf_ptr * ctx->padded_size, raw_size);
+		if (ipecamera_resolve_event_id(ctx, event_id) < 0) return NULL;
+		*size = raw_size;
+		return data;
+	    }
+	    if (size) *size = raw_size;
 	    return ctx->buffer + buf_ptr * ctx->padded_size;
 	case IPECAMERA_IMAGE_DATA:
-	    if (size) *size = ctx->dim.width * ctx->dim.height * sizeof(ipecamera_pixel_t);
-	    return ctx->buffer + buf_ptr * ctx->dim.width * ctx->dim.height;
+	    err = ipecamera_decode_frame(ctx, event_id);
+	    if (err) return NULL;
+
+	    if (data) {
+		if ((!size)||(*size < ctx->image_size * sizeof(ipecamera_pixel_t))) return NULL;
+		memcpy(data, ctx->image + buf_ptr * ctx->image_size, ctx->image_size * sizeof(ipecamera_pixel_t));
+		if (ipecamera_resolve_event_id(ctx, event_id) < 0) return NULL;
+		*size =  ctx->image_size * sizeof(ipecamera_pixel_t);
+		return data;
+	    }
+	
+	    if (size) *size = ctx->image_size * sizeof(ipecamera_pixel_t);
+	    return ctx->image + buf_ptr * ctx->image_size;
 	case IPECAMERA_CHANGE_MASK:
+	    err = ipecamera_decode_frame(ctx, event_id);
+	    if (err) return NULL;
+
+	    if (data) {
+		if ((!size)||(*size < ctx->dim.height * sizeof(ipecamera_change_mask_t))) return NULL;
+		memcpy(data, ctx->image + buf_ptr * ctx->dim.height, ctx->dim.height * sizeof(ipecamera_change_mask_t));
+		if (ipecamera_resolve_event_id(ctx, event_id) < 0) return NULL;
+		*size =  ctx->dim.height * sizeof(ipecamera_change_mask_t);
+
+		return data;
+	    }
+
 	    if (size) *size = ctx->dim.height * sizeof(ipecamera_change_mask_t);
 	    return ctx->cmask + buf_ptr * ctx->dim.height;
 	case IPECAMERA_DIMENSIONS:

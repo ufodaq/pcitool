@@ -103,6 +103,7 @@ pcilib_event_description_t ipecamera_events[] = {
 pcilib_event_data_type_description_t ipecamera_data_types[] = {
     {IPECAMERA_IMAGE_DATA, PCILIB_EVENT0, "image", "16 bit pixel data" },
     {IPECAMERA_RAW_DATA, PCILIB_EVENT0, "raw", "raw data from camera" },
+    {IPECAMERA_CHANGE_MASK, PCILIB_EVENT0, "cmask", "change mask" },
     {0, 0, NULL, NULL}
 };
 
