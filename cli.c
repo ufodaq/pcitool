@@ -1084,15 +1084,18 @@ typedef struct {
     int started;			/**< Indicates that recording is started */
     
     int run_flag;
-    
+
+    struct timeval first_frame;    
     struct timeval last_frame;
     size_t trigger_count;
-    size_t frame_count;
+    size_t event_count;
     size_t broken_count;
     
+    struct timeval start_time;
     struct timeval stop_time;
 } GRABContext;
 
+#include "ipecamera/ipecamera.h"
 int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user) {
     int err;
     void *data;
@@ -1101,12 +1104,22 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
     GRABContext *ctx = (GRABContext*)user;
     pcilib_t *handle = ctx->handle;
 
+    ipecamera_event_info_t *ipe = (ipecamera_event_info_t*)info;
+
     gettimeofday(&ctx->last_frame, NULL);
+
+    if (!ctx->event_count) {
+	memcpy(&ctx->first_frame, &ctx->last_frame, sizeof(struct timeval));
+    }
     
     ctx->event_pending = 0;
-    ctx->frame_count++;
-
+    ctx->event_count++;
+    
     if (info->flags&PCILIB_EVENT_INFO_FLAG_BROKEN) ctx->broken_count++;
+    
+//    printf("%lu %lu\n", info->seqnum, info->offset);
+
+//    printf("%lu %lx %lu\n", ipe->raw_size, info->flags, ctx->broken_count);
 
 /*
     FILE *o = ctx->output;
@@ -1126,7 +1139,7 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
     pcilib_return_data(handle, ctx->event, data);
 */
 
-    printf("data callback: %lu\n", event_id);    
+//    printf("data callback: %lu\n", event_id);    
 }
 
 int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event_flags_t flags, size_t size, void *data, void *user) {
@@ -1164,6 +1177,33 @@ void *Trigger(void *user) {
     ctx->trigger_thread_started = 0;
 
     return NULL;
+}
+
+void GrabStats(GRABContext *ctx, struct timeval *end_time) {
+    pcilib_timeout_t duration, fps_duration;
+    struct timeval cur;
+    double fps;
+
+    if (!end_time) {
+	gettimeofday(&cur, NULL);
+	end_time = &cur;
+    }
+        
+    duration = pcilib_timediff(&ctx->start_time, end_time);
+    
+    if (ctx->event_count > 1) {
+	fps_duration = pcilib_timediff(&ctx->first_frame, &ctx->last_frame);
+	fps = (ctx->event_count - 1) / (1.*fps_duration/1000000);
+    }
+    
+    if (duration > 100000000) printf("Time: %9lu s", duration/1000000);
+    else if (duration > 10000000) printf("Time: %9.1lf  s", 1.*duration/1000000);
+    else if (duration > 1000000) printf("Time: %9.2lf  s", 1.*duration/1000000);
+    else if (duration > 1000) printf("Time: %9lu ms", duration/1000);
+    else printf("Time: %9lu us", duration);
+    
+    printf(", Triggers: %9lu, Frames: %9lu, Broken: %9u, Lost: %9u, FPS: %5.1lf\n", ctx->trigger_count, ctx->event_count, ctx->broken_count, 0, fps);
+
 }
 
 void *Monitor(void *user) {
@@ -1211,7 +1251,7 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, con
     pthread_attr_t attr;
     struct sched_param sched;
 
-    struct timeval start, end;
+    struct timeval end_time;
     pcilib_event_flags_t flags;
 
     ctx.handle = handle;
@@ -1220,7 +1260,8 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, con
     ctx.run_time = run_time;
     ctx.timeout = timeout;
     
-    ctx.frame_count = 0;
+    ctx.event_count = 0;
+    ctx.broken_count = 0;
     
     ctx.started = 0;
     ctx.trigger_thread_started = 0;
@@ -1259,7 +1300,7 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, con
 	while (!ctx.trigger_thread_started) usleep(10);
     }
 
-    gettimeofday(&start, NULL);
+    gettimeofday(&ctx.start_time, NULL);
 
     if (grab_mode&GRAB_MODE_GRAB) {
 	err = pcilib_start(handle, PCILIB_EVENTS_ALL, PCILIB_EVENT_FLAGS_DEFAULT);
@@ -1269,18 +1310,18 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, con
     ctx.started = 1;
     
     if (run_time) {
-	ctx.stop_time.tv_usec = start.tv_usec + run_time%1000000;
+	ctx.stop_time.tv_usec = ctx.start_time.tv_usec + run_time%1000000;
 	if (ctx.stop_time.tv_usec > 999999) {
 	    ctx.stop_time.tv_usec -= 1000000;
 	    __sync_synchronize();
-	    ctx.stop_time.tv_sec = start.tv_sec + 1 + run_time / 1000000;
+	    ctx.stop_time.tv_sec = ctx.start_time.tv_sec + 1 + run_time / 1000000;
 	} else {
 	    __sync_synchronize();
-	    ctx.stop_time.tv_sec = start.tv_sec + run_time / 1000000;
+	    ctx.stop_time.tv_sec = ctx.start_time.tv_sec + run_time / 1000000;
 	}
     }
     
-    memcpy(&ctx.last_frame, &start, sizeof(struct timeval));
+    memcpy(&ctx.last_frame, &ctx.start_time, sizeof(struct timeval));
     if (pthread_create(&monitor_thread, NULL, Monitor, (void*)&ctx))
 	Error("Error spawning monitoring thread");
 
@@ -1299,6 +1340,8 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, con
         pcilib_stop(handle, PCILIB_EVENT_FLAGS_DEFAULT);
     }
 
+    gettimeofday(&end_time, NULL);
+
 /*	
     err = pcilib_grab(handle, PCILIB_EVENTS_ALL, &size, &data, PCILIB_TIMEOUT_TRIGGER);
     if (err) {
@@ -1311,6 +1354,8 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *event, con
     if (grab_mode&GRAB_MODE_TRIGGER) {
 	pthread_join(trigger_thread, NULL);
     }
+
+    GrabStats(&ctx, &end_time);
 
     // print information
     

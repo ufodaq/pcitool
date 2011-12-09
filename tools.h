@@ -40,5 +40,6 @@ int pcilib_check_deadline(struct timeval *tve, pcilib_timeout_t timeout);
 pcilib_timeout_t pcilib_calc_time_to_deadline(struct timeval *tve);
 int pcilib_sleep_until_deadline(struct timeval *tv);
 int pcilib_timecmp(struct timeval *tv1, struct timeval *tv2);
+pcilib_timeout_t pcilib_timediff(struct timeval *tve, struct timeval *tvs);
 
 #endif /* _PCITOOL_TOOS_H */

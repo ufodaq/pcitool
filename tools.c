@@ -310,6 +310,10 @@ int pcilib_sleep_until_deadline(struct timeval *tv) {
     return 0;
 }
 
+pcilib_timeout_t pcilib_timediff(struct timeval *tvs, struct timeval *tve) {
+    return ((tve->tv_sec - tvs->tv_sec)*1000000 + (tve->tv_usec - tvs->tv_usec));
+}
+
 int pcilib_timecmp(struct timeval *tv1, struct timeval *tv2) {
     if (tv1->tv_sec > tv2->tv_sec) return 1;
     else if (tv1->tv_sec > tv2->tv_sec) return -1;
