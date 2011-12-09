@@ -857,7 +857,7 @@ int ReadRegister(pcilib_t *handle, pcilib_model_description_t *model_info, const
     fwrite(tbuf, access/8, n, o); \
 }
 
-int ReadRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, size_t n, FILE *o) {
+int ReadRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, long addr_shift, size_t n, FILE *o) {
     int err;
     int i;
 
@@ -905,7 +905,7 @@ int ReadRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, 
 		}
 	    }
 	    
-	    if (i%numbers_per_line == 0) printf("%4lx:  ", addr + i);
+	    if (i%numbers_per_line == 0) printf("%4lx:  ", addr + i - addr_shift);
 	    printf("%0*lx", access * 2, (unsigned long)buf[i]);
 	}
 	printf("\n\n");
@@ -972,7 +972,7 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
     return 0;
 }
 
-int WriteRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, size_t n, char ** data) {
+int WriteRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, long addr_shift, size_t n, char ** data) {
     pcilib_register_value_t *buf, *check;
     int res, i, err;
     unsigned long value;
@@ -996,7 +996,7 @@ int WriteRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info,
 
     if (memcmp(buf, check, size)) {
 	printf("Write failed: the data written and read differ, the foolowing is read back:\n");
-	ReadRegisterRange(handle, model_info, bank, addr, n, NULL);
+	ReadRegisterRange(handle, model_info, bank, addr, addr_shift, n, NULL);
 	exit(-1);
     }
 
@@ -1815,6 +1815,7 @@ int main(int argc, char **argv) {
     pcilib_dma_direction_t dma_direction = PCILIB_DMA_BIDIRECTIONAL;
     
     pcilib_dma_engine_addr_t dma = PCILIB_DMA_ENGINE_ADDR_INVALID;
+    long addr_shift = 0;
     uintptr_t start = -1;
     size_t size = 1;
     access_t access = 4;
@@ -2240,6 +2241,7 @@ int main(int argc, char **argv) {
 		    
 		    bank = model_info->banks[regbank].name;
 		    start += ranges[i].addr_shift;
+		    addr_shift = ranges[i].addr_shift;
 		    ++mode;
 		}
 	    }
@@ -2321,14 +2323,14 @@ int main(int argc, char **argv) {
      break;
      case MODE_READ_REGISTER:
         if ((reg)||(!addr)) ReadRegister(handle, model_info, bank, reg);
-	else ReadRegisterRange(handle, model_info, bank, start, size, ofile);
+	else ReadRegisterRange(handle, model_info, bank, start, addr_shift, size, ofile);
      break;
      case MODE_WRITE:
 	WriteData(handle, amode, dma, bar, start, size, access, endianess, data);
      break;
      case MODE_WRITE_REGISTER:
         if (reg) WriteRegister(handle, model_info, bank, reg, data);
-	else WriteRegisterRange(handle, model_info, bank, start, size, data);
+	else WriteRegisterRange(handle, model_info, bank, start, addr_shift, size, data);
      break;
      case MODE_RESET:
         pcilib_reset(handle);
