@@ -365,7 +365,8 @@ static int ipecamera_resolve_event_id(ipecamera_t *ctx, pcilib_event_id_t evid) 
 }
 
 static inline int ipecamera_new_frame(ipecamera_t *ctx) {
-    ctx->frame_info[ctx->buffer_pos].raw_size =ctx->cur_size;
+    ctx->frame_info[ctx->buffer_pos].raw_size = ctx->cur_size;
+
     if (ctx->cur_size < ctx->raw_size) ctx->frame_info[ctx->buffer_pos].info.flags |= PCILIB_EVENT_INFO_FLAG_BROKEN;
     
     ctx->buffer_pos = (++ctx->event_id) % ctx->buffer_size;
@@ -799,7 +800,7 @@ int ipecamera_stream(pcilib_context_t *vctx, pcilib_event_callback_t callback, v
 	    if ((ctx->event_id - ctx->reported_id) > (ctx->buffer_size - IPECAMERA_RESERVE_BUFFERS)) ctx->reported_id = ctx->event_id - (ctx->buffer_size - 1) - IPECAMERA_RESERVE_BUFFERS;
 	    else ++ctx->reported_id;
 
-	    callback(ctx->reported_id, (pcilib_event_info_t*)(ctx->frame_info + (ctx->reported_id%ctx->buffer_size)), user);
+	    callback(ctx->reported_id, (pcilib_event_info_t*)(ctx->frame_info + ((ctx->reported_id-1)%ctx->buffer_size)), user);
 	}
 	usleep(IPECAMERA_NOFRAME_SLEEP);
     }
@@ -843,7 +844,10 @@ int ipecamera_next_event(pcilib_context_t *vctx, pcilib_event_t event_mask, pcil
     if ((ctx->event_id - ctx->reported_id) > (ctx->buffer_size - IPECAMERA_RESERVE_BUFFERS)) ctx->reported_id = ctx->event_id - (ctx->buffer_size - 1) - IPECAMERA_RESERVE_BUFFERS;
     else ++ctx->reported_id;
 
-    return ctx->reported_id;
+    if (evid) *evid = ctx->reported_id;
+    if (info) *info = (pcilib_event_info_t*)(ctx->frame_info + ((ctx->reported_id-1)%ctx->buffer_size));
+    
+    return 0;
 }
 
 
