@@ -1121,7 +1121,7 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 	return 0;
     }
 
-    data = pcilib_get_data(handle, ctx->event, ctx->data, &size);
+    data = pcilib_get_data(handle, event_id, ctx->data, &size);
     if (!data) {
 	ctx->broken_count++;
 	return 0;
@@ -1136,7 +1136,7 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 	else Error("Write failed");
     }
 
-    pcilib_return_data(handle, ctx->event, data);
+    pcilib_return_data(handle, event_id, data);
     
 //    printf("%lu %lu\n", info->seqnum, info->offset);
 
