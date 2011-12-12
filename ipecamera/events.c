@@ -48,7 +48,11 @@ int ipecamera_stream(pcilib_context_t *vctx, pcilib_event_callback_t callback, v
     
 	// This loop iterates while the generation
     while ((run_flag)&&((ctx->run_streamer)||(ctx->reported_id != ctx->event_id))) {
+#ifdef IPECAMERA_ANNOUNCE_READY
+	while (((!ctx->preproc)&&(ctx->reported_id != ctx->event_id))||((ctx->preproc)&&(ctx->reported_id != ctx->preproc_id))) {
+#else /* IPECAMERA_ANNOUNCE_READY */
 	while (ctx->reported_id != ctx->event_id) {
+#endif /* IPECAMERA_ANNOUNCE_READY */
 	    if ((ctx->event_id - ctx->reported_id) > (ctx->buffer_size - IPECAMERA_RESERVE_BUFFERS)) ctx->reported_id = ctx->event_id - (ctx->buffer_size - 1) - IPECAMERA_RESERVE_BUFFERS;
 	    else ++ctx->reported_id;
 
@@ -90,12 +94,22 @@ int ipecamera_next_event(pcilib_context_t *vctx, pcilib_timeout_t timeout, pcili
 	return PCILIB_ERROR_INVALID_REQUEST;
     }
 
+#ifdef IPECAMERA_ANNOUNCE_READY
+    if (((!ctx->preproc)&&(ctx->reported_id == ctx->event_id))||((ctx->preproc)&&(ctx->reported_id == ctx->preproc_id))) {
+#else /* IPECAMERA_ANNOUNCE_READY */
     if (ctx->reported_id == ctx->event_id) {
+#endif /* IPECAMERA_ANNOUNCE_READY */
+
 	if (timeout) {
 	    pcilib_calc_deadline(&tv, timeout);
-	    
-	    while ((pcilib_calc_time_to_deadline(&tv) > 0)&&(ctx->reported_id == ctx->event_id))
+
+#ifdef IPECAMERA_ANNOUNCE_READY
+	    while ((pcilib_calc_time_to_deadline(&tv) > 0)&&(((!ctx->preproc)&&(ctx->reported_id == ctx->event_id))||((ctx->preproc)&&(ctx->reported_id == ctx->preproc_id)))) {
+#else /* IPECAMERA_ANNOUNCE_READY */
+	    while ((pcilib_calc_time_to_deadline(&tv) > 0)&&(ctx->reported_id == ctx->event_id)) {
+#endif /* IPECAMERA_ANNOUNCE_READY */
 		usleep(IPECAMERA_NOFRAME_SLEEP);
+	    }
 	}
 	
 	if (ctx->reported_id == ctx->event_id) return PCILIB_ERROR_TIMEOUT;

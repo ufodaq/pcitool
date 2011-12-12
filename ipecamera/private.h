@@ -7,6 +7,8 @@
 #define IPECAMERA_BUG_MULTIFRAME_PACKETS
 #define IPECAMERA_BUG_INCOMPLETE_PACKETS
 
+#define IPECAMERA_ANNOUNCE_READY		//**< announce new event only after the reconstruction is done */
+
 #define IPECAMERA_DEFAULT_BUFFER_SIZE 16//64  	//**< should be power of 2 */
 #define IPECAMERA_RESERVE_BUFFERS 2		//**< Return Frame is Lost error, if requested frame will be overwritten after specified number of frames
 #define IPECAMERA_SLEEP_TIME 250000 		//**< Michele thinks 250 should be enough, but reset failing in this case */
@@ -63,7 +65,7 @@ struct ipecamera_s {
     void *cb_user;
 
     volatile pcilib_event_id_t event_id;
-    pcilib_event_id_t preproc_id;
+    volatile pcilib_event_id_t preproc_id;
     pcilib_event_id_t reported_id;
     
     pcilib_dma_engine_t rdma, wdma;
