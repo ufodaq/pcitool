@@ -347,7 +347,7 @@ pcilib_timeout_t pcilib_timediff(struct timeval *tvs, struct timeval *tve) {
 
 int pcilib_timecmp(struct timeval *tv1, struct timeval *tv2) {
     if (tv1->tv_sec > tv2->tv_sec) return 1;
-    else if (tv1->tv_sec > tv2->tv_sec) return -1;
+    else if (tv1->tv_sec < tv2->tv_sec) return -1;
     else if (tv1->tv_usec > tv2->tv_usec) return 1;
     else if (tv1->tv_usec < tv2->tv_usec) return -1;
     return 0;

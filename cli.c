@@ -2488,6 +2488,10 @@ int main(int argc, char **argv) {
 	    if (run_time) timeout = PCILIB_TIMEOUT_INFINITE;
 	    else timeout = PCILIB_EVENT_TIMEOUT;
 	}
+	
+	if (!size_set) {
+	    if (run_time) size = 0;
+	}
     }
     
     if (mode != MODE_GRAB) {
