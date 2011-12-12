@@ -9,7 +9,7 @@
 
 //#define IPECAMERA_ANNOUNCE_READY		//**< announce new event only after the reconstruction is done */
 
-#define IPECAMERA_DEFAULT_BUFFER_SIZE 16//64  	//**< should be power of 2 */
+#define IPECAMERA_DEFAULT_BUFFER_SIZE 64  	//**< should be power of 2 */
 #define IPECAMERA_RESERVE_BUFFERS 2		//**< Return Frame is Lost error, if requested frame will be overwritten after specified number of frames
 #define IPECAMERA_SLEEP_TIME 250000 		//**< Michele thinks 250 should be enough, but reset failing in this case */
 #define IPECAMERA_NEXT_FRAME_DELAY 1000 	//**< Michele requires 30000 to sync between End Of Readout and next Frame Req */

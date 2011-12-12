@@ -41,6 +41,8 @@
 #define BLOCK_SEPARATOR_WIDTH 2
 #define BLOCK_SIZE 8
 #define BENCHMARK_ITERATIONS 128
+#define STATUS_MESSAGE_INTERVAL	5	/* seconds */
+
 
 #define isnumber pcilib_isnumber
 #define isxnumber pcilib_isxnumber
@@ -140,7 +142,8 @@ typedef enum {
     OPT_READ_KMEM,
     OPT_FORCE,
     OPT_WAIT,
-    OPT_MULTIPACKET
+    OPT_MULTIPACKET,
+    OPT_VERBOSE
 } OPTIONS;
 
 static struct option long_options[] = {
@@ -179,6 +182,7 @@ static struct option long_options[] = {
     {"read-kernel-memory",	required_argument, 0, OPT_READ_KMEM },
     {"free-kernel-memory",	required_argument, 0, OPT_FREE_KMEM },
     {"quiete",			no_argument, 0, OPT_QUIETE },
+    {"verbose",			optional_argument, 0, OPT_VERBOSE },
     {"force",			no_argument, 0, OPT_FORCE },
     {"multipacket",		no_argument, 0, OPT_MULTIPACKET },
     {"wait",			no_argument, 0, OPT_WAIT },
@@ -267,6 +271,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   --wait			- Wait until data arrives\n"
 "\n"
 "  Information:\n"
+"   --verbose [level]		- Announce details of ongoing operations\n"
 "   -q				- Quiete mode (suppress warnings)\n"
 "\n"
 "  Data:\n"
@@ -1085,6 +1090,7 @@ typedef struct {
     pcilib_event_data_type_t data;
     FILE *output;
 
+    int verbose;
     pcilib_timeout_t timeout;
     size_t run_time;
     size_t trigger_time;    
@@ -1218,13 +1224,27 @@ void *Trigger(void *user) {
     return NULL;
 }
 
+void PrintNumber(size_t num) {
+    if (num > 999999999999999999) printf("%3lue", num/1000000);
+    else if (num > 999999999999999) printf("%3lup", num/1000000);
+    else if (num > 999999999999) printf("%3lut", num/1000000);
+    else if (num > 999999999) printf("%3lug", num/1000000);
+    else if (num > 999999) printf("%3lum", num/1000000);
+    else if (num > 9999) printf("%3luk", num/1000);
+    else printf("%4lu", num);
+}
+
 void GrabStats(GRABContext *ctx, struct timeval *end_time) {
     int unprocessed_count;
     pcilib_timeout_t duration, fps_duration;
     struct timeval cur;
     double fps = 0;
 
-    if (!end_time) {
+    if (end_time) {
+	if (ctx->verbose) {
+	    printf("-------------------------------------------------------------------------------\n");
+	}
+    } else {
 	gettimeofday(&cur, NULL);
 	end_time = &cur;
     }
@@ -1236,25 +1256,49 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
 	fps = (ctx->event_count - 1) / (1.*fps_duration/1000000);
     }
     
-    if (duration > 100000000) printf("Time: %9lu s", duration/1000000);
-    else if (duration > 10000000) printf("Time: %9.1lf  s", 1.*duration/1000000);
-    else if (duration > 1000000) printf("Time: %9.2lf  s", 1.*duration/1000000);
-    else if (duration > 1000) printf("Time: %9lu ms", duration/1000);
-    else printf("Time: %9lu us", duration);
+    if (duration > 999999999999) printf("Time: %4.1lf d", 1.*duration/86400000000);
+    else if (duration > 99999999999) printf("Time: %4.1lf h", 1.*duration/3600000000);
+    else if (duration > 9999999999) printf("Time: %4.2lf h", 1.*duration/3600000000);
+    else if (duration > 999999999) printf("Time: %4.1lf m", 1.*duration/60000000);
+    else if (duration > 99999999) printf("Time: %4.2lf m", 1.*duration/60000000);
+    else if (duration > 9999999) printf("Time: %4.1lf s", 1.*duration/1000000);
+    else if (duration > 999999) printf("Time: %4.2lf s", 1.*duration/1000000);
+    else if (duration > 999) printf("Time: %3lu ms", duration/1000);
+    else printf("Time: %3lu us", duration);
     
     if (ctx->trigger_count) {
-	unprocessed_count = ctx->trigger_count - ctx->event_count - ctx->missing_count;
+	printf(", Trg: ");
+	PrintNumber(ctx->trigger_count);
     }
     
-    printf(", Triggers: %9lu, Frames: %9lu, Lost: %9u, %9u, %9u, %9u FPS: %5.1lf\n", ctx->trigger_count, ctx->event_count, ctx->broken_count, ctx->incomplete_count, ctx->missing_count, unprocessed_count, fps);
-
+    printf(", Frm: ");
+    PrintNumber(ctx->event_count);
+    printf(" (");
+    
+    if (ctx->trigger_count) {
+	printf("P: ");
+	unprocessed_count = ctx->trigger_count - ctx->event_count - ctx->missing_count;
+	PrintNumber(unprocessed_count);
+    }
+    
+    printf(" L: ");
+    PrintNumber(ctx->missing_count);
+    printf(" B: ");
+    PrintNumber(ctx->broken_count);
+    printf(" I: ");
+    PrintNumber(ctx->incomplete_count);
+    
+    printf("), %5.1lf\n", fps);
 }
 
 void *Monitor(void *user) {
     struct timeval deadline;
+    struct timeval nextinfo;
     
     GRABContext *ctx = (GRABContext*)user;
+    int verbose = ctx->verbose;
     pcilib_timeout_t timeout = ctx->timeout;
+    
     
     if (timeout == PCILIB_TIMEOUT_INFINITE) timeout = 0;
 
@@ -1263,6 +1307,10 @@ void *Monitor(void *user) {
     if (timeout) {
 	memcpy(&deadline, (struct timeval*)&ctx->last_frame, sizeof(struct timeval));
 	pcilib_add_timeout(&deadline, timeout);
+    }
+    
+    if (verbose) {
+	pcilib_calc_deadline(&nextinfo, STATUS_MESSAGE_INTERVAL*1000000);
     }
     
     while (ctx->run_flag) {
@@ -1278,13 +1326,20 @@ void *Monitor(void *user) {
 	    }
 	}
 	
+	if (verbose) {
+	    if (pcilib_calc_time_to_deadline(&nextinfo) == 0) {
+		GrabStats(ctx, NULL);
+		pcilib_calc_deadline(&nextinfo, STATUS_MESSAGE_INTERVAL*1000000);
+	    }
+	}
+	
 	usleep(100000);
     }
     
     return NULL;
 }
 
-int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, const char *data_type, size_t num, size_t run_time, size_t trigger_time, pcilib_timeout_t timeout, PARTITION partition, FORMAT format, size_t buffer_size, size_t threads, FILE *ofile) {
+int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, const char *data_type, size_t num, size_t run_time, size_t trigger_time, pcilib_timeout_t timeout, PARTITION partition, FORMAT format, size_t buffer_size, size_t threads, int verbose, FILE *ofile) {
     int err;
     GRABContext ctx;
 //    void *data = NULL;
@@ -1329,6 +1384,7 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
     ctx.data = data;
     ctx.run_time = run_time;
     ctx.timeout = timeout;
+    ctx.verbose = verbose;
     
     ctx.run_flag = 1;
 
@@ -1899,6 +1955,7 @@ int main(int argc, char **argv) {
     const char *num_offset;
 
     int details = 0;
+    int verbose = 0;
     int quiete = 0;
     int force = 0;
     
@@ -2248,11 +2305,23 @@ int main(int argc, char **argv) {
 	    break;	   
 	    case OPT_FORMAT:
 		if (!strcasecmp(optarg, "add_header")) format =  FORMAT_HEADER;
-		else if (!strcasecmp(optarg, "ringfs")) format =  FORMAT_RINGFS;
+//		else if (!strcasecmp(optarg, "ringfs")) format =  FORMAT_RINGFS;
 		else if (strcasecmp(optarg, "raw")) Error("Invalid format (%s) is specified", optarg);
 	    break; 
 	    case OPT_QUIETE:
 		quiete = 1;
+	    break;
+	    case OPT_VERBOSE:
+		if (optarg) num_offset = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-'))  num_offset = argv[optind++];
+		else num_offset = NULL;
+		
+		if (num_offset) {
+		    if ((!isnumber(num_offset))||(sscanf(num_offset, "%i", &verbose) != 1))
+			Usage(argc, argv, "Invalid verbosity level is specified (%s)", num_offset);
+		} else {
+		    verbose = 1;
+		}
 	    break;
 	    case OPT_FORCE:
 		force = 1;
@@ -2473,7 +2542,7 @@ int main(int argc, char **argv) {
         pcilib_reset(handle);
      break;
      case MODE_GRAB:
-        TriggerAndGrab(handle, grab_mode, event, data_type, size, run_time, trigger_time, timeout, partition, format, buffer, threads, ofile);
+        TriggerAndGrab(handle, grab_mode, event, data_type, size, run_time, trigger_time, timeout, partition, format, buffer, threads, verbose, ofile);
      break;
      case MODE_LIST_DMA:
         ListDMA(handle, fpga_device, model_info);
