@@ -66,13 +66,10 @@ int dma_nwl_stop_loopback(nwl_dma_t *ctx) {
 
 double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction) {
     int iter, i;
-    int res;
     int err;
     size_t bytes, rbytes;
-    uint32_t val;
     uint32_t *buf, *cmp;
     const char *error = NULL;
-    pcilib_register_value_t regval;
     size_t packet_size, blocks;    
 
     size_t us = 0;
@@ -82,9 +79,6 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
     pcilib_dma_engine_t readid = pcilib_find_dma_by_addr(ctx->pcilib, PCILIB_DMA_FROM_DEVICE, dma);
     pcilib_dma_engine_t writeid = pcilib_find_dma_by_addr(ctx->pcilib, PCILIB_DMA_TO_DEVICE, dma);
-
-    char *read_base = ctx->engines[readid].base_addr;
-    char *write_base = ctx->engines[writeid].base_addr;
 
     if (size%sizeof(uint32_t)) size = 1 + size / sizeof(uint32_t);
     else size /= sizeof(uint32_t);
@@ -214,8 +208,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	
 #ifndef NWL_BUG_EXTRA_DATA
 	if (direction == PCILIB_DMA_BIDIRECTIONAL) {
-	    res = memcmp(buf, cmp, size * sizeof(uint32_t));
-	    if (res) {
+	    if (memcmp(buf, cmp, size * sizeof(uint32_t))) {
 		for (i = 0; i < size; i++)
 		    if (buf[i] != cmp[i]) break;
 		

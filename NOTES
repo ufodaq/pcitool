@@ -186,16 +186,32 @@ Shall we do a special handling in case of overflow?
 Buffering
 =========
  The DMA addresses are limited to 32 bits (~4GB for everything). This means we 
- can't really use DMA pages are sole buffers. Therefore,
- 1. In streaming mode a second thread will be spawned copying the data from the
-    DMA pages into the allocated buffers. On duration expiration this thread
-    will be stopped but processing will continue until all copyied data is 
-    passed to the callbacks.
- 2. In synchronous mode, a single event will be extracted from the the DMA
-    memory.
+ can't really use DMA pages are sole buffers. Therefore, a second thread, with
+ a realtime scheduling policy if possible, will be spawned and will copy the 
+ data from the DMA pages into the allocated buffers. On expiration of duration
+ or number of events set by autostop call, this thread will be stopped but 
+ processing in streaming mode will continue until all copyied data is passed 
+ to the callbacks.
 
- - Actually, we can make another in-module buffering. But this hopefully can
- be avoided.
+ To avoid stalls, the IPECamera requires data to be read continuously read out.
+ For this reason, there is no locks in the readout thread. It will simplify
+ overwrite the old frames if data is not copied out timely. To handle this case
+ after getting the data and processing it, the calling application should use
+ return_data function and check return code. This function may return error
+ indicating that the data was overwritten meanwhile. Hence, the data is 
+ corrupted and shoud be droped by the application. The copy_data function
+ performs this check and user application can be sure it get coherent data
+ in this case.
+ 
+ There is a way to avoid this problem. For raw data, the rawdata callback
+ can be requested. This callback blocks execution of readout thread and 
+ data may be treated safely by calling application. However, this may 
+ cause problems to electronics. Therefore, only memcpy should be performed
+ on the data normally. 
+
+ The reconstructed data, however, may be safely accessed. As described above,
+ the raw data will be continuously overwritten by the reader thread. However,
+ reconstructed data, upon the get_data call, will be protected by the mutex.
 
 
 Register Access Synchronization

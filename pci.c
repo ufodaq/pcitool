@@ -7,7 +7,6 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <stdarg.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -16,33 +15,14 @@
 #include <errno.h>
 #include <assert.h>
 
+#include "pcilib.h"
 #include "pci.h"
-
 #include "kernel.h"
 #include "tools.h"
 #include "error.h"
 
 #include "ipecamera/model.h"
 
-
-static void pcilib_print_error(const char *msg, ...) {
-    va_list va;
-    
-    va_start(va, msg);
-    vprintf(msg, va);
-    va_end(va);
-    printf("\n");
-}
-
-void (*pcilib_error)(const char *msg, ...) = pcilib_print_error;
-void (*pcilib_warning)(const char *msg, ...) = pcilib_print_error;
-
-int pcilib_set_error_handler(void (*err)(const char *msg, ...), void (*warn)(const char *msg, ...)) {
-    if (err) pcilib_error = err;
-    else pcilib_error = pcilib_print_error;
-    if (warn) pcilib_warning = warn;
-    else pcilib_warning = pcilib_print_error;
-}
 
 pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
     pcilib_t *ctx = malloc(sizeof(pcilib_t));
@@ -98,8 +78,8 @@ pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx) {
 
 pcilib_model_t pcilib_get_model(pcilib_t *ctx) {
     if (ctx->model == PCILIB_MODEL_DETECT) {
-	unsigned short vendor_id;
-	unsigned short device_id;
+//	unsigned short vendor_id;
+//	unsigned short device_id;
 
 	//return PCILIB_MODEL_PCI;
 	
@@ -421,42 +401,46 @@ void pcilib_close(pcilib_t *ctx) {
 }
 
 int pcilib_read(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf) {
-    int i;
     void *data;
 
     pcilib_detect_address(ctx, &bar, &addr, size);
     data = pcilib_map_bar(ctx, bar);
 
     pcilib_memcpy(buf, data + addr, size);
-    
-    pcilib_unmap_bar(ctx, bar, data);    
+
+    pcilib_unmap_bar(ctx, bar, data);
+
+    return 0;
 }
 
 int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf) {
-    int i;
     void *data;
 
     pcilib_detect_address(ctx, &bar, &addr, size);
     data = pcilib_map_bar(ctx, bar);
 
     pcilib_memcpy(data + addr, buf, size);
-    
-    pcilib_unmap_bar(ctx, bar, data);    
+
+    pcilib_unmap_bar(ctx, bar, data);
+
+    return 0;
 }
 
 
 int pcilib_read_fifo(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t fifo_size, size_t n, void *buf) {
     int i;
     void *data;
-    
+
     pcilib_detect_address(ctx, &bar, &addr, fifo_size);
     data = pcilib_map_bar(ctx, bar);
 
     for (i = 0; i < n; i++) {
 	pcilib_memcpy(buf + i * fifo_size, data + addr, fifo_size);
     }
-    
-    pcilib_unmap_bar(ctx, bar, data);    
+
+    pcilib_unmap_bar(ctx, bar, data);
+
+    return 0;
 }
 
 int pcilib_write_fifo(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t fifo_size, size_t n, void *buf) {
@@ -470,6 +454,7 @@ int pcilib_write_fifo(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t f
 	pcilib_memcpy(data + addr, buf + i * fifo_size, fifo_size);
     }
 
-    pcilib_unmap_bar(ctx, bar, data);    
-}
+    pcilib_unmap_bar(ctx, bar, data);
 
+    return 0;
+}

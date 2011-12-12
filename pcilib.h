@@ -82,14 +82,15 @@ typedef enum {
     PCILIB_STREAMING_REQ_FRAGMENT = 5,	/**< only fragment of a packet is read, wait for next fragment and fail if no data during DMA timeout */
     PCILIB_STREAMING_REQ_PACKET = 6,	/**< wait for next packet and fail if no data during the specified timeout */
     PCILIB_STREAMING_TIMEOUT_MASK = 3	/**< mask specifying all timeout modes */
-} pcilib_streaming_action;
+} pcilib_streaming_action_t;
 
 
 typedef enum {
     PCILIB_EVENT_FLAGS_DEFAULT = 0,
     PCILIB_EVENT_FLAG_RAW_DATA_ONLY = 1,	/**< Do not parse data, just read raw and pass it to rawdata callback */
     PCILIB_EVENT_FLAG_STOP_ONLY = 1,		/**< Do not cleanup, just stop acquiring new frames, the cleanup should be requested afterwards */
-    PCILIB_EVENT_FLAG_EOF = 2			/**< Indicates that it is the last part of the frame (not required) */
+    PCILIB_EVENT_FLAG_EOF = 2,			/**< Indicates that it is the last part of the frame (not required) */
+    PCILIB_EVENT_FLAG_PREPROCESS = 4		/**< Enables preprocessing of the raw data (decoding frames, etc.) */
 } pcilib_event_flags_t;
 
 typedef enum {
@@ -333,19 +334,20 @@ int pcilib_configure_rawdata_callback(pcilib_t *ctx, pcilib_event_rawdata_callba
 
 int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, pcilib_event_flags_t flags);
 int pcilib_stop(pcilib_t *ctx, pcilib_event_flags_t flags);
-int pcilib_stream(pcilib_t *ctx, pcilib_event_callback_t callback, void *user);
 
-int pcilib_get_next_event(pcilib_t *ctx, pcilib_timeout_t timeout, pcilib_event_id_t *evid, pcilib_event_info_t **info);
+int pcilib_stream(pcilib_t *ctx, pcilib_event_callback_t callback, void *user);
+int pcilib_get_next_event(pcilib_t *ctx, pcilib_timeout_t timeout, pcilib_event_id_t *evid, size_t info_size, pcilib_event_info_t *info);
+
 int pcilib_copy_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t size, void *buf, size_t *retsize);
 int pcilib_copy_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t size, void *buf, size_t *retsize);
-void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size);
-void *pcilib_get_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size);
+void *pcilib_get_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t *size_or_err);
+void *pcilib_get_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size_or_err);
 
 /*
  * This function is provided to find potentially corrupted data. If the data is overwritten by 
  * the time return_data is called it will return error. 
  */
-int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id, void *data);
+int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, void *data);
 
 
 

@@ -4,9 +4,9 @@
 typedef struct ipecamera_s ipecamera_t;
 
 typedef  struct {
-    int bpp;			/*<< Bits per pixel (8, 16, or 32) as returned by IPECAMERA_IMAGE_DATA */
-    int real_bpp;		/*<< Bits per pixel as returned by camera and IPECAMERA_PACKED_IMAGE */
-    int width, height;
+    unsigned int bpp;			/*<< Bits per pixel (8, 16, or 32) as returned by IPECAMERA_IMAGE_DATA */
+    unsigned int real_bpp;		/*<< Bits per pixel as returned by camera and IPECAMERA_PACKED_IMAGE */
+    unsigned int width, height;
 } ipecamera_image_dimensions_t;
 
 typedef enum {
@@ -25,8 +25,9 @@ typedef uint16_t ipecamera_pixel_t;
 
 typedef struct {
     pcilib_event_info_t info;
-    size_t raw_size;		/**< Indicates the actual size of raw data */
     int image_ready;		/**< Indicates if image data is parsed */
+    int image_broken;		/**< Unlike the info.flags this is bound to the reconstructed image (i.e. is not updated on rawdata overwrite) */
+    size_t raw_size;		/**< Indicates the actual size of raw data */
 } ipecamera_event_info_t;
 
 int ipecamera_set_buffer_size(ipecamera_t *ctx, int size);

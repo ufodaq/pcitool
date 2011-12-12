@@ -57,7 +57,7 @@
  */
 
 #include <linux/ioctl.h>
-#include "pcilib_types.h"
+#include "../pcilib_types.h"
 
 /* Identifies the PCI-E Xilinx ML605 */
 #define PCIE_XILINX_VENDOR_ID 0x10ee

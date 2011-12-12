@@ -119,24 +119,24 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	
 	    if (persistent) {
 		if (persistent < 0) {
-		    if ((flags&PCILIB_KMEM_FLAG_PERSISTENT == 0)&&(kh.flags&KMEM_FLAG_REUSED_PERSISTENT)) err = PCILIB_ERROR_INVALID_STATE;
+		    if (((flags&PCILIB_KMEM_FLAG_PERSISTENT) == 0)&&(kh.flags&KMEM_FLAG_REUSED_PERSISTENT)) err = PCILIB_ERROR_INVALID_STATE;
 		    else persistent = (kh.flags&KMEM_FLAG_REUSED_PERSISTENT)?1:0;
-		} else if (kh.flags&KMEM_FLAG_REUSED_PERSISTENT == 0) err = PCILIB_ERROR_INVALID_STATE;
+		} else if ((kh.flags&KMEM_FLAG_REUSED_PERSISTENT) == 0) err = PCILIB_ERROR_INVALID_STATE;
 	    } else if (kh.flags&KMEM_FLAG_REUSED_PERSISTENT) err = PCILIB_ERROR_INVALID_STATE;
 	    
 	    if (hardware) {
 		if (hardware < 0) {
-		    if ((flags&PCILIB_KMEM_FLAG_HARDWARE == 0)&&(kh.flags&KMEM_FLAG_REUSED_HW)) err = PCILIB_ERROR_INVALID_STATE;
+		    if (((flags&PCILIB_KMEM_FLAG_HARDWARE) == 0)&&(kh.flags&KMEM_FLAG_REUSED_HW)) err = PCILIB_ERROR_INVALID_STATE;
 		    else hardware = (kh.flags&KMEM_FLAG_REUSED_HW)?1:0;
-		} else if (kh.flags&KMEM_FLAG_REUSED_HW == 0) err = PCILIB_ERROR_INVALID_STATE;
+		} else if ((kh.flags&KMEM_FLAG_REUSED_HW) == 0) err = PCILIB_ERROR_INVALID_STATE;
 	    } else if (kh.flags&KMEM_FLAG_REUSED_HW) err = PCILIB_ERROR_INVALID_STATE;
 	    
 	} else {
 	    if (!i) reused = PCILIB_TRISTATE_NO;
 	    else if (reused) reused = PCILIB_TRISTATE_PARTIAL;
 	    
-	    if ((persistent > 0)&&(flags&PCILIB_KMEM_FLAG_PERSISTENT == 0)) err = PCILIB_ERROR_INVALID_STATE;
-	    if ((hardware > 0)&&(flags&PCILIB_KMEM_FLAG_HARDWARE == 0)) err = PCILIB_ERROR_INVALID_STATE;
+	    if ((persistent > 0)&&((flags&PCILIB_KMEM_FLAG_PERSISTENT) == 0)) err = PCILIB_ERROR_INVALID_STATE;
+	    if ((hardware > 0)&&((flags&PCILIB_KMEM_FLAG_HARDWARE) == 0)) err = PCILIB_ERROR_INVALID_STATE;
 	}
 	
 	if (err) {
@@ -205,7 +205,6 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 void pcilib_free_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kmem_flags_t flags) {
     int ret, err = 0; 
     int i;
-    kmem_handle_t kh = {0};
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
 
 	// if linked in to the list

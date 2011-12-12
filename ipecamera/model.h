@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include "pcilib.h"
-#include "image.h"
+#include "public.h"
 
 //#define IPECAMERA_DEBUG
 
@@ -126,7 +126,7 @@ pcilib_event_api_description_t ipecamera_image_api = {
     ipecamera_trigger,
     
     ipecamera_stream,
-    NULL, //ipecamera_next_event,
+    ipecamera_next_event,
     ipecamera_get,
     ipecamera_return,
     ipecamera_init_dma

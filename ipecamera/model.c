@@ -26,7 +26,7 @@
 int ipecamera_read(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, pcilib_register_value_t *value) {
     uint32_t val, tmp[4];
     char *wr, *rd;
-    struct timeval start, cur;
+    struct timeval start;//, cur;
     int retries = RETRIES;
 
     assert(addr < 128);
@@ -116,7 +116,7 @@ retry:
 int ipecamera_write(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, pcilib_register_value_t value) {
     uint32_t val, tmp[4];
     char *wr, *rd;
-    struct timeval start, cur;
+    struct timeval start;//, cur;
     int retries = RETRIES;
 
     assert(addr < 128);

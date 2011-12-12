@@ -1,6 +1,7 @@
 #ifndef _PCITOOL_PCI_H
 #define _PCITOOL_PCI_H
 
+#define PCILIB_DEFAULT_CPU_COUNT 2
 #define PCILIB_EVENT_TIMEOUT 1000000		/**< us */
 #define PCILIB_TRIGGER_TIMEOUT 100000		/**< us */
 #define PCILIB_DMA_TIMEOUT 10000		/**< us */
@@ -67,10 +68,6 @@ pcilib_protocol_description_t pcilib_protocol[3] = {
 };
 #else
 extern pcilib_model_description_t pcilib_model[];
-
-extern void (*pcilib_error)(const char *msg, ...);
-extern void (*pcilib_warning)(const char *msg, ...);
-
 extern pcilib_protocol_description_t pcilib_protocol[];
 #endif /* _PCILIB_PCI_C */
 

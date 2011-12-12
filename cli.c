@@ -345,6 +345,8 @@ void List(pcilib_t *handle, pcilib_model_description_t *model_info, const char *
 		case PCILIB_DMA_TYPE_PACKET:
 		    printf("Packet");
 		break;
+		default:
+		    printf("Unknown");
 	    }
 	    
 	    printf(", Address Width: %02lu bits\n", engine->addr_bits);
@@ -371,7 +373,7 @@ void List(pcilib_t *handle, pcilib_model_description_t *model_info, const char *
     else registers = model_info->registers;
     
     if (registers) {
-        pcilib_register_bank_addr_t bank_addr;
+        pcilib_register_bank_addr_t bank_addr = 0;
 	if (bank) {
 	    pcilib_register_bank_t bank_id = pcilib_find_bank(handle, bank);
 	    pcilib_register_bank_description_t *b = model_info->banks + bank_id;
@@ -458,7 +460,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
     int err;
     int i, j, errors;
     void *data, *buf, *check;
-    void *fifo;
+    void *fifo = NULL;
     struct timeval start, end;
     unsigned long time;
     size_t size, min_size, max_size;
@@ -483,7 +485,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	    err = pcilib_wait_irq(handle, 0, 0, &irqs);
 	    if (err) irqs = 0;
 	    
-	    printf("%8i KB - ", size / 1024);
+	    printf("%8zu KB - ", size / 1024);
 	    
 	    printf("RW: ");
 	    if (mbs < 0) printf("failed ...   ");
@@ -571,7 +573,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	gettimeofday(&end,NULL);
 
 	time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	printf("%8i bytes - read: %8.2lf MB/s", size, 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
+	printf("%8zu bytes - read: %8.2lf MB/s", size, 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
 	
 	fflush(0);
 
@@ -611,7 +613,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	gettimeofday(&end,NULL);
 
 	time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	printf("%8i bytes - read: %8.2lf MB/s", size, 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
+	printf("%8zu bytes - read: %8.2lf MB/s", size, 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
 	
 	fflush(0);
 
@@ -651,6 +653,8 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 
     free(check);
     free(buf);
+    
+    return 0;
 }
 
 #define pci2host16(endianess, value) endianess?
@@ -793,7 +797,7 @@ int ReadRegister(pcilib_t *handle, pcilib_model_description_t *model_info, const
     const char *format;
 
     pcilib_register_bank_t bank_id;
-    pcilib_register_bank_addr_t bank_addr;
+    pcilib_register_bank_addr_t bank_addr = 0;
 
     pcilib_register_value_t value;
     
@@ -871,7 +875,7 @@ int ReadRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, 
     }
 
     int access = banks[bank_id].access / 8;
-    int size = n * abs(access);
+//    int size = n * abs(access);
     int block_width, blocks_per_line;
     int numbers_per_block, numbers_per_line; 
     
@@ -918,7 +922,7 @@ int ReadRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, 
 int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, char ** data) {
     int read_back = 0;
     void *buf, *check;
-    int res, i, err;
+    int res = 0, i, err;
     int size = n * abs(access);
     size_t ret;
     pcilib_dma_engine_t dmaid;
@@ -933,6 +937,7 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	    case 2: res = sscanf(data[i], "%hx", ((uint16_t*)buf)+i); break;
 	    case 4: res = sscanf(data[i], "%x", ((uint32_t*)buf)+i); break;
 	    case 8: res = sscanf(data[i], "%lx", ((uint64_t*)buf)+i); break;
+	    default: Error("Unexpected data size (%lu)", access);
 	}
 	if ((res != 1)||(!isxnumber(data[i]))) Error("Can't parse data value at poition %i, (%s) is not valid hex number", i, data[i]);
     }
@@ -1010,12 +1015,11 @@ int WriteRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info,
 
 int WriteRegister(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, const char *reg, char ** data) {
     int err;
-    int i;
 
     unsigned long val;
     pcilib_register_value_t value;
 
-    const char *format;
+    const char *format = NULL;
 
     pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
     if (regid == PCILIB_REGISTER_INVALID) Error("Can't find register (%s) from bank (%s)", reg, bank?bank:"autodetected");
@@ -1118,13 +1122,13 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
     
     if (info->flags&PCILIB_EVENT_INFO_FLAG_BROKEN) {
 	ctx->broken_count++;
-	return 0;
+	return PCILIB_STREAMING_CONTINUE;
     }
 
     data = pcilib_get_data(handle, event_id, ctx->data, &size);
     if (!data) {
 	ctx->broken_count++;
-	return 0;
+	return PCILIB_STREAMING_CONTINUE;
     }
     
     
@@ -1136,7 +1140,7 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 	else Error("Write failed");
     }
 
-    pcilib_return_data(handle, event_id, data);
+    pcilib_return_data(handle, event_id, ctx->data, data);
     
 //    printf("%lu %lu\n", info->seqnum, info->offset);
 
@@ -1161,11 +1165,12 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 */
 
 //    printf("data callback: %lu\n", event_id);    
-    return 0;
+    return PCILIB_STREAMING_CONTINUE;
 }
 
 int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event_flags_t flags, size_t size, void *data, void *user) {
 //    printf("%i\n", event_id);
+    return PCILIB_STREAMING_CONTINUE;
 }
 
 
@@ -1204,7 +1209,7 @@ void *Trigger(void *user) {
 void GrabStats(GRABContext *ctx, struct timeval *end_time) {
     pcilib_timeout_t duration, fps_duration;
     struct timeval cur;
-    double fps;
+    double fps = 0;
 
     if (!end_time) {
 	gettimeofday(&cur, NULL);
@@ -1532,11 +1537,11 @@ int ListKMEM(pcilib_t *handle, const char *device) {
     
     while ((entry = readdir(dir)) != NULL) {
 	FILE *f;
-	unsigned long use;
-	unsigned long size;
-	unsigned long refs;
-	unsigned long mode;
-	unsigned long hwref;
+	unsigned long use = 0;
+	unsigned long size = 0;
+	unsigned long refs = 0;
+	unsigned long mode = 0;
+	unsigned long hwref = 0;
 	
 	if (strncmp(entry->d_name, "kbuf", 4)) continue;
 	if (!isnumber(entry->d_name+4)) continue;
@@ -1581,9 +1586,9 @@ int ListKMEM(pcilib_t *handle, const char *device) {
 	
 	printf("%08lx  ", uses[i].use);
 	if (!i) printf("All Others         ");
-	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_RING) printf("DMA%u %s Ring      ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
-	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_PAGES) printf("DMA%u %s Pages     ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
-	else printf ("                   ", uses[i].use);
+	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_RING) printf("DMA%lu %s Ring      ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
+	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_PAGES) printf("DMA%lu %s Pages     ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
+	else printf ("                   ");
 	printf("  ");
 	printf("% 6lu", uses[i].count);
 	printf("     ");
@@ -1611,13 +1616,13 @@ int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t
     void *data;
     size_t size;
     pcilib_kmem_handle_t *kbuf;
-    
+
     kbuf = pcilib_alloc_kernel_memory(handle, 0, block + 1, 0, 0, use, PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_TRY);
     if (!kbuf) {
 	printf("The specified kernel buffer is not allocated\n");
 	return 0;
     }
-    
+
     data = pcilib_kmem_get_block_ua(handle, kbuf, block);
     if (data) {
 	size = pcilib_kmem_get_block_size(handle, kbuf, block);
@@ -1626,16 +1631,18 @@ int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t
     } else {
 	printf("The specified block is not existing\n");
     }
-    
+
     pcilib_free_kernel_memory(handle, kbuf, KMEM_FLAG_REUSE);
+
+    return 0;
 }
 
 int FreeKMEM(pcilib_t *handle, const char *device, const char *use, int force) {
     int err;
     int i;
-    
+
     unsigned long useid;
-    
+
     pcilib_kmem_flags_t flags = PCILIB_KMEM_FLAG_HARDWARE|PCILIB_KMEM_FLAG_PERSISTENT|PCILIB_KMEM_FLAG_EXCLUSIVE; 
     if (force) flags |= PCILIB_KMEM_FLAG_FORCE; // this will ignore mmap locks as well.
 
@@ -1653,12 +1660,12 @@ int FreeKMEM(pcilib_t *handle, const char *device, const char *use, int force) {
 	
 	return 0;
     }
-    
+
     if ((!isxnumber(use))||(sscanf(use, "%lx", &useid) != 1)) Error("Invalid use (%s) is specified", use);
-    
+
     err = pcilib_clean_kernel_memory(handle, useid, flags);
     if (err) Error("Error cleaning kernel buffers for use (0x%lx)", useid);
-    
+
     return 0;
 }
 
@@ -1689,11 +1696,11 @@ int ListDMA(pcilib_t *handle, const char *device, pcilib_model_description_t *mo
     printf("--------------------------------------------------------------------------------\n");
     while ((entry = readdir(dir)) != NULL) {
 	FILE *f;
-	unsigned long use;
-	unsigned long size;
-	unsigned long refs;
-	unsigned long mode;
-	unsigned long hwref;
+	unsigned long use = 0;
+	unsigned long size = 0;
+	unsigned long refs = 0;
+	unsigned long mode = 0;
+	unsigned long hwref = 0;
 	
 	if (strncmp(entry->d_name, "kbuf", 4)) continue;
 	if (!isnumber(entry->d_name+4)) continue;
@@ -1724,7 +1731,7 @@ int ListDMA(pcilib_t *handle, const char *device, pcilib_model_description_t *mo
 	if (dmaid == PCILIB_DMA_ENGINE_INVALID) continue;
 	
 	
-	printf("DMA%u %s         ", use&0x7F, (use&0x80)?"S2C":"C2S");
+	printf("DMA%lu %s         ", use&0x7F, (use&0x80)?"S2C":"C2S");
         err = pcilib_start_dma(handle, dmaid, 0);
         if (err) {
     	    printf("-- Wrong state, start is failed\n");
@@ -1773,47 +1780,46 @@ int ListBuffers(pcilib_t *handle, const char *device, pcilib_model_description_t
 
     dmaid = pcilib_find_dma_by_addr(handle, dma_direction, dma);
     if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("The specified DMA engine is not found");
-    
+
     err = pcilib_start_dma(handle, dmaid, 0);
     if (err) Error("Error starting the specified DMA engine");
-    
+
     err = pcilib_get_dma_status(handle, dmaid, &status, 0, NULL);
     if (err) Error("Failed to obtain status of the specified DMA engine");
-    
+
     buffer = (pcilib_dma_buffer_status_t*)malloc(status.ring_size*sizeof(pcilib_dma_buffer_status_t));
     if (!buffer) Error("Failed to allocate memory for status buffer");
-    
+
     err = pcilib_get_dma_status(handle, dmaid, &status, status.ring_size, buffer);
     if (err) Error("Failed to obtain extended status of the specified DMA engine");
-    
-    
+
+
     printf("Buffer      Status      Total Size         \n");
     printf("--------------------------------------------------------------------------------\n");
-    
+
     for (i = 0; i < status.ring_size; i++) {
 	printf("%8zu    ", i);
         printf("%c%c %c%c ", buffer[i].used?'U':' ',  buffer[i].error?'E':' ', buffer[i].first?'F':' ', buffer[i].last?'L':' ');
 	printf("% 10s", PrintSize(stmp, buffer[i].size));
 	printf("\n");
     }
-    
+
     printf("--------------------------------------------------------------------------------\n");
     printf("U - Used, E - Error, F - First block, L - Last Block\n");
-    
+
     free(buffer);
 
     pcilib_stop_dma(handle, dmaid, 0);
 
+    return 0;
 }
 
 int ReadBuffer(pcilib_t *handle, const char *device, pcilib_model_description_t *model_info, pcilib_dma_engine_addr_t dma, pcilib_dma_direction_t dma_direction, size_t block, FILE *o) {
     int err;
-    size_t i;
     pcilib_dma_engine_t dmaid;
     pcilib_dma_engine_status_t status;
     pcilib_dma_buffer_status_t *buffer;
     size_t size;
-    char stmp[256];
 
     dmaid = pcilib_find_dma_by_addr(handle, dma_direction, dma);
     if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("The specified DMA engine is not found");
@@ -1902,9 +1908,9 @@ int main(int argc, char **argv) {
     const char *data_type = NULL;
     const char *dma_channel = NULL;
     const char *use = NULL;
-    pcilib_kmem_use_t use_id;
+    pcilib_kmem_use_t use_id = 0;
     size_t block = 0;
-    pcilib_irq_hw_source_t irq_source;
+    pcilib_irq_hw_source_t irq_source =  PCILIB_IRQ_SOURCE_DEFAULT;
     pcilib_dma_direction_t dma_direction = PCILIB_DMA_BIDIRECTIONAL;
     
     pcilib_dma_engine_addr_t dma = PCILIB_DMA_ENGINE_ADDR_INVALID;
@@ -1912,7 +1918,7 @@ int main(int argc, char **argv) {
     uintptr_t start = -1;
     size_t size = 1;
     access_t access = 4;
-    int skip = 0;
+//    int skip = 0;
     int endianess = 0;
     size_t timeout = 0;
     const char *output = NULL;
@@ -1920,7 +1926,7 @@ int main(int argc, char **argv) {
     size_t iterations = BENCHMARK_ITERATIONS;
 
     pcilib_t *handle;
-    
+
     int size_set = 0;
     int timeout_set = 0;
     int run_time_set = 0;
@@ -2046,11 +2052,14 @@ int main(int argc, char **argv) {
 		mode = MODE_WAIT_IRQ;
 		if (optarg) num_offset = optarg;
 		else if ((optind < argc)&&(argv[optind][0] != '-'))  num_offset = argv[optind++];
+		else num_offset = NULL;
 		
-		if ((!isnumber(num_offset))||(sscanf(num_offset, "%li", &itmp) != 1))
-		    Usage(argc, argv, "Invalid IRQ source is specified (%s)", num_offset);
+		if (num_offset) {
+		    if ((!isnumber(num_offset))||(sscanf(num_offset, "%li", &itmp) != 1))
+			Usage(argc, argv, "Invalid IRQ source is specified (%s)", num_offset);
 
-		irq_source = itmp;
+		    irq_source = itmp;
+		}
 	    break;
 	    case OPT_LIST_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
@@ -2132,11 +2141,12 @@ int main(int argc, char **argv) {
 		}
 	    break;
 	    case OPT_SIZE:
-		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &size) != 1))
+		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &size) != 1)) {
 		    if (strcasecmp(optarg, "unlimited"))
 			Usage(argc, argv, "Invalid size is specified (%s)", optarg);
 		    else
 			size = 0;//(size_t)-1;
+		}
 			
 		size_set = 1;
 	    break;
@@ -2151,11 +2161,12 @@ int main(int argc, char **argv) {
 		
 	    break;
 	    case OPT_TIMEOUT:
-		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &timeout) != 1))
+		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &timeout) != 1)) {
 		    if (strcasecmp(optarg, "unlimited"))
 			Usage(argc, argv, "Invalid timeout is specified (%s)", optarg);
 		    else
 			timeout = PCILIB_TIMEOUT_INFINITE;
+		}
 		timeout_set = 1;
 	    break;
 	    case OPT_OUTPUT:
@@ -2172,11 +2183,12 @@ int main(int argc, char **argv) {
 		data_type = optarg;
 	    break;
 	    case OPT_RUN_TIME:
-		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &run_time) != 1))
+		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &run_time) != 1)) {
 		    if (strcasecmp(optarg, "unlimited"))
 			Usage(argc, argv, "Invalid run-time is specified (%s)", optarg);
 		    else
 			run_time = 0;
+		}
 		run_time_set = 1;
 	    break;
 	    case OPT_TRIGGER_TIME:
@@ -2461,6 +2473,8 @@ int main(int argc, char **argv) {
      case MODE_FREE_KMEM:
         FreeKMEM(handle, fpga_device, use, force);
      break;
+     case MODE_INVALID:
+        break;
     }
 
     if (ofile) fclose(ofile);

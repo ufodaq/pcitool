@@ -1,6 +1,7 @@
 #ifndef _PCILIB_NWL_REGISTERS_H
 #define _PCILIB_NWL_REGISTERS_H 
 
+#ifdef _PCILIB_NWL_REGISTER_C 
   // DMA
 static pcilib_register_description_t nwl_dma_registers[] = {
     {0x4000, 	0, 	32, 	0, 	0x00000011,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "dma_control_and_status",  ""},
@@ -89,5 +90,8 @@ static pcilib_register_description_t nwl_xrawdata_registers[] = {
     {0,		0,	0,	0,	0x00000000,	0,                                            0,                        0, NULL, NULL}
 };
 
+#endif /* _PCILIB_NWL_REGISTERS_C */
+
 int nwl_add_registers(nwl_dma_t *ctx);
+
 #endif /* _PCILIB_NWL_REGISTERS_H */

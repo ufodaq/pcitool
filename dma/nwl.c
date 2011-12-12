@@ -77,7 +77,6 @@ int dma_nwl_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
 pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib, pcilib_dma_modification_t type, void *arg) {
     int i;
     int err;
-    uint32_t val;
     pcilib_dma_engine_t n_engines;
 
     pcilib_model_description_t *model_info = pcilib_get_model_description(pcilib);
@@ -128,9 +127,6 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib, pcilib_dma_modification_t t
 }
 
 void  dma_nwl_free(pcilib_dma_context_t *vctx) {
-    int err;
-    
-    pcilib_dma_engine_t i;
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
 
     if (ctx) {

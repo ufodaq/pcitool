@@ -3,7 +3,6 @@
 #define NWL_RING_UPDATE(data, offset, mask, val) *(uint32_t*)(((char*)(data)) + (offset)) = ((*(uint32_t*)(((char*)(data)) + (offset)))&(mask))|(val)
 
 static int dma_nwl_compute_read_s2c_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, unsigned char *ring, uint32_t ring_pa) {
-    size_t pos;
     uint32_t val;
 
     char *base = info->base_addr;
@@ -42,13 +41,10 @@ static int dma_nwl_compute_read_s2c_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_d
 }
 
 static int dma_nwl_compute_read_c2s_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, unsigned char *ring, uint32_t ring_pa) {
-    size_t pos;
     uint32_t val;
-    size_t prev;
 
     char *base = info->base_addr;
 
-    
     nwl_read_register(val, ctx, base, REG_SW_NEXT_BD);
     if ((val < ring_pa)||((val - ring_pa) % PCILIB_NWL_DMA_DESCRIPTOR_SIZE)) {
 	if (val < ring_pa) pcilib_warning("Inconsistent C2S DMA Ring buffer is found (REG_SW_NEXT_BD register value (%lx) is below start of the ring [%lx,%lx])", val, ring_pa, PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
@@ -112,8 +108,8 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
 	if (reuse_ring == reuse_pages) {
 	    if (reuse_ring & PCILIB_KMEM_REUSE_PARTIAL) pcilib_warning("Inconsistent DMA buffers are found (only part of required buffers is available), reinitializing...");
 	    else if (reuse_ring & PCILIB_KMEM_REUSE_REUSED) {
-		if (reuse_ring & PCILIB_KMEM_REUSE_PERSISTENT == 0) pcilib_warning("Lost DMA buffers are found (non-persistent mode), reinitializing...");
-		else if (reuse_ring & PCILIB_KMEM_REUSE_HARDWARE == 0) pcilib_warning("Lost DMA buffers are found (missing HW reference), reinitializing...");
+		if ((reuse_ring & PCILIB_KMEM_REUSE_PERSISTENT) == 0) pcilib_warning("Lost DMA buffers are found (non-persistent mode), reinitializing...");
+		else if ((reuse_ring & PCILIB_KMEM_REUSE_HARDWARE) == 0) pcilib_warning("Lost DMA buffers are found (missing HW reference), reinitializing...");
 		else {
 		    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
 
@@ -174,7 +170,7 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
 
 static size_t dma_nwl_clean_buffers(nwl_dma_t * ctx, pcilib_nwl_engine_description_t *info) {
     size_t res = 0;
-    uint32_t status, control;
+    uint32_t status;
 
     unsigned char *ring = pcilib_kmem_get_ua(ctx->pcilib, info->ring);
     ring += info->tail * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
@@ -282,9 +278,8 @@ static int dma_nwl_push_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *
 
 
 static size_t dma_nwl_wait_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info, size_t *size, int *eop, pcilib_timeout_t timeout) {
-    uint32_t val;
     struct timeval start, cur;
-    uint32_t status_size, status, control;
+    uint32_t status_size, status;
 
     unsigned char *ring = pcilib_kmem_get_ua(ctx->pcilib, info->ring);
     
@@ -325,6 +320,8 @@ static size_t dma_nwl_wait_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_
     return (size_t)-1;
 }
 
+/*
+    // This function is not used now, but we may need it in the future
 static int dma_nwl_is_overflown(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info) {
     uint32_t status;
     unsigned char *ring = pcilib_kmem_get_ua(ctx->pcilib, info->ring);
@@ -334,6 +331,7 @@ static int dma_nwl_is_overflown(nwl_dma_t *ctx, pcilib_nwl_engine_description_t 
     status = NWL_RING_GET(ring, DMA_BD_BUFL_STATUS_OFFSET);
     return status&DMA_BD_COMP_MASK?1:0;
 }
+*/
 
 static int dma_nwl_return_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t *info) {
     uint32_t val;
@@ -357,6 +355,8 @@ static int dma_nwl_return_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_description_t
     
     info->tail++;
     if (info->tail == info->ring_size) info->tail = 0;
+    
+    return 0;
 }
 
 int dma_nwl_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers) {
@@ -375,7 +375,7 @@ int dma_nwl_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcil
     status->ring_tail = info->tail;
     
     if (info->desc.direction == PCILIB_DMA_FROM_DEVICE) {
-	size_t pos;
+	size_t pos = 0;
 	for (i = 0; i < info->ring_size; i++) {
 	    pos = status->ring_tail + i;
 	    if (pos >= info->ring_size) pos -= info->ring_size;

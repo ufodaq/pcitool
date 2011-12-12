@@ -32,6 +32,7 @@ void * pcilib_memcpy64(void * dst, void const * src, size_t len);
 void * pcilib_datacpy32(void * dst, void const * src, uint8_t size, size_t n, pcilib_endianess_t endianess);
 
 int pcilib_get_page_mask();
+int pcilib_get_cpu_count();
 
 
 int pcilib_add_timeout(struct timeval *tv, pcilib_timeout_t timeout);

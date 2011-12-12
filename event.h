@@ -3,6 +3,19 @@
 
 #include "pcilib.h"
 
+
+/*
+ * get_data: This call is used by get_data and copy_data functions of public  
+ * interface. When copy_data is the caller, the data parameter will be passed.
+ * Therefore, depending on data the parameter, the function should behave
+ * diferently. If get get_data function is used (buf == NULL), the caller is 
+ * expected to call return_data afterwards. Otherwise, if buf != NULL and 
+ * copy_data is used, the return call will not be executed.
+ * Still, the get_data function is not obliged to return the data in the
+ * passed buf, but a reference to the staticaly allocated memory may be 
+ * returned instead. The copy can be managed by the envelope function.
+ */
+
 struct pcilib_event_api_description_s {
     pcilib_context_t *(*init)(pcilib_t *ctx);
     void (*free)(pcilib_context_t *ctx);
@@ -14,10 +27,10 @@ struct pcilib_event_api_description_s {
     int (*trigger)(pcilib_context_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);
     
     int (*stream)(pcilib_context_t *ctx, pcilib_event_callback_t callback, void *user);
-    pcilib_event_id_t (*next_event)(pcilib_context_t *ctx, pcilib_timeout_t timeout, pcilib_event_id_t *evid, pcilib_event_info_t **info);
+    int (*next_event)(pcilib_context_t *ctx, pcilib_timeout_t timeout, pcilib_event_id_t *evid, size_t info_size, pcilib_event_info_t *info);
 
-    void* (*get_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size, void *data);
-    int (*return_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id, void *data);
+    int (*get_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size, void **data);
+    int (*return_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, void *data);
     
     pcilib_dma_context_t *(*init_dma)(pcilib_context_t *ctx);
 };

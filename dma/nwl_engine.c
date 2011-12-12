@@ -267,14 +267,13 @@ int dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, 
 
 int dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, pcilib_dma_callback_t cb, void *cbattr) {
     int err, ret = PCILIB_STREAMING_REQ_PACKET;
+    pcilib_timeout_t wait = 0;
     size_t res = 0;
     size_t bufnum;
     size_t bufsize;
-    pcilib_timeout_t wait;
     
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
 
-    size_t buf_size;
     int eop;
 
     pcilib_nwl_engine_description_t *info = ctx->engines + dma;
@@ -286,7 +285,7 @@ int dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	switch (ret&PCILIB_STREAMING_TIMEOUT_MASK) {
 	    case PCILIB_STREAMING_CONTINUE: wait = PCILIB_DMA_TIMEOUT; break;
 	    case PCILIB_STREAMING_WAIT: wait = timeout; break;
-	    case PCILIB_STREAMING_CHECK: wait = 0; break;
+//	    case PCILIB_STREAMING_CHECK: wait = 0; break;
 	}
     
         bufnum = dma_nwl_wait_buffer(ctx, info, &bufsize, &eop, wait);

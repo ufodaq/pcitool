@@ -12,3 +12,8 @@ ipecamera.d
 pci.d
 tools.d
 *.d
+CMakeCache.txt
+CMakeFiles
+cmake_install.cmake
+Makefile
+*.so.*

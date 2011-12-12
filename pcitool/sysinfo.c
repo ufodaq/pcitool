@@ -104,7 +104,7 @@ int get_file_fs(const char *fname, size_t size, char *fs) {
   
   if ((!fname)||(!fs)||(size < 3)) return -1;
   
-  if (*fn == '/') {
+  if (*fname == '/') {
     fn = (char*)fname;
   } else {
     if (!getcwd(buf, 4095)) return -1;

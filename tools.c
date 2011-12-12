@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
+#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <string.h>
@@ -7,10 +8,12 @@
 #include <assert.h>
 #include <ctype.h>
 #include <time.h>
+#include <sched.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
 
 #include "tools.h"
+#include "error.h"
 
 int pcilib_isnumber(const char *str) {
     int i = 0;
@@ -240,6 +243,8 @@ void *pcilib_datacpy32(void * dst, void const * src, uint8_t size, size_t n, pci
             --n;
         }
     }
+
+    return dst;
 } 
 
 int pcilib_get_page_mask() {
@@ -254,6 +259,28 @@ int pcilib_get_page_mask() {
     return pagemask;
 }
 
+int pcilib_get_cpu_count() {
+    int err;
+
+    int cpu_count;
+    cpu_set_t mask;
+
+    err = sched_getaffinity(getpid(), sizeof(mask), &mask);
+    if (err) return 1;
+
+#ifdef CPU_COUNT
+    cpu_count = CPU_COUNT(&mask);
+#else
+    for (cpu_count = 0; cpu_count < CPU_SETSIZE; cpu_count++) {
+	if (!CPU_ISSET(cpu_count, &mask)) break;
+    }
+#endif
+
+    if (!cpu_count) cpu_count = PCILIB_DEFAULT_CPU_COUNT;
+    return cpu_count;    
+}
+
+
 int pcilib_add_timeout(struct timeval *tv, pcilib_timeout_t timeout) {
     tv->tv_usec += timeout%1000000;
     if (tv->tv_usec > 999999) {
@@ -262,21 +289,23 @@ int pcilib_add_timeout(struct timeval *tv, pcilib_timeout_t timeout) {
     } else {
 	tv->tv_sec += timeout/1000000;
     }
+
+    return 0;
 }
 
 int pcilib_calc_deadline(struct timeval *tv, pcilib_timeout_t timeout) {
     gettimeofday(tv, NULL);
     pcilib_add_timeout(tv, timeout);
-        
+
     return 0;
 }
 
 int pcilib_check_deadline(struct timeval *tve, pcilib_timeout_t timeout) {
     int64_t res;
     struct timeval tvs;
-    
+
     if (!tve->tv_sec) return 0;
-    
+
     gettimeofday(&tvs, NULL);
     res = ((tve->tv_sec - tvs.tv_sec)*1000000 + (tve->tv_usec - tvs.tv_usec));
 	// Hm... Some problems comparing signed and unsigned. So, sign check first

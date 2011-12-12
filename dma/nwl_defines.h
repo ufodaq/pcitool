@@ -33,7 +33,7 @@
 
 
 
-#define DMA_BD_MINIMUM_ALIGNMENT    0x40  /**< Minimum byte alignment
+#define DMA_BD_MINIMUM_ALIGNMENT    0x40  /**< Minimum byte alignment */
 
 /* Common DMA registers */
 #define REG_DMA_CTRL_STATUS     0x4000      /**< DMA Common Ctrl & Status */
