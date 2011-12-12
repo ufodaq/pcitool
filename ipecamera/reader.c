@@ -126,7 +126,7 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
     }
     
     if (eof) {
-	if (ipecamera_new_frame(ctx)) {
+	if ((ipecamera_new_frame(ctx))||(!ctx->run_reader)) {
 	    return PCILIB_STREAMING_STOP;
 	}
 	
