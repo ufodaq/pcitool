@@ -1094,6 +1094,7 @@ typedef struct {
     struct timeval last_frame;
     size_t trigger_count;
     size_t event_count;
+    size_t incomplete_count;
     size_t broken_count;
     
     struct timeval start_time;
@@ -1116,12 +1117,12 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
     if (!ctx->event_count) {
 	memcpy(&ctx->first_frame, &ctx->last_frame, sizeof(struct timeval));
     }
-    
+
     ctx->event_pending = 0;
     ctx->event_count++;
     
     if (info->flags&PCILIB_EVENT_INFO_FLAG_BROKEN) {
-	ctx->broken_count++;
+	ctx->incomplete_count++;
 	return PCILIB_STREAMING_CONTINUE;
     }
 
@@ -1177,14 +1178,14 @@ int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event
 void *Trigger(void *user) {
     struct timeval start;
 
-    GRABContext *ctx = (GRABContext*)user;
+    volatile GRABContext *ctx = (GRABContext*)user;
     size_t trigger_time = ctx->trigger_time;
     size_t max_triggers = ctx->max_triggers;
     
     ctx->trigger_thread_started = 1;
     ctx->event_pending = 1;
-    
-    while (!ctx->started);
+
+    while (!ctx->started) ;
 
     gettimeofday(&start, NULL);
     do {
@@ -1229,14 +1230,14 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
     else if (duration > 1000) printf("Time: %9lu ms", duration/1000);
     else printf("Time: %9lu us", duration);
     
-    printf(", Triggers: %9lu, Frames: %9lu, Broken: %9u, Lost: %9u, FPS: %5.1lf\n", ctx->trigger_count, ctx->event_count, ctx->broken_count, 0, fps);
+    printf(", Triggers: %9lu, Frames: %9lu, Lost: %9u, %9u, FPS: %5.1lf\n", ctx->trigger_count, ctx->event_count, ctx->broken_count, ctx->incomplete_count, fps);
 
 }
 
 void *Monitor(void *user) {
     struct timeval deadline;
     
-    GRABContext *ctx = (GRABContext*)user;
+    volatile GRABContext *ctx = (GRABContext*)user;
     pcilib_timeout_t timeout = ctx->timeout;
     
     if (timeout == PCILIB_TIMEOUT_INFINITE) timeout = 0;
@@ -1255,6 +1256,7 @@ void *Monitor(void *user) {
 		pcilib_add_timeout(&deadline, timeout);
 		
 		if (pcilib_calc_time_to_deadline(&deadline) == 0) {
+		    puts("stop");
 		    pcilib_stop(ctx->handle, PCILIB_EVENT_FLAG_STOP_ONLY);
 		    break;
 		}
@@ -1313,6 +1315,7 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
     
     ctx.event_count = 0;
     ctx.broken_count = 0;
+    ctx.incomplete_count = 0;
     
     ctx.started = 0;
     ctx.trigger_thread_started = 0;
@@ -1321,7 +1324,6 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
     memset(&ctx.stop_time, 0, sizeof(struct timeval));
 
 
-    
 //    printf("Limits: %lu %lu %lu\n", num, run_time, timeout);
     pcilib_configure_autostop(handle, num, run_time);//PCILIB_TIMEOUT_TRIGGER);
     pcilib_configure_rawdata_callback(handle, &raw_data, NULL);
