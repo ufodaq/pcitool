@@ -332,9 +332,11 @@ int pcilib_sleep_until_deadline(struct timeval *tv) {
     pcilib_timeout_t duration;
 
     duration = pcilib_calc_time_to_deadline(tv);
-    wait.tv_sec = duration / 1000000;
-    wait.tv_nsec = 1000 * (duration % 1000000);
-    nanosleep(&wait, NULL);
+    if (duration > 0) {
+	wait.tv_sec = duration / 1000000;
+	wait.tv_nsec = 1000 * (duration % 1000000);
+	nanosleep(&wait, NULL);
+    }
 
     return 0;
 }

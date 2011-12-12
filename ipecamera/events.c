@@ -21,6 +21,7 @@
 #include "events.h"
 
 int ipecamera_stream(pcilib_context_t *vctx, pcilib_event_callback_t callback, void *user) {
+    int run_flag = 1;
     int res, err = 0;
     int do_stop = 0;
     
@@ -46,7 +47,7 @@ int ipecamera_stream(pcilib_context_t *vctx, pcilib_event_callback_t callback, v
     }
     
 	// This loop iterates while the generation
-    while ((ctx->run_streamer)||(ctx->reported_id != ctx->event_id)) {
+    while ((run_flag)&&((ctx->run_streamer)||(ctx->reported_id != ctx->event_id))) {
 	while (ctx->reported_id != ctx->event_id) {
 	    if ((ctx->event_id - ctx->reported_id) > (ctx->buffer_size - IPECAMERA_RESERVE_BUFFERS)) ctx->reported_id = ctx->event_id - (ctx->buffer_size - 1) - IPECAMERA_RESERVE_BUFFERS;
 	    else ++ctx->reported_id;
@@ -57,6 +58,7 @@ int ipecamera_stream(pcilib_context_t *vctx, pcilib_event_callback_t callback, v
 		res = callback(ctx->reported_id, (pcilib_event_info_t*)&info, user);
 		if (res <= 0) {
 		    if (res < 0) err = -res;
+		    run_flag = 0;
 		    break;
 		}
 	    }

@@ -7,7 +7,7 @@
 #define IPECAMERA_BUG_MULTIFRAME_PACKETS
 #define IPECAMERA_BUG_INCOMPLETE_PACKETS
 
-#define IPECAMERA_DEFAULT_BUFFER_SIZE 64  	//**< should be power of 2 */
+#define IPECAMERA_DEFAULT_BUFFER_SIZE 16//64  	//**< should be power of 2 */
 #define IPECAMERA_RESERVE_BUFFERS 2		//**< Return Frame is Lost error, if requested frame will be overwritten after specified number of frames
 #define IPECAMERA_SLEEP_TIME 250000 		//**< Michele thinks 250 should be enough, but reset failing in this case */
 #define IPECAMERA_NEXT_FRAME_DELAY 1000 	//**< Michele requires 30000 to sync between End Of Readout and next Frame Req */
@@ -62,7 +62,7 @@ struct ipecamera_s {
     pcilib_event_callback_t cb;
     void *cb_user;
 
-    pcilib_event_id_t event_id;
+    volatile pcilib_event_id_t event_id;
     pcilib_event_id_t preproc_id;
     pcilib_event_id_t reported_id;
     
@@ -70,7 +70,7 @@ struct ipecamera_s {
 
     pcilib_register_t packet_len_reg;
     pcilib_register_t control_reg, status_reg;
-    pcilib_register_t start_reg, end_reg;
+    pcilib_register_t status3_reg;
     pcilib_register_t n_lines_reg;
     uint16_t line_reg;
     pcilib_register_t exposure_reg;
@@ -87,6 +87,7 @@ struct ipecamera_s {
     ipecamera_autostop_t autostop;
 
     struct timeval autostop_time;
+    struct timeval next_trigger;	/**< The minimal delay between trigger signals is mandatory, this indicates time when next trigger is possible */
 
     size_t buffer_size;		/**< How many images to store */
     size_t buffer_pos;		/**< Current image offset in the buffer, due to synchronization reasons should not be used outside of reader_thread */

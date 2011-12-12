@@ -75,6 +75,8 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	    ctx->frame[ctx->buffer_pos].event.info.seqnum = ((uint32_t*)buf)[6] & 0xF0000000;
 	    ctx->frame[ctx->buffer_pos].event.info.offset = ((uint32_t*)buf)[7] & 0xF0000000;
 */
+	    ctx->frame[ctx->buffer_pos].event.info.seqnum = ctx->event_id + 1;
+
 	    gettimeofday(&ctx->frame[ctx->buffer_pos].event.info.timestamp, NULL);
 	} else {
 //	    pcilib_warning("Frame magic is not found, ignoring broken data...");
@@ -156,7 +158,7 @@ void *ipecamera_reader_thread(void *user) {
 		}
 		usleep(IPECAMERA_NOFRAME_SLEEP);
 	    } else pcilib_error("DMA error while reading IPECamera frames, error: %i", err);
-	} else printf("no error\n");
+	} //else printf("no error\n");
 
 	//usleep(1000);
     }

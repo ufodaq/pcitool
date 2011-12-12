@@ -95,8 +95,8 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	
 	FIND_REG(status_reg, "fpga", "status");
 	FIND_REG(control_reg, "fpga", "control");
-	FIND_REG(start_reg, "fpga", "start_address");
-	FIND_REG(end_reg, "fpga", "end_address");
+
+	FIND_REG(status3_reg, "fpga", "status3");
 
 	FIND_REG(n_lines_reg, "cmosis", "number_lines");
 	FIND_REG(line_reg, "cmosis", "start1");
@@ -583,15 +583,23 @@ int ipecamera_trigger(pcilib_context_t *vctx, pcilib_event_t event, size_t trigg
 	pcilib_error("IPECamera imaging is not initialized");
 	return PCILIB_ERROR_NOTINITIALIZED;
     }
+    
+    pcilib_sleep_until_deadline(&ctx->next_trigger);
 
+/*
+    do {
+	usleep(10);
+	GET_REG(status3_reg, value);
+    } while (value&0x20000000);
+*/
+    
     SET_REG(control_reg, IPECAMERA_FRAME_REQUEST|IPECAMERA_READOUT_FLAG);
     usleep(IPECAMERA_WAIT_FRAME_RCVD_TIME);
     CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
     SET_REG(control_reg, IPECAMERA_IDLE|IPECAMERA_READOUT_FLAG);
 
 
-	// DS: Just measure when next trigger is allowed instead and wait in the beginning
-    usleep(IPECAMERA_NEXT_FRAME_DELAY);  // minimum delay between End Of Readout and next Frame Req
+    pcilib_calc_deadline(&ctx->next_trigger, IPECAMERA_NEXT_FRAME_DELAY);
 
     return 0;
 }

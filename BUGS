@@ -3,7 +3,7 @@ IPECamera Hardware Bugs
  1. Strange sequence writting CMOSIS registers
  2. Extra 8 byte padding in the end of frames
  3. Solve the conflict between DMA packet_length register and FPGA registers
-
+ 4. Some frame requests are lost
 
 Incomplete Frames
 -----------------
