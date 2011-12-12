@@ -407,12 +407,17 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     
     if (flags&PCILIB_EVENT_FLAG_PREPROCESS) {
 	ctx->n_preproc = pcilib_get_cpu_count();
+	
+	    // it would be greate to detect hyperthreading cores and ban them
 	switch (ctx->n_preproc) {
 	    case 1: break;
 	    case 2-3: ctx->n_preproc -= 1; break;
 	    default: ctx->n_preproc -= 2; break;
 	}
-	
+
+	if ((vctx->params.parallel.max_threads)&&(vctx->params.parallel.max_threads < ctx->n_preproc))
+	    ctx->n_preproc = vctx->params.parallel.max_threads;
+
 	ctx->preproc = (ipecamera_preprocessor_t*)malloc(ctx->n_preproc * sizeof(ipecamera_preprocessor_t));
 	if (!ctx->preproc) {
 	    ipecamera_stop(vctx, PCILIB_EVENT_FLAGS_DEFAULT);

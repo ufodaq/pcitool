@@ -47,8 +47,13 @@ typedef struct {
 } pcilib_rawdata_parameters_t;
 
 typedef struct {
+    size_t max_threads;
+} pcilib_parallel_parameters_t;
+
+typedef struct {
     pcilib_autostop_parameters_t autostop;
     pcilib_rawdata_parameters_t rawdata;
+    pcilib_parallel_parameters_t parallel;
 } pcilib_event_parameters_t;
 
 struct pcilib_event_context_s {

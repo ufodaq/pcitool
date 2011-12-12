@@ -121,6 +121,22 @@ int pcilib_configure_autostop(pcilib_t *ctx, size_t max_events, pcilib_timeout_t
     return 0;    
 }
 
+int pcilib_configure_preprocessing_threads(pcilib_t *ctx, size_t max_threads) {
+    pcilib_event_api_description_t *api;
+    
+    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+
+    api = model_info->event_api;
+    if (!api) {
+	pcilib_error("Event API is not supported by the selected model");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    ctx->event_ctx->params.parallel.max_threads = max_threads;
+
+    return 0;
+}
+
 int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, pcilib_event_flags_t flags) {
     pcilib_event_api_description_t *api;
     

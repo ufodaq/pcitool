@@ -332,6 +332,14 @@ int pcilib_configure_autostop(pcilib_t *ctx, size_t max_events, pcilib_timeout_t
  */
 int pcilib_configure_rawdata_callback(pcilib_t *ctx, pcilib_event_rawdata_callback_t callback, void *user);
 
+/*
+ * Configures maximal number of preprocessing threads. Actual amount of threads 
+ * may be bigger. For instance, additionaly a real-time reader thread will be 
+ * executed for most of hardware
+ */
+int pcilib_configure_preprocessing_threads(pcilib_t *ctx, size_t max_threads);
+
+
 int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, pcilib_event_flags_t flags);
 int pcilib_stop(pcilib_t *ctx, pcilib_event_flags_t flags);
 

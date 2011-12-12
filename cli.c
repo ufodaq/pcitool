@@ -127,6 +127,7 @@ typedef enum {
     OPT_RUN_TIME,
     OPT_FORMAT,
     OPT_BUFFER,
+    OPT_THREADS,
     OPT_LIST_DMA,
     OPT_LIST_DMA_BUFFERS,
     OPT_READ_DMA_BUFFER,
@@ -167,6 +168,7 @@ static struct option long_options[] = {
     {"trigger-time",		required_argument, 0, OPT_TRIGGER_TIME },
     {"format",			required_argument, 0, OPT_FORMAT },
     {"buffer",			optional_argument, 0, OPT_BUFFER },
+    {"threads",			optional_argument, 0, OPT_THREADS },
     {"start-dma",		required_argument, 0, OPT_START_DMA },
     {"stop-dma",		optional_argument, 0, OPT_STOP_DMA },
     {"list-dma-engines",	no_argument, 0, OPT_LIST_DMA },
@@ -258,6 +260,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "	add_header		- Prefix events with 256 bit header\n"
 //"	ringfs			- Write to RingFS\n"
 "   --buffer [size]		- Request data buffering, size in MB\n"
+"   --threads [num]		- Allow multithreaded processing\n"
 "\n"
 "  DMA Options:\n"
 "   --multipacket		- Read multiple packets\n"
@@ -1281,7 +1284,7 @@ void *Monitor(void *user) {
     return NULL;
 }
 
-int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, const char *data_type, size_t num, size_t run_time, size_t trigger_time, pcilib_timeout_t timeout, PARTITION partition, FORMAT format, size_t buffer_size, FILE *ofile) {
+int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, const char *data_type, size_t num, size_t run_time, size_t trigger_time, pcilib_timeout_t timeout, PARTITION partition, FORMAT format, size_t buffer_size, size_t threads, FILE *ofile) {
     int err;
     GRABContext ctx;
 //    void *data = NULL;
@@ -1346,7 +1349,10 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
     if (flags&PCILIB_EVENT_FLAG_RAW_DATA_ONLY) {
 	pcilib_configure_rawdata_callback(handle, &raw_data, NULL);
     }
-
+    
+    if (flags&PCILIB_EVENT_FLAG_PREPROCESS) {
+	pcilib_configure_preprocessing_threads(handle, threads);
+    }
     
     if (grab_mode&GRAB_MODE_TRIGGER) {
 	if (trigger_time) {
@@ -1903,6 +1909,7 @@ int main(int argc, char **argv) {
     size_t trigger_time = 0;
     size_t run_time = 0;
     size_t buffer = 0;
+    size_t threads = 1;
     FORMAT format = FORMAT_RAW;
     PARTITION partition = PARTITION_UNKNOWN;
     FLAGS flags = 0;
@@ -2227,6 +2234,18 @@ int main(int argc, char **argv) {
 		    buffer -= 128 + buffer/16;
 		}
 	    break;	   
+	    case OPT_THREADS:
+		if (optarg) num_offset = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-')) num_offset = argv[optind++];
+		else num_offset = NULL;
+		
+		if (num_offset) {
+		    if ((!isnumber(num_offset))||(sscanf(num_offset, "%zu", &threads) != 1))
+			Usage(argc, argv, "Invalid threads number is specified (%s)", num_offset);
+		} else {
+		    threads = 0;
+		}
+	    break;	   
 	    case OPT_FORMAT:
 		if (!strcasecmp(optarg, "add_header")) format =  FORMAT_HEADER;
 		else if (!strcasecmp(optarg, "ringfs")) format =  FORMAT_RINGFS;
@@ -2454,7 +2473,7 @@ int main(int argc, char **argv) {
         pcilib_reset(handle);
      break;
      case MODE_GRAB:
-        TriggerAndGrab(handle, grab_mode, event, data_type, size, run_time, trigger_time, timeout, partition, format, buffer, ofile);
+        TriggerAndGrab(handle, grab_mode, event, data_type, size, run_time, trigger_time, timeout, partition, format, buffer, threads, ofile);
      break;
      case MODE_LIST_DMA:
         ListDMA(handle, fpga_device, model_info);
