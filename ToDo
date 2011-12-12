@@ -20,6 +20,7 @@ Normal Priority (it would make just few things a bit easier)
  3. Provide OR and AND operations on registers in cli
  4. Support writting a data from a binary file in cli
  5. Use bus-addresses instead of physcial addresses for DMA 
+ 6. Use pthread_condition_t instead of polling
  
 Low Priority (only as generalization for other projects)
 ============

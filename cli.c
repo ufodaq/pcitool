@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include <getopt.h>
 
@@ -283,6 +284,14 @@ argv[0]);
 
     exit(0);
 }
+
+static int StopFlag = 0;
+
+static void signal_exit_handler(int signo) { 
+    if (++StopFlag > 2)
+	exit(-1);
+}
+
 
 void Error(const char *format, ...) {
     va_list ap;
@@ -1314,6 +1323,11 @@ void *Monitor(void *user) {
     }
     
     while (ctx->run_flag) {
+	if (StopFlag) {
+	    pcilib_stop(ctx->handle, PCILIB_EVENT_FLAG_STOP_ONLY);
+	    break;
+	}
+	
 	if (timeout) {
 	    if (pcilib_calc_time_to_deadline(&deadline) == 0) {
 		memcpy(&deadline, (struct timeval*)&ctx->last_frame, sizeof(struct timeval));
@@ -2500,6 +2514,8 @@ int main(int argc, char **argv) {
 		    Usage(argc, argv, "Invalid data bank (%s) is specified", bank);
 	}
     }
+
+    signal(SIGINT, signal_exit_handler);
 
     if (output) {
 	ofile = fopen(output, "a+");
