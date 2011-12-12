@@ -1339,6 +1339,12 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
 	ctx.max_triggers = num;
 	ctx.trigger_count = 0;
 	ctx.trigger_time = trigger_time;
+
+	
+	if ((timeout)&&(trigger_time * 2 > timeout)) {
+	    timeout = 2 * trigger_time;
+	    ctx.timeout = timeout;
+	}
     
 	    // We don't really care if RT priority is imposible
 	pthread_attr_init(&attr);
