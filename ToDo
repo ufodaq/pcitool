@@ -7,7 +7,11 @@ High Priority (we would need it for IPE Camera)
 =============
  1. Serialize access to the registers across applications
  2. Protect kmem_entries in the driver using spinlock
- 3. CMake build system
+ 3. Extend Event API with function to generate triggers 
+    at the specified pace. By default the current cli 
+    implementation should be used. However, the hardware
+    alternative should be possible to implement.
+    
  
 Normal Priority (it would make just few things a bit easier)
 ===============
@@ -16,9 +20,6 @@ Normal Priority (it would make just few things a bit easier)
  3. Provide OR and AND operations on registers in cli
  4. Support writting a data from a binary file in cli
  5. Use bus-addresses instead of physcial addresses for DMA 
- 6. Instead of waiting in the end of trigger function to satisfy delay required
-    between consequent triggers, measure the timestamp when next trigger is 
-    allowed and check it in the beginning of the trigger function.
  
 Low Priority (only as generalization for other projects)
 ============

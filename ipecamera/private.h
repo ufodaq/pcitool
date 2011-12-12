@@ -7,7 +7,7 @@
 #define IPECAMERA_BUG_MULTIFRAME_PACKETS
 #define IPECAMERA_BUG_INCOMPLETE_PACKETS
 
-#define IPECAMERA_ANNOUNCE_READY		//**< announce new event only after the reconstruction is done */
+//#define IPECAMERA_ANNOUNCE_READY		//**< announce new event only after the reconstruction is done */
 
 #define IPECAMERA_DEFAULT_BUFFER_SIZE 16//64  	//**< should be power of 2 */
 #define IPECAMERA_RESERVE_BUFFERS 2		//**< Return Frame is Lost error, if requested frame will be overwritten after specified number of frames
