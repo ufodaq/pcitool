@@ -21,7 +21,7 @@
 #include "events.h"
 
 int ipecamera_stream(pcilib_context_t *vctx, pcilib_event_callback_t callback, void *user) {
-    int err = 0;
+    int res, err = 0;
     int do_stop = 0;
     
     ipecamera_event_info_t info;
@@ -54,9 +54,9 @@ int ipecamera_stream(pcilib_context_t *vctx, pcilib_event_callback_t callback, v
 	    memcpy(&info, ctx->frame + ((ctx->reported_id-1)%ctx->buffer_size), sizeof(ipecamera_event_info_t));
 
 	    if ((ctx->event_id - ctx->reported_id) < ctx->buffer_size) {
-		err = callback(ctx->reported_id, (pcilib_event_info_t*)&info, user);
-		if (err <= 0) {
-		    if (err < 0) err = -err;
+		res = callback(ctx->reported_id, (pcilib_event_info_t*)&info, user);
+		if (res <= 0) {
+		    if (res < 0) err = -res;
 		    break;
 		}
 	    }
