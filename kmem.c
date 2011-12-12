@@ -80,7 +80,6 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
     
     memset(kbuf, 0, sizeof(pcilib_kmem_list_t) + nmemb * sizeof(pcilib_kmem_addr_t));
     
-
     ret = ioctl( ctx->handle, PCIDRIVER_IOC_MMAP_MODE, PCIDRIVER_MMAP_KMEM );
     if (ret) {
 	pcilib_error("PCIDRIVER_IOC_MMAP_MODE ioctl have failed");
@@ -106,7 +105,7 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	    error = "PCIDRIVER_IOC_KMEM_ALLOC ioctl have failed";
 	    break;
 	}
-    
+	
 	kbuf->buf.blocks[i].handle_id = kh.handle_id;
 	kbuf->buf.blocks[i].pa = kh.pa;
 	kbuf->buf.blocks[i].size = kh.size;
@@ -119,15 +118,15 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	
 	    if (persistent) {
 		if (persistent < 0) {
-		    if (((flags&PCILIB_KMEM_FLAG_PERSISTENT) == 0)&&(kh.flags&KMEM_FLAG_REUSED_PERSISTENT)) err = PCILIB_ERROR_INVALID_STATE;
-		    else persistent = (kh.flags&KMEM_FLAG_REUSED_PERSISTENT)?1:0;
+		    /*if (((flags&PCILIB_KMEM_FLAG_PERSISTENT) == 0)&&(kh.flags&KMEM_FLAG_REUSED_PERSISTENT)) err = PCILIB_ERROR_INVALID_STATE;
+		    else*/ persistent = (kh.flags&KMEM_FLAG_REUSED_PERSISTENT)?1:0;
 		} else if ((kh.flags&KMEM_FLAG_REUSED_PERSISTENT) == 0) err = PCILIB_ERROR_INVALID_STATE;
 	    } else if (kh.flags&KMEM_FLAG_REUSED_PERSISTENT) err = PCILIB_ERROR_INVALID_STATE;
 	    
 	    if (hardware) {
 		if (hardware < 0) {
-		    if (((flags&PCILIB_KMEM_FLAG_HARDWARE) == 0)&&(kh.flags&KMEM_FLAG_REUSED_HW)) err = PCILIB_ERROR_INVALID_STATE;
-		    else hardware = (kh.flags&KMEM_FLAG_REUSED_HW)?1:0;
+		    /*if (((flags&PCILIB_KMEM_FLAG_HARDWARE) == 0)&&(kh.flags&KMEM_FLAG_REUSED_HW)) err = PCILIB_ERROR_INVALID_STATE;
+		    else*/ hardware = (kh.flags&KMEM_FLAG_REUSED_HW)?1:0;
 		} else if ((kh.flags&KMEM_FLAG_REUSED_HW) == 0) err = PCILIB_ERROR_INVALID_STATE;
 	    } else if (kh.flags&KMEM_FLAG_REUSED_HW) err = PCILIB_ERROR_INVALID_STATE;
 	    
@@ -164,13 +163,15 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	kbuf->buf.blocks[i].mmap_offset = kh.pa & ctx->page_mask;
     }
 
+	//This is possible in the case of error (nothing is allocated yet) or if buffers are not reused
     if (persistent < 0) persistent = 0;
     if (hardware < 0) hardware = 0;
 
     if (err||error) {
 	pcilib_kmem_flags_t free_flags = 0;
 	
-	if ((persistent <= 0)&&(flags&PCILIB_KMEM_FLAG_PERSISTENT)) {
+	    // for the sake of simplicity always clean partialy reused buffers
+	if ((persistent == PCILIB_TRISTATE_PARTIAL)||((persistent <= 0)&&(flags&PCILIB_KMEM_FLAG_PERSISTENT))) {
 	    free_flags |= PCILIB_KMEM_FLAG_PERSISTENT;
 	}
 	
@@ -178,14 +179,17 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	    free_flags |= PCILIB_KMEM_FLAG_HARDWARE;
 	}
 	
-	pcilib_cancel_kernel_memory(ctx, kbuf, free_flags, err?kh.flags:0);
+	    // do not clean if we have reused peresistent buffers
+	    //  we don't care about -1, because it will be the value only if no buffers actually allocated
+	if ((!persistent)||(reused != PCILIB_TRISTATE_YES)) {
+	    pcilib_cancel_kernel_memory(ctx, kbuf, free_flags, err?kh.flags:0);
+	}
 
-	if (err) error = "Reused buffers are inconsistent";
+	if (!error) error = "Reused buffers are inconsistent";
 	pcilib_error(error);
 
 	return NULL;
     }
-    
     
     if (nmemb == 1) {
 	memcpy(&kbuf->buf.addr, &kbuf->buf.blocks[0], sizeof(pcilib_kmem_addr_t));

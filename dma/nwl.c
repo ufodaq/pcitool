@@ -27,9 +27,9 @@ int dma_nwl_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     if (dma == PCILIB_DMA_ENGINE_INVALID) return 0;
     else if (dma > ctx->n_engines) return PCILIB_ERROR_INVALID_BANK;
 
-    err = dma_nwl_start_engine(ctx, dma);
-
     if (flags&PCILIB_DMA_FLAG_PERSISTENT) ctx->engines[dma].preserve = 1;
+
+    err = dma_nwl_start_engine(ctx, dma);
     
     return err;
 }
