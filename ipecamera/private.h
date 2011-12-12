@@ -80,9 +80,9 @@ struct ipecamera_s {
     int streaming;		/**< Camera is in streaming mode (we are within stream call) */
     int parse_data;		/**< Indicates if some processing of the data is required, otherwise only rawdata_callback will be called */
 
-    int run_reader;		/**< Instructs the reader thread to stop processing */
-    int run_streamer;		/**< Indicates request to stop streaming events and can be set by reader_thread upon exit or by user request */
-    int run_preprocessors;	/**< Instructs preprocessors to exit */
+    volatile int run_reader;		/**< Instructs the reader thread to stop processing */
+    volatile int run_streamer;		/**< Indicates request to stop streaming events and can be set by reader_thread upon exit or by user request */
+    volatile int run_preprocessors;	/**< Instructs preprocessors to exit */
     
     ipecamera_autostop_t autostop;
 

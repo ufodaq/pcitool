@@ -1084,11 +1084,11 @@ typedef struct {
     size_t trigger_time;    
     size_t max_triggers;
     
-    int event_pending;			/**< Used to detect that we have read previously triggered event */
-    int trigger_thread_started;		/**< Indicates that trigger thread is ready and we can't procced to start event recording */
-    int started;			/**< Indicates that recording is started */
+    int event_pending;				/**< Used to detect that we have read previously triggered event */
+    volatile int trigger_thread_started;	/**< Indicates that trigger thread is ready and we can't procced to start event recording */
+    volatile int started;			/**< Indicates that recording is started */
     
-    int run_flag;
+    volatile int run_flag;
 
     struct timeval first_frame;    
     struct timeval last_frame;
@@ -1178,7 +1178,7 @@ int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event
 void *Trigger(void *user) {
     struct timeval start;
 
-    volatile GRABContext *ctx = (GRABContext*)user;
+    GRABContext *ctx = (GRABContext*)user;
     size_t trigger_time = ctx->trigger_time;
     size_t max_triggers = ctx->max_triggers;
     
@@ -1237,7 +1237,7 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
 void *Monitor(void *user) {
     struct timeval deadline;
     
-    volatile GRABContext *ctx = (GRABContext*)user;
+    GRABContext *ctx = (GRABContext*)user;
     pcilib_timeout_t timeout = ctx->timeout;
     
     if (timeout == PCILIB_TIMEOUT_INFINITE) timeout = 0;
@@ -1245,18 +1245,17 @@ void *Monitor(void *user) {
 //    while (!ctx->started);
     
     if (timeout) {
-	memcpy(&deadline, &ctx->last_frame, sizeof(struct timeval));
+	memcpy(&deadline, (struct timeval*)&ctx->last_frame, sizeof(struct timeval));
 	pcilib_add_timeout(&deadline, timeout);
     }
     
     while (ctx->run_flag) {
 	if (timeout) {
 	    if (pcilib_calc_time_to_deadline(&deadline) == 0) {
-		memcpy(&deadline, &ctx->last_frame, sizeof(struct timeval));
+		memcpy(&deadline, (struct timeval*)&ctx->last_frame, sizeof(struct timeval));
 		pcilib_add_timeout(&deadline, timeout);
 		
 		if (pcilib_calc_time_to_deadline(&deadline) == 0) {
-		    puts("stop");
 		    pcilib_stop(ctx->handle, PCILIB_EVENT_FLAG_STOP_ONLY);
 		    break;
 		}
