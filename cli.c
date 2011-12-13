@@ -25,6 +25,7 @@
 #include <fastwriter.h>
 
 #include "pcitool/sysinfo.h"
+#include "pcitool/formaters.h"
 
 //#include "pci.h"
 #include "tools.h"
@@ -44,7 +45,7 @@
 #define BLOCK_SEPARATOR_WIDTH 2
 #define BLOCK_SIZE 8
 #define BENCHMARK_ITERATIONS 128
-#define STATUS_MESSAGE_INTERVAL	5	/* seconds */
+#define STATUS_MESSAGE_INTERVAL	1//5	/* seconds */
 
 
 #define isnumber pcilib_isnumber
@@ -1107,6 +1108,7 @@ typedef struct {
     size_t run_time;
     size_t trigger_time;    
     size_t max_triggers;
+    pcilib_event_flags_t flags;
     
     volatile int event_pending;			/**< Used to detect that we have read previously triggered event */
     volatile int trigger_thread_started;	/**< Indicates that trigger thread is ready and we can't procced to start event recording */
@@ -1186,15 +1188,22 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 
 int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event_flags_t flags, size_t size, void *data, void *user) {
     int err;
-    static size_t sum = 0;
 
     GRABContext *ctx = (GRABContext*)user;
 //    pcilib_t *handle = ctx->handle;
 
-    gettimeofday(&ctx->last_frame, NULL);
 
-    sum += size;
-//    printf("raw: %zu\n", sum);
+    if ((info)&&(info->seqnum != ctx->last_num)) {
+        gettimeofday(&ctx->last_frame, NULL);
+	if (!ctx->event_count) {
+	    memcpy(&ctx->first_frame, &ctx->last_frame, sizeof(struct timeval));
+	}
+
+	ctx->event_count++;
+	ctx->missing_count += (info->seqnum - ctx->last_num) - 1;
+	ctx->last_num = info->seqnum;
+    }
+
     err = fastwriter_push_data(ctx->writer, size, data);
     if (err) {
 	if (err == EWOULDBLOCK) Error("Storage is not able to handle the data stream, buffer overrun");
@@ -1237,49 +1246,12 @@ void *Trigger(void *user) {
     return NULL;
 }
 
-void PrintTime(pcilib_timeout_t duration) {
-    if (duration > 999999999999) printf("%4.1lf""d", 1.*duration/86400000000);
-    else if (duration > 99999999999) printf("%4.1lf""h", 1.*duration/3600000000);
-    else if (duration > 9999999999) printf("%4.2lf""h", 1.*duration/3600000000);
-    else if (duration > 999999999) printf("%4.1lf""m", 1.*duration/60000000);
-    else if (duration > 99999999) printf("%4.2lf""m", 1.*duration/60000000);
-    else if (duration > 9999999) printf("%4.1lf""s", 1.*duration/1000000);
-    else if (duration > 999999) printf("%4.2lf""s", 1.*duration/1000000);
-    else if (duration > 999) printf("%3lu""ms", duration/1000);
-    else printf("%3lu""us", duration);
-}
-
-void PrintNumber(size_t num) {
-    if (num > 999999999999999999) printf("%3lue", num/1000000000000000000);
-    else if (num > 999999999999999) printf("%3lup", num/1000000000000000);
-    else if (num > 999999999999) printf("%3lut", num/1000000000000);
-    else if (num > 999999999) printf("%3lug", num/1000000000);
-    else if (num > 999999) printf("%3lum", num/1000000);
-    else if (num > 9999) printf("%3luk", num/1000);
-    else printf("%4lu", num);
-}
-
-void PrintSize(size_t num) {
-    if (num >= 112589990684263) printf("%4.1lf PB", 1.*num/1125899906842624);
-    else if (num >= 109951162778) printf("%4.1lf TB", 1.*num/1099511627776);
-    else if (num >= 107374183) printf("%4.1lf GB", 1.*num/1073741824);
-    else if (num >= 1048576) printf("%4lu MB", num/1048576);
-    else if (num >= 1024) printf("%4lu KB", num/1024);
-    else printf("%5lu B", num);
-}
-
-void PrintPercent(size_t num, size_t total) {
-    if (num >= total) printf(" 100");
-    printf("%4.1lf", 100.*num/total);
-    
-}
-
 void GrabStats(GRABContext *ctx, struct timeval *end_time) {
     int verbose;
     pcilib_timeout_t duration, fps_duration;
     struct timeval cur;
     double fps = 0, good_fps = 0;
-    size_t total, good, pending;
+    size_t total, good, pending = 0;
 
     verbose = ctx->verbose;
     
@@ -1291,7 +1263,10 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
 	gettimeofday(&cur, NULL);
 	end_time = &cur;
     }
-        
+
+    if ((ctx->event_count + ctx->missing_count) == 0) 
+	return;
+    
     duration = pcilib_timediff(&ctx->start_time, end_time);
     fps_duration = pcilib_timediff(&ctx->first_frame, &ctx->last_frame);
     
@@ -1325,21 +1300,28 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
     PrintNumber(ctx->event_count);
     printf(" FPS %5.0lf", fps);
 
-    printf(", Stored: ");
-    PrintNumber(good);
-    printf(" FPS %5.0lf", good_fps);
+    if ((ctx->flags&PCILIB_EVENT_FLAG_RAW_DATA_ONLY) == 0) {
+	printf(", Stored: ");
+	PrintNumber(good);
+	printf(" FPS %5.0lf", good_fps);
+    }
 
     printf("\n");    
 
     if (verbose > 2) {
-	printf("Good: ");
-        PrintNumber(good);
-        printf(", Dropped: ");
-        PrintNumber(ctx->storage_count);
-        printf(", Broken: ");
-        PrintNumber(ctx->broken_count);
-	printf(", Bad: ");
-	PrintNumber(ctx->incomplete_count);
+	if (ctx->flags&PCILIB_EVENT_FLAG_RAW_DATA_ONLY) {
+	    printf("Captured: ");
+	    PrintNumber(good);
+	} else {
+	    printf("Good: ");
+	    PrintNumber(good);
+	    printf(", Dropped: ");
+    	    PrintNumber(ctx->storage_count);
+	    printf(", Broken: ");
+    	    PrintNumber(ctx->broken_count);
+	    printf(", Bad: ");
+	    PrintNumber(ctx->incomplete_count);
+	}
 	printf(", Lost: ");
 	PrintNumber(ctx->missing_count);
         if (ctx->trigger_count) {
@@ -1350,15 +1332,21 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
     }
 
     if (verbose > 1) {
-	printf("Good: ");
-	PrintPercent(good, total);
-	printf("%% Dropped: ");
-        PrintPercent(ctx->storage_count, total);
-	printf("%% Broken: ");
-	PrintPercent(ctx->broken_count, total);
-	printf("%% Bad: ");
-	PrintPercent(ctx->incomplete_count, total);
-        printf("%% Lost: ");
+	if (ctx->flags&PCILIB_EVENT_FLAG_RAW_DATA_ONLY) {
+	    printf("Captured: ");
+	    PrintPercent(good, total);
+	} else {
+	    printf("Good: ");
+	    PrintPercent(good, total);
+	    printf("%% Dropped: ");
+	    PrintPercent(ctx->storage_count, total);
+	    printf("%% Broken: ");
+	    PrintPercent(ctx->broken_count, total);
+	    printf("%% Bad: ");
+	    PrintPercent(ctx->incomplete_count, total);
+	}
+
+	printf("%% Lost: ");
 	PrintPercent(ctx->missing_count, total);
 	if (ctx->trigger_count) {
 	    printf("%% Pending: ");
@@ -1393,8 +1381,6 @@ void StorageStats(GRABContext *ctx) {
     printf(" of ");
     PrintSize(st.buffer_size);
     printf(" buffer (%6.2lf%% max)\n", 100.*st.buffer_max / st.buffer_size);
-    
-//    printf("Lost  %6.2lf%% (% 8lu of % 8lu), %9.3lf GB at %8.3lf MB/s, buf:%6.2lf%%\n", 100.*(lost - last_lost) / (lost + frames - (last_lost + last_frames)), lost - last_lost, lost + frames - (last_lost + last_frames), 1. * (frames - last_frames) * width * height / 1024 / 1024 / 1024, 1. * (frames - last_frames) * width * height / (tv.tv_sec - last_written) / 1024 / 1024, max_fill);
 }
 
 void *Monitor(void *user) {
@@ -1534,6 +1520,8 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
     } else {
 	flags |= PCILIB_EVENT_FLAG_PREPROCESS;
     }
+    
+    ctx.flags = flags;
 
 //    printf("Limits: %lu %lu %lu\n", num, run_time, timeout);
     pcilib_configure_autostop(handle, num, run_time);
@@ -1724,16 +1712,6 @@ size_t FindUse(size_t *n_uses, kmem_use_info_t *uses, unsigned long use) {
 
     uses[n].use = use;
     return (*n_uses)++;
-}
-
-
-char *GetPrintSize(char *str, size_t size) {
-    if (size >= 1073741824) sprintf(str, "%.1lf GB", 1.*size / 1073741824);
-    else if (size >= 1048576) sprintf(str, "%.1lf MB", 1.*size / 1048576);
-    else if (size >= 1024) sprintf(str, "%lu KB", size / 1024);
-    else sprintf(str, "%lu B ", size);
-    
-    return str;
 }
 
 int ListKMEM(pcilib_t *handle, const char *device) {
