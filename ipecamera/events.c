@@ -46,28 +46,34 @@ int ipecamera_stream(pcilib_context_t *vctx, pcilib_event_callback_t callback, v
 	do_stop = 1;
     }
     
-	// This loop iterates while the generation
-    while ((run_flag)&&((ctx->run_streamer)||(ctx->reported_id != ctx->event_id))) {
+    if (ctx->parse_data) {
+	    // This loop iterates while the generation
+	while ((run_flag)&&((ctx->run_streamer)||(ctx->reported_id != ctx->event_id))) {
 #ifdef IPECAMERA_ANNOUNCE_READY
-	while (((!ctx->preproc)&&(ctx->reported_id != ctx->event_id))||((ctx->preproc)&&(ctx->reported_id != ctx->preproc_id))) {
+	    while (((!ctx->preproc)&&(ctx->reported_id != ctx->event_id))||((ctx->preproc)&&(ctx->reported_id != ctx->preproc_id))) {
 #else /* IPECAMERA_ANNOUNCE_READY */
-	while (ctx->reported_id != ctx->event_id) {
+	    while (ctx->reported_id != ctx->event_id) {
 #endif /* IPECAMERA_ANNOUNCE_READY */
-	    if ((ctx->event_id - ctx->reported_id) > (ctx->buffer_size - IPECAMERA_RESERVE_BUFFERS)) ctx->reported_id = ctx->event_id - (ctx->buffer_size - 1) - IPECAMERA_RESERVE_BUFFERS;
-	    else ++ctx->reported_id;
+		if ((ctx->event_id - ctx->reported_id) > (ctx->buffer_size - IPECAMERA_RESERVE_BUFFERS)) ctx->reported_id = ctx->event_id - (ctx->buffer_size - 1) - IPECAMERA_RESERVE_BUFFERS;
+		else ++ctx->reported_id;
 
-	    memcpy(&info, ctx->frame + ((ctx->reported_id-1)%ctx->buffer_size), sizeof(ipecamera_event_info_t));
+		memcpy(&info, ctx->frame + ((ctx->reported_id-1)%ctx->buffer_size), sizeof(ipecamera_event_info_t));
 
-	    if ((ctx->event_id - ctx->reported_id) < ctx->buffer_size) {
-		res = callback(ctx->reported_id, (pcilib_event_info_t*)&info, user);
-		if (res <= 0) {
-		    if (res < 0) err = -res;
-		    run_flag = 0;
-		    break;
+		if ((ctx->event_id - ctx->reported_id) < ctx->buffer_size) {
+		    res = callback(ctx->reported_id, (pcilib_event_info_t*)&info, user);
+		    if (res <= 0) {
+			if (res < 0) err = -res;
+			run_flag = 0;
+			break;
+		    }
 		}
 	    }
+	    usleep(IPECAMERA_NOFRAME_SLEEP);
 	}
-	usleep(IPECAMERA_NOFRAME_SLEEP);
+    } else {
+	while ((run_flag)&&(ctx->run_streamer)) {
+	    usleep(IPECAMERA_NOFRAME_SLEEP);
+	}
     }
 
     ctx->streaming = 0;
@@ -91,6 +97,11 @@ int ipecamera_next_event(pcilib_context_t *vctx, pcilib_timeout_t timeout, pcili
 
     if (!ctx->started) {
 	pcilib_error("IPECamera is not in grabbing mode");
+	return PCILIB_ERROR_INVALID_REQUEST;
+    }
+    
+    if (!ctx->parse_data) {
+	pcilib_error("RAWData only mode is requested");
 	return PCILIB_ERROR_INVALID_REQUEST;
     }
 

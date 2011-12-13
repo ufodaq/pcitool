@@ -275,7 +275,7 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     ctx->buffer_pos = 0;
     ctx->parse_data = (flags&PCILIB_EVENT_FLAG_RAW_DATA_ONLY)?0:1;
     ctx->cur_size = 0;
-
+    
     ctx->dim.width = IPECAMERA_WIDTH;
     GET_REG(n_lines_reg, ctx->dim.height);
     
@@ -405,7 +405,7 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
 	ctx->autostop.evid = vctx->params.autostop.max_events;
     }
     
-    if (flags&PCILIB_EVENT_FLAG_PREPROCESS) {
+    if ((ctx->parse_data)&&(flags&PCILIB_EVENT_FLAG_PREPROCESS)) {
 	ctx->n_preproc = pcilib_get_cpu_count();
 	
 	    // it would be greate to detect hyperthreading cores and ban them
