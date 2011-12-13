@@ -51,6 +51,7 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
     int eof = 0;
 
 #ifdef IPECAMERA_BUG_MULTIFRAME_PACKETS
+    size_t real_size;
     size_t extra_data = 0;
 #endif /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
 
@@ -64,6 +65,16 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	}
 	
 	if (startpos) {
+		// pass padding to rawdata callback
+	    if (ctx->event.params.rawdata.callback) {
+		res = ctx->event.params.rawdata.callback(0, NULL, PCILIB_EVENT_FLAG_RAW_DATA_ONLY, startpos, buf, ctx->event.params.rawdata.user);
+		if (res <= 0) {
+		    if (res < 0) return res;
+		    ctx->run_reader = 0;
+		}
+	    }
+
+
 	    buf += startpos;
 	    bufsize -= startpos;
 	}
@@ -85,6 +96,9 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
     }
 
 #ifdef IPECAMERA_BUG_MULTIFRAME_PACKETS
+	// for rawdata_callback with complete padding
+    real_size = bufsize;
+    
     if (ctx->cur_size + bufsize > ctx->raw_size) {
         size_t need;
 	
@@ -118,7 +132,11 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
     if (ctx->cur_size >= ctx->full_size) eof = 1;
 
     if (ctx->event.params.rawdata.callback) {
+#ifdef IPECAMERA_BUG_MULTIFRAME_PACKETS
+	res = ctx->event.params.rawdata.callback(ctx->event_id, (pcilib_event_info_t*)(ctx->frame + ctx->buffer_pos), (eof?PCILIB_EVENT_FLAG_EOF:PCILIB_EVENT_FLAGS_DEFAULT), real_size, buf, ctx->event.params.rawdata.user);
+#else /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
 	res = ctx->event.params.rawdata.callback(ctx->event_id, (pcilib_event_info_t*)(ctx->frame + ctx->buffer_pos), (eof?PCILIB_EVENT_FLAG_EOF:PCILIB_EVENT_FLAGS_DEFAULT), bufsize, buf, ctx->event.params.rawdata.user);
+#endif /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
 	if (res <= 0) {
 	    if (res < 0) return res;
 	    ctx->run_reader = 0;
