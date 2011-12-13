@@ -45,7 +45,7 @@
 #define BLOCK_SEPARATOR_WIDTH 2
 #define BLOCK_SIZE 8
 #define BENCHMARK_ITERATIONS 128
-#define STATUS_MESSAGE_INTERVAL	1//5	/* seconds */
+#define STATUS_MESSAGE_INTERVAL	5	/* seconds */
 
 
 #define isnumber pcilib_isnumber
@@ -265,7 +265,9 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   -s <num|unlimited> 		- Number of events to grab and trigger\n"
 "   --format [type]		- Specifies how event data should be stored\n"
 "	raw			- Just write all events sequentially\n"
-"	add_header		- Prefix events with 256 bit header\n"
+"	add_header		- Prefix events with 512 bit header:\n"
+"				  event(64), data(64), nope(64), size(64)\n"
+"				  seqnum(64), offset(64), timestamp(128)\n"
 //"	ringfs			- Write to RingFS\n"
 "   --buffer [size]		- Request data buffering, size in MB\n"
 "   --threads [num]		- Allow multithreaded processing\n"
@@ -1109,6 +1111,7 @@ typedef struct {
     size_t trigger_time;    
     size_t max_triggers;
     pcilib_event_flags_t flags;
+    FORMAT format;
     
     volatile int event_pending;			/**< Used to detect that we have read previously triggered event */
     volatile int trigger_thread_started;	/**< Indicates that trigger thread is ready and we can't procced to start event recording */
@@ -1133,7 +1136,7 @@ typedef struct {
 } GRABContext;
 
 int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user) {
-    int err;
+    int err = 0;
     void *data;
     size_t size;
     
@@ -1162,9 +1165,26 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 	ctx->broken_count++;
 	return PCILIB_STREAMING_CONTINUE;
     }
-    
-    err = fastwriter_push(ctx->writer, size, data);
+
+    if (ctx->format == FORMAT_HEADER) {
+	uint64_t header[8];
+	header[0] = info->type;
+	header[1] = ctx->data;
+	header[2] = 0;
+	header[3] = size;
+	header[4] = info->seqnum;
+	header[5] = info->offset;
+	memcpy(header + 6, &info->timestamp, 16);
+	
+	err = fastwriter_push(ctx->writer, 64, header);
+    }
+
+    if (!err) 
+	err = fastwriter_push(ctx->writer, size, data);
+
     if (err) {
+	fastwriter_cancel(ctx->writer);
+
 	if (err != EWOULDBLOCK)
 	    Error("Storage error %i", err);
 
@@ -1491,6 +1511,7 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
     ctx.data = data;
     ctx.run_time = run_time;
     ctx.timeout = timeout;
+    ctx.format = format;
 
     if (grab_mode&GRAB_MODE_GRAB) ctx.verbose = verbose;
     else ctx.verbose = 0;
