@@ -22,6 +22,8 @@
 
 #include <getopt.h>
 
+#include <fastwriter.h>
+
 #include "pcitool/sysinfo.h"
 
 //#include "pci.h"
@@ -1097,7 +1099,8 @@ typedef struct {
     pcilib_t *handle;
     pcilib_event_t event;
     pcilib_event_data_type_t data;
-    FILE *output;
+
+    fastwriter_t *writer;
 
     int verbose;
     pcilib_timeout_t timeout;
@@ -1110,6 +1113,7 @@ typedef struct {
     volatile int started;			/**< Indicates that recording is started */
     
     volatile int run_flag;
+    volatile int writing_flag;
 
     struct timeval first_frame;    
     struct timeval last_frame;
@@ -1120,21 +1124,19 @@ typedef struct {
     size_t incomplete_count;
     size_t broken_count;
     size_t missing_count;
+    size_t storage_count;
     
     struct timeval start_time;
     struct timeval stop_time;
 } GRABContext;
 
-#include "ipecamera/ipecamera.h"
 int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user) {
     int err;
     void *data;
-    size_t size, written;
+    size_t size;
     
     GRABContext *ctx = (GRABContext*)user;
     pcilib_t *handle = ctx->handle;
-
-    ipecamera_event_info_t *ipe = (ipecamera_event_info_t*)info;
 
     gettimeofday(&ctx->last_frame, NULL);
 
@@ -1159,44 +1161,41 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 	return PCILIB_STREAMING_CONTINUE;
     }
     
-    
-    //Error("Internal Error: No data is provided to event callback");
+    err = fastwriter_push(ctx->writer, size, data);
+    if (err) {
+	if (err != EWOULDBLOCK)
+	    Error("Storage error %i", err);
 
-    written = fwrite(data, 1, size, ctx->output);
-    if (written != size) {
-	if (written > 0) Error("Write failed, only %z bytes out of %z are stored", written, size);
-	else Error("Write failed");
+	ctx->storage_count++;
+	pcilib_return_data(handle, event_id, ctx->data, data);
+	return PCILIB_STREAMING_CONTINUE;
     }
 
-    pcilib_return_data(handle, event_id, ctx->data, data);
-    
-//    printf("%lu %lu\n", info->seqnum, info->offset);
-
-//    printf("%lu %lx %lu\n", ipe->raw_size, info->flags, ctx->broken_count);
-
-/*
-    FILE *o = ctx->output;
-    
-    data = pcilib_get_data(handle, ctx->event, ctx->data, &size);
-    if (!data) Error("Internal Error: No data is provided to event callback");
-
-    if (o) printf("Writting %zu bytes into file...\n", size);
-    else o = stdout;
-    
-    written = fwrite(data, 1, size, o);
-    if (written != size) {
-	if (written > 0) Error("Write failed, only %z bytes out of %z are stored", written, size);
-	else Error("Write failed");
+    err = pcilib_return_data(handle, event_id, ctx->data, data);
+    if (err) {
+	ctx->missing_count++;
+	fastwriter_cancel(ctx->writer);
+	return PCILIB_STREAMING_CONTINUE;
     }
-    
-    pcilib_return_data(handle, ctx->event, data);
-*/
 
-//    printf("data callback: %lu\n", event_id);    
+    err = fastwriter_commit(ctx->writer);
+    if (err) Error("Error commiting data to storage, Error: %i", err);
+    
     return PCILIB_STREAMING_CONTINUE;
 }
 
 int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event_flags_t flags, size_t size, void *data, void *user) {
+    int err;
+
+    GRABContext *ctx = (GRABContext*)user;
+//    pcilib_t *handle = ctx->handle;
+    
+    err = fastwriter_push_data(ctx->writer, size, data);
+    if (err) {
+	if (err == EWOULDBLOCK) Error("Storage is not able to handle the data stream, buffer overrun");
+	Error("Storage error %i", err);
+    }
+    
     return PCILIB_STREAMING_CONTINUE;
 }
 
@@ -1350,10 +1349,13 @@ void *Monitor(void *user) {
 	usleep(100000);
     }
     
+    while (ctx->writing_flag) {
+    }
+    
     return NULL;
 }
 
-int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, const char *data_type, size_t num, size_t run_time, size_t trigger_time, pcilib_timeout_t timeout, PARTITION partition, FORMAT format, size_t buffer_size, size_t threads, int verbose, FILE *ofile) {
+int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, const char *data_type, size_t num, size_t run_time, size_t trigger_time, pcilib_timeout_t timeout, PARTITION partition, FORMAT format, size_t buffer_size, size_t threads, int verbose, const char *output) {
     int err;
     GRABContext ctx;
 //    void *data = NULL;
@@ -1389,19 +1391,28 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
     } else {
 	data = PCILIB_EVENT_DATA;
     }
-
+    
     memset(&ctx, 0, sizeof(GRABContext));
     
     ctx.handle = handle;
-    ctx.output = ofile;
     ctx.event = event;
     ctx.data = data;
     ctx.run_time = run_time;
     ctx.timeout = timeout;
     ctx.verbose = verbose;
     
-    ctx.run_flag = 1;
+    ctx.writer =  fastwriter_init(output, 0);
+    if (!ctx.writer)
+	Error("Can't initialize fastwritter library");
 
+    fastwriter_set_buffer_size(ctx.writer, buffer_size);
+	
+    err = fastwriter_open(ctx.writer, output, 0);
+    if (err)
+	Error("Error opening file (%s), Error: %i\n", output, err);
+
+    ctx.run_flag = 1;
+    ctx.writing_flag = 1;
 
     flags = PCILIB_EVENT_FLAGS_DEFAULT;
     
@@ -1495,13 +1506,19 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
 
     gettimeofday(&end_time, NULL);
 
-    pthread_join(monitor_thread, NULL);
-
     if (grab_mode&GRAB_MODE_TRIGGER) {
 	pthread_join(trigger_thread, NULL);
     }
     
+    fastwriter_close(ctx.writer);
+
+    ctx.writing_flag = 0;
+
+    pthread_join(monitor_thread, NULL);
+
     GrabStats(&ctx, &end_time);
+
+    fastwriter_destroy(ctx.writer);
 
     return 0;
 }
@@ -2521,7 +2538,7 @@ int main(int argc, char **argv) {
 
     signal(SIGINT, signal_exit_handler);
 
-    if (output) {
+    if ((mode != MODE_GRAB)&&(output)) {
 	ofile = fopen(output, "a+");
 	if (!ofile) {
 	    Error("Failed to open file \"%s\"", output);
@@ -2562,7 +2579,7 @@ int main(int argc, char **argv) {
         pcilib_reset(handle);
      break;
      case MODE_GRAB:
-        TriggerAndGrab(handle, grab_mode, event, data_type, size, run_time, trigger_time, timeout, partition, format, buffer, threads, verbose, ofile);
+        TriggerAndGrab(handle, grab_mode, event, data_type, size, run_time, trigger_time, timeout, partition, format, buffer, threads, verbose, output);
      break;
      case MODE_LIST_DMA:
         ListDMA(handle, fpga_device, model_info);
