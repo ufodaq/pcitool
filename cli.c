@@ -1189,7 +1189,7 @@ int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event
 
     GRABContext *ctx = (GRABContext*)user;
 //    pcilib_t *handle = ctx->handle;
-    
+
     err = fastwriter_push_data(ctx->writer, size, data);
     if (err) {
 	if (err == EWOULDBLOCK) Error("Storage is not able to handle the data stream, buffer overrun");
@@ -1428,7 +1428,7 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
     pcilib_configure_autostop(handle, num, run_time);
     
     if (flags&PCILIB_EVENT_FLAG_RAW_DATA_ONLY) {
-	pcilib_configure_rawdata_callback(handle, &raw_data, NULL);
+	pcilib_configure_rawdata_callback(handle, &raw_data, &ctx);
     }
     
     if (flags&PCILIB_EVENT_FLAG_PREPROCESS) {
@@ -1510,7 +1510,8 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
 	pthread_join(trigger_thread, NULL);
     }
     
-    fastwriter_close(ctx.writer);
+    err = fastwriter_close(ctx.writer);
+    if (err) Error("Storage problems, error %i", err);
 
     ctx.writing_flag = 0;
 
