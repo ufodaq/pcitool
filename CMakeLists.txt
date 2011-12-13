@@ -9,6 +9,7 @@ find_package(PkgConfig REQUIRED)
 
 #Check in sibling directory
 pkg_check_modules(UFODECODE ufodecode REQUIRED)
+pkg_check_modules(FASTWRITER fastwriter REQUIRED)
 
 set(HEADERS pcilib.h pci.h register.h kmem.h irq.h dma.h event.h default.h tools.h error.h)
 add_definitions("-fPIC --std=c99 -Wall -O2 -pthread")
@@ -18,7 +19,7 @@ add_subdirectory(ipecamera)
 add_subdirectory(pcitool)
 
 add_library(pcilib SHARED pci.c register.c kmem.c irq.c dma.c event.c default.c tools.c error.c) 
-target_link_libraries(pcilib ufodecode dma ipecamera)
+target_link_libraries(pcilib ufodecode fastwriter dma ipecamera)
 add_dependencies(pcilib dma ipecamera)
 
 set_target_properties(pcilib PROPERTIES
@@ -36,3 +37,20 @@ target_link_libraries(pci pcilib pcitool)
 #    LINK_FLAGS "-Wl,pcitool/libpcitool.a"
 #)
 
+
+if(NOT DEFINED BIN_INSTALL_DIR)
+    set(BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")
+endif(NOT DEFINED BIN_INSTALL_DIR)
+
+
+install(TARGETS pcilib
+    LIBRARY DESTINATION lib${LIB_SUFFIX}
+)
+
+install(TARGETS pci
+    DESTINATION ${BIN_INSTALL_DIR}
+)
+
+install(FILES pcilib.h
+    DESTINATION include
+)

@@ -6,3 +6,6 @@ set(HEADERS ${HEADERS} ipecamera.h model.h reader.h events.h data.h public.h pri
 
 add_library(ipecamera STATIC ipecamera.c model.c reader.c events.c data.c)
 
+install(FILES ipecamera.h
+    DESTINATION include
+)
