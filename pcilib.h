@@ -87,7 +87,7 @@ typedef enum {
 
 typedef enum {
     PCILIB_EVENT_FLAGS_DEFAULT = 0,
-    PCILIB_EVENT_FLAG_RAW_DATA_ONLY = 1,	/**< Do not parse data, just read raw and pass it to rawdata callback */
+    PCILIB_EVENT_FLAG_RAW_DATA_ONLY = 1,	/**< Do not parse data, just read raw and pass it to rawdata callback. If passed to rawdata callback, idicates the data is not identified as event (most probably just padding) */
     PCILIB_EVENT_FLAG_STOP_ONLY = 1,		/**< Do not cleanup, just stop acquiring new frames, the cleanup should be requested afterwards */
     PCILIB_EVENT_FLAG_EOF = 2,			/**< Indicates that it is the last part of the frame (not required) */
     PCILIB_EVENT_FLAG_PREPROCESS = 4		/**< Enables preprocessing of the raw data (decoding frames, etc.) */
