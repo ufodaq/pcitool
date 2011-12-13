@@ -323,24 +323,19 @@ int pcidriver_kmem_free_all(pcidriver_privdata_t *privdata)
 	return 0;
 }
 
+
 /**
  *
  * Synchronize memory to/from the device (or in both directions).
  *
  */
-int pcidriver_kmem_sync( pcidriver_privdata_t *privdata, kmem_sync_t *kmem_sync )
+int pcidriver_kmem_sync_entry( pcidriver_privdata_t *privdata, pcidriver_kmem_entry_t *kmem_entry, int direction)
 {
-	pcidriver_kmem_entry_t *kmem_entry;
-
-	/* Find the associated kmem_entry for this buffer */
-	if ((kmem_entry = pcidriver_kmem_find_entry(privdata, &(kmem_sync->handle))) == NULL)
-		return -EINVAL;					/* kmem_handle is not valid */
-
 	if (kmem_entry->direction == PCI_DMA_NONE)
 		return -EINVAL;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,11)
-	switch (kmem_sync->dir) {
+	switch (direction) {
 		case PCILIB_KMEM_SYNC_TODEVICE:
 			pci_dma_sync_single_for_device( privdata->pdev, kmem_entry->dma_handle, kmem_entry->size, kmem_entry->direction );
 			break;
@@ -355,7 +350,7 @@ int pcidriver_kmem_sync( pcidriver_privdata_t *privdata, kmem_sync_t *kmem_sync 
 			return -EINVAL;				/* wrong direction parameter */
 	}
 #else
-	switch (kmem_sync->dir) {
+	switch (direction) {
 		case PCILIB_KMEM_SYNC_TODEVICE:
 			pci_dma_sync_single( privdata->pdev, kmem_entry->dma_handle, kmem_entry->size, kmem_entry->direction );
 			break;
@@ -371,6 +366,22 @@ int pcidriver_kmem_sync( pcidriver_privdata_t *privdata, kmem_sync_t *kmem_sync 
 #endif
 
 	return 0;	/* success */
+}
+
+/**
+ *
+ * Synchronize memory to/from the device (or in both directions).
+ *
+ */
+int pcidriver_kmem_sync( pcidriver_privdata_t *privdata, kmem_sync_t *kmem_sync )
+{
+	pcidriver_kmem_entry_t *kmem_entry;
+
+	/* Find the associated kmem_entry for this buffer */
+	if ((kmem_entry = pcidriver_kmem_find_entry(privdata, &(kmem_sync->handle))) == NULL)
+		return -EINVAL;					/* kmem_handle is not valid */
+
+	return pcidriver_kmem_sync_entry(privdata, kmem_entry, kmem_sync->dir);
 }
 
 /**

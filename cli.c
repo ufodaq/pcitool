@@ -1836,13 +1836,21 @@ int ListKMEM(pcilib_t *handle, const char *device) {
 }
 
 int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t block, size_t max_size, FILE *o) {
+    int err;
     void *data;
     size_t size;
     pcilib_kmem_handle_t *kbuf;
 
     kbuf = pcilib_alloc_kernel_memory(handle, 0, block + 1, 0, 0, use, PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_TRY);
     if (!kbuf) {
-	printf("The specified kernel buffer is not allocated\n");
+	Error("The specified kernel buffer is not allocated\n");
+	return 0;
+    }
+
+    err = pcilib_kmem_sync_block(handle, kbuf, PCILIB_KMEM_SYNC_FROMDEVICE, block);
+    if (err) {
+	pcilib_free_kernel_memory(handle, kbuf, KMEM_FLAG_REUSE);
+	Error("The synchronization of kernel buffer has failed\n");
 	return 0;
     }
 
@@ -1850,9 +1858,12 @@ int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t
     if (data) {
 	size = pcilib_kmem_get_block_size(handle, kbuf, block);
 	if ((max_size)&&(size > max_size)) size = max_size;
+	
 	fwrite(data, 1, size, o?o:stdout);
     } else {
-	printf("The specified block is not existing\n");
+	pcilib_free_kernel_memory(handle, kbuf, KMEM_FLAG_REUSE);
+	Error("The specified block is not existing\n");
+	return 0;
     }
 
     pcilib_free_kernel_memory(handle, kbuf, KMEM_FLAG_REUSE);
@@ -2069,10 +2080,6 @@ int ReadBuffer(pcilib_t *handle, const char *device, pcilib_model_description_t 
 
     pcilib_stop_dma(handle, dmaid, 0);
 
-
-
-//    printf("%i %i\n", dma, buffer);
-//    printf("%lx\n", ((dma&0x7F)|((dma_direction == PCILIB_DMA_TO_DEVICE)?0x80:0x00))|(PCILIB_KMEM_USE_DMA_PAGES<<16));
     return ReadKMEM(handle, device, ((dma&0x7F)|((dma_direction == PCILIB_DMA_TO_DEVICE)?0x80:0x00))|(PCILIB_KMEM_USE_DMA_PAGES<<16), block, size, o);
 }
 
