@@ -1421,7 +1421,7 @@ void *Monitor(void *user) {
 	pcilib_add_timeout(&deadline, timeout);
     }
     
-    if (verbose) {
+    if (verbose > 0) {
 	pcilib_calc_deadline(&nextinfo, STATUS_MESSAGE_INTERVAL*1000000);
     }
     
@@ -1443,7 +1443,7 @@ void *Monitor(void *user) {
 	    }
 	}
 	
-	if (verbose) {
+	if (verbose > 0) {
 	    if (pcilib_calc_time_to_deadline(&nextinfo) == 0) {
 		GrabStats(ctx, NULL);
 		StorageStats(ctx);
@@ -1457,7 +1457,7 @@ void *Monitor(void *user) {
     pcilib_calc_deadline(&nextinfo, STATUS_MESSAGE_INTERVAL*1000000);
     while (ctx->writing_flag) {
         if (pcilib_calc_time_to_deadline(&nextinfo) == 0) {
-	    StorageStats(ctx);
+	    if (verbose >= 0) StorageStats(ctx);
 	    pcilib_calc_deadline(&nextinfo, STATUS_MESSAGE_INTERVAL*1000000);
 	}
     
@@ -1632,7 +1632,8 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
     
 
     if (grab_mode&GRAB_MODE_GRAB) {
-	printf("Grabbing is finished, flushing results....\n");
+	if (verbose >= 0)
+	    printf("Grabbing is finished, flushing results....\n");
     
 	err = fastwriter_close(ctx.writer);
 	if (err) Error("Storage problems, error %i", err);
@@ -1642,7 +1643,7 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
 
     pthread_join(monitor_thread, NULL);
 
-    if (grab_mode&GRAB_MODE_GRAB) {
+    if ((grab_mode&GRAB_MODE_GRAB)&&(verbose>=0)) {
 	GrabStats(&ctx, &end_time);
 	StorageStats(&ctx);
     }
@@ -2468,6 +2469,7 @@ int main(int argc, char **argv) {
 	    break; 
 	    case OPT_QUIETE:
 		quiete = 1;
+		verbose = -1;
 	    break;
 	    case OPT_VERBOSE:
 		if (optarg) num_offset = optarg;
