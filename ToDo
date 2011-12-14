@@ -1,17 +1,8 @@
-Bugs 
-====
- 1. For IPECamera, shall we limit DMA packet size to xdma_packet_lenght register
- additionally to size of memory page?
-
 High Priority (we would need it for IPE Camera)
 =============
  1. Serialize access to the registers across applications
  2. Protect kmem_entries in the driver using spinlock
- 3. Extend Event API with function to generate triggers 
-    at the specified pace. By default the current cli 
-    implementation should be used. However, the hardware
-    alternative should be possible to implement.
-    
+ 3. Implement pcilib_configure_autotrigger
  
 Normal Priority (it would make just few things a bit easier)
 ===============
@@ -20,7 +11,6 @@ Normal Priority (it would make just few things a bit easier)
  3. Provide OR and AND operations on registers in cli
  4. Support writting a data from a binary file in cli
  5. Use bus-addresses instead of physcial addresses for DMA 
- 6. Use pthread_condition_t instead of polling
  
 Low Priority (only as generalization for other projects)
 ============
@@ -28,5 +18,5 @@ Low Priority (only as generalization for other projects)
  2. Access register/bank lookups using hash tables
  3. Support for Network Registers and Network DMA
  4. Define a syntax for register dependencies / delays (?)
+ 5. Use pthread_condition_t instead of polling
 
- 

@@ -121,6 +121,15 @@ int pcilib_configure_autostop(pcilib_t *ctx, size_t max_events, pcilib_timeout_t
     return 0;    
 }
 
+int pcilib_configure_autotrigger(pcilib_t *ctx, pcilib_timeout_t interval, pcilib_event_t event, size_t trigger_size, void *trigger_data) {
+	/* To support hardware without autotriggering, we need to provide in event.c a code 
+	to generate multiple triggers in a thread (available in cli). The function should 
+	be re-enabled afterwards: just set parameters and let implementation decide if it 
+	can make triggering in hardware or will use our emulation */
+	
+    return PCILIB_ERROR_NOTSUPPORTED;
+}
+
 int pcilib_configure_preprocessing_threads(pcilib_t *ctx, size_t max_threads) {
     pcilib_event_api_description_t *api;
     

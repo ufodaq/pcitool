@@ -321,6 +321,11 @@ int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, voi
  * is specified.
  */
 int pcilib_configure_autostop(pcilib_t *ctx, size_t max_events, pcilib_timeout_t duration);
+
+/*
+ * Request auto-triggering while grabbing
+ */
+int pcilib_configure_autotrigger(pcilib_t *ctx, pcilib_timeout_t interval, pcilib_event_t event, size_t trigger_size, void *trigger_data);
 /*
  * Request streaming the rawdata from the event engine. It is fastest way to acuqire data.
  * No memory copies will be performed and DMA buffers will be directly passed to the user
