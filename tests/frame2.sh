@@ -16,16 +16,20 @@ usleep 1000
 
 echo "Send frame request ... "
 pci -w control 1e9
-usleep 100000
+usleep 1000
 pci -w control 1e1
-usleep 100000
+usleep 300000
+pci -w control 1e9
+usleep 1000
+pci -w control 1e1
+usleep 3000
 
 echo "Enable Readout ... "
 pci -w control 3e1
 
 usleep 100000
 
-pci -r dma1 -o bench.out --multipacket
+pci -r dma1 -o bench.out --multipacket --timeout 1000000
 
 pci -w control 1e1
 
