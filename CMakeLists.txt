@@ -5,11 +5,17 @@ set(PCILIB_ABI_VERSION "0")
 
 cmake_minimum_required(VERSION 2.8)
 
+set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library") 
+
+
 find_package(PkgConfig REQUIRED)
 
 #Check in sibling directory
 pkg_check_modules(UFODECODE ufodecode REQUIRED)
-pkg_check_modules(FASTWRITER fastwriter REQUIRED)
+
+if (NOT DISABLE_PCITOOL)
+    pkg_check_modules(FASTWRITER fastwriter REQUIRED)
+endif (NOT DISABLE_PCITOOL)
 
 set(HEADERS pcilib.h pci.h register.h kmem.h irq.h dma.h event.h default.h tools.h error.h)
 add_definitions("-fPIC --std=c99 -Wall -O2 -pthread")
@@ -29,9 +35,11 @@ set_target_properties(pcilib PROPERTIES
 #    LINK_FLAGS "-pthread -Wl,--whole-archive,dma/libdma.a,ipecamera/libipecamera.a,--no-whole-archive"
 )
 
-add_executable(pci cli.c)
-add_dependencies(pci pcitool)
-target_link_libraries(pci pcilib pcitool)
+if (NOT DISABLE_PCITOOL)
+    add_executable(pci cli.c)
+    add_dependencies(pci pcitool)
+    target_link_libraries(pci pcilib pcitool)
+endif (NOT DISABLE_PCITOOL)
 
 #set_target_properties(pci PROPERTIES
 #    LINK_FLAGS "-Wl,pcitool/libpcitool.a"
@@ -47,9 +55,11 @@ install(TARGETS pcilib
     LIBRARY DESTINATION lib${LIB_SUFFIX}
 )
 
-install(TARGETS pci
-    DESTINATION ${BIN_INSTALL_DIR}
-)
+if (NOT DISABLE_PCITOOL)
+    install(TARGETS pci
+	DESTINATION ${BIN_INSTALL_DIR}
+    )
+endif (NOT DISABLE_PCITOOL)
 
 install(FILES pcilib.h
     DESTINATION include
