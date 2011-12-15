@@ -25,7 +25,7 @@ add_subdirectory(ipecamera)
 add_subdirectory(pcitool)
 
 add_library(pcilib SHARED pci.c register.c kmem.c irq.c dma.c event.c default.c tools.c error.c) 
-target_link_libraries(pcilib ufodecode fastwriter dma ipecamera)
+target_link_libraries(pcilib ufodecode dma ipecamera)
 add_dependencies(pcilib dma ipecamera)
 
 set_target_properties(pcilib PROPERTIES
@@ -38,7 +38,7 @@ set_target_properties(pcilib PROPERTIES
 if (NOT DISABLE_PCITOOL)
     add_executable(pci cli.c)
     add_dependencies(pci pcitool)
-    target_link_libraries(pci pcilib pcitool)
+    target_link_libraries(pci pcilib pcitool fastwriter)
 endif (NOT DISABLE_PCITOOL)
 
 #set_target_properties(pci PROPERTIES
