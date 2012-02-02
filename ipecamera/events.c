@@ -112,18 +112,30 @@ int ipecamera_next_event(pcilib_context_t *vctx, pcilib_timeout_t timeout, pcili
 #endif /* IPECAMERA_ANNOUNCE_READY */
 
 	if (timeout) {
-	    pcilib_calc_deadline(&tv, timeout);
-
+	    if (timeout == PCILIB_TIMEOUT_INFINITE) {
 #ifdef IPECAMERA_ANNOUNCE_READY
-	    while ((pcilib_calc_time_to_deadline(&tv) > 0)&&(((!ctx->preproc)&&(ctx->reported_id == ctx->event_id))||((ctx->preproc)&&(ctx->reported_id == ctx->preproc_id)))) {
+		while ((((!ctx->preproc)&&(ctx->reported_id == ctx->event_id))||((ctx->preproc)&&(ctx->reported_id == ctx->preproc_id)))) {
 #else /* IPECAMERA_ANNOUNCE_READY */
-	    while ((pcilib_calc_time_to_deadline(&tv) > 0)&&(ctx->reported_id == ctx->event_id)) {
+		while ((ctx->reported_id == ctx->event_id)) {
 #endif /* IPECAMERA_ANNOUNCE_READY */
 		usleep(IPECAMERA_NOFRAME_SLEEP);
+		}
+	    } else {	    
+		pcilib_calc_deadline(&tv, timeout);
+
+#ifdef IPECAMERA_ANNOUNCE_READY
+		while ((pcilib_calc_time_to_deadline(&tv) > 0)&&(((!ctx->preproc)&&(ctx->reported_id == ctx->event_id))||((ctx->preproc)&&(ctx->reported_id == ctx->preproc_id)))) {
+#else /* IPECAMERA_ANNOUNCE_READY */
+		while ((pcilib_calc_time_to_deadline(&tv) > 0)&&(ctx->reported_id == ctx->event_id)) {
+#endif /* IPECAMERA_ANNOUNCE_READY */
+		usleep(IPECAMERA_NOFRAME_SLEEP);
+		}
 	    }
+	    
 	}
 	
 	if (ctx->reported_id == ctx->event_id) return PCILIB_ERROR_TIMEOUT;
+	
     }
 
 retry:
