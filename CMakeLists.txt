@@ -9,6 +9,7 @@ set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library")
 
 
 find_package(PkgConfig REQUIRED)
+find_package(Threads REQUIRED)
 
 #Check in sibling directory
 pkg_check_modules(UFODECODE ufodecode REQUIRED)
@@ -18,7 +19,8 @@ if (NOT DISABLE_PCITOOL)
 endif (NOT DISABLE_PCITOOL)
 
 set(HEADERS pcilib.h pci.h register.h kmem.h irq.h dma.h event.h default.h tools.h error.h)
-add_definitions("-fPIC --std=c99 -Wall -O2 -pthread")
+add_definitions("-fPIC --std=c99 -Wall -O2")
+#add_definitions("-fPIC --std=c99 -Wall -O2 -pthread")
 
 add_subdirectory(dma)
 add_subdirectory(ipecamera)
@@ -31,7 +33,8 @@ add_dependencies(pcilib dma ipecamera)
 set_target_properties(pcilib PROPERTIES
     VERSION ${PCILIB_VERSION}
     SOVERSION ${PCILIB_ABI_VERSION}
-    LINK_FLAGS "-pthread"
+    LINK_FLAGS ${CMAKE_THREAD_LIBS_INIT}
+#    LINK_FLAGS "-pthread"
 #    LINK_FLAGS "-pthread -Wl,--whole-archive,dma/libdma.a,ipecamera/libipecamera.a,--no-whole-archive"
 )
 
