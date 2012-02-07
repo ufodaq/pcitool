@@ -42,6 +42,9 @@ if (NOT DISABLE_PCITOOL)
     add_executable(pci cli.c)
     add_dependencies(pci pcitool)
     target_link_libraries(pci pcilib pcitool fastwriter)
+    set_target_properties(pci PROPERTIES
+	LINK_FLAGS ${CMAKE_THREAD_LIBS_INIT}
+    )
 endif (NOT DISABLE_PCITOOL)
 
 #set_target_properties(pci PROPERTIES
