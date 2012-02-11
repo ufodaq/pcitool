@@ -9,7 +9,27 @@ PWD := $(shell pwd)
 EXTRA_CFLAGS += -I$(M)/..
 
 default:
-	$(MAKE) $(CFLAGS) -C $(KERNELDIR) M=$(PWD) modules
+	@KERNEL_GCC_VERSION=`cat /proc/version | head -n1 | cut -d " " -f 7` ;\
+	GCC_VERSION=`$(CC) --version | head -n 1 | awk 'BEGIN { FPAT = "([^[:space:]]*)|(\\\\([^)]+\\\\))" } { print $$3 }'` ;\
+	if [ $$KERNEL_GCC_VERSION != $$GCC_VERSION ]; then \
+	    echo "Kernel is compiled with gcc $$KERNEL_GCC_VERSION, but you are now using $$GCC_VERSION" ;\
+	    GCC_MAJOR=`echo $$KERNEL_GCC_VERSION | cut -d "." -f 1-2` ;\
+	    newCC=gcc-$$GCC_MAJOR ;\
+	    CC=`which $$newCC 2>/dev/null` ;\
+	    if [ $$? -ne 0 ]; then \
+		echo "No compiler of $$GCC_MAJOR series is installed" ;\
+		exit 1 ;\
+	    fi ;\
+	    GCC_VERSION=`$$CC --version | head -n 1 | awk 'BEGIN { FPAT = "([^[:space:]]*)|(\\\\([^)]+\\\\))" } { print $$3 }'` ;\
+	    if [ $$KERNEL_GCC_VERSION != $$GCC_VERSION ]; then \
+		echo "The $$GCC_VERSION of $$GCC_MAJOR series is installed" ;\
+		exit 1 ;\
+	    fi ;\
+	    echo "Setting CC to $$newCC" ;\
+	else \
+	    CC=$(CC) ;\
+	fi ;\
+	$(MAKE) $(CFLAGS) -C $(KERNELDIR) M=$(PWD) CC=$$CC modules
 
 install:
 	@mkdir -p $(INSTALLDIR)
