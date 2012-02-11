@@ -325,7 +325,7 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 	if ((id->vendor == PCIE_XILINX_VENDOR_ID)&&(id->device == PCIE_IPECAMERA_DEVICE_ID)) {
 	    pci_set_master(pdev);
 	    
-	    err = pci_set_dma_mask(pdev, DMA_32BIT_MASK);
+	    err = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
 	    if (err < 0) {
 		printk(KERN_ERR "pci_set_dma_mask failed\n");
 		goto probe_dma_fail;
