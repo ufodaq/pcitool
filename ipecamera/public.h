@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include "ipecamera.h"
-#include "pcilib.h"
+#include "../pcilib.h"
 
 
 pcilib_context_t *ipecamera_init(pcilib_t *pcilib);

@@ -2,7 +2,7 @@
 #define _PCILIB_DMA_NWL_H
 
 #include <stdio.h>
-#include "pcilib.h"
+#include "../pcilib.h"
 
 #define PCILIB_NWL_MODIFICATION_IPECAMERA 0x100
 

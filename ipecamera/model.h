@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#include "pcilib.h"
+#include "../pcilib.h"
 #include "public.h"
 
 //#define IPECAMERA_DEBUG
