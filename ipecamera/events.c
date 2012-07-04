@@ -1,4 +1,3 @@
-#define _IPECAMERA_IMAGE_C
 #define _BSD_SOURCE
 #define _GNU_SOURCE
 
