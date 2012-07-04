@@ -241,13 +241,6 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     pcilib_t *pcilib = vctx->pcilib;
     pcilib_register_value_t value;
     
-    const size_t chan_size = (2 + IPECAMERA_PIXELS_PER_CHANNEL / 3) * sizeof(ipecamera_payload_t);
-    const size_t line_size = (IPECAMERA_MAX_CHANNELS * chan_size);
-    const size_t header_size = 8 * sizeof(ipecamera_payload_t);
-    const size_t footer_size = 8 * sizeof(ipecamera_payload_t);
-    size_t raw_size;
-    size_t padded_blocks;
-    
     pthread_attr_t attr;
     struct sched_param sched;
     
@@ -279,19 +272,13 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     ctx->dim.width = IPECAMERA_WIDTH;
     GET_REG(n_lines_reg, ctx->dim.height);
     
-    raw_size = header_size + ctx->dim.height * line_size + footer_size;
-    padded_blocks = raw_size / IPECAMERA_DMA_PACKET_LENGTH + ((raw_size % IPECAMERA_DMA_PACKET_LENGTH)?1:0);
-    
+    ipecamera_compute_buffer_size(ctx, ctx->dim.height);
+
+    ctx->raw_size = ctx->cur_raw_size;
+    ctx->full_size = ctx->cur_full_size;
+    ctx->padded_size = ctx->cur_padded_size;
+
     ctx->image_size = ctx->dim.width * ctx->dim.height;
-    ctx->raw_size = raw_size;
-    ctx->full_size = padded_blocks * IPECAMERA_DMA_PACKET_LENGTH;
-
-#ifdef IPECAMERA_BUG_EXTRA_DATA
-    ctx->full_size += 8;
-    padded_blocks ++;
-#endif /* IPECAMERA_BUG_EXTRA_DATA */
-
-    ctx->padded_size = padded_blocks * IPECAMERA_DMA_PACKET_LENGTH;
 
     ctx->buffer = malloc(ctx->padded_size * ctx->buffer_size);
     if (!ctx->buffer) {

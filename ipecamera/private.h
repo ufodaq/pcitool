@@ -97,6 +97,9 @@ struct ipecamera_s {
     size_t raw_size;		/**< Size of raw data in bytes */
     size_t full_size;		/**< Size of raw data including the padding */
     size_t padded_size;		/**< Size of buffer for raw data, including the padding for performance */
+    size_t cur_raw_size;	/**< Size of raw data in bytes */
+    size_t cur_full_size;	/**< Size of raw data including the padding */
+    size_t cur_padded_size;	/**< Size of buffer for raw data, including the padding for performance */
     
     size_t image_size;		/**< Size of a single image in bytes */
     

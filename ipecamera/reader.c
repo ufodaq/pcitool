@@ -16,8 +16,31 @@
 #include "../error.h"
 
 #include "pcilib.h"
+#include "model.h"
 #include "private.h"
 #include "reader.h"
+
+
+int ipecamera_compute_buffer_size(ipecamera_t *ctx, size_t lines) {
+    const size_t line_size = (1 + IPECAMERA_PIXELS_PER_CHANNEL) * 32;
+    const size_t header_size = 8 * sizeof(ipecamera_payload_t);
+    const size_t footer_size = 8 * sizeof(ipecamera_payload_t);
+
+    size_t raw_size = header_size + lines * line_size - 32 + footer_size;
+    size_t padded_blocks = raw_size / IPECAMERA_DMA_PACKET_LENGTH + ((raw_size % IPECAMERA_DMA_PACKET_LENGTH)?1:0);
+    
+    ctx->cur_raw_size = raw_size;
+    ctx->cur_full_size = padded_blocks * IPECAMERA_DMA_PACKET_LENGTH;
+
+#ifdef IPECAMERA_BUG_EXTRA_DATA
+    ctx->cur_full_size += 8;
+    padded_blocks ++;
+#endif /* IPECAMERA_BUG_EXTRA_DATA */
+
+    ctx->cur_padded_size = padded_blocks * IPECAMERA_DMA_PACKET_LENGTH;
+    
+    return 0;
+}
 
 static inline int ipecamera_new_frame(ipecamera_t *ctx) {
     ctx->frame[ctx->buffer_pos].event.raw_size = ctx->cur_size;
@@ -44,7 +67,7 @@ static inline int ipecamera_new_frame(ipecamera_t *ctx) {
     return 0;
 }
 
-static uint32_t frame_magic[6] = { 0x51111111, 0x52222222, 0x53333333, 0x54444444, 0x55555555, 0x56666666 };
+static uint32_t frame_magic[5] = { 0x51111111, 0x52222222, 0x53333333, 0x54444444, 0x55555555 };
 
 static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t bufsize, void *buf) {
     int res;
@@ -62,6 +85,7 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	size_t startpos;
 	for (startpos = 0; (startpos + 8) < bufsize; startpos++) {
 	    if (!memcmp(buf + startpos, frame_magic, sizeof(frame_magic))) break;
+//o	    raw_size = 
 	}
 	
 	if (startpos) {
@@ -81,6 +105,8 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 #endif /* IPECAMERA_BUG_INCOMPLETE_PACKETS */
 
 	if ((bufsize >= 8)&&(!memcmp(buf, frame_magic, sizeof(frame_magic)))) {
+	    size_t n_lines = ((uint32_t*)buf)[5] & 0x7FF;
+	    ipecamera_compute_buffer_size(ctx, n_lines);
 /*
 		// Not implemented in hardware yet
 	    ctx->frame[ctx->buffer_pos].event.info.seqnum = ((uint32_t*)buf)[6] & 0xF0000000;
@@ -99,10 +125,10 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	// for rawdata_callback with complete padding
     real_size = bufsize;
     
-    if (ctx->cur_size + bufsize > ctx->raw_size) {
+    if (ctx->cur_size + bufsize > ctx->cur_raw_size) {
         size_t need;
 	
-	for (need = ctx->raw_size - ctx->cur_size; need < bufsize; need += sizeof(uint32_t)) {
+	for (need = ctx->cur_raw_size - ctx->cur_size; need < bufsize; need += sizeof(uint32_t)) {
 	    if (*(uint32_t*)(buf + need) == frame_magic[0]) break;
 	}
 	
@@ -113,7 +139,7 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	}
 	
 	    // just rip of padding
-	bufsize = ctx->raw_size - ctx->cur_size;
+	bufsize = ctx->cur_raw_size - ctx->cur_size;
     }
 #endif /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
 
@@ -166,7 +192,7 @@ void *ipecamera_reader_thread(void *user) {
 	err = pcilib_stream_dma(ctx->event.pcilib, ctx->rdma, 0, 0, PCILIB_DMA_FLAG_MULTIPACKET, PCILIB_DMA_TIMEOUT, &ipecamera_data_callback, user);
 	if (err) {
 	    if (err == PCILIB_ERROR_TIMEOUT) {
-		if (ctx->cur_size > ctx->raw_size) ipecamera_new_frame(ctx);
+		if (ctx->cur_size > ctx->cur_raw_size) ipecamera_new_frame(ctx);
 #ifdef IPECAMERA_BUG_INCOMPLETE_PACKETS
 		else if (ctx->cur_size > 0) ipecamera_new_frame(ctx);
 #endif /* IPECAMERA_BUG_INCOMPLETE_PACKETS */
