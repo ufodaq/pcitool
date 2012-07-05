@@ -44,7 +44,9 @@ int ipecamera_compute_buffer_size(ipecamera_t *ctx, size_t lines) {
 static inline int ipecamera_new_frame(ipecamera_t *ctx) {
     ctx->frame[ctx->buffer_pos].event.raw_size = ctx->cur_size;
 
-    if (ctx->cur_size < ctx->raw_size) ctx->frame[ctx->buffer_pos].event.info.flags |= PCILIB_EVENT_INFO_FLAG_BROKEN;
+    if (ctx->cur_size < ctx->cur_raw_size) {
+	ctx->frame[ctx->buffer_pos].event.info.flags |= PCILIB_EVENT_INFO_FLAG_BROKEN;
+    }
     
     ctx->buffer_pos = (++ctx->event_id) % ctx->buffer_size;
     ctx->cur_size = 0;
@@ -191,7 +193,7 @@ void *ipecamera_reader_thread(void *user) {
 	err = pcilib_stream_dma(ctx->event.pcilib, ctx->rdma, 0, 0, PCILIB_DMA_FLAG_MULTIPACKET, PCILIB_DMA_TIMEOUT, &ipecamera_data_callback, user);
 	if (err) {
 	    if (err == PCILIB_ERROR_TIMEOUT) {
-		if (ctx->cur_size > ctx->cur_raw_size) ipecamera_new_frame(ctx);
+		if (ctx->cur_size >= ctx->cur_raw_size) ipecamera_new_frame(ctx);
 #ifdef IPECAMERA_BUG_INCOMPLETE_PACKETS
 		else if (ctx->cur_size > 0) ipecamera_new_frame(ctx);
 #endif /* IPECAMERA_BUG_INCOMPLETE_PACKETS */
