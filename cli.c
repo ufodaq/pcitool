@@ -95,6 +95,7 @@ typedef enum {
 
 
 typedef enum {
+    FORMAT_DEFAULT = 0,
     FORMAT_RAW,
     FORMAT_HEADER,
     FORMAT_RINGFS
@@ -1159,8 +1160,15 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 	ctx->incomplete_count++;
 	return PCILIB_STREAMING_CONTINUE;
     }
-
-    data = pcilib_get_data(handle, event_id, ctx->data, &size);
+    
+    switch (ctx->format) {
+     case FORMAT_DEFAULT:
+	data = pcilib_get_data(handle, event_id, PCILIB_EVENT_DATA, &size);
+	break;
+     default:
+	data = pcilib_get_data(handle, event_id, PCILIB_EVENT_RAW_DATA, &size);
+    }
+        
     if (!data) {
 	ctx->broken_count++;
 	return PCILIB_STREAMING_CONTINUE;
@@ -2126,7 +2134,7 @@ int main(int argc, char **argv) {
     size_t run_time = 0;
     size_t buffer = 0;
     size_t threads = 1;
-    FORMAT format = FORMAT_RAW;
+    FORMAT format = FORMAT_DEFAULT;
     PARTITION partition = PARTITION_UNKNOWN;
     FLAGS flags = 0;
     const char *type = NULL;
@@ -2463,9 +2471,10 @@ int main(int argc, char **argv) {
 		}
 	    break;	   
 	    case OPT_FORMAT:
-		if (!strcasecmp(optarg, "add_header")) format =  FORMAT_HEADER;
+		if (!strcasecmp(optarg, "raw")) format =  FORMAT_RAW;
+		else if (!strcasecmp(optarg, "add_header")) format =  FORMAT_HEADER;
 //		else if (!strcasecmp(optarg, "ringfs")) format =  FORMAT_RINGFS;
-		else if (strcasecmp(optarg, "raw")) Error("Invalid format (%s) is specified", optarg);
+		else if (strcasecmp(optarg, "default")) Error("Invalid format (%s) is specified", optarg);
 	    break; 
 	    case OPT_QUIETE:
 		quiete = 1;
