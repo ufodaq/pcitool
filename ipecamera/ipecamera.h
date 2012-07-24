@@ -1,6 +1,8 @@
 #ifndef _IPECAMERA_H
 #define _IPECAMERA_H
 
+#include <ufodecode.h>
+
 typedef struct ipecamera_s ipecamera_t;
 
 typedef  struct {
@@ -25,6 +27,7 @@ typedef uint16_t ipecamera_pixel_t;
 
 typedef struct {
     pcilib_event_info_t info;
+    UfoDecoderMeta meta;	/**< Frame metadata declared in ufodecode.h */
     int image_ready;		/**< Indicates if image data is parsed */
     int image_broken;		/**< Unlike the info.flags this is bound to the reconstructed image (i.e. is not updated on rawdata overwrite) */
     size_t raw_size;		/**< Indicates the actual size of raw data */

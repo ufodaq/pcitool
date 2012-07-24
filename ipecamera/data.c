@@ -38,7 +38,6 @@ inline static int ipecamera_decode_frame(ipecamera_t *ctx, pcilib_event_id_t eve
     int err = 0;
     size_t res;
     uint16_t *pixels;
-    UfoDecoderMeta meta;
     
     int buf_ptr = ipecamera_resolve_event_id(ctx, event_id);
     if (buf_ptr < 0) return PCILIB_ERROR_TIMEOUT;
@@ -54,7 +53,7 @@ inline static int ipecamera_decode_frame(ipecamera_t *ctx, pcilib_event_id_t eve
 		
     pixels = ctx->image + buf_ptr * ctx->image_size;
     memset(ctx->cmask + ctx->buffer_pos * ctx->dim.height, 0, ctx->dim.height * sizeof(ipecamera_change_mask_t));
-    res = ufo_decoder_decode_frame(ctx->ipedec, ctx->buffer + buf_ptr * ctx->padded_size, ctx->raw_size, pixels, &meta);
+    res = ufo_decoder_decode_frame(ctx->ipedec, ctx->buffer + buf_ptr * ctx->padded_size, ctx->raw_size, pixels, &ctx->frame[buf_ptr].event.meta);
     if (!res) {
         ctx->frame[buf_ptr].event.image_broken = 1;
         err = PCILIB_ERROR_FAILED;
