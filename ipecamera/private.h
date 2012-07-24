@@ -55,7 +55,7 @@ typedef struct {
 
 struct ipecamera_s {
     pcilib_context_t event;
-    ufo_decoder ipedec;
+    UfoDecoder *ipedec;
 
     char *data;
     ipecamera_pixel_t *image;
