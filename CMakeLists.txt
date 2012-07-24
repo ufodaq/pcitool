@@ -12,7 +12,7 @@ find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
 #Check in sibling directory
-pkg_check_modules(UFODECODE ufodecode REQUIRED)
+pkg_check_modules(UFODECODE ufodecode>=0.2 REQUIRED)
 
 if (NOT DISABLE_PCITOOL)
     pkg_check_modules(FASTWRITER fastwriter REQUIRED)
