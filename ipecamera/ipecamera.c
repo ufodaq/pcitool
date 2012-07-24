@@ -102,6 +102,9 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	FIND_REG(line_reg, "cmosis", "start1");
 	FIND_REG(exposure_reg, "cmosis", "exp_time");
 	FIND_REG(flip_reg, "cmosis", "image_flipping");
+	
+	FIND_REG(adc_resolution_reg, "fpga", "adc_resolution");
+	FIND_REG(output_mode_reg, "fpga", "output_mode");
 
 	ctx->rdma = PCILIB_DMA_ENGINE_INVALID;
 	ctx->wdma = PCILIB_DMA_ENGINE_INVALID;
@@ -271,6 +274,19 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     
     ctx->dim.width = IPECAMERA_WIDTH;
     GET_REG(n_lines_reg, ctx->dim.height);
+    
+    GET_REG(output_mode_reg, value);
+    switch (value) {
+     case IPECAMERA_MODE_16_CHAN_IO:
+        ctx->cmosis_outputs = 16;
+        break;
+     case IPECAMERA_MODE_4_CHAN_IO:
+        ctx->cmosis_outputs = 4;
+        break;
+     default:
+        pcilib_error("IPECamera reporting invalid output_mode 0x%lx", value);
+        return PCILIB_ERROR_INVALID_STATE;
+    }
     
     ipecamera_compute_buffer_size(ctx, ctx->dim.height);
 

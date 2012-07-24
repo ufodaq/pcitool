@@ -6,7 +6,7 @@ function pci {
 }
 
 pci --stop-dma dma1
-pci --reset
+#pci --reset
 
 echo "Set packet size 1024 .. "
 pci -w number_lines 1088

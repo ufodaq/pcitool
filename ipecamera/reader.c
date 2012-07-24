@@ -25,8 +25,12 @@ int ipecamera_compute_buffer_size(ipecamera_t *ctx, size_t lines) {
     const size_t header_size = 8 * sizeof(ipecamera_payload_t);
     const size_t footer_size = 8 * sizeof(ipecamera_payload_t);
 
-    size_t raw_size = header_size + lines * line_size - 32 + footer_size;
-    size_t padded_blocks = raw_size / IPECAMERA_DMA_PACKET_LENGTH + ((raw_size % IPECAMERA_DMA_PACKET_LENGTH)?1:0);
+    size_t raw_size, padded_blocks;
+    
+    raw_size = header_size + lines * line_size - 32 + footer_size;
+    raw_size *= 16 / ctx->cmosis_outputs;
+
+    padded_blocks = raw_size / IPECAMERA_DMA_PACKET_LENGTH + ((raw_size % IPECAMERA_DMA_PACKET_LENGTH)?1:0);
     
     ctx->cur_raw_size = raw_size;
     ctx->cur_full_size = padded_blocks * IPECAMERA_DMA_PACKET_LENGTH;
@@ -37,7 +41,7 @@ int ipecamera_compute_buffer_size(ipecamera_t *ctx, size_t lines) {
 #endif /* IPECAMERA_BUG_EXTRA_DATA */
 
     ctx->cur_padded_size = padded_blocks * IPECAMERA_DMA_PACKET_LENGTH;
-    
+
     return 0;
 }
 

@@ -31,6 +31,12 @@
 #define IPECAMERA_IDLE 				0x1E1
 #define IPECAMERA_START_INTERNAL_STIMULI 	0x1F1
 
+#define IPECAMERA_MODE_16_CHAN_IO		0
+#define IPECAMERA_MODE_4_CHAN_IO		2
+
+#define IPECAMERA_MODE_12_BIT_ADC		2
+#define IPECAMERA_MODE_11_BIT_ADC		1
+#define IPECAMERA_MODE_10_BIT_ADC		0
 
 typedef uint32_t ipecamera_payload_t;
 
@@ -78,6 +84,9 @@ struct ipecamera_s {
     pcilib_register_t exposure_reg;
     pcilib_register_t flip_reg;
 
+    pcilib_register_t adc_resolution_reg;
+    pcilib_register_t output_mode_reg;
+
     int started;		/**< Camera is in grabbing mode (start function is called) */
     int streaming;		/**< Camera is in streaming mode (we are within stream call) */
     int parse_data;		/**< Indicates if some processing of the data is required, otherwise only rawdata_callback will be called */
@@ -103,6 +112,7 @@ struct ipecamera_s {
     
     size_t image_size;		/**< Size of a single image in bytes */
     
+    int cmosis_outputs;
     int width, height;
 
     
