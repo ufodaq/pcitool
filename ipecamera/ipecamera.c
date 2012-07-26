@@ -60,8 +60,8 @@
 	if (err) { \
 	    pcilib_error("Error reading %s register", ipecamera_registers[ctx->reg].name); \
 	} \
-	if (!(check)) { \
-	    pcilib_error("Unexpected value (%li) of register %s", value, ipecamera_registers[ctx->reg].name); \
+	if (value != check) { \
+	    pcilib_error("Unexpected value (0x%lx) of register %s", value, ipecamera_registers[ctx->reg].name); \
 	    err = PCILIB_ERROR_INVALID_DATA; \
 	} \
     }
@@ -98,10 +98,10 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 
 	FIND_REG(status3_reg, "fpga", "status3");
 
-	FIND_REG(n_lines_reg, "cmosis", "number_lines");
-	FIND_REG(line_reg, "cmosis", "start1");
-	FIND_REG(exposure_reg, "cmosis", "exp_time");
-	FIND_REG(flip_reg, "cmosis", "image_flipping");
+	FIND_REG(n_lines_reg, "cmosis", "cmosis_number_lines");
+	FIND_REG(line_reg, "cmosis", "cmosis_start1");
+	FIND_REG(exposure_reg, "cmosis", "cmosis_exp_time");
+	FIND_REG(flip_reg, "cmosis", "cmosis_image_flipping");
 	
 	FIND_REG(adc_resolution_reg, "fpga", "adc_resolution");
 	FIND_REG(output_mode_reg, "fpga", "output_mode");
@@ -472,7 +472,7 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
 	sched.sched_priority = sched_get_priority_max(SCHED_FIFO) - 1;	// Let 1 priority for something really critcial
 	pthread_attr_setschedparam(&attr, &sched);
     }
-    
+
     if (pthread_create(&ctx->rthread, &attr, &ipecamera_reader_thread, (void*)ctx)) {
 	ctx->started = 0;
 	ipecamera_stop(vctx, PCILIB_EVENT_FLAGS_DEFAULT);
@@ -603,7 +603,7 @@ int ipecamera_trigger(pcilib_context_t *vctx, pcilib_event_t event, size_t trigg
     
     SET_REG(control_reg, IPECAMERA_FRAME_REQUEST|IPECAMERA_READOUT_FLAG);
     usleep(IPECAMERA_WAIT_FRAME_RCVD_TIME);
-    CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
+    //CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
     SET_REG(control_reg, IPECAMERA_IDLE|IPECAMERA_READOUT_FLAG);
 
 
