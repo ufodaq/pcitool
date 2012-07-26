@@ -9,7 +9,7 @@ function pci {
 #pci --reset
 
 echo "Set packet size 1024 .. "
-pci -w number_lines 1088
+pci -w cmosis_number_lines 1088
 #pci -w xrawdata_packet_length 4096
 pci --start-dma dma1
 usleep 1000

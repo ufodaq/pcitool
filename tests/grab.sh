@@ -14,7 +14,7 @@ pid=$!
 
 usleep 1000000
 
-for i in `seq 1 10`; do
+for i in `seq 1 1000`; do
     echo "Trigger $i"
     pci --trigger
     usleep 100000
