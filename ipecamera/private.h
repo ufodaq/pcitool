@@ -86,6 +86,9 @@ struct ipecamera_s {
 
     pcilib_register_t adc_resolution_reg;
     pcilib_register_t output_mode_reg;
+    
+    pcilib_register_t max_frames_reg;
+    pcilib_register_t num_frames_reg;
 
     int started;		/**< Camera is in grabbing mode (start function is called) */
     int streaming;		/**< Camera is in streaming mode (we are within stream call) */
@@ -112,7 +115,8 @@ struct ipecamera_s {
     
     size_t image_size;		/**< Size of a single image in bytes */
     
-    int cmosis_outputs;
+    size_t max_frames;		/**< Maximal number of frames what may be buffered in camera DDR memory */
+    int cmosis_outputs;		/**< Number of active cmosis outputs: 4 or 16 */
     int width, height;
 
     

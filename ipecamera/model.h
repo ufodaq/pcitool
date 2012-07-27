@@ -114,8 +114,8 @@ pcilib_register_description_t ipecamera_registers[] = {
 {0x170,	0, 	32, 	0,	0, PCILIB_REGISTER_RW, PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "num_triggers", ""},
 {0x180,	0, 	32, 	0x280,	0, PCILIB_REGISTER_RW, PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "trigger_period", ""},
 {0x190,	0, 	32, 	0,	0, PCILIB_REGISTER_R,  PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "temperature_sample_period", ""},
-{0x1a0,	0, 	32, 	0x64,	0, PCILIB_REGISTER_RW, PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "max_frames", ""},
-{0x1b0,	0, 	32, 	0,	0, PCILIB_REGISTER_R,  PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "num_frames", ""},
+{0x1a0,	0, 	32, 	0x64,	0, PCILIB_REGISTER_RW, PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "ddr_max_frames", ""},
+{0x1b0,	0, 	32, 	0,	0, PCILIB_REGISTER_R,  PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK1, "ddr_num_frames", ""},
 {0,	0,	0,	0,	0, 0,                  0,                        0,                     NULL, NULL}
 };
 

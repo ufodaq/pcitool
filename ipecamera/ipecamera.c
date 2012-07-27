@@ -105,6 +105,9 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	
 	FIND_REG(adc_resolution_reg, "fpga", "adc_resolution");
 	FIND_REG(output_mode_reg, "fpga", "output_mode");
+	
+	FIND_REG(max_frames_reg, "fpga", "ddr_max_frames");
+	FIND_REG(num_frames_reg, "fpga", "ddr_num_frames");
 
 	ctx->rdma = PCILIB_DMA_ENGINE_INVALID;
 	ctx->wdma = PCILIB_DMA_ENGINE_INVALID;
@@ -264,7 +267,6 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
     if (err) return err;
 
-
     ctx->event_id = 0;
     ctx->preproc_id = 0;
     ctx->reported_id = 0;
@@ -295,6 +297,10 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     ctx->padded_size = ctx->cur_padded_size;
 
     ctx->image_size = ctx->dim.width * ctx->dim.height;
+
+    
+    GET_REG(max_frames_reg, value);
+    ctx->max_frames = value;
 
     ctx->buffer = malloc(ctx->padded_size * ctx->buffer_size);
     if (!ctx->buffer) {
@@ -594,6 +600,10 @@ int ipecamera_trigger(pcilib_context_t *vctx, pcilib_event_t event, size_t trigg
     
     pcilib_sleep_until_deadline(&ctx->next_trigger);
 
+    GET_REG(num_frames_reg, value);
+    if (value == ctx->max_frames) {
+	return PCILIB_ERROR_BUSY;
+    }
 /*
     do {
 	usleep(10);
