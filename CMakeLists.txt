@@ -27,13 +27,12 @@ add_subdirectory(ipecamera)
 add_subdirectory(pcitool)
 
 add_library(pcilib SHARED pci.c register.c kmem.c irq.c dma.c event.c default.c tools.c error.c) 
-target_link_libraries(pcilib ufodecode dma ipecamera)
+target_link_libraries(pcilib ufodecode dma ipecamera ${CMAKE_THREAD_LIBS_INIT})
 add_dependencies(pcilib dma ipecamera)
 
 set_target_properties(pcilib PROPERTIES
     VERSION ${PCILIB_VERSION}
     SOVERSION ${PCILIB_ABI_VERSION}
-    LINK_FLAGS ${CMAKE_THREAD_LIBS_INIT}
 #    LINK_FLAGS "-pthread"
 #    LINK_FLAGS "-pthread -Wl,--whole-archive,dma/libdma.a,ipecamera/libipecamera.a,--no-whole-archive"
 )
