@@ -10,7 +10,7 @@ EXTRA_CFLAGS += -I$(M)/..
 
 default:
 	@KERNEL_GCC_VERSION=`cat /proc/version | head -n1 | cut -d " " -f 7` ;\
-	GCC_VERSION=`$(CC) --version | head -n 1 | awk 'BEGIN { FPAT = "([^[:space:]]*)|(\\\\([^)]+\\\\))" } { print $$3 }'` ;\
+	GCC_VERSION=`$(CC) --version | head -n 1 | tr ' ' '\n' | tail -n 1` ;\
 	if [ $$KERNEL_GCC_VERSION != $$GCC_VERSION ]; then \
 	    echo "Kernel is compiled with gcc $$KERNEL_GCC_VERSION, but you are now using $$GCC_VERSION" ;\
 	    GCC_MAJOR=`echo $$KERNEL_GCC_VERSION | cut -d "." -f 1-2` ;\
@@ -20,7 +20,7 @@ default:
 		echo "No compiler of $$GCC_MAJOR series is installed" ;\
 		exit 1 ;\
 	    fi ;\
-	    GCC_VERSION=`$$CC --version | head -n 1 | awk 'BEGIN { FPAT = "([^[:space:]]*)|(\\\\([^)]+\\\\))" } { print $$3 }'` ;\
+	    GCC_VERSION=`$$CC --version | head -n 1 | tr ' ' '\n' | tail -n 1` ;\
 	    if [ $$KERNEL_GCC_VERSION != $$GCC_VERSION ]; then \
 		echo "The $$GCC_VERSION of $$GCC_MAJOR series is installed" ;\
 		exit 1 ;\
