@@ -26,8 +26,17 @@ add_subdirectory(dma)
 add_subdirectory(ipecamera)
 add_subdirectory(pcitool)
 
+include_directories(
+    ${FASTWRITER_INCLUDE_DIRS}
+)
+
+link_directories(
+    ${FASTWRITER_LIBRARY_DIRS}
+    ${UFODECODE_LIBRARY_DIRS}
+)
+
 add_library(pcilib SHARED pci.c register.c kmem.c irq.c dma.c event.c default.c tools.c error.c) 
-target_link_libraries(pcilib ufodecode dma ipecamera ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(pcilib dma ipecamera ${CMAKE_THREAD_LIBS_INIT} ${UFODECODE_LIBRARIES} )
 add_dependencies(pcilib dma ipecamera)
 
 set_target_properties(pcilib PROPERTIES
@@ -40,7 +49,7 @@ set_target_properties(pcilib PROPERTIES
 if (NOT DISABLE_PCITOOL)
     add_executable(pci cli.c)
     add_dependencies(pci pcitool)
-    target_link_libraries(pci pcilib pcitool fastwriter)
+    target_link_libraries(pci pcilib pcitool ${FASTWRITER_LIBRARIES})
     set_target_properties(pci PROPERTIES
 	LINK_FLAGS ${CMAKE_THREAD_LIBS_INIT}
     )
@@ -49,7 +58,6 @@ endif (NOT DISABLE_PCITOOL)
 #set_target_properties(pci PROPERTIES
 #    LINK_FLAGS "-Wl,pcitool/libpcitool.a"
 #)
-
 
 if(NOT DEFINED BIN_INSTALL_DIR)
     set(BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")

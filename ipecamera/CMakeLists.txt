@@ -1,5 +1,6 @@
 include_directories(
     ${CMAKE_SOURCE_DIR}
+    ${UFODECODE_INCLUDE_DIRS}
 )
 
 set(HEADERS ${HEADERS} ipecamera.h model.h reader.h events.h data.h public.h private.h)
