@@ -32,7 +32,7 @@ typedef uint8_t pcilib_dma_engine_addr_t;
 typedef uint8_t pcilib_dma_engine_t;
 typedef uint64_t pcilib_event_id_t;
 typedef uint32_t pcilib_event_t;
-typedef uint64_t pcilib_timeout_t;
+typedef uint64_t pcilib_timeout_t;		/**< In microseconds */
 
 typedef enum {
     PCILIB_HOST_ENDIAN = 0,

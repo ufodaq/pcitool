@@ -1292,8 +1292,8 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
 	end_time = &cur;
     }
 
-    if ((ctx->event_count + ctx->missing_count) == 0) 
-	return;
+//    if ((ctx->event_count + ctx->missing_count) == 0) 
+//	return;
     
     duration = pcilib_timediff(&ctx->start_time, end_time);
     fps_duration = pcilib_timediff(&ctx->first_frame, &ctx->last_frame);
@@ -1314,7 +1314,6 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
     if (good > 1) {
 	good_fps = (good - 1) / (1.*fps_duration/1000000);
     }
-
 
     printf("Run: ");
     PrintTime(duration);    
