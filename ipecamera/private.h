@@ -18,7 +18,9 @@
 #define IPECAMERA_NOFRAME_PREPROC_SLEEP 100
 
 #define IPECAMERA_MAX_LINES 1088
+#define IPECAMERA_EXPECTED_STATUS_4 0x08409FFFF
 #define IPECAMERA_EXPECTED_STATUS 0x08449FFFF
+
 #define IPECAMERA_END_OF_SEQUENCE 0x1F001001
 
 #define IPECAMERA_MAX_CHANNELS 16
@@ -84,6 +86,7 @@ struct ipecamera_s {
     pcilib_register_t exposure_reg;
     pcilib_register_t flip_reg;
 
+    pcilib_register_t firmware_version_reg;
     pcilib_register_t adc_resolution_reg;
     pcilib_register_t output_mode_reg;
     
@@ -116,6 +119,7 @@ struct ipecamera_s {
     size_t image_size;		/**< Size of a single image in bytes */
     
     size_t max_frames;		/**< Maximal number of frames what may be buffered in camera DDR memory */
+    int firmware;		/**< Firmware version */
     int cmosis_outputs;		/**< Number of active cmosis outputs: 4 or 16 */
     int width, height;
 

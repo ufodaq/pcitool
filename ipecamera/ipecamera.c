@@ -66,6 +66,9 @@
 	} \
     }
 
+#define IPECAMERA_GET_EXPECTED_STATUS(ctx) ((ctx->firmware == 4)?IPECAMERA_EXPECTED_STATUS_4:IPECAMERA_EXPECTED_STATUS)
+#define CHECK_STATUS_REG() CHECK_REG(status_reg, IPECAMERA_GET_EXPECTED_STATUS(ctx))
+
 #define CHECK_VALUE(value, val) \
     if ((!err)&&(value != val)) { \
 	pcilib_error("Unexpected value (0x%x) in data stream (0x%x is expected)", value, val); \
@@ -103,6 +106,7 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	FIND_REG(exposure_reg, "cmosis", "cmosis_exp_time");
 	FIND_REG(flip_reg, "cmosis", "cmosis_image_flipping");
 	
+	FIND_REG(firmware_version_reg, "fpga", "firmware_version");
 	FIND_REG(adc_resolution_reg, "fpga", "adc_resolution");
 	FIND_REG(output_mode_reg, "fpga", "output_mode");
 	
@@ -224,15 +228,14 @@ int ipecamera_reset(pcilib_context_t *vctx) {
 
     usleep(10000);
 
-        
     err = pcilib_read_register_by_id(pcilib, status, &value);
     if (err) {
 	pcilib_error("Error reading status register");
 	return err;
     }
 
-    if (value != IPECAMERA_EXPECTED_STATUS) {
-	pcilib_error("Unexpected value (%lx) of status register, expected %lx", value, IPECAMERA_EXPECTED_STATUS);
+    if (value != IPECAMERA_GET_EXPECTED_STATUS(ctx)) {
+	pcilib_error("Unexpected value (%lx) of status register, expected %lx", value, IPECAMERA_GET_EXPECTED_STATUS(ctx));
 	return PCILIB_ERROR_VERIFY;
     }
 
@@ -261,10 +264,20 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     }
 
 
+    GET_REG(firmware_version_reg, value);
+    switch (value) {
+     case 4:
+     case 5:
+	ctx->firmware = value;
+	break;
+     default:
+        pcilib_error("Unsupported version of firmware (%lu)", value);
+    }
+
 	// Allow readout and clean the FRAME_REQUEST mode if set for some reason
     SET_REG(control_reg, IPECAMERA_IDLE|IPECAMERA_READOUT_FLAG);
     usleep(IPECAMERA_SLEEP_TIME);
-    CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
+    CHECK_STATUS_REG();
     if (err) return err;
 
     ctx->event_id = 0;
