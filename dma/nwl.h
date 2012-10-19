@@ -13,7 +13,7 @@ typedef struct pcilib_nwl_engine_description_s pcilib_nwl_engine_description_t;
 
 #define PCILIB_NWL_ALIGNMENT 			64  // in bytes
 #define PCILIB_NWL_DMA_DESCRIPTOR_SIZE		64  // in bytes
-#define PCILIB_NWL_DMA_PAGES			2048 // 1024
+#define PCILIB_NWL_DMA_PAGES			256 // 1024
 
 //#define DEBUG_HARDWARE
 //#define DEBUG_NWL
