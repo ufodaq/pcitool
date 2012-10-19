@@ -88,8 +88,10 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
     ipecamera_t *ctx = malloc(sizeof(ipecamera_t));
 
     if (ctx) {
-	memset(ctx, 0, sizeof(ipecamera_t));
+	pcilib_register_value_t value;
 	
+	memset(ctx, 0, sizeof(ipecamera_t));
+
 	ctx->buffer_size = IPECAMERA_DEFAULT_BUFFER_SIZE;
 	ctx->dim.bpp = sizeof(ipecamera_pixel_t) * 8;
 
@@ -112,6 +114,17 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	
 	FIND_REG(max_frames_reg, "fpga", "ddr_max_frames");
 	FIND_REG(num_frames_reg, "fpga", "ddr_num_frames");
+
+
+	GET_REG(firmware_version_reg, value);
+	switch (value) {
+	 case 4:
+	 case 5:
+	    ctx->firmware = value;
+	    break;
+	 default:
+    	    pcilib_error("Unsupported version of firmware (%lu)", value);
+	}
 
 	ctx->rdma = PCILIB_DMA_ENGINE_INVALID;
 	ctx->wdma = PCILIB_DMA_ENGINE_INVALID;
@@ -261,17 +274,6 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     if (ctx->started) {
 	pcilib_error("IPECamera grabbing is already started");
 	return PCILIB_ERROR_INVALID_REQUEST;
-    }
-
-
-    GET_REG(firmware_version_reg, value);
-    switch (value) {
-     case 4:
-     case 5:
-	ctx->firmware = value;
-	break;
-     default:
-        pcilib_error("Unsupported version of firmware (%lu)", value);
     }
 
 	// Allow readout and clean the FRAME_REQUEST mode if set for some reason
