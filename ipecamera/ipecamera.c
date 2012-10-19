@@ -290,7 +290,8 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     ctx->cur_size = 0;
     
     ctx->dim.width = IPECAMERA_WIDTH;
-    GET_REG(n_lines_reg, ctx->dim.height);
+    ctx->dim.height = IPECAMERA_MAX_LINES;
+//    GET_REG(n_lines_reg, ctx->dim.height);
     
     GET_REG(output_mode_reg, value);
     switch (value) {
@@ -407,12 +408,14 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     }
 
 	// Clean DMA
+/*
     err = pcilib_skip_dma(vctx->pcilib, ctx->rdma);
     if (err) {
         ipecamera_stop(vctx, PCILIB_EVENT_FLAGS_DEFAULT);
 	pcilib_error("Can't start grabbing, device continuously writes unexpected data using DMA engine");
 	return err;
     }
+*/
 
     if (vctx->params.autostop.duration) {
 	gettimeofday(&ctx->autostop.timestamp, NULL);
