@@ -557,6 +557,7 @@ int ipecamera_stop(pcilib_context_t *vctx, pcilib_event_flags_t flags) {
 	ctx->frame_mutex_destroy = 0;
     }
     
+
     if (ctx->wdma != PCILIB_DMA_ENGINE_INVALID) {
 	pcilib_stop_dma(vctx->pcilib, ctx->wdma, PCILIB_DMA_FLAGS_DEFAULT);
 	ctx->wdma = PCILIB_DMA_ENGINE_INVALID;

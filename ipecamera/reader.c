@@ -98,7 +98,11 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	size_t startpos;
 	for (startpos = 0; (startpos + 8) < bufsize; startpos++) {
 	    if (!memcmp(buf + startpos, frame_magic, sizeof(frame_magic))) break;
-//o	    raw_size = 
+	}
+	
+	if ((startpos + 8) >= bufsize) {
+	    pcilib_warning("Invalid DMA packet received");
+	    return PCILIB_STREAMING_REQ_FRAGMENT;
 	}
 	
 	if (startpos) {
