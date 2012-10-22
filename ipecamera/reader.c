@@ -93,16 +93,43 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 
     ipecamera_t *ctx = (ipecamera_t*)user;
 
+#if defined(IPECAMERA_BUG_INCOMPLETE_PACKETS)||defined(IPECAMERA_BUG_MULTIFRAME_PACKETS)
+    static  pcilib_event_id_t invalid_frame_id = (pcilib_event_id_t)-1;
+#endif
+/*
+    char fname[128];
+    { 
+	static unsigned long packet_id = 0;
+	sprintf(fname,"/mnt/fast/frames/frame%4u", ctx->event_id);
+	mkdir(fname, 0755);
+	sprintf(fname,"/mnt/fast/frames/frame%4u/frame%9u", ctx->event_id, packet_id);
+	FILE *f = fopen(fname, "w");
+	fwrite(buf, 1, bufsize, f);
+	fclose(f);
+	sprintf(fname,"/mnt/fast/frames/frame%4u/frame%9u.invalid", ctx->event_id, packet_id++);
+    }
+*/
+    
     if (!ctx->cur_size) {
 #if defined(IPECAMERA_BUG_INCOMPLETE_PACKETS)||defined(IPECAMERA_BUG_MULTIFRAME_PACKETS)
 	size_t startpos;
-	for (startpos = 0; (startpos + 8) < bufsize; startpos++) {
+	for (startpos = 0; (startpos + sizeof(frame_magic)) < bufsize; startpos += sizeof(uint32_t)) {
 	    if (!memcmp(buf + startpos, frame_magic, sizeof(frame_magic))) break;
 	}
 	
-	if ((startpos + 8) >= bufsize) {
-	    pcilib_warning("Invalid DMA packet received");
-	    return PCILIB_STREAMING_REQ_FRAGMENT;
+	if ((startpos + sizeof(frame_magic)) >= bufsize) {
+/*
+	    FILE *f = fopen(fname, "a+");
+//	    fwrite(buf, 1, bufsize, f);
+	    fclose(f);
+*/
+	    
+	    if (invalid_frame_id != ctx->event_id) {
+		pcilib_warning("Invalid DMA packets received, first is %u bytes long, current event %lu", bufsize, ctx->event_id);
+		invalid_frame_id = ctx->event_id;
+	    }
+
+	    return PCILIB_STREAMING_CONTINUE;
 	}
 	
 	if (startpos) {
@@ -145,11 +172,11 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
     if (ctx->cur_size + bufsize > ctx->cur_raw_size) {
         size_t need;
 	
-	for (need = ctx->cur_raw_size - ctx->cur_size; need < bufsize; need += sizeof(uint32_t)) {
-	    if (*(uint32_t*)(buf + need) == frame_magic[0]) break;
+	for (need = ctx->cur_raw_size - ctx->cur_size; (need + sizeof(frame_magic)) < bufsize; need += sizeof(uint32_t)) {
+	    if (!memcmp(buf + need, frame_magic, sizeof(frame_magic))) break;
 	}
 	
-	if (need < bufsize) {
+	if ((need + sizeof(frame_magic)) < bufsize) {
 	    extra_data = bufsize - need;
 	    //bufsize = need;
 	    eof = 1;
@@ -157,6 +184,11 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	
 	    // just rip of padding
 	bufsize = ctx->cur_raw_size - ctx->cur_size;
+/*
+	FILE *f = fopen(fname, "w");
+	fwrite(buf, 1, bufsize, f);
+	fclose(f);
+*/
     }
 #endif /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
 
