@@ -53,7 +53,7 @@ int ipecamera_stream(pcilib_context_t *vctx, pcilib_event_callback_t callback, v
 #else /* IPECAMERA_ANNOUNCE_READY */
 	    while (ctx->reported_id != ctx->event_id) {
 #endif /* IPECAMERA_ANNOUNCE_READY */
-		if ((ctx->event_id - ctx->reported_id) > (ctx->buffer_size - IPECAMERA_RESERVE_BUFFERS)) ctx->reported_id = ctx->event_id - (ctx->buffer_size - 1) - IPECAMERA_RESERVE_BUFFERS;
+		if ((ctx->event_id - ctx->reported_id) > (ctx->buffer_size - IPECAMERA_RESERVE_BUFFERS)) ctx->reported_id = ctx->event_id - (ctx->buffer_size - 1 - IPECAMERA_RESERVE_BUFFERS);
 		else ++ctx->reported_id;
 
 		memcpy(&info, ctx->frame + ((ctx->reported_id-1)%ctx->buffer_size), sizeof(ipecamera_event_info_t));

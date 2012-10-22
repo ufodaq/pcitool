@@ -87,7 +87,7 @@ static int ipecamera_get_next_buffer_to_process(ipecamera_t *ctx, pcilib_event_i
 	return -1;
     }
 
-    if ((ctx->event_id - ctx->preproc_id) > (ctx->buffer_size - IPECAMERA_RESERVE_BUFFERS)) ctx->preproc_id = ctx->event_id - (ctx->buffer_size - 1) - IPECAMERA_RESERVE_BUFFERS - 1;
+    if ((ctx->event_id - ctx->preproc_id) > (ctx->buffer_size - IPECAMERA_RESERVE_BUFFERS)) ctx->preproc_id = ctx->event_id - (ctx->buffer_size - 1 - IPECAMERA_RESERVE_BUFFERS - 1);
 
     res = ctx->preproc_id%ctx->buffer_size;
 
@@ -123,7 +123,7 @@ void *ipecamera_preproc_thread(void *user) {
 	
 	pthread_rwlock_unlock(&ctx->frame[buf_ptr].mutex);
     }
-    
+
     return NULL;
 }
 
@@ -181,7 +181,7 @@ int ipecamera_get(pcilib_context_t *vctx, pcilib_event_id_t event_id, pcilib_eve
 	pcilib_error("IPECamera imaging is not initialized");
 	return PCILIB_ERROR_NOTINITIALIZED;
     }
-	
+
     buf_ptr = ipecamera_resolve_event_id(ctx, event_id);
     if (buf_ptr < 0) return PCILIB_ERROR_OVERWRITTEN;
     
