@@ -103,8 +103,11 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
     reuse_ring = pcilib_kmem_is_reused(ctx->pcilib, ring);
     reuse_pages = pcilib_kmem_is_reused(ctx->pcilib, pages);
 
-
-    if (!info->preserve) {
+//	I guess idea here was that we not need to check all that stuff during the second iteration
+//	which is basicaly true (shall we expect any driver-triggered changes or parallel accesses?)
+//	but still we need to set preserve flag (and that if we enforcing preservation --start-dma). 
+//	Probably having checks anyway is not harming...
+//    if (!info->preserve) {
 	if (reuse_ring == reuse_pages) {
 	    if (reuse_ring & PCILIB_KMEM_REUSE_PARTIAL) pcilib_warning("Inconsistent DMA buffers are found (only part of required buffers is available), reinitializing...");
 	    else if (reuse_ring & PCILIB_KMEM_REUSE_REUSED) {
@@ -118,7 +121,7 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
 		}
 	    } 	
 	} else pcilib_warning("Inconsistent DMA buffers (modes of ring and page buffers does not match), reinitializing....");
-    }
+//    }
 
     
     unsigned char *data = (unsigned char*)pcilib_kmem_get_ua(ctx->pcilib, ring);
@@ -135,6 +138,8 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
 	info->reused = 1;
         buf_sz = pcilib_kmem_get_block_size(ctx->pcilib, pages, 0);
     } else {
+	info->reused = 0;
+	
 	memset(data, 0, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE);
 
 	for (i = 0; i < PCILIB_NWL_DMA_PAGES; i++, data += PCILIB_NWL_DMA_DESCRIPTOR_SIZE) {
