@@ -128,8 +128,8 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 
 #ifdef IPECAMERA_BUG_POSTPONED_READ
 	GET_REG(max_frames_reg, value);
-	if (value >= ctx->buffer_size) {
-	    ctx->buffer_size = value + 1;
+	if ((value + IPECAMERA_RESERVE_BUFFERS + 3) > ctx->buffer_size) {
+	    ctx->buffer_size = (value + 1) + IPECAMERA_RESERVE_BUFFERS + 2;
 	}
 #endif /* IPECAMERA_BUG_POSTPONED_READ */
 
