@@ -1125,6 +1125,7 @@ typedef struct {
     struct timeval last_frame;
     size_t last_num;
     
+    size_t trigger_failed;
     size_t trigger_count;
     size_t event_count;
     size_t incomplete_count;
@@ -1243,6 +1244,7 @@ int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event
 
 
 void *Trigger(void *user) {
+    int err;
     struct timeval start;
 
     GRABContext *ctx = (GRABContext*)user;
@@ -1256,7 +1258,8 @@ void *Trigger(void *user) {
 
     gettimeofday(&start, NULL);
     do {
-        pcilib_trigger(ctx->handle, ctx->event, 0, NULL);
+        err = pcilib_trigger(ctx->handle, ctx->event, 0, NULL);
+        if (err) ctx->trigger_failed++;
 	if ((++ctx->trigger_count == max_triggers)&&(max_triggers)) break;
 	
 	if (trigger_time) {
@@ -1300,7 +1303,7 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
     
     if (ctx->trigger_count) {
 	total = ctx->trigger_count;
-	pending = ctx->trigger_count - ctx->event_count - ctx->missing_count;
+	pending = ctx->trigger_count - ctx->event_count - ctx->missing_count - ctx->trigger_failed;
     } else {
 	total = ctx->event_count + ctx->missing_count;
     }
@@ -1336,6 +1339,24 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
     printf("\n");    
 
     if (verbose > 2) {
+	if (ctx->trigger_count) {
+	    printf("Trig: ");
+	    PrintNumber(ctx->trigger_count);
+	    printf(" Issued: ");
+	    PrintNumber(ctx->trigger_count - ctx->trigger_failed);
+	    printf(" (");
+	    PrintPercent(ctx->trigger_count - ctx->trigger_failed, ctx->trigger_count);
+	    printf("%%) Failed: ");
+	    PrintNumber(ctx->trigger_failed);
+	    printf( " (");
+	    PrintPercent(ctx->trigger_failed, ctx->trigger_count);
+	    printf( "%%); Pending: ");
+	    PrintNumber(pending);
+	    printf( " (");
+	    PrintPercent(pending, ctx->trigger_count);
+	    printf( "%%)\n");
+	}
+	
 	if (ctx->flags&PCILIB_EVENT_FLAG_RAW_DATA_ONLY) {
 	    printf("Captured: ");
 	    PrintNumber(good);
@@ -1344,17 +1365,13 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
 	    PrintNumber(good);
 	    printf(", Dropped: ");
     	    PrintNumber(ctx->storage_count);
-	    printf(", Broken: ");
-    	    PrintNumber(ctx->broken_count);
 	    printf(", Bad: ");
 	    PrintNumber(ctx->incomplete_count);
+	    printf(", Empty: ");
+    	    PrintNumber(ctx->broken_count);
 	}
 	printf(", Lost: ");
 	PrintNumber(ctx->missing_count);
-        if (ctx->trigger_count) {
-	    printf(", Pending: ");
-	    PrintNumber(pending);
-	}
 	printf("\n");
     }
 
@@ -1367,19 +1384,15 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
 	    PrintPercent(good, total);
 	    printf("%% Dropped: ");
 	    PrintPercent(ctx->storage_count, total);
-	    printf("%% Broken: ");
-	    PrintPercent(ctx->broken_count, total);
 	    printf("%% Bad: ");
 	    PrintPercent(ctx->incomplete_count, total);
+	    printf("%% Empty: ");
+	    PrintPercent(ctx->broken_count, total);
 	}
 
 	printf("%% Lost: ");
 	PrintPercent(ctx->missing_count, total);
-	if (ctx->trigger_count) {
-	    printf("%% Pending: ");
-	    PrintPercent(pending, total);
-	    printf("%%");
-	}
+        printf("%%");
 	printf("\n");
     }
 }
