@@ -45,8 +45,8 @@ inline static int ipecamera_decode_frame(ipecamera_t *ctx, pcilib_event_id_t eve
     if (ctx->frame[buf_ptr].event.image_ready) return 0;
     
     if (ctx->frame[buf_ptr].event.info.flags&PCILIB_EVENT_INFO_FLAG_BROKEN) {
-	ctx->frame[buf_ptr].event.image_broken = 1;
 	err = PCILIB_ERROR_INVALID_DATA;
+	ctx->frame[buf_ptr].event.image_broken = err;
 	goto ready;
     }
 	
@@ -55,8 +55,8 @@ inline static int ipecamera_decode_frame(ipecamera_t *ctx, pcilib_event_id_t eve
     memset(ctx->cmask + ctx->buffer_pos * ctx->dim.height, 0, ctx->dim.height * sizeof(ipecamera_change_mask_t));
     res = ufo_decoder_decode_frame(ctx->ipedec, ctx->buffer + buf_ptr * ctx->padded_size, ctx->raw_size, pixels, &ctx->frame[buf_ptr].event.meta);
     if (!res) {
-        ctx->frame[buf_ptr].event.image_broken = 1;
         err = PCILIB_ERROR_FAILED;
+        ctx->frame[buf_ptr].event.image_broken = err;
 	goto ready;
     }
 	    
@@ -131,7 +131,10 @@ static int ipecamera_get_frame(ipecamera_t *ctx, pcilib_event_id_t event_id) {
     int err;
     int buf_ptr = (event_id - 1) % ctx->buffer_size;
     
-    if (!ctx->preproc) {	
+    if (ctx->preproc) {	
+	if (ctx->frame[buf_ptr].event.image_broken)
+		return ctx->frame[buf_ptr].event.image_broken;
+    } else {
 	pthread_rwlock_rdlock(&ctx->frame[buf_ptr].mutex);
 
 	err = ipecamera_decode_frame(ctx, event_id);
