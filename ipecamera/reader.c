@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/time.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <pthread.h>
 #include <assert.h>
 
@@ -96,19 +98,22 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 #if defined(IPECAMERA_BUG_INCOMPLETE_PACKETS)||defined(IPECAMERA_BUG_MULTIFRAME_PACKETS)
     static  pcilib_event_id_t invalid_frame_id = (pcilib_event_id_t)-1;
 #endif
-/*
+
+#ifdef IPECAMERA_DEBUG_RAW_PACKETS
     char fname[128];
     { 
 	static unsigned long packet_id = 0;
-	sprintf(fname,"/mnt/fast/frames/frame%4u", ctx->event_id);
+	sprintf(fname,"%s/frame%4lu", IPECAMERA_DEBUG_RAW_PACKETS, ctx->event_id);
 	mkdir(fname, 0755);
-	sprintf(fname,"/mnt/fast/frames/frame%4u/frame%9u", ctx->event_id, packet_id);
+	sprintf(fname,"%s/frame%4lu/frame%9lu", IPECAMERA_DEBUG_RAW_PACKETS, ctx->event_id, packet_id);
 	FILE *f = fopen(fname, "w");
-	fwrite(buf, 1, bufsize, f);
-	fclose(f);
-	sprintf(fname,"/mnt/fast/frames/frame%4u/frame%9u.invalid", ctx->event_id, packet_id++);
+	if (f) {
+	    fwrite(buf, 1, bufsize, f);
+	    fclose(f);
+	}
+	sprintf(fname,"%s/frame%4lu/frame%9lu.invalid", IPECAMERA_DEBUG_RAW_PACKETS, ctx->event_id, packet_id++);
     }
-*/
+#endif /* IPECAMERA_DEBUG_RAW_PACKETS */
     
     if (!ctx->cur_size) {
 #if defined(IPECAMERA_BUG_INCOMPLETE_PACKETS)||defined(IPECAMERA_BUG_MULTIFRAME_PACKETS)
@@ -118,11 +123,10 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	}
 	
 	if ((startpos + sizeof(frame_magic)) >= bufsize) {
-/*
-	    FILE *f = fopen(fname, "a+");
-//	    fwrite(buf, 1, bufsize, f);
-	    fclose(f);
-*/
+#ifdef IPECAMERA_DEBUG_RAW_PACKETS
+	    FILE *f = fopen(fname, "w");
+	    if (f) fclose(f);
+#endif /* IPECAMERA_DEBUG_RAW_PACKETS */
 	    
 	    if (invalid_frame_id != ctx->event_id) {
 		pcilib_warning("Invalid DMA packets received, first is %u bytes long, current event %lu", bufsize, ctx->event_id);
@@ -184,11 +188,15 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	
 	    // just rip of padding
 	bufsize = ctx->cur_raw_size - ctx->cur_size;
-/*
+
+#ifdef IPECAMERA_DEBUG_RAW_PACKETS
+	sprintf(fname + strlen(fname) - 8, ".partial");
 	FILE *f = fopen(fname, "w");
-	fwrite(buf, 1, bufsize, f);
-	fclose(f);
-*/
+	if (f) {
+	    fwrite(buf, 1, bufsize, f);
+	    fclose(f);
+	}
+#endif /* IPECAMERA_DEBUG_RAW_PACKETS */
     }
 #endif /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
 
@@ -207,11 +215,7 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
     if (ctx->cur_size >= ctx->full_size) eof = 1;
 
     if (ctx->event.params.rawdata.callback) {
-#ifdef IPECAMERA_BUG_MULTIFRAME_PACKETS
-	res = ctx->event.params.rawdata.callback(ctx->event_id, (pcilib_event_info_t*)(ctx->frame + ctx->buffer_pos), (eof?PCILIB_EVENT_FLAG_EOF:PCILIB_EVENT_FLAGS_DEFAULT), real_size, buf, ctx->event.params.rawdata.user);
-#else /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
 	res = ctx->event.params.rawdata.callback(ctx->event_id, (pcilib_event_info_t*)(ctx->frame + ctx->buffer_pos), (eof?PCILIB_EVENT_FLAG_EOF:PCILIB_EVENT_FLAGS_DEFAULT), bufsize, buf, ctx->event.params.rawdata.user);
-#endif /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
 	if (res <= 0) {
 	    if (res < 0) return res;
 	    ctx->run_reader = 0;
@@ -225,7 +229,7 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	
 #ifdef IPECAMERA_BUG_MULTIFRAME_PACKETS
 	if (extra_data) {
-	    return ipecamera_data_callback(user, flags, extra_data, buf + bufsize);
+	    return ipecamera_data_callback(user, flags, extra_data, buf + (real_size - extra_data));
 	}
 #endif /* IPECAMERA_BUG_MULTIFRAME_PACKETS */
     }

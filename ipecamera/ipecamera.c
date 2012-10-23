@@ -126,6 +126,14 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
     	    pcilib_error("Unsupported version of firmware (%lu)", value);
 	}
 
+#ifdef IPECAMERA_BUG_POSTPONED_READ
+	GET_REG(max_frames_reg, value);
+	if (value >= ctx->buffer_size) {
+	    ctx->buffer_size = value + 1;
+	}
+#endif /* IPECAMERA_BUG_POSTPONED_READ */
+
+
 	ctx->rdma = PCILIB_DMA_ENGINE_INVALID;
 	ctx->wdma = PCILIB_DMA_ENGINE_INVALID;
 
@@ -408,14 +416,14 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
     }
 
 	// Clean DMA
-/*
+#ifndef IPECAMERA_BUG_POSTPONED_READ
     err = pcilib_skip_dma(vctx->pcilib, ctx->rdma);
     if (err) {
         ipecamera_stop(vctx, PCILIB_EVENT_FLAGS_DEFAULT);
 	pcilib_error("Can't start grabbing, device continuously writes unexpected data using DMA engine");
 	return err;
     }
-*/
+#endif /* ! IPECAMERA_BUG_POSTPONED_READ */
 
     if (vctx->params.autostop.duration) {
 	gettimeofday(&ctx->autostop.timestamp, NULL);

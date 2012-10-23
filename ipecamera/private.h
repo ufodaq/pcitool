@@ -6,6 +6,8 @@
 #define IPECAMERA_BUG_EXTRA_DATA
 #define IPECAMERA_BUG_MULTIFRAME_PACKETS
 #define IPECAMERA_BUG_INCOMPLETE_PACKETS
+#define IPECAMERA_BUG_POSTPONED_READ
+//#define IPECAMERA_DEBUG_RAW_PACKETS		"/mnt/fast/frames"
 
 //#define IPECAMERA_ANNOUNCE_READY		//**< announce new event only after the reconstruction is done */
 
