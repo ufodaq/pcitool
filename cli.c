@@ -766,6 +766,10 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
 		}
 	    } while (err == PCILIB_ERROR_TOOBIG);
 	}
+
+	if ((err)&&(err != PCILIB_ERROR_TIMEOUT)) {
+	    Error("Error (%i) during DMA read", err);
+	}
 	if (bytes <= 0) {
 	    pcilib_warning("No data is returned by DMA engine");
 	    return 0;
