@@ -77,6 +77,7 @@ typedef enum {
     MODE_LIST_DMA_BUFFERS,
     MODE_READ_DMA_BUFFER,
     MODE_WAIT_IRQ,
+    MODE_ALLOC_KMEM,
     MODE_LIST_KMEM,
     MODE_READ_KMEM,
     MODE_FREE_KMEM
@@ -142,9 +143,13 @@ typedef enum {
     OPT_STOP_DMA,
     OPT_WAIT_IRQ,
     OPT_ITERATIONS,
+    OPT_ALLOC_KMEM,
     OPT_LIST_KMEM,
     OPT_FREE_KMEM,
     OPT_READ_KMEM,
+    OPT_BLOCK_SIZE,
+    OPT_ALIGNMENT,
+    OPT_TYPE,
     OPT_FORCE,
     OPT_VERIFY,
     OPT_WAIT,
@@ -184,9 +189,13 @@ static struct option long_options[] = {
     {"list-dma-buffers",	required_argument, 0, OPT_LIST_DMA_BUFFERS },
     {"read-dma-buffer",		required_argument, 0, OPT_READ_DMA_BUFFER },
     {"wait-irq",		optional_argument, 0, OPT_WAIT_IRQ },
-    {"list-kernel-memory",	no_argument, 0, OPT_LIST_KMEM },
+    {"list-kernel-memory",	optional_argument, 0, OPT_LIST_KMEM },
     {"read-kernel-memory",	required_argument, 0, OPT_READ_KMEM },
+    {"alloc-kernel-memory",	required_argument, 0, OPT_ALLOC_KMEM },
     {"free-kernel-memory",	required_argument, 0, OPT_FREE_KMEM },
+    {"type",			required_argument, 0, OPT_TYPE },
+    {"block-size",		required_argument, 0, OPT_BLOCK_SIZE },
+    {"alignment",		required_argument, 0, OPT_ALIGNMENT },
     {"quiete",			no_argument, 0, OPT_QUIETE },
     {"verbose",			optional_argument, 0, OPT_VERBOSE },
     {"force",			no_argument, 0, OPT_FORCE },
@@ -237,12 +246,20 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   --wait-irq <source>		- Wait for IRQ\n"
 "\n"
 "  Kernel Modes:\n"
-"   --list-kernel-memory 	- List kernel buffers\n"
+"   --list-kernel-memory [use] 	- List kernel buffers\n"
 "   --read-kernel-memory <blk>	- Read the specified block of the kernel memory\n"
 "				  block is specified as: use:block_number\n"
+"   --alloc-kernel-memory <use>	- Allocate kernel buffers (DANGEROUS)\n"
 "   --free-kernel-memory <use>	- Cleans lost kernel space buffers (DANGEROUS)\n"
 "	dma			- Remove all buffers allocated by DMA subsystem\n"
 "	#number			- Remove all buffers with the specified use id\n"
+"   --type <type>		- Type of kernel memory to allocate\n"
+"   	consistent		- Consistent memory\n"
+"   	s2c			- DMA S2C (write) memory\n"
+"   	c2s			- DMA C2S (read) memory\n"
+"   --page-size <size>		- Size of kernel buffer in bytes (default: page)\n"
+"   -s <size>			- Number of buffers to allocate (default: 1)\n"
+"   --allignment <alignment>	- Buffer alignment (default: page)\n"
 "\n"
 "  Addressing:\n"
 "   -d <device>			- FPGA device (/dev/fpga0)\n"
@@ -1765,17 +1782,27 @@ size_t FindUse(size_t *n_uses, kmem_use_info_t *uses, unsigned long use) {
     return (*n_uses)++;
 }
 
-int ListKMEM(pcilib_t *handle, const char *device) {
+kmem_use_info_t *GetUse(size_t n_uses, kmem_use_info_t *uses, unsigned long use) {
+    size_t i;
+    for (i = 0; i < n_uses; i++) {
+	if (uses[i].use == use) {
+	    if (uses[i].count) return uses + i;
+	    else return NULL;
+	}
+    }
+    return NULL;
+}
+
+
+int ParseKMEM(pcilib_t *handle, const char *device, size_t *uses_number, kmem_use_info_t *uses) {
     DIR *dir;
     struct dirent *entry;
     const char *pos;
     char sysdir[256];
     char fname[256];
     char info[256];
-    char stmp[256];
-    
-    size_t useid, i, n_uses = 1;	// Use 0 is for others
-    kmem_use_info_t uses[MAX_USES];
+
+    size_t useid, n_uses = 1;	// Use 0 is for others
 
     memset(uses, 0, sizeof(uses));
     
@@ -1824,6 +1851,21 @@ int ListKMEM(pcilib_t *handle, const char *device) {
     }
     closedir(dir);
 
+    *uses_number = n_uses;
+
+    return 0;
+}
+
+int ListKMEM(pcilib_t *handle, const char *device) {
+    int err;
+    char stmp[256];
+    
+    size_t i, useid, n_uses;	
+    kmem_use_info_t uses[MAX_USES];
+
+    err = ParseKMEM(handle, device, &n_uses, uses);
+    if (err) Error("Failed to parse kernel memory information provided through sysfs");
+
     if ((n_uses == 1)&&(uses[0].count == 0)) {
 	printf("No kernel memory is allocated\n");
 	return 0;
@@ -1841,6 +1883,7 @@ int ListKMEM(pcilib_t *handle, const char *device) {
 	if (!i) printf("All Others         ");
 	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_RING) printf("DMA%lu %s Ring      ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
 	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_PAGES) printf("DMA%lu %s Pages     ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
+	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_USER)	printf("User %04lx         ", uses[i].use&0xFFFF);
 	else printf ("                   ");
 	printf("  ");
 	printf("% 6lu", uses[i].count);
@@ -1865,11 +1908,59 @@ int ListKMEM(pcilib_t *handle, const char *device) {
     return 0;
 }
 
+int DetailKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t block) {
+    int err;
+    void *data;
+    size_t size;
+    size_t i, n;
+    pcilib_kmem_handle_t *kbuf;
+
+    size_t n_uses;	
+    kmem_use_info_t uses[MAX_USES];
+    kmem_use_info_t *use_info;
+    
+    if (block == (size_t)-1) {
+        err = ParseKMEM(handle, device, &n_uses, uses);
+	if (err) Error("Failed to parse kernel memory information provided through sysfs");
+	use_info = GetUse(n_uses, uses, use);
+	if (!use_info) Error("No kernel buffers is allocated for the specified use (%lx)", use);
+
+	i = 0;    
+	n = use_info->count;
+    } else {
+	i = block;
+	n = block + 1;
+    }
+    
+    kbuf = pcilib_alloc_kernel_memory(handle, 0, n, 0, 0, use, PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_TRY);
+    if (!kbuf) {
+	Error("Allocation of kernel buffer (use %lx, count %lu) is failed\n", use, n);
+	return 0;
+    }
+
+    printf("Buffer         Address          Hardware Address          Bus Address\n");
+    printf("--------------------------------------------------------------------------------\n");
+    for (; i < n; i++) {
+	void *data = pcilib_kmem_get_block_ua(handle, kbuf, i);
+	uintptr_t pa = pcilib_kmem_get_block_pa(handle, kbuf, i);
+	uintptr_t ba = pcilib_kmem_get_block_ba(handle, kbuf, i);
+	printf("%6lu     %16p     %16lx       %16lx\n", i, data, pa, ba);
+    }
+    printf("\n");
+
+    pcilib_free_kernel_memory(handle, kbuf, KMEM_FLAG_REUSE);
+
+    return 0;
+}
+
+
 int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t block, size_t max_size, FILE *o) {
     int err;
     void *data;
     size_t size;
     pcilib_kmem_handle_t *kbuf;
+    
+    if (block == (size_t)-1) block = 0;
 
     kbuf = pcilib_alloc_kernel_memory(handle, 0, block + 1, 0, 0, use, PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_TRY);
     if (!kbuf) {
@@ -1897,6 +1988,36 @@ int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t
     }
 
     pcilib_free_kernel_memory(handle, kbuf, KMEM_FLAG_REUSE);
+
+    return 0;
+}
+
+int AllocKMEM(pcilib_t *handle, const char *device, const char *use, const char *type, size_t size, size_t block_size, size_t alignment) {
+    int err;
+    unsigned long useid;
+    pcilib_kmem_type_t ktype = PCILIB_KMEM_TYPE_PAGE;
+    pcilib_kmem_flags_t flags = KMEM_FLAG_REUSE;
+    pcilib_kmem_handle_t *kbuf;
+
+    long page_size = sysconf(_SC_PAGESIZE);
+    
+    if ((!isxnumber(use))||(sscanf(use, "%lx", &useid) != 1)) Error("Invalid use (%s) is specified", use);
+    if ((useid&PCILIB_KMEM_TYPE_MASK) == 0) useid = PCILIB_KMEM_USE(PCILIB_KMEM_USE_USER,useid);
+    
+    if (type) {
+	if (!strcmp(type, "consistent")) ktype = PCILIB_KMEM_TYPE_CONSISTENT;
+	else if (!strcmp(type, "c2s")) ktype = PCILIB_KMEM_TYPE_DMA_C2S_PAGE;
+	else if (!strcmp(type, "s2c")) ktype = PCILIB_KMEM_TYPE_DMA_S2C_PAGE;
+	else Error("Invalid memory type (%s) is specified", type);
+    } 
+    
+    if ((block_size)&&(ktype != PCILIB_KMEM_TYPE_CONSISTENT))
+	Error("Selected memory type does not allow custom size");
+    
+    kbuf = pcilib_alloc_kernel_memory(handle, ktype, size, (block_size?block_size:page_size), (alignment?alignment:page_size), useid, flags|KMEM_FLAG_PERSISTENT);
+    if (!kbuf) Error("Allocation of kernel memory has failed");
+
+    pcilib_free_kernel_memory(handle, kbuf, flags);
 
     return 0;
 }
@@ -2172,18 +2293,20 @@ int main(int argc, char **argv) {
     const char *dma_channel = NULL;
     const char *use = NULL;
     pcilib_kmem_use_t use_id = 0;
-    size_t block = 0;
+    size_t block = (size_t)-1;
     pcilib_irq_hw_source_t irq_source =  PCILIB_IRQ_SOURCE_DEFAULT;
     pcilib_dma_direction_t dma_direction = PCILIB_DMA_BIDIRECTIONAL;
     
     pcilib_dma_engine_addr_t dma = PCILIB_DMA_ENGINE_ADDR_INVALID;
     long addr_shift = 0;
     uintptr_t start = -1;
+    size_t block_size = 0;
     size_t size = 1;
     access_t access = 4;
 //    int skip = 0;
     int endianess = 0;
     size_t timeout = 0;
+    size_t alignment = 0;
     const char *output = NULL;
     FILE *ofile = NULL;
     size_t iterations = BENCHMARK_ITERATIONS;
@@ -2327,6 +2450,28 @@ int main(int argc, char **argv) {
 	    case OPT_LIST_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 		mode = MODE_LIST_KMEM;
+		
+		if (optarg) use = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-'))  use = argv[optind++];
+		
+		if (use) {
+		    num_offset = strchr(use, ':');
+
+		    if (num_offset) {
+			if (sscanf(num_offset + 1, "%zu", &block) != 1)
+			    Usage(argc, argv, "Invalid block number is specified (%s)", num_offset + 1);
+
+			*(char*)num_offset = 0;
+		    }
+
+	    	    if (sscanf(use, "%lx", &utmp) != 1)
+			Usage(argc, argv, "Invalid USE number is specified (%s)", optarg);
+		
+	    	    if (!utmp)
+			Usage(argc, argv, "Can't detail memory with the unspecific use (use number is 0)");
+		    
+		    use_id = utmp;
+		}
 	    break;
 	    case OPT_READ_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
@@ -2349,6 +2494,13 @@ int main(int argc, char **argv) {
 		    
 		use_id = utmp;
 	    break;
+	    case OPT_ALLOC_KMEM:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		mode = MODE_ALLOC_KMEM;
+
+		if (optarg) use = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-')) use = argv[optind++];
+	    break;
 	    case OPT_FREE_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 		mode = MODE_FREE_KMEM;
@@ -2368,6 +2520,11 @@ int main(int argc, char **argv) {
 		bank = optarg;
 //		if ((sscanf(optarg,"%li", &itmp) != 1)||(itmp < 0)||(itmp >= PCILIB_MAX_BANKS)) Usage(argc, argv, "Invalid data bank (%s) is specified", optarg);
 //		else bar = itmp;
+	    break;
+	    case OPT_ALIGNMENT:
+		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &alignment) != 1)) {
+		    Usage(argc, argv, "Invalid alignment is specified (%s)", optarg);
+		}
 	    break;
 	    case OPT_ACCESS:
 		if (!strncasecmp(optarg, "fifo", 4)) {
@@ -2413,6 +2570,11 @@ int main(int argc, char **argv) {
 			
 		size_set = 1;
 	    break;
+	    case OPT_BLOCK_SIZE:
+		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &block_size) != 1)) {
+		    Usage(argc, argv, "Invalid size is specified (%s)", optarg);
+		}
+	    break;
 	    case OPT_ENDIANESS:
 		if ((*optarg == 'b')||(*optarg == 'B')) {
 		    if (ntohs(1) == 1) endianess = 0;
@@ -2441,6 +2603,9 @@ int main(int argc, char **argv) {
 	    break;
 	    case OPT_EVENT:
 		event = optarg;
+	    break;
+	    case OPT_TYPE:
+		type = optarg;
 	    break;
 	    case OPT_DATA_TYPE:
 		data_type = optarg;
@@ -2763,10 +2928,14 @@ int main(int argc, char **argv) {
         WaitIRQ(handle, model_info, irq_source, timeout);
      break;
      case MODE_LIST_KMEM:
-        ListKMEM(handle, fpga_device);
+        if (use) DetailKMEM(handle, fpga_device, use_id, block);
+        else ListKMEM(handle, fpga_device);
      break;
      case MODE_READ_KMEM:
         ReadKMEM(handle, fpga_device, use_id, block, 0, ofile);
+     break;
+     case MODE_ALLOC_KMEM:
+        AllocKMEM(handle, fpga_device, use, type, size, block_size, alignment);
      break;
      case MODE_FREE_KMEM:
         FreeKMEM(handle, fpga_device, use, force);

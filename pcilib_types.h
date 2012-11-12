@@ -21,7 +21,8 @@ typedef enum {
 typedef enum {
     PCILIB_KMEM_USE_STANDARD = 0,
     PCILIB_KMEM_USE_DMA_RING = 1,
-    PCILIB_KMEM_USE_DMA_PAGES = 2
+    PCILIB_KMEM_USE_DMA_PAGES = 2,
+    PCILIB_KMEM_USE_USER = 0x10
 } pcilib_kmem_use_t;
 
 typedef enum {

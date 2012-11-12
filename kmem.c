@@ -91,7 +91,7 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
     kh.align = alignment;
     kh.use = use;
 
-    if (type != PCILIB_KMEM_TYPE_PAGE) {
+    if ((type&PCILIB_KMEM_TYPE_MASK) != PCILIB_KMEM_TYPE_PAGE) {
 	kh.size += alignment;
     }
     
@@ -143,11 +143,11 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	    break;
 	}
     
-        if ((kh.align)&&(type != PCILIB_KMEM_TYPE_PAGE)) {
+        if ((kh.align)&&((kh.type&PCILIB_KMEM_TYPE_MASK) != PCILIB_KMEM_TYPE_PAGE)) {
 	    if (kh.pa % kh.align) kbuf->buf.blocks[i].alignment_offset = kh.align - kh.pa % kh.align;
 	    kbuf->buf.blocks[i].size -= kh.align;
 	}
-	
+
     	addr = mmap( 0, kbuf->buf.blocks[i].size + kbuf->buf.blocks[i].alignment_offset, PROT_WRITE | PROT_READ, MAP_SHARED, ctx->handle, 0 );
 	if ((!addr)||(addr == MAP_FAILED)) {
 	    kbuf->buf.n_blocks = i + 1;
@@ -273,12 +273,22 @@ uintptr_t pcilib_kmem_get_pa(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
     return kbuf->buf.addr.pa + kbuf->buf.addr.alignment_offset;
 }
 
+uintptr_t pcilib_kmem_get_ba(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
+    pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
+    return kbuf->buf.addr.pa + kbuf->buf.addr.alignment_offset;
+}
+
 void *pcilib_kmem_get_block_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
     return kbuf->buf.blocks[block].ua + kbuf->buf.blocks[block].alignment_offset + kbuf->buf.blocks[block].mmap_offset;
 }
 
 uintptr_t pcilib_kmem_get_block_pa(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block) {
+    pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
+    return kbuf->buf.blocks[block].pa + kbuf->buf.blocks[block].alignment_offset;
+}
+
+uintptr_t pcilib_kmem_get_block_ba(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
     return kbuf->buf.blocks[block].pa + kbuf->buf.blocks[block].alignment_offset;
 }
