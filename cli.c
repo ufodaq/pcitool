@@ -146,6 +146,7 @@ typedef enum {
     OPT_FREE_KMEM,
     OPT_READ_KMEM,
     OPT_FORCE,
+    OPT_VERIFY,
     OPT_WAIT,
     OPT_MULTIPACKET,
     OPT_VERBOSE
@@ -189,6 +190,7 @@ static struct option long_options[] = {
     {"quiete",			no_argument, 0, OPT_QUIETE },
     {"verbose",			optional_argument, 0, OPT_VERBOSE },
     {"force",			no_argument, 0, OPT_FORCE },
+    {"verify",			no_argument, 0, OPT_VERIFY },
     {"multipacket",		no_argument, 0, OPT_MULTIPACKET },
     {"wait",			no_argument, 0, OPT_WAIT },
     {"help",			no_argument, 0, OPT_HELP },
@@ -255,6 +257,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   -e <l|b>			- Endianess Little/Big (default: host)\n"
 "   -o <file>			- Append output to file (default: stdout)\n"
 "   -t <timeout|unlimited> 	- Timeout in microseconds\n"
+"   --check			- Verify write operations\n"
 "\n"
 "  Event Options:\n"
 "   --event <evt>		- Specifies event for trigger and grab modes\n"
@@ -949,7 +952,7 @@ int ReadRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, 
     return 0;
 }
 
-int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, char ** data) {
+int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, pcilib_bar_t bar, uintptr_t addr, size_t n, access_t access, int endianess, char ** data, int verify) {
     int read_back = 0;
     void *buf, *check;
     int res = 0, i, err;
@@ -991,8 +994,10 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
       break;
       default:
 	pcilib_write(handle, bar, addr, size, buf);
-	pcilib_read(handle, bar, addr, size, check);
-	read_back = 1;
+	if (verify) {
+	    pcilib_read(handle, bar, addr, size, check);
+	    read_back = 1;
+	}
     }
 
     if ((read_back)&&(memcmp(buf, check, size))) {
@@ -2141,6 +2146,7 @@ int main(int argc, char **argv) {
     int verbose = 0;
     int quiete = 0;
     int force = 0;
+    int verify = 0;
     
     pcilib_model_t model = PCILIB_MODEL_DETECT;
     pcilib_model_description_t *model_info;
@@ -2511,6 +2517,9 @@ int main(int argc, char **argv) {
 	    case OPT_FORCE:
 		force = 1;
 	    break;
+	    case OPT_VERIFY:
+		verify = 1;
+	    break;
 	    case OPT_MULTIPACKET:
 		flags |= FLAG_MULTIPACKET;
 	    break;
@@ -2723,7 +2732,7 @@ int main(int argc, char **argv) {
 	else ReadRegisterRange(handle, model_info, bank, start, addr_shift, size, ofile);
      break;
      case MODE_WRITE:
-	WriteData(handle, amode, dma, bar, start, size, access, endianess, data);
+	WriteData(handle, amode, dma, bar, start, size, access, endianess, data, verify);
      break;
      case MODE_WRITE_REGISTER:
         if (reg) WriteRegister(handle, model_info, bank, reg, data);
