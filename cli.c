@@ -2241,7 +2241,10 @@ int WaitIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq
     size_t count;
     
     err = pcilib_enable_irq(handle, PCILIB_EVENT_IRQ, 0);
-    if (err) Error("Error enabling IRQs");
+    if (err) {
+	if ((err != PCILIB_ERROR_NOTSUPPORTED)&&(err != PCILIB_ERROR_NOTAVAILABLE))
+	    Error("Error enabling IRQs");
+    }
 
     err = pcilib_wait_irq(handle, irq_source, timeout, &count);
     if (err) {

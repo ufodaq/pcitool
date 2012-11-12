@@ -100,12 +100,12 @@ int pcilib_stop_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t f
 int pcilib_enable_irq(pcilib_t *ctx, pcilib_irq_type_t irq_type, pcilib_dma_flags_t flags) {
     const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
     if (!info) {
-	pcilib_error("DMA is not supported by the device");
+	//pcilib_error("DMA is not supported by the device");
 	return PCILIB_ERROR_NOTSUPPORTED;
     }
 
     if (!ctx->model_info.dma_api) {
-	pcilib_error("DMA Engine is not configured in the current model");
+	//pcilib_error("DMA Engine is not configured in the current model");
 	return PCILIB_ERROR_NOTAVAILABLE;
     }
     
