@@ -16,6 +16,7 @@
 #include <alloca.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <pthread.h>
 #include <signal.h>
@@ -89,7 +90,8 @@ typedef enum {
 typedef enum {
     ACCESS_BAR,
     ACCESS_DMA,
-    ACCESS_FIFO
+    ACCESS_FIFO, 
+    ACCESS_CONFIG
 } ACCESS_MODE;
 
 typedef enum {
@@ -277,7 +279,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "\n"
 "  Options:\n"
 "   -s <size>			- Number of words (default: 1)\n"
-"   -a [fifo|dma]<bits>		- Access type and bits per word (default: 32)\n"
+"   -a [fifo|dma|config]<bits>	- Access type and bits per word (default: 32)\n"
 "   -e <l|b>			- Endianess Little/Big (default: host)\n"
 "   -o <file>			- Append output to file (default: stdout)\n"
 "   -t <timeout|unlimited> 	- Timeout in microseconds\n"
@@ -528,6 +530,9 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
     size_t irqs;
     
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
+    
+    if (mode == ACCESS_CONFIG)
+	Error("No benchmarking of configuration space acess is allowed");
 
     if (mode == ACCESS_DMA) {
 	if (n) {
@@ -758,7 +763,12 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
     int numbers_per_block, numbers_per_line; 
     pcilib_dma_engine_t dmaid;
     pcilib_dma_flags_t dma_flags = 0;
-    
+
+    int fd;
+    char stmp[256];
+    struct stat st;
+    const pcilib_board_info_t *board_info;
+
     numbers_per_block = BLOCK_SIZE / access;
 
     block_width = numbers_per_block * ((access * 2) +  SEPARATOR_WIDTH);
@@ -818,6 +828,33 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
       case ACCESS_FIFO:
 	pcilib_read_fifo(handle, bar, addr, access, n, buf);
 	addr = 0;
+      break;
+      case ACCESS_CONFIG:
+	board_info = pcilib_get_board_info(handle);
+	sprintf(stmp, "/sys/bus/pci/devices/0000:%02x:%02x.%1x/config", board_info->bus, board_info->slot, board_info->func);
+	fd = open(stmp, O_RDONLY);
+
+	if ((!fd)||(fstat(fd, &st))) Error("Can't open %s", stmp);
+	
+        if (st.st_size < addr) 
+    	    Error("Access beyond the end of PCI configuration space");
+    	
+	if (st.st_size < (addr + size)) {
+	    n = (st.st_size - addr) / abs(access);
+	    size = n * abs(access);
+	    if (!n) Error("Access beyond the end of PCI configuration space");
+	}
+	
+	lseek(fd, addr, SEEK_SET);
+	ret = read(fd, buf, size);
+	if (ret == (size_t)-1) Error("Error reading %s", stmp);
+	
+	if (ret < size) {
+	    size = ret;
+	    n = ret / abs(access);
+	}
+	
+	close(fd);
       break;
       default:
 	pcilib_read(handle, bar, addr, size, buf);
@@ -993,6 +1030,9 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
     int size = n * abs(access);
     size_t ret;
     pcilib_dma_engine_t dmaid;
+
+    if (mode == ACCESS_CONFIG)
+	Error("Writting to PCI configuration space is not supported");
 
     err = posix_memalign( (void**)&buf, 256, size );
     if (!err) err = posix_memalign( (void**)&check, 256, size );
@@ -2322,6 +2362,7 @@ int main(int argc, char **argv) {
     FORMAT format = FORMAT_DEFAULT;
     PARTITION partition = PARTITION_UNKNOWN;
     FLAGS flags = 0;
+    const char *atype = NULL;
     const char *type = NULL;
     ACCESS_MODE amode = ACCESS_BAR;
     const char *fpga_device = DEFAULT_FPGA_DEVICE;
@@ -2617,19 +2658,23 @@ int main(int argc, char **argv) {
 	    break;
 	    case OPT_ACCESS:
 		if (!strncasecmp(optarg, "fifo", 4)) {
-		    type = "fifo";
+		    atype = "fifo";
 		    num_offset = optarg + 4;
 		    amode = ACCESS_FIFO;
 		} else if (!strncasecmp(optarg, "dma", 3)) {
-		    type = "dma";
+		    atype = "dma";
 		    num_offset = optarg + 3;
 		    amode = ACCESS_DMA;
 		} else if (!strncasecmp(optarg, "bar", 3)) {
-		    type = "plain";
+		    atype = "plain";
 		    num_offset = optarg + 3;
 		    amode = ACCESS_BAR;
+		} else if (!strncasecmp(optarg, "config", 6)) {
+		    atype = "config";
+		    num_offset = optarg + 6;
+		    amode = ACCESS_CONFIG;
 		} else if (!strncasecmp(optarg, "plain", 5)) {
-		    type = "plain";
+		    atype = "plain";
 		    num_offset = optarg + 5;
 		    amode = ACCESS_BAR;
 		} else {
@@ -2800,7 +2845,6 @@ int main(int argc, char **argv) {
 
     switch (mode) {
      case MODE_WRITE:
-        if (!addr) Usage(argc, argv, "The address is not specified");
         if (((argc - optind) == 1)&&(*argv[optind] == '*')) {
     	    int vallen = strlen(argv[optind]);
     	    if (vallen > 1) {
@@ -2822,11 +2866,11 @@ int main(int argc, char **argv) {
 	    }
         } else if ((argc - optind) == size) data = argv + optind;
         else Usage(argc, argv, "The %i data values is specified, but %i required", argc - optind, size);
-     break;
      case MODE_READ:
         if (!addr) {
 	    if (model == PCILIB_MODEL_PCI) {
-		Usage(argc, argv, "The address is not specified");
+		if ((amode != ACCESS_DMA)&&(amode != ACCESS_CONFIG)) 
+		    Usage(argc, argv, "The address is not specified");
 	    } else ++mode;
 	}
      break;
@@ -2864,7 +2908,7 @@ int main(int argc, char **argv) {
 
     if (addr) {
 	if ((!strncmp(addr, "dma", 3))&&((addr[3]==0)||isnumber(addr+3))) {
-	    if ((type)&&(amode != ACCESS_DMA)) Usage(argc, argv, "Conflicting access modes, the DMA read is requested, but access type is (%s)", type);
+	    if ((atype)&&(amode != ACCESS_DMA)) Usage(argc, argv, "Conflicting access modes, the DMA read is requested, but access type is (%s)", type);
 	    if (bank) {
 		if ((addr[3] != 0)&&(strcmp(addr + 3, bank))) Usage(argc, argv, "Conflicting DMA channels are specified in read parameter (%s) and bank parameter (%s)", addr + 3, bank);
 	    } else {
@@ -2872,11 +2916,17 @@ int main(int argc, char **argv) {
 	    }
 	    dma = atoi(addr + 3);
 	    amode = ACCESS_DMA;
+	    addr = NULL;
 	} else if ((!strncmp(addr, "bar", 3))&&((addr[3]==0)||isnumber(addr+3))) {
-	    if ((type)&&(amode != ACCESS_BAR)) Usage(argc, argv, "Conflicting access modes, the plain PCI read is requested, but access type is (%s)", type);
+	    if ((atype)&&(amode != ACCESS_BAR)) Usage(argc, argv, "Conflicting access modes, the plain PCI read is requested, but access type is (%s)", type);
 	    if ((addr[3] != 0)&&(strcmp(addr + 3, bank))) Usage(argc, argv, "Conflicting PCI bars are specified in read parameter (%s) and bank parameter (%s)", addr + 3, bank);
 	    bar = atoi(addr + 3);
 	    amode = ACCESS_BAR;
+	    addr = NULL;
+	} else if (!strcmp(addr, "config")) {
+	    if ((atype)&&(amode != ACCESS_CONFIG)) Usage(argc, argv, "Conflicting access modes, the read of PCI configurataion space is requested, but access type is (%s)", type);
+	    amode = ACCESS_CONFIG;
+	    addr = NULL;
 	} else if ((isxnumber(addr))&&(sscanf(addr, "%lx", &start) == 1)) {
 		// check if the address in the register range
 	    pcilib_register_range_t *ranges =  model_info->ranges;
@@ -2975,6 +3025,8 @@ int main(int argc, char **argv) {
      case MODE_READ:
 	if (amode == ACCESS_DMA) {
 	    ReadData(handle, amode, flags, dma, bar, start, size_set?size:0, access, endianess, timeout_set?timeout:(size_t)-1, ofile);
+	} else if (amode == ACCESS_CONFIG) {
+	    ReadData(handle, amode, flags, dma, bar, addr?start:0, (addr||size_set)?size:(256/abs(access)), access, endianess, (size_t)-1, ofile);
 	} else if (addr) {
 	    ReadData(handle, amode, flags, dma, bar, start, size, access, endianess, (size_t)-1, ofile);
 	} else {
