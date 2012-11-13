@@ -150,6 +150,7 @@ static int ioctl_pci_info(pcidriver_privdata_t *privdata, unsigned long arg)
 	pci_info.bus = privdata->pdev->bus->number;
 	pci_info.slot = PCI_SLOT(privdata->pdev->devfn);
 	pci_info.devfn = privdata->pdev->devfn;
+	pci_info.func = PCI_FUNC(privdata->pdev->devfn);
 
 	if ((ret = pci_read_config_byte(privdata->pdev, PCI_INTERRUPT_PIN, &(pci_info.interrupt_pin))) != 0)
 		return ret;

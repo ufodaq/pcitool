@@ -507,7 +507,8 @@ void List(pcilib_t *handle, pcilib_model_description_t *model_info, const char *
 void Info(pcilib_t *handle, pcilib_model_description_t *model_info) {
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
 
-    printf("Vendor: %x, Device: %x, Interrupt Pin: %i, Interrupt Line: %i\n", board_info->vendor_id, board_info->device_id, board_info->interrupt_pin, board_info->interrupt_line);
+    printf("Vendor: %x, Device: %x, Bus: %x, Slot: %x, Function: %x\n", board_info->vendor_id, board_info->device_id, board_info->bus, board_info->slot, board_info->func);
+    printf(" Interrupt - Pin: %i, Line: %i\n", board_info->interrupt_pin, board_info->interrupt_line);
     List(handle, model_info, (char*)-1, 0);
 }
 

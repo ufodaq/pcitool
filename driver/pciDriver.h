@@ -170,6 +170,7 @@ typedef struct {
 	unsigned short device_id;
 	unsigned short bus;
 	unsigned short slot;
+	unsigned short func;
 	unsigned short devfn;
 	unsigned char interrupt_pin;
 	unsigned char interrupt_line;
