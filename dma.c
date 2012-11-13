@@ -80,6 +80,7 @@ int pcilib_start_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t 
 
 int pcilib_stop_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags) {
     const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
+
     if (!info) {
 	pcilib_error("DMA is not supported by the device");
 	return PCILIB_ERROR_NOTSUPPORTED;
@@ -99,62 +100,27 @@ int pcilib_stop_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t f
 
 int pcilib_enable_irq(pcilib_t *ctx, pcilib_irq_type_t irq_type, pcilib_dma_flags_t flags) {
     const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
-    if (!info) {
-	//pcilib_error("DMA is not supported by the device");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    }
 
-    if (!ctx->model_info.dma_api) {
-	//pcilib_error("DMA Engine is not configured in the current model");
-	return PCILIB_ERROR_NOTAVAILABLE;
-    }
-    
-    if (!ctx->model_info.dma_api->enable_irq) {
-	return 0;
-    }
+    if ((!info)||(!ctx->model_info.dma_api)||(!ctx->model_info.dma_api->enable_irq)) return 0;
 
     return ctx->model_info.dma_api->enable_irq(ctx->dma_ctx, irq_type, flags);
 }
 
 int pcilib_disable_irq(pcilib_t *ctx, pcilib_dma_flags_t flags) {
     const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
-    if (!info) {
-	pcilib_error("DMA is not supported by the device");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    }
 
-    if (!ctx->model_info.dma_api) {
-	pcilib_error("DMA Engine is not configured in the current model");
-	return PCILIB_ERROR_NOTAVAILABLE;
-    }
-    
-    if (!ctx->model_info.dma_api->disable_irq) {
-	return 0;
-    }
-    
+    if ((!info)||(!ctx->model_info.dma_api)||(!ctx->model_info.dma_api->disable_irq)) return 0;
+
     return ctx->model_info.dma_api->disable_irq(ctx->dma_ctx, flags);
 }
 
 int pcilib_acknowledge_irq(pcilib_t *ctx, pcilib_irq_type_t irq_type, pcilib_irq_source_t irq_source) {
     const pcilib_dma_info_t *info =  pcilib_get_dma_info(ctx);
-    if (!info) {
-	pcilib_error("DMA is not supported by the device");
-	return PCILIB_ERROR_NOTSUPPORTED;
-    }
 
-    if (!ctx->model_info.dma_api) {
-	pcilib_error("DMA Engine is not configured in the current model");
-	return PCILIB_ERROR_NOTAVAILABLE;
-    }
-    
-    if (!ctx->model_info.dma_api->acknowledge_irq) {
-	return 0;
-    }
+    if ((!info)||(!ctx->model_info.dma_api)||(!ctx->model_info.dma_api->acknowledge_irq)) return 0;
 
     return ctx->model_info.dma_api->acknowledge_irq(ctx->dma_ctx, irq_type, irq_source);
 }
-
-
 
 typedef struct {
     size_t size;

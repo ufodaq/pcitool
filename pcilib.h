@@ -128,6 +128,7 @@ typedef enum {
 #define PCILIB_EVENT_DATA_TYPE_INVALID	((pcilib_event_data_type_t)-1)
 #define PCILIB_TIMEOUT_INFINITE		((pcilib_timeout_t)-1)
 #define PCILIB_TIMEOUT_IMMEDIATE	0
+#define PCILIB_IRQ_TYPE_ALL 		0
 #define PCILIB_IRQ_SOURCE_DEFAULT	0
 
 typedef struct {

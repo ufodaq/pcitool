@@ -76,6 +76,9 @@ typedef enum {
     MODE_LIST_DMA,
     MODE_LIST_DMA_BUFFERS,
     MODE_READ_DMA_BUFFER,
+    MODE_ENABLE_IRQ,
+    MODE_DISABLE_IRQ,
+    MODE_ACK_IRQ,
     MODE_WAIT_IRQ,
     MODE_ALLOC_KMEM,
     MODE_LIST_KMEM,
@@ -141,6 +144,9 @@ typedef enum {
     OPT_READ_DMA_BUFFER,
     OPT_START_DMA,
     OPT_STOP_DMA,
+    OPT_ENABLE_IRQ,
+    OPT_DISABLE_IRQ,
+    OPT_ACK_IRQ,
     OPT_WAIT_IRQ,
     OPT_ITERATIONS,
     OPT_ALLOC_KMEM,
@@ -188,6 +194,9 @@ static struct option long_options[] = {
     {"list-dma-engines",	no_argument, 0, OPT_LIST_DMA },
     {"list-dma-buffers",	required_argument, 0, OPT_LIST_DMA_BUFFERS },
     {"read-dma-buffer",		required_argument, 0, OPT_READ_DMA_BUFFER },
+    {"enable-irq",		optional_argument, 0, OPT_ENABLE_IRQ },
+    {"disable-irq",		optional_argument, 0, OPT_DISABLE_IRQ },
+    {"acknowledge-irq",		optional_argument, 0, OPT_ACK_IRQ },
     {"wait-irq",		optional_argument, 0, OPT_WAIT_IRQ },
     {"list-kernel-memory",	optional_argument, 0, OPT_LIST_KMEM },
     {"read-kernel-memory",	required_argument, 0, OPT_READ_KMEM },
@@ -237,13 +246,18 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   --trigger [event]		- Trigger Events\n"
 "   -g [event]			- Grab Events\n"
 "\n"
+"  IRQ Modes:\n"
+"   --enable-irq [type]		- Enable IRQs\n"
+"   --disable-irq [type]	- Disable IRQs\n"
+"   --acknowledge-irq <source>	- Clean IRQ queue\n"
+"   --wait-irq <source>		- Wait for IRQ\n"
+
 "  DMA Modes:\n"
 "   --start-dma <num>[r|w]	- Start specified DMA engine\n"
 "   --stop-dma [num[r|w]]	- Stop specified engine or DMA subsystem\n"
 "   --list-dma-engines		- List active DMA engines\n"
 "   --list-dma-buffers <dma>	- List buffers for specified DMA engine\n"
 "   --read-dma-buffer <dma:buf>	- Read the specified buffer\n"
-"   --wait-irq <source>		- Wait for IRQ\n"
 "\n"
 "  Kernel Modes:\n"
 "   --list-kernel-memory [use] 	- List kernel buffers\n"
@@ -253,13 +267,6 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   --free-kernel-memory <use>	- Cleans lost kernel space buffers (DANGEROUS)\n"
 "	dma			- Remove all buffers allocated by DMA subsystem\n"
 "	#number			- Remove all buffers with the specified use id\n"
-"   --type <type>		- Type of kernel memory to allocate\n"
-"   	consistent		- Consistent memory\n"
-"   	s2c			- DMA S2C (write) memory\n"
-"   	c2s			- DMA C2S (read) memory\n"
-"   --page-size <size>		- Size of kernel buffer in bytes (default: page)\n"
-"   -s <size>			- Number of buffers to allocate (default: 1)\n"
-"   --allignment <alignment>	- Buffer alignment (default: page)\n"
 "\n"
 "  Addressing:\n"
 "   -d <device>			- FPGA device (/dev/fpga0)\n"
@@ -296,6 +303,15 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "  DMA Options:\n"
 "   --multipacket		- Read multiple packets\n"
 "   --wait			- Wait until data arrives\n"
+"\n"
+"  Kernel Options:\n"
+"   --type <type>		- Type of kernel memory to allocate\n"
+"   	consistent		- Consistent memory\n"
+"   	s2c			- DMA S2C (write) memory\n"
+"   	c2s			- DMA C2S (read) memory\n"
+"   --page-size <size>		- Size of kernel buffer in bytes (default: page)\n"
+"   -s <size>			- Number of buffers to allocate (default: 1)\n"
+"   --allignment <alignment>	- Buffer alignment (default: page)\n"
 "\n"
 "  Information:\n"
 "   --verbose [level]		- Announce details of ongoing operations\n"
@@ -2235,16 +2251,38 @@ int ReadBuffer(pcilib_t *handle, const char *device, pcilib_model_description_t 
 }
 
 
-
-int WaitIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_hw_source_t irq_source, pcilib_timeout_t timeout) {
+int EnableIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_type_t irq_type) {
     int err;
-    size_t count;
-    
-    err = pcilib_enable_irq(handle, PCILIB_EVENT_IRQ, 0);
+
+    err = pcilib_enable_irq(handle, irq_type, 0);
     if (err) {
 	if ((err != PCILIB_ERROR_NOTSUPPORTED)&&(err != PCILIB_ERROR_NOTAVAILABLE))
 	    Error("Error enabling IRQs");
     }
+    
+    return err;
+}
+
+int DisableIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_type_t irq_type) {
+    int err;
+    
+    err = pcilib_disable_irq(handle, 0);
+    if (err) {
+	if ((err != PCILIB_ERROR_NOTSUPPORTED)&&(err != PCILIB_ERROR_NOTAVAILABLE))
+	    Error("Error disabling IRQs");
+    }
+    
+    return err;
+}
+
+int AckIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_hw_source_t irq_source) {
+    pcilib_clear_irq(handle, irq_source);
+    return 0;
+}
+
+int WaitIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_hw_source_t irq_source, pcilib_timeout_t timeout) {
+    int err;
+    size_t count;
 
     err = pcilib_wait_irq(handle, irq_source, timeout, &count);
     if (err) {
@@ -2297,6 +2335,7 @@ int main(int argc, char **argv) {
     const char *use = NULL;
     pcilib_kmem_use_t use_id = 0;
     size_t block = (size_t)-1;
+    pcilib_irq_type_t irq_type = PCILIB_IRQ_TYPE_ALL;
     pcilib_irq_hw_source_t irq_source =  PCILIB_IRQ_SOURCE_DEFAULT;
     pcilib_dma_direction_t dma_direction = PCILIB_DMA_BIDIRECTIONAL;
     
@@ -2435,6 +2474,51 @@ int main(int argc, char **argv) {
 		if (optarg) dma_channel = optarg;
 		else if ((optind < argc)&&(argv[optind][0] != '-')) dma_channel = argv[optind++];
 	    break;
+	    case OPT_ENABLE_IRQ:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		
+		mode = MODE_ENABLE_IRQ;
+		if (optarg) num_offset = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-'))  num_offset = argv[optind++];
+		else num_offset = NULL;
+		
+		if (num_offset) {
+		    if ((!isnumber(num_offset))||(sscanf(num_offset, "%li", &itmp) != 1))
+			Usage(argc, argv, "Invalid IRQ source is specified (%s)", num_offset);
+
+		    irq_type = itmp;
+		}
+	    break;
+	    case OPT_DISABLE_IRQ:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		
+		mode = MODE_DISABLE_IRQ;
+		if (optarg) num_offset = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-'))  num_offset = argv[optind++];
+		else num_offset = NULL;
+		
+		if (num_offset) {
+		    if ((!isnumber(num_offset))||(sscanf(num_offset, "%li", &itmp) != 1))
+			Usage(argc, argv, "Invalid IRQ source is specified (%s)", num_offset);
+
+		    irq_type = itmp;
+		}
+	    break;
+	    case OPT_ACK_IRQ:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		
+		mode = MODE_ACK_IRQ;
+		if (optarg) num_offset = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-'))  num_offset = argv[optind++];
+		else num_offset = NULL;
+		
+		if (num_offset) {
+		    if ((!isnumber(num_offset))||(sscanf(num_offset, "%li", &itmp) != 1))
+			Usage(argc, argv, "Invalid IRQ source is specified (%s)", num_offset);
+
+		    irq_source = itmp;
+		}
+	    break;
 	    case OPT_WAIT_IRQ:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 		
@@ -2456,6 +2540,7 @@ int main(int argc, char **argv) {
 		
 		if (optarg) use = optarg;
 		else if ((optind < argc)&&(argv[optind][0] != '-'))  use = argv[optind++];
+		else use = NULL;
 		
 		if (use) {
 		    num_offset = strchr(use, ':');
@@ -2926,6 +3011,15 @@ int main(int argc, char **argv) {
      break;
      case MODE_STOP_DMA:
         StartStopDMA(handle, model_info, dma, dma_direction, 0);
+     break;
+     case MODE_ENABLE_IRQ:
+        EnableIRQ(handle, model_info, irq_type);
+     break;
+     case MODE_DISABLE_IRQ:
+        DisableIRQ(handle, model_info, irq_type);
+     break;
+     case MODE_ACK_IRQ:
+        AckIRQ(handle, model_info, irq_source);
      break;
      case MODE_WAIT_IRQ:
         WaitIRQ(handle, model_info, irq_source, timeout);
