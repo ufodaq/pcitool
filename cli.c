@@ -1810,7 +1810,7 @@ int StartStopDMA(pcilib_t *handle,  pcilib_model_description_t *model_info, pcil
 
 
 typedef struct {
-    unsigned long use;
+    pcilib_kmem_use_t use;
     
     int referenced;
     int hw_lock;
@@ -1824,7 +1824,23 @@ typedef struct {
 
 #define MAX_USES 64
 
-size_t FindUse(size_t *n_uses, kmem_use_info_t *uses, unsigned long use) {
+pcilib_kmem_use_t ParseUse(const char *use) {
+    unsigned long utmp;
+
+    if (use) {
+        if ((!isxnumber(use))||(sscanf(use, "%lx", &utmp) != 1)) Error("Invalid use (%s) is specified", use);
+
+	if (strlen(use) < 5)
+	    return PCILIB_KMEM_USE(PCILIB_KMEM_USE_USER,utmp);
+	else
+	    return utmp;
+    }
+
+    Error("Kernel memory use is not specified");
+    return 0;
+}
+
+size_t FindUse(size_t *n_uses, kmem_use_info_t *uses, pcilib_kmem_use_t use) {
     size_t i, n = *n_uses;
     
     if (uses[n - 1].use == use) return n - 1;
@@ -1839,7 +1855,8 @@ size_t FindUse(size_t *n_uses, kmem_use_info_t *uses, unsigned long use) {
     return (*n_uses)++;
 }
 
-kmem_use_info_t *GetUse(size_t n_uses, kmem_use_info_t *uses, unsigned long use) {
+
+kmem_use_info_t *GetUse(size_t n_uses, kmem_use_info_t *uses, pcilib_kmem_use_t use) {
     size_t i;
     for (i = 0; i < n_uses; i++) {
 	if (uses[i].use == use) {
@@ -1916,7 +1933,7 @@ int ParseKMEM(pcilib_t *handle, const char *device, size_t *uses_number, kmem_us
 int ListKMEM(pcilib_t *handle, const char *device) {
     int err;
     char stmp[256];
-    
+
     size_t i, useid, n_uses;	
     kmem_use_info_t uses[MAX_USES];
 
@@ -1936,11 +1953,11 @@ int ListKMEM(pcilib_t *handle, const char *device) {
 	    i = 0;
 	} else i = useid + 1;
 	
-	printf("%08lx  ", uses[i].use);
+	printf("%08x  ", uses[i].use);
 	if (!i) printf("All Others         ");
-	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_RING) printf("DMA%lu %s Ring      ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
-	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_PAGES) printf("DMA%lu %s Pages     ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
-	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_USER)	printf("User %04lx         ", uses[i].use&0xFFFF);
+	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_RING) printf("DMA%u %s Ring      ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
+	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_PAGES) printf("DMA%u %s Pages     ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
+	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_USER)	printf("User %04x         ", uses[i].use&0xFFFF);
 	else printf ("                   ");
 	printf("  ");
 	printf("% 6lu", uses[i].count);
@@ -1965,12 +1982,11 @@ int ListKMEM(pcilib_t *handle, const char *device) {
     return 0;
 }
 
-int DetailKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t block) {
+int DetailKMEM(pcilib_t *handle, const char *device, const char *use, size_t block) {
     int err;
-    void *data;
-    size_t size;
     size_t i, n;
     pcilib_kmem_handle_t *kbuf;
+    pcilib_kmem_use_t useid = ParseUse(use); 
 
     size_t n_uses;	
     kmem_use_info_t uses[MAX_USES];
@@ -1979,8 +1995,8 @@ int DetailKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size
     if (block == (size_t)-1) {
         err = ParseKMEM(handle, device, &n_uses, uses);
 	if (err) Error("Failed to parse kernel memory information provided through sysfs");
-	use_info = GetUse(n_uses, uses, use);
-	if (!use_info) Error("No kernel buffers is allocated for the specified use (%lx)", use);
+	use_info = GetUse(n_uses, uses, useid);
+	if (!use_info) Error("No kernel buffers is allocated for the specified use (%lx)", useid);
 
 	i = 0;    
 	n = use_info->count;
@@ -1989,9 +2005,9 @@ int DetailKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size
 	n = block + 1;
     }
     
-    kbuf = pcilib_alloc_kernel_memory(handle, 0, n, 0, 0, use, PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_TRY);
+    kbuf = pcilib_alloc_kernel_memory(handle, 0, n, 0, 0, useid, PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_TRY);
     if (!kbuf) {
-	Error("Allocation of kernel buffer (use %lx, count %lu) is failed\n", use, n);
+	Error("Allocation of kernel buffer (use %lx, count %lu) is failed\n", useid, n);
 	return 0;
     }
 
@@ -2011,15 +2027,15 @@ int DetailKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size
 }
 
 
-int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t block, size_t max_size, FILE *o) {
+int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t useid, size_t block, size_t max_size, FILE *o) {
     int err;
     void *data;
     size_t size;
     pcilib_kmem_handle_t *kbuf;
-    
+
     if (block == (size_t)-1) block = 0;
 
-    kbuf = pcilib_alloc_kernel_memory(handle, 0, block + 1, 0, 0, use, PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_TRY);
+    kbuf = pcilib_alloc_kernel_memory(handle, 0, block + 1, 0, 0, useid, PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_TRY);
     if (!kbuf) {
 	Error("The specified kernel buffer is not allocated\n");
 	return 0;
@@ -2050,17 +2066,13 @@ int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t use, size_t
 }
 
 int AllocKMEM(pcilib_t *handle, const char *device, const char *use, const char *type, size_t size, size_t block_size, size_t alignment) {
-    int err;
-    unsigned long useid;
     pcilib_kmem_type_t ktype = PCILIB_KMEM_TYPE_PAGE;
     pcilib_kmem_flags_t flags = KMEM_FLAG_REUSE;
     pcilib_kmem_handle_t *kbuf;
+    pcilib_kmem_use_t useid = ParseUse(use);
 
     long page_size = sysconf(_SC_PAGESIZE);
-    
-    if ((!isxnumber(use))||(sscanf(use, "%lx", &useid) != 1)) Error("Invalid use (%s) is specified", use);
-    if ((useid&PCILIB_KMEM_TYPE_MASK) == 0) useid = PCILIB_KMEM_USE(PCILIB_KMEM_USE_USER,useid);
-    
+
     if (type) {
 	if (!strcmp(type, "consistent")) ktype = PCILIB_KMEM_TYPE_CONSISTENT;
 	else if (!strcmp(type, "c2s")) ktype = PCILIB_KMEM_TYPE_DMA_C2S_PAGE;
@@ -2083,7 +2095,7 @@ int FreeKMEM(pcilib_t *handle, const char *device, const char *use, int force) {
     int err;
     int i;
 
-    unsigned long useid;
+    pcilib_kmem_use_t useid;
 
     pcilib_kmem_flags_t flags = PCILIB_KMEM_FLAG_HARDWARE|PCILIB_KMEM_FLAG_PERSISTENT|PCILIB_KMEM_FLAG_EXCLUSIVE; 
     if (force) flags |= PCILIB_KMEM_FLAG_FORCE; // this will ignore mmap locks as well.
@@ -2103,8 +2115,7 @@ int FreeKMEM(pcilib_t *handle, const char *device, const char *use, int force) {
 	return 0;
     }
 
-    if ((!isxnumber(use))||(sscanf(use, "%lx", &useid) != 1)) Error("Invalid use (%s) is specified", use);
-
+    useid = ParseUse(use);
     err = pcilib_clean_kernel_memory(handle, useid, flags);
     if (err) Error("Error cleaning kernel buffers for use (0x%lx)", useid);
 
@@ -2139,10 +2150,10 @@ int ListDMA(pcilib_t *handle, const char *device, pcilib_model_description_t *mo
     while ((entry = readdir(dir)) != NULL) {
 	FILE *f;
 	unsigned long use = 0;
-	unsigned long size = 0;
-	unsigned long refs = 0;
+//	unsigned long size = 0;
+//	unsigned long refs = 0;
 	unsigned long mode = 0;
-	unsigned long hwref = 0;
+//	unsigned long hwref = 0;
 	
 	if (strncmp(entry->d_name, "kbuf", 4)) continue;
 	if (!isnumber(entry->d_name+4)) continue;
@@ -2154,10 +2165,10 @@ int ListDMA(pcilib_t *handle, const char *device, pcilib_model_description_t *mo
 	while(!feof(f)) {
 	    fgets(info, 256, f);
 	    if (!strncmp(info, "use:", 4)) use = strtoul(info+4, NULL, 16);
-	    if (!strncmp(info, "size:", 5)) size = strtoul(info+5, NULL, 10);
-	    if (!strncmp(info, "refs:", 5)) refs = strtoul(info+5, NULL, 10);
+//	    if (!strncmp(info, "size:", 5)) size = strtoul(info+5, NULL, 10);
+//	    if (!strncmp(info, "refs:", 5)) refs = strtoul(info+5, NULL, 10);
 	    if (!strncmp(info, "mode:", 5)) mode = strtoul(info+5, NULL, 16);
-	    if (!strncmp(info, "hw ref:", 7)) hwref = strtoul(info+7, NULL, 10);
+//	    if (!strncmp(info, "hw ref:", 7)) hwref = strtoul(info+7, NULL, 10);
 	}
 	fclose(f);
 	
@@ -2338,7 +2349,6 @@ int WaitIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq
 int main(int argc, char **argv) {
     int i;
     long itmp;
-    unsigned long utmp;
     size_t ztmp;
     unsigned char c;
 
@@ -2375,11 +2385,11 @@ int main(int argc, char **argv) {
     const char *data_type = NULL;
     const char *dma_channel = NULL;
     const char *use = NULL;
-    pcilib_kmem_use_t use_id = 0;
     size_t block = (size_t)-1;
     pcilib_irq_type_t irq_type = PCILIB_IRQ_TYPE_ALL;
     pcilib_irq_hw_source_t irq_source =  PCILIB_IRQ_SOURCE_DEFAULT;
     pcilib_dma_direction_t dma_direction = PCILIB_DMA_BIDIRECTIONAL;
+    pcilib_kmem_use_t useid = 0;
     
     pcilib_dma_engine_addr_t dma = PCILIB_DMA_ENGINE_ADDR_INVALID;
     long addr_shift = 0;
@@ -2399,8 +2409,8 @@ int main(int argc, char **argv) {
 
     int size_set = 0;
     int timeout_set = 0;
-    int run_time_set = 0;
-    
+//    int run_time_set = 0;
+
     while ((c = getopt_long(argc, argv, "hqilr::w::g::d:m:t:b:a:s:e:o:", long_options, NULL)) != (unsigned char)-1) {
 	extern int optind;
 	switch (c) {
@@ -2593,14 +2603,6 @@ int main(int argc, char **argv) {
 
 			*(char*)num_offset = 0;
 		    }
-
-	    	    if (sscanf(use, "%lx", &utmp) != 1)
-			Usage(argc, argv, "Invalid USE number is specified (%s)", optarg);
-		
-	    	    if (!utmp)
-			Usage(argc, argv, "Can't detail memory with the unspecific use (use number is 0)");
-		    
-		    use_id = utmp;
 		}
 	    break;
 	    case OPT_READ_KMEM:
@@ -2616,14 +2618,9 @@ int main(int argc, char **argv) {
 		    *(char*)num_offset = 0;
 		}
 		
-		if (sscanf(optarg, "%lx", &utmp) != 1)
-		    Usage(argc, argv, "Invalid USE number is specified (%s)", optarg);
-		
-		if (!utmp)
-		    Usage(argc, argv, "Can't read buffer with the unspecific use (use number is 0)");
-		    
-		use_id = utmp;
-	    break;
+		use = optarg;
+		useid = ParseUse(use);
+    	    break;
 	    case OPT_ALLOC_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 		mode = MODE_ALLOC_KMEM;
@@ -2751,7 +2748,7 @@ int main(int argc, char **argv) {
 		    else
 			run_time = 0;
 		}
-		run_time_set = 1;
+//		run_time_set = 1;
 	    break;
 	    case OPT_TRIGGER_TIME:
 		if ((!isnumber(optarg))||(sscanf(optarg, "%zu", &trigger_time) != 1))
@@ -3078,11 +3075,11 @@ int main(int argc, char **argv) {
         WaitIRQ(handle, model_info, irq_source, timeout);
      break;
      case MODE_LIST_KMEM:
-        if (use) DetailKMEM(handle, fpga_device, use_id, block);
+        if (use) DetailKMEM(handle, fpga_device, use, block);
         else ListKMEM(handle, fpga_device);
      break;
      case MODE_READ_KMEM:
-        ReadKMEM(handle, fpga_device, use_id, block, 0, ofile);
+        ReadKMEM(handle, fpga_device, useid, block, 0, ofile);
      break;
      case MODE_ALLOC_KMEM:
         AllocKMEM(handle, fpga_device, use, type, size, block_size, alignment);
