@@ -96,15 +96,23 @@ pcilib_model_t pcilib_get_model(pcilib_t *ctx) {
 }
 
 static pcilib_bar_t pcilib_detect_bar(pcilib_t *ctx, uintptr_t addr, size_t size) {
+    int n = 0;
     pcilib_bar_t i;
 	
     const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
     if (!board_info) return PCILIB_BAR_INVALID;
 		
     for (i = 0; i < PCILIB_MAX_BANKS; i++) {
-	if ((addr >= board_info->bar_start[i])&&((board_info->bar_start[i] + board_info->bar_length[i]) >= (addr + size))) return i;
+	if (board_info->bar_length[i] > 0) {
+	    if ((addr >= board_info->bar_start[i])&&((board_info->bar_start[i] + board_info->bar_length[i]) >= (addr + size))) return i;
+
+	    if (n) n = -1;
+	    else n = i + 1;
+	}
     }
-	
+
+    if (n > 0) return n - 1;
+
     return PCILIB_BAR_INVALID;
 }
 
@@ -114,24 +122,26 @@ static int pcilib_detect_address(pcilib_t *ctx, pcilib_bar_t *bar, uintptr_t *ad
     
     if (*bar == PCILIB_BAR_DETECT) {
 	*bar = pcilib_detect_bar(ctx, *addr, size);
-	if (*bar < 0) {
-	    pcilib_error("The requested data block at address 0x%x with size 0x%x does not belongs to any available memory bank", *addr, size);
+	if (*bar == PCILIB_BAR_INVALID) {
+	    pcilib_error("The requested data block at address 0x%x with size %zu does not belongs to any available memory bank", *addr, size);
 	    return PCILIB_ERROR_NOTFOUND;
 	}
+	if (*addr < board_info->bar_start[*bar]) 
+	    *addr += board_info->bar_start[*bar];
     } else {
 	if ((*addr < board_info->bar_start[*bar])||((board_info->bar_start[*bar] + board_info->bar_length[*bar]) < (((uintptr_t)*addr) + size))) {
 	    if ((board_info->bar_length[*bar]) >= (((uintptr_t)*addr) + size)) {
 		*addr += board_info->bar_start[*bar];
 	    } else {
-		pcilib_error("The requested data block at address 0x%x with size 0x%x does not belong the specified memory bank (Bar %i: starting at 0x%x with size 0x%x)", *addr, size, *bar, board_info->bar_start[*bar], board_info->bar_length[*bar]);
+		pcilib_error("The requested data block at address 0x%x with size %zu does not belong the specified memory bank (Bar %i: starting at 0x%x with size 0x%x)", *addr, size, *bar, board_info->bar_start[*bar], board_info->bar_length[*bar]);
 		return PCILIB_ERROR_NOTFOUND;
 	    }
 	}
     }
-    
+
     *addr -= board_info->bar_start[*bar];
     *addr += board_info->bar_start[*bar] & ctx->page_mask;
-    
+
     return 0;
 }
 
