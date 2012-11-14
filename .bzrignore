@@ -18,3 +18,4 @@ cmake_install.cmake
 Makefile
 *.so.*
 install_manifest.txt
+./xilinx

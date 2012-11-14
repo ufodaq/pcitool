@@ -59,7 +59,7 @@ function parse_config {
 
     echo "Link: PCIe gen$link_speed x$link_width"
     if [ $link_speed -ne $dev_link_speed -o $link_width -ne $dev_link_width ]; then
-	echo " * But device capable of gen$link_speed x$link_width"
+	echo " * But device capable of gen$dev_link_speed x$dev_link_width"
     fi
     
     info=0x`read_cfg 40`
@@ -99,7 +99,12 @@ for i in `seq 1 $ITERATIONS`; do
 #Trigger
     pci -b $BAR -w 0x04 0x01
     pci --wait-irq
-    pci -b $BAR -w 0x04 0x00
+#    pci -b $BAR -w 0x04 0x00
+
+    status=`pci -b $BAR -r 0x04 | awk '{print $2; }' | cut -c 5-8`
+    if [ $status != "0101" ]; then
+	echo "Read failed, invalid status: $status"
+    fi
 
     dmaperf=$((dmaperf + 0x`pci -b $BAR -r 0x28 | awk '{print $2}'`))
     reset
@@ -110,6 +115,7 @@ pci --free-kernel-memory $USE
 pci --disable-irq
 
 echo
-echo "FPGA performance: $((4096 * BUFFERS * ITERATIONS * $speed / $dmaperf)) MB/s"
+# Don't ask me about this formula
+echo "Performance reported by FPGA: $((4096 * BUFFERS * ITERATIONS * $speed / $dmaperf / 8)) MB/s"
 
 #pci -b $BAR  -r 0 -s 32

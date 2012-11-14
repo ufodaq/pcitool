@@ -2,6 +2,9 @@
 #define _PCILIB_KMEM_H
 
 #include "pcilib.h"
+
+typedef struct pcilib_kmem_list_s pcilib_kmem_list_t;
+
 #include "tools.h"
 
 typedef enum {
@@ -53,7 +56,6 @@ typedef struct {
 typedef void pcilib_kmem_handle_t;
 
 
-typedef struct pcilib_kmem_list_s pcilib_kmem_list_t;
 struct pcilib_kmem_list_s {
     pcilib_kmem_list_t *next, *prev;
 

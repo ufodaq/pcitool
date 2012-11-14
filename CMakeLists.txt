@@ -25,6 +25,7 @@ add_definitions("-fPIC --std=c99 -Wall -O2")
 add_subdirectory(dma)
 add_subdirectory(ipecamera)
 add_subdirectory(pcitool)
+add_subdirectory(apps)
 
 include_directories(
     ${FASTWRITER_INCLUDE_DIRS}
