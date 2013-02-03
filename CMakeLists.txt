@@ -3,7 +3,7 @@ project(pcitool)
 set(PCILIB_VERSION "0.0.1")
 set(PCILIB_ABI_VERSION "0")
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.6)
 
 set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library") 
 

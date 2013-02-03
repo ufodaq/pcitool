@@ -61,7 +61,7 @@
 
 /* Identifies the PCI-E Xilinx ML605 */
 #define PCIE_XILINX_VENDOR_ID 0x10ee
-#define PCIE_ML605_DEVICE_ID 0x04a0
+#define PCIE_ML605_DEVICE_ID 0x6024
 
 /* Identifies the PCI-E IPE Camera */
 #define PCIE_IPECAMERA_DEVICE_ID 0x6081
