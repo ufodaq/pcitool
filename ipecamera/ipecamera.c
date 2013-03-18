@@ -575,7 +575,11 @@ int ipecamera_stop(pcilib_context_t *vctx, pcilib_event_flags_t flags) {
 	pcilib_stop_dma(vctx->pcilib, ctx->rdma, PCILIB_DMA_FLAGS_DEFAULT);
 	ctx->rdma = PCILIB_DMA_ENGINE_INVALID;
     }
-    
+
+    while (ctx->streaming) {
+        usleep(IPECAMERA_NOFRAME_SLEEP);
+    }
+
     if (ctx->ipedec) {
 	ufo_decoder_free(ctx->ipedec);
 	ctx->ipedec = NULL;
