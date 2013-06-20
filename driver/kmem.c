@@ -130,23 +130,28 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	    retptr = pci_alloc_consistent( privdata->pdev, kmem_handle->size, &(kmem_entry->dma_handle) );
 	    break;
 	 case PCILIB_KMEM_TYPE_PAGE:
-	    retptr = (void*)__get_free_pages(GFP_KERNEL, get_order(PAGE_SIZE));
+	    if (kmem_handle->size == 0)
+		kmem_handle->size = PAGE_SIZE;
+	    else if (kmem_handle->size%PAGE_SIZE)
+		goto kmem_alloc_mem_fail;
+		
+	    retptr = (void*)__get_free_pages(GFP_KERNEL|__GFP_DMA, get_order(kmem_handle->size));
 	    kmem_entry->dma_handle = 0;
-	    kmem_handle->size = PAGE_SIZE;
+	    kmem_handle->size = kmem_handle->size;
 	    
 	    if (retptr) {
 	        if (kmem_entry->type == PCILIB_KMEM_TYPE_DMA_S2C_PAGE) {
 		    kmem_entry->direction = PCI_DMA_TODEVICE;
-    		    kmem_entry->dma_handle = pci_map_single(privdata->pdev, retptr, PAGE_SIZE, PCI_DMA_TODEVICE);
+    		    kmem_entry->dma_handle = pci_map_single(privdata->pdev, retptr, kmem_handle->size, PCI_DMA_TODEVICE);
 		    if (pci_dma_mapping_error(privdata->pdev, kmem_entry->dma_handle)) {
-			free_page((unsigned long)retptr);
+			free_pages((unsigned long)retptr, get_order(kmem_handle->size));
 			goto kmem_alloc_mem_fail;
 		    }
 		} else if (kmem_entry->type == PCILIB_KMEM_TYPE_DMA_C2S_PAGE) {
 		    kmem_entry->direction = PCI_DMA_FROMDEVICE;
-    		    kmem_entry->dma_handle = pci_map_single(privdata->pdev, retptr, PAGE_SIZE, PCI_DMA_FROMDEVICE);
+    		    kmem_entry->dma_handle = pci_map_single(privdata->pdev, retptr, kmem_handle->size, PCI_DMA_FROMDEVICE);
 		    if (pci_dma_mapping_error(privdata->pdev, kmem_entry->dma_handle)) {
-			free_page((unsigned long)retptr);
+			free_pages((unsigned long)retptr, get_order(kmem_handle->size));
 			goto kmem_alloc_mem_fail;
 		    
 		    }
@@ -435,7 +440,7 @@ int pcidriver_kmem_free_entry(pcidriver_privdata_t *privdata, pcidriver_kmem_ent
 		    pci_unmap_single(privdata->pdev, kmem_entry->dma_handle, kmem_entry->size, PCI_DMA_FROMDEVICE);
 		}
 	    }
-	    free_page((unsigned long)kmem_entry->cpua);
+	    free_pages((unsigned long)kmem_entry->cpua, get_order(kmem_entry->size));
 	    break;
 	}
 

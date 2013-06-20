@@ -123,7 +123,8 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	    ctx->firmware = value;
 	    break;
 	 default:
-    	    pcilib_error("Unsupported version of firmware (%lu)", value);
+//    	    pcilib_error("Unsupported version of firmware (%lu)", value);
+	    ;
 	}
 
 #ifdef IPECAMERA_BUG_POSTPONED_READ
