@@ -2,6 +2,7 @@
 #define _POSIX_C_SOURCE 199309L
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdarg.h>
 #include <time.h>
@@ -15,9 +16,10 @@
 #define DEVICE "/dev/fpga0"
 #define BAR PCILIB_BAR0
 #define USE PCILIB_KMEM_USE(PCILIB_KMEM_USE_USER, 1)
+#define STATIC_REGION 0x80000000 //  to reserve 512 MB at the specified address, add "memmap=512M$2G" to kernel parameters
 #define BUFFERS 1
-#define ITERATIONS 16384
-#define HUGE_PAGE 128	// number of pages per huge page
+#define ITERATIONS 100
+#define HUGE_PAGE 4096	// number of pages per huge page
 #define PAGE_SIZE 4096	// other values are not supported in the kernel
 #define TIMEOUT 100000
 
@@ -28,6 +30,7 @@ much extra time */
 //#define CHECK_READY
 //#define REALTIME
 //#define ADD_DELAYS
+#define CHECK_RESULT
 
 //#define WR(addr, value) { val = value; pcilib_write(pci, BAR, addr, sizeof(val), &val); }
 //#define RD(addr, value) { pcilib_read(pci, BAR, addr, sizeof(val), &val); value = val; }
@@ -64,7 +67,7 @@ void hpsleep(size_t ns) {
 
 int main() {
     int err;
-    int i, j;
+    long i, j;
     pcilib_t *pci;
     pcilib_kmem_handle_t *kbuf;
     uint32_t status;
@@ -110,7 +113,30 @@ int main() {
 
     pcilib_clean_kernel_memory(pci, USE, clean_flags);
 
+#ifdef STATIC_REGION
+    kbuf = pcilib_alloc_kernel_memory(pci, PCILIB_KMEM_TYPE_REGION_C2S, BUFFERS, HUGE_PAGE * PAGE_SIZE, STATIC_REGION, USE, 0);
+#else /* STATIC_REGION */
     kbuf = pcilib_alloc_kernel_memory(pci, PCILIB_KMEM_TYPE_DMA_C2S_PAGE, BUFFERS, HUGE_PAGE * PAGE_SIZE, 4096, USE, 0);
+#endif /* STATIC_REGION */
+
+    if (!kbuf) {
+	printf("KMem allocation failed\n");
+	exit(0);
+    }
+
+
+#ifdef CHECK_RESULT    
+    volatile uint32_t *ptr0 = pcilib_kmem_get_block_ua(pci, kbuf, 0);
+
+    memset((void*)ptr0, 0, (HUGE_PAGE * PAGE_SIZE));
+    
+    for (i = 0; i < (HUGE_PAGE * PAGE_SIZE / 4); i++) {
+	if (ptr0[i] != 0) break;
+    }
+    if (i < (HUGE_PAGE * PAGE_SIZE / 4)) {
+	printf("Initialization error in position %lu, value = %x\n", i * 4, ptr0[i]);
+    }
+#endif /* CHECK_RESULT */
 
     WR(0x04, 0)
     WR(0x0C, 0x20)
@@ -163,6 +189,18 @@ int main() {
     }
     gettimeofday(&end, NULL);
 
+
+#ifdef CHECK_RESULT    
+    pcilib_kmem_sync_block(pci, kbuf, PCILIB_KMEM_SYNC_FROMDEVICE, 0);
+
+    for (i = 0; i < (HUGE_PAGE * PAGE_SIZE / 4); i++) {
+	if (ptr0[i] != 0x13131313) break;
+    }
+    if (i < (HUGE_PAGE * PAGE_SIZE / 4)) {
+	printf("Error in position %lu, value = %x\n", i * 4, ptr0[i]);
+    }
+#endif /* CHECK_RESULT */
+
     pcilib_free_kernel_memory(pci, kbuf,  0);
     pcilib_disable_irq(pci, 0);
     pcilib_unmap_bar(pci, BAR, bar);
@@ -176,4 +214,6 @@ int main() {
 # ifdef ADD_DELAYS
     printf("Repeats: %lf, %lf\n",1. * rpt / (ITERATIONS * BUFFERS), 1. * rpt2 / (ITERATIONS * BUFFERS));
 #endif /* USE_IRQ */	    
+
+
 }

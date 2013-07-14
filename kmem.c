@@ -91,13 +91,19 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
     kh.align = alignment;
     kh.use = use;
 
-    if ((type&PCILIB_KMEM_TYPE_MASK) != PCILIB_KMEM_TYPE_PAGE) {
+    if ((type&PCILIB_KMEM_TYPE_MASK) == PCILIB_KMEM_TYPE_REGION) {
+	kh.align = 0;
+    } else if ((type&PCILIB_KMEM_TYPE_MASK) != PCILIB_KMEM_TYPE_PAGE) {
 	kh.size += alignment;
     }
-    
+
     for ( i = 0; i < nmemb; i++) {
 	kh.item = i;
 	kh.flags = flags;
+
+	if ((type&PCILIB_KMEM_TYPE_MASK) == PCILIB_KMEM_TYPE_REGION) {
+	    kh.pa = alignment + i * size;
+	}
 	
         ret = ioctl(ctx->handle, PCIDRIVER_IOC_KMEM_ALLOC, &kh);
 	if (ret) {

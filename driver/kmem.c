@@ -129,15 +129,23 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	 case PCILIB_KMEM_TYPE_CONSISTENT:
 	    retptr = pci_alloc_consistent( privdata->pdev, kmem_handle->size, &(kmem_entry->dma_handle) );
 	    break;
+	 case PCILIB_KMEM_TYPE_REGION:
+	    retptr = ioremap(kmem_handle->pa,  kmem_handle->size);
+	    kmem_entry->dma_handle = kmem_handle->pa;
+	    if (kmem_entry->type == PCILIB_KMEM_TYPE_REGION_S2C) {
+		kmem_entry->direction = PCI_DMA_TODEVICE;
+	    } else if (kmem_entry->type == PCILIB_KMEM_TYPE_REGION_C2S) {
+		kmem_entry->direction = PCI_DMA_FROMDEVICE;
+	    }
+	    break;
 	 case PCILIB_KMEM_TYPE_PAGE:
 	    if (kmem_handle->size == 0)
 		kmem_handle->size = PAGE_SIZE;
 	    else if (kmem_handle->size%PAGE_SIZE)
 		goto kmem_alloc_mem_fail;
-		
+	
 	    retptr = (void*)__get_free_pages(GFP_KERNEL|__GFP_DMA, get_order(kmem_handle->size));
 	    kmem_entry->dma_handle = 0;
-	    kmem_handle->size = kmem_handle->size;
 	    
 	    if (retptr) {
 	        if (kmem_entry->type == PCILIB_KMEM_TYPE_DMA_S2C_PAGE) {
@@ -432,6 +440,9 @@ int pcidriver_kmem_free_entry(pcidriver_privdata_t *privdata, pcidriver_kmem_ent
 	 case PCILIB_KMEM_TYPE_CONSISTENT:
 	    pci_free_consistent( privdata->pdev, kmem_entry->size, (void *)(kmem_entry->cpua), kmem_entry->dma_handle );
 	    break;
+	 case PCILIB_KMEM_TYPE_REGION:
+	    iounmap((void *)(kmem_entry->cpua));
+	    break;
 	 case PCILIB_KMEM_TYPE_PAGE:
 	    if (kmem_entry->dma_handle) {
 		if (kmem_entry->type == PCILIB_KMEM_TYPE_DMA_S2C_PAGE) {
@@ -609,12 +620,25 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 			virt_to_phys((void*)kmem_entry->cpua),
 			page_to_pfn(virt_to_page((void*)kmem_entry->cpua)));
 
-	ret = remap_pfn_range_cpua_compat(
+	 if ((kmem_entry->type&PCILIB_KMEM_TYPE_MASK) == PCILIB_KMEM_TYPE_REGION) {
+	    mod_info("Mapping address %08lx / Size %08lx\n",
+			kmem_entry->dma_handle,
+			(vma_size < kmem_entry->size)?vma_size:kmem_entry->size)
+
+		ret = remap_pfn_range_compat(
+					vma,
+					vma->vm_start,
+					kmem_entry->dma_handle,
+					(vma_size < kmem_entry->size)?vma_size:kmem_entry->size,
+					vma->vm_page_prot);
+	 } else {
+		ret = remap_pfn_range_cpua_compat(
 					vma,
 					vma->vm_start,
 					kmem_entry->cpua,
 					(vma_size < kmem_entry->size)?vma_size:kmem_entry->size,
 					vma->vm_page_prot );
+	}
 
 	if (ret) {
 		mod_info("kmem remap failed: %d (%lx)\n", ret,kmem_entry->cpua);
