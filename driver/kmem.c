@@ -24,6 +24,11 @@
 #include "kmem.h"			/* prototypes for kernel memory */
 #include "sysfs.h"			/* prototypes for sysfs */
 
+/* VM_RESERVED is removed in 3.7-rc1 */
+#ifndef VM_RESERVED
+# define  VM_RESERVED   (VM_DONTEXPAND | VM_DONTDUMP)
+#endif
+
 /**
  *
  * Allocates new kernel memory including the corresponding management structure, makes
