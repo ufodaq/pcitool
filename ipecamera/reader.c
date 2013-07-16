@@ -129,7 +129,7 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 #endif /* IPECAMERA_DEBUG_RAW_PACKETS */
 	    
 	    if (invalid_frame_id != ctx->event_id) {
-		pcilib_warning("Invalid DMA packets received, first is %u bytes long, current event %lu", bufsize, ctx->event_id);
+		pcilib_warning("No frame magic in DMA packet of %u bytes, current event %lu", bufsize, ctx->event_id);
 		invalid_frame_id = ctx->event_id;
 	    }
 
