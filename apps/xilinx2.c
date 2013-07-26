@@ -35,8 +35,8 @@ much extra time */
 
 //#define WR(addr, value) { val = value; pcilib_write(pci, BAR, addr, sizeof(val), &val); }
 //#define RD(addr, value) { pcilib_read(pci, BAR, addr, sizeof(val), &val); value = val; }
-#define WR(addr, value) { *(uint32_t*)(bar + addr) = value; }
-#define RD(addr, value) { value = *(uint32_t*)(bar + addr); }
+#define WR(addr, value) { *(uint32_t*)(bar + addr + offset) = value; }
+#define RD(addr, value) { value = *(uint32_t*)(bar + addr + offset); }
 
 static void fail(const char *msg, ...) {
     va_list va;
@@ -77,6 +77,9 @@ int main() {
     void* volatile bar;
     uintptr_t bus_addr[BUFFERS];
 
+    pcilib_bar_t bar_tmp = BAR; 
+    uintptr_t offset = 0;
+
     pcilib_kmem_flags_t clean_flags = PCILIB_KMEM_FLAG_HARDWARE|PCILIB_KMEM_FLAG_PERSISTENT|PCILIB_KMEM_FLAG_EXCLUSIVE;
 
 #ifdef ADD_DELAYS
@@ -103,6 +106,8 @@ int main() {
 	pcilib_close(pci);
 	fail("map bar");
     }
+
+    pcilib_detect_address(pci, &bar_tmp, &offset, 1);
 
 	// Reset
     WR(0x00, 1)
@@ -189,7 +194,6 @@ int main() {
 	}
     }
     gettimeofday(&end, NULL);
-
 
 #ifdef CHECK_RESULT    
     pcilib_kmem_sync_block(pci, kbuf, PCILIB_KMEM_SYNC_FROMDEVICE, 0);
