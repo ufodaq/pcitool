@@ -621,9 +621,9 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 			page_to_pfn(virt_to_page((void*)kmem_entry->cpua)));
 
 	 if ((kmem_entry->type&PCILIB_KMEM_TYPE_MASK) == PCILIB_KMEM_TYPE_REGION) {
-	    mod_info("Mapping address %08lx / Size %08lx\n",
-			kmem_entry->dma_handle,
-			(vma_size < kmem_entry->size)?vma_size:kmem_entry->size)
+		mod_info("Mapping address %08lx / Size %08lx\n",
+			(unsigned long)kmem_entry->dma_handle,
+			(vma_size < kmem_entry->size)?vma_size:kmem_entry->size);
 
 		ret = remap_pfn_range_compat(
 					vma,
