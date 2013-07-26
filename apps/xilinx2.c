@@ -19,6 +19,7 @@
 #define STATIC_REGION 0x80000000 //  to reserve 512 MB at the specified address, add "memmap=512M$2G" to kernel parameters
 #define BUFFERS 1
 #define ITERATIONS 100
+#define TLP_SIZE 64
 #define HUGE_PAGE 4096	// number of pages per huge page
 #define PAGE_SIZE 4096	// other values are not supported in the kernel
 #define TIMEOUT 100000
@@ -26,7 +27,7 @@
 /* IRQs are slow for some reason. REALTIME mode is slower. Adding delays does not really help,
 otherall we have only 3 checks in average. Check ready seems to be not needed and adds quite 
 much extra time */
-//#define USE_IRQ
+#define USE_IRQ
 //#define CHECK_READY
 //#define REALTIME
 //#define ADD_DELAYS
@@ -139,8 +140,8 @@ int main() {
 #endif /* CHECK_RESULT */
 
     WR(0x04, 0)
-    WR(0x0C, 0x20)
-    WR(0x10, (HUGE_PAGE * (PAGE_SIZE / 0x80)))
+    WR(0x0C, TLP_SIZE)
+    WR(0x10, (HUGE_PAGE * (PAGE_SIZE / (4 * TLP_SIZE))))
     WR(0x14, 0x13131313)
 
     for (j = 0; j < BUFFERS; j++ ) {
@@ -194,6 +195,7 @@ int main() {
     pcilib_kmem_sync_block(pci, kbuf, PCILIB_KMEM_SYNC_FROMDEVICE, 0);
 
     for (i = 0; i < (HUGE_PAGE * PAGE_SIZE / 4); i++) {
+//	printf("%lx ", ptr0[i]);
 	if (ptr0[i] != 0x13131313) break;
     }
     if (i < (HUGE_PAGE * PAGE_SIZE / 4)) {
