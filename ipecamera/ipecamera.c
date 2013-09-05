@@ -446,7 +446,7 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
 	    // it would be greate to detect hyperthreading cores and ban them
 	switch (ctx->n_preproc) {
 	    case 1: break;
-	    case 2-3: ctx->n_preproc -= 1; break;
+	    case 2 ... 3: ctx->n_preproc -= 1; break;
 	    default: ctx->n_preproc -= 2; break;
 	}
 
