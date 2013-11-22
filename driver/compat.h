@@ -10,6 +10,12 @@
 #ifndef _COMPAT_H
 #define _COMPAT_H
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
+# define __devinit
+# define __devexit
+# define __devinitdata
+#endif
+
 /* dev_name is the wrapper one needs to use to access what was formerly called
  * bus_id in struct device. However, before 2.6.27, direct access was necessary,
  * so we provide our own version. */
