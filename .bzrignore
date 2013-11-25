@@ -19,3 +19,7 @@ Makefile
 *.so.*
 install_manifest.txt
 ./xilinx
+apps/pio_test
+apps/compare_to_value
+*.out
+apps/xilinx
