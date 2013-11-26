@@ -1,7 +1,7 @@
 #! /bin/bash
 
-#location=/mnt/fast/
-location="./"
+location=/mnt/fast/
+#location="./"
 duration=10000000
 wait_frame=1000000
 
@@ -18,6 +18,13 @@ function stop {
     pci -w control 0x201 &> /dev/null
 }
 
+function reset {
+    pci -r 0x9000 -s 256 > $1.status
+    $TESTS_PATH/ipecamera/Reset_Init_all_reg_10bit.sh &> $1.reset 
+}
+
+
+$TESTS_PATH/ipecamera/Reset_Init_all_reg_10bit.sh &> /dev/null
 /root/pcitool/tests/frame.sh &> /dev/null
 rm -f bench.out
 
@@ -39,6 +46,9 @@ decode_failures=0
 failures=0
 failed=0
 frames=0
+fpga_failures=0
+cmosis_failures=0
+frame_rate_failures=0
 
 iter=0
 while [ 1 ]; do
@@ -60,19 +70,34 @@ while [ 1 ]; do
 	if [ $? -ne 0 -o $cur_failed -eq 0 ]; then
 	    ipedec -d -v --continue $output > $output.decode
 	    decode_failures=$(($decode_failures + 1))
+	    reset $output
 	else
 	    cur_failed=$(($cur_failed - 1))
 	    cur_frames=`echo $cur_decoded | cut -f 2 -d ' '`
 	    failed=$(($failed + $cur_failed))
 	    frames=$(($frames + $cur_frames))
-	    if [ $cur_failed -eq 0 ]; then
+	    fpga_status=`pci -r 0x9054 | awk '{print $2;}' | cut -c 2`
+	    cmosis_status=`pci -r 0x9050 | awk '{print $2;}' | cut -c 3-4`
+	    if [ "$fpga_status" != "f" ]; then
+		fpga_failures=$(($fpga_failures + 1))
+		reset $output
+	    elif [ "$cmosis_status" == "7d" ]; then
+		cmosis_failures=$(($cmosis_failures + 1))
+		reset $output
+	    elif [ $cur_frames -lt 10 ]; then
+		frame_rate_failures=$(($frame_rate_failures + 1))
+		reset $output
+	    elif [ $cur_failed -eq 0 ]; then
 		rm -f $output
+	    else
+		reset $output
 	    fi
 	fi
     else
 	failures=$(($failures + 1))
+	reset $output
     fi
 
-    echo "Frames: $frames, Failed Frames: $failed, Failed Exchanges: $failures, Failed Decodings: $decode_failures"
+    echo "Frames: $frames, Failed Frames: $failed, Failed Exchanges: $failures, Failed Decodings: $decode_failures, FPGA Failures: $fpga_failures, CMOSIS Failures: $cmosis_failures, Low Frame Rate: $frame_rate_failures"
     iter=`expr $iter + 1`
 done

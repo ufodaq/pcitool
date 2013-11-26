@@ -279,6 +279,10 @@ if [ "$value" != "b$val" ]; then
 fi
 #pci -r 0x9000 -s 10
 
+##################################################
+#SET the max number of frame in DDR
+pci -w 0x91a0 0x1C
+
 sleep 0.01
 #pci -w 0x9000 0xd011
 sleep 0.01
@@ -306,4 +310,9 @@ else
 fi
 echo 
 
+
+echo "DMA reset ... "
+pci --stop-dma dma1
+sleep 0.5
+pci --start-dma dma1
 

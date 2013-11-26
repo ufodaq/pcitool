@@ -5,10 +5,10 @@
 
 error=0
 echo " Reset Readout and CMOSIS "
-pci -w 0x9040 204 
+pci -w 0x9040 80000204 
 sleep .1
 #echo " Release Reset for Readout"
-#pci -w 0x9040 1e0
+#pci -w 0x9040 800001e0
 sleep .1
 ##################### PLL SET #####################################
 val=f501
@@ -228,7 +228,7 @@ fi
 ####################################################################################################################
 
 sleep 0.01
-#pci -w 0x9040 201
+#pci -w 0x9040 80000201
 sleep 0.01
 ########################## WRITE THE READOUT NUMBER OF LINE #######################################################
 pci -w cmosis_number_lines 1088
@@ -288,16 +288,23 @@ sleep 0.01
 #########################################################################################################
 sleep 0.01
 
+
+
+##################################################
+#SET the max number of frame in DDR
+pci -w 0x91a0 0x71
+
 #echo " Reset Readout and CMOSIS "
-pci -w 0x9040 0x204
+pci -w 0x9040 0x80000204
 sleep .1
 echo " Release Reset for Readout"
-pci -w 0x9040 0x201
+pci -w 0x9040 0x80000201
 sleep .1
 
 status=`pci -r 0x9050 -s 4 | awk '{print $2$3$4}'`
 if [ "$status" != "8449ffff0f0010013ffff111" ]; then
     echo "--------------------------------->>>> ERROR! in the camera status ... "
+    echo "  $status     "
     error=1
     # exit
 fi
@@ -310,5 +317,10 @@ else
 	echo " Camera READY ........................... OK"		
 fi
 echo 
+
+echo "DMA reset ... "
+pci --stop-dma dma1
+sleep 0.5
+pci --start-dma dma1
 
 

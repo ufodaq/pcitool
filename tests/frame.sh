@@ -1,7 +1,10 @@
 #!/bin/bash
 
+TESTS_PATH="`dirname \"$0\"`"
+TESTS_PATH="`( cd \"$TESTS_PATH\" && pwd )`"
+
 function pci {
-    PCILIB_PATH="/root/pcitool"
+    PCILIB_PATH=$TESTS_PATH/..
     LD_LIBRARY_PATH="$PCILIB_PATH" $PCILIB_PATH/pci $*
 }
 

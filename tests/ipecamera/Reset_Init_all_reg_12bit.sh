@@ -188,7 +188,7 @@ echo " End CMOSIS Configuration .."
 echo " Write exp time......"
 
 ######################################### EXP TIME #######################################################
-val=aa01
+val=aa0f
 pci -w 0x9000 $val
 sleep 0.01
 #pci -r 0x9000 -s 10
@@ -280,20 +280,29 @@ fi
 #pci -r 0x9000 -s 10
 
 sleep 0.01
+
+##################################################
+#SET the max number of frame in DDR
+pci -w 0x91a0 0x1C
+
+
 #pci -w 0x9000 0xd011
 sleep 0.01
-#pci -r 0x9000 -s 10
+pci -r 0x9000 -s 10
 
 sleep 0.01
 #pci -w 0x9000 0xd111
-#pci -r 0x9000 -s 10
-#########################################################################################################
 sleep 0.01
+pci -r 0x9000 -s 10
+#########################################################################################################
+sleep 0.1
 
 status=`pci -r 0x9050 -s 4 | awk '{print $2$3$4}'`
-if [ "$status" != "8449ffff0f0010013ffff111" ]; then
+if [ "$status" != "844950280f0010013ffff111" ]; then
+
     echo "--------------------------------->>>> ERROR! in the camera status ... "
-    error =1
+    echo $status
+    error=1
     # exit
 fi
 
@@ -307,3 +316,8 @@ fi
 echo 
 
 
+
+echo "DMA reset ... "
+pci --stop-dma dma1
+sleep 0.5
+pci --start-dma dma1
