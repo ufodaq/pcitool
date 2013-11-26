@@ -47,6 +47,7 @@ int main(int argc, char *argv[]) {
     num = fread(buf, 4, size, f);
     if (num != size) {
 	printf("Only %lu of %lu dwords in the file\n", num, size);
+	exit(1);
     }
     fclose(f);
     
