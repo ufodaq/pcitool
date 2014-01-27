@@ -16,7 +16,7 @@
 //#define REALTIME
 
 #define BAR PCILIB_BAR0
-#define BITS 16
+#define BITS 32
 #define MASK ((1ll << BITS) - 1)
 
 

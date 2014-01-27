@@ -123,6 +123,7 @@ struct ipecamera_s {
     
     size_t max_frames;		/**< Maximal number of frames what may be buffered in camera DDR memory */
     int firmware;		/**< Firmware version */
+    int fr_mode;		/**< Fast Reject mode */
     int cmosis_outputs;		/**< Number of active cmosis outputs: 4 or 16 */
     int width, height;
 

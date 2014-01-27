@@ -284,11 +284,17 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
 	return PCILIB_ERROR_INVALID_REQUEST;
     }
 
+
 	// Allow readout and clean the FRAME_REQUEST mode if set for some reason
-    SET_REG(control_reg, IPECAMERA_IDLE|IPECAMERA_READOUT_FLAG);
+    GET_REG(control_reg, value);
+    SET_REG(control_reg, value|IPECAMERA_READOUT_FLAG);
     usleep(IPECAMERA_SLEEP_TIME);
-    CHECK_STATUS_REG();
-    if (err) return err;
+    if (value&0x1000) ctx->fr_mode = 1;
+    else {
+	ctx->fr_mode = 0;
+	CHECK_STATUS_REG();
+	if (err) return err;
+    }
 
     ctx->event_id = 0;
     ctx->preproc_id = 0;

@@ -62,5 +62,5 @@ int main(int argc, char *argv[]) {
     free(buf);
     
     printf("%lu of %lu is wrong\n", count, total);
-
+    return 0;
 }
