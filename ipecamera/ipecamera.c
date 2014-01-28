@@ -647,11 +647,12 @@ int ipecamera_trigger(pcilib_context_t *vctx, pcilib_event_t event, size_t trigg
 	GET_REG(status3_reg, value);
     } while (value&0x20000000);
 */
-    
-    SET_REG(control_reg, IPECAMERA_FRAME_REQUEST|IPECAMERA_READOUT_FLAG);
+
+    GET_REG(control_reg, value); 
+    SET_REG(control_reg, value|IPECAMERA_FRAME_REQUEST);
     usleep(IPECAMERA_WAIT_FRAME_RCVD_TIME);
     //CHECK_REG(status_reg, IPECAMERA_EXPECTED_STATUS);
-    SET_REG(control_reg, IPECAMERA_IDLE|IPECAMERA_READOUT_FLAG);
+    SET_REG(control_reg, value);
 
 
     pcilib_calc_deadline(&ctx->next_trigger, IPECAMERA_NEXT_FRAME_DELAY);
