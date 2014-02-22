@@ -130,6 +130,8 @@ typedef enum {
 #define PCILIB_TIMEOUT_IMMEDIATE	0
 #define PCILIB_IRQ_TYPE_ALL 		0
 #define PCILIB_IRQ_SOURCE_DEFAULT	0
+#define PCILIB_REGISTER_NO_BITS		0
+#define PCILIB_REGISTER_ALL_BITS	((pcilib_register_value_t)-1)
 
 typedef struct {
     pcilib_event_t type;
@@ -183,7 +185,9 @@ typedef struct {
     pcilib_register_size_t offset;
     pcilib_register_size_t bits;
     pcilib_register_value_t defvalue;
-    pcilib_register_value_t rwmask;	/**< 1 - read before write bits, 0 - zero should be written to preserve value */
+    pcilib_register_value_t rwmask;	/**< 1 - read before write bits, 0 - zero should be written to preserve value 
+					Used to define how external bits of PCILIB_REGISTER_BITS registers are treated.
+					Currently it is a bit confusing, we may find a better way in the next release */
     pcilib_register_mode_t mode;
     pcilib_register_type_t type;
     
