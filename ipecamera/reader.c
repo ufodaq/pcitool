@@ -156,14 +156,10 @@ static int ipecamera_data_callback(void *user, pcilib_dma_flags_t flags, size_t 
 	    size_t n_lines = ((uint32_t*)buf)[5] & 0x7FF;
 	    ipecamera_compute_buffer_size(ctx, n_lines);
 
-/*
-		// Not implemented in hardware yet
 	    ctx->frame[ctx->buffer_pos].event.info.seqnum = ((uint32_t*)buf)[6] & 0x1FFFFFF;
-*/
 	    ctx->frame[ctx->buffer_pos].event.info.offset = (((uint32_t*)buf)[7] & 0xFFFFFF) * 80;
 
-
-	    ctx->frame[ctx->buffer_pos].event.info.seqnum = ctx->event_id + 1;
+//	    ctx->frame[ctx->buffer_pos].event.info.seqnum = ctx->event_id + 1;
 
 	    gettimeofday(&ctx->frame[ctx->buffer_pos].event.info.timestamp, NULL);
 	} else {
