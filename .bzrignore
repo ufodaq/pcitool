@@ -23,3 +23,4 @@ apps/pio_test
 apps/compare_to_value
 *.out
 apps/xilinx
+apps/heb_strip_bad_values
