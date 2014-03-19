@@ -24,8 +24,8 @@ function reset {
 }
 
 
-$TESTS_PATH/ipecamera/Reset_Init_all_reg_10bit.sh &> /dev/null
-/root/pcitool/tests/frame.sh &> /dev/null
+$TESTS_PATH/ipecamera/cfg/Reset_Init_all_reg_10bit.sh &> /dev/null
+$TESTS_PATH/ipecamera/frame.sh &> /dev/null
 rm -f bench.out
 
 pci --stop-dma

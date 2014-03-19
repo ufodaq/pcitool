@@ -18,7 +18,7 @@ size=`expr 1024 "*" 1`
 multiplier=2
 wait=0
 
-/root/pcitool/tests/frame.sh &> /dev/null
+/root/pcitool/tests/ipecamera/frame.sh &> /dev/null
 rm -f bench.out
 
 pci --stop-dma dma1
