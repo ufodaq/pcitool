@@ -37,6 +37,7 @@
  */
 int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_handle)
 {
+	int flags;
 	pcidriver_kmem_entry_t *kmem_entry;
 	void *retptr;
 
@@ -135,7 +136,12 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	    retptr = pci_alloc_consistent( privdata->pdev, kmem_handle->size, &(kmem_entry->dma_handle) );
 	    break;
 	 case PCILIB_KMEM_TYPE_PAGE:
-	    retptr = (void*)__get_free_pages(GFP_KERNEL, get_order(PAGE_SIZE));
+	    flags = GFP_KERNEL;
+	    
+	    if ((kmem_entry->type == PCILIB_KMEM_TYPE_DMA_S2C_PAGE)||(kmem_entry->type == PCILIB_KMEM_TYPE_DMA_C2S_PAGE))
+		flags |= __GFP_DMA;
+
+	    retptr = (void*)__get_free_pages(flags, get_order(PAGE_SIZE));
 	    kmem_entry->dma_handle = 0;
 	    kmem_handle->size = PAGE_SIZE;
 	    
