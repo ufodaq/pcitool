@@ -116,7 +116,7 @@ static pcilib_bar_t pcilib_detect_bar(pcilib_t *ctx, uintptr_t addr, size_t size
     return PCILIB_BAR_INVALID;
 }
 
-static int pcilib_detect_address(pcilib_t *ctx, pcilib_bar_t *bar, uintptr_t *addr, size_t size) {
+int pcilib_detect_address(pcilib_t *ctx, pcilib_bar_t *bar, uintptr_t *addr, size_t size) {
     const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
     if (!board_info) return PCILIB_ERROR_NOTFOUND;
     

@@ -123,7 +123,8 @@ pcilib_context_t *ipecamera_init(pcilib_t *pcilib) {
 	    ctx->firmware = value;
 	    break;
 	 default:
-    	    pcilib_error("Unsupported version of firmware (%lu)", value);
+//    	    pcilib_error("Unsupported version of firmware (%lu)", value);
+	    ctx->firmware = 0;
 	}
 
 #ifdef IPECAMERA_BUG_POSTPONED_READ
@@ -155,7 +156,9 @@ void ipecamera_free(pcilib_context_t *vctx) {
 }
 
 pcilib_dma_context_t *ipecamera_init_dma(pcilib_context_t *vctx) {
-//    ipecamera_t *ctx = (ipecamera_t*)vctx;
+#ifdef IPECAMERA_DMA_R3
+    ipecamera_t *ctx = (ipecamera_t*)vctx;
+#endif
     
     pcilib_model_description_t *model_info = pcilib_get_model_description(vctx->pcilib);
     if ((!model_info->dma_api)||(!model_info->dma_api->init)) {
@@ -165,7 +168,11 @@ pcilib_dma_context_t *ipecamera_init_dma(pcilib_context_t *vctx) {
 
 
 #ifdef IPECAMERA_DMA_R3
-    return model_info->dma_api->init(vctx->pcilib, PCILIB_NWL_MODIFICATION_IPECAMERA, NULL);
+    if (ctx->firmware) {
+	return model_info->dma_api->init(vctx->pcilib, PCILIB_NWL_MODIFICATION_IPECAMERA, NULL);
+    } else {
+	return model_info->dma_api->init(vctx->pcilib, PCILIB_DMA_MODIFICATION_DEFAULT, NULL);
+    }
 #else
     return model_info->dma_api->init(vctx->pcilib, PCILIB_DMA_MODIFICATION_DEFAULT, NULL);
 #endif
@@ -203,6 +210,11 @@ int ipecamera_reset(pcilib_context_t *vctx) {
     if (!ctx) {
 	pcilib_error("IPECamera imaging is not initialized");
 	return PCILIB_ERROR_NOTINITIALIZED;
+    }
+    
+    if (!ctx->firmware) {
+	pcilib_warning("Unsupported version of firmware (%lu)", ctx->firmware);
+	return 0;
     }
 
     pcilib = vctx->pcilib;
@@ -278,12 +290,16 @@ int ipecamera_start(pcilib_context_t *vctx, pcilib_event_t event_mask, pcilib_ev
 	pcilib_error("IPECamera imaging is not initialized");
 	return PCILIB_ERROR_NOTINITIALIZED;
     }
+
+    if (!ctx->firmware) {
+	pcilib_error("Unsupported version of firmware (%lu)", ctx->firmware);
+	return PCILIB_ERROR_INVALID_REQUEST;
+    }
     
     if (ctx->started) {
 	pcilib_error("IPECamera grabbing is already started");
 	return PCILIB_ERROR_INVALID_REQUEST;
     }
-
 
 	// Allow readout and clean the FRAME_REQUEST mode if set for some reason
     GET_REG(control_reg, value);
@@ -634,7 +650,12 @@ int ipecamera_trigger(pcilib_context_t *vctx, pcilib_event_t event, size_t trigg
 	pcilib_error("IPECamera imaging is not initialized");
 	return PCILIB_ERROR_NOTINITIALIZED;
     }
-    
+
+    if (!ctx->firmware) {
+	pcilib_error("Unsupported version of firmware (%lu)", ctx->firmware);
+	return PCILIB_ERROR_INVALID_REQUEST;
+    }
+
     pcilib_sleep_until_deadline(&ctx->next_trigger);
 
     GET_REG(num_frames_reg, value);

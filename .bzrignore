@@ -18,9 +18,8 @@ cmake_install.cmake
 Makefile
 *.so.*
 install_manifest.txt
-./xilinx
+apps/xilinx
 apps/pio_test
 apps/compare_to_value
-*.out
-apps/xilinx
 apps/heb_strip_bad_values
+*.out
