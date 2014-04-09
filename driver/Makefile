@@ -10,7 +10,7 @@ EXTRA_CFLAGS += -I$(M)/..
 
 default:
 	@KERNEL_GCC_VERSION=`cat /proc/version | head -n1 | cut -d " " -f 7` ;\
-	GCC_VERSION=`$(CC) --version | head -n 1 | tr ' ' '\n' | grep -e "[0-9]\+\.[0-9]" | head -n 1` ;\
+	GCC_VERSION=`$(CC) --version | head -n 1 | tr ' ' '\n' | grep -e "[0-9]\+\.[0-9]" | tail -n 1` ;\
 	if [ $$KERNEL_GCC_VERSION != $$GCC_VERSION ]; then \
 	    echo "Kernel is compiled with gcc $$KERNEL_GCC_VERSION, but you are now using $$GCC_VERSION" ;\
 	    GCC_MAJOR=`echo $$KERNEL_GCC_VERSION | cut -d "." -f 1-2` ;\
