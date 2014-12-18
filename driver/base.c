@@ -307,6 +307,8 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 		mod_info("Found ML605 board at %s\n", dev_name(&pdev->dev));
 	    } else if (id->device == PCIE_IPECAMERA_DEVICE_ID) {
 		mod_info("Found IPE Camera at %s\n", dev_name(&pdev->dev));
+	    } else if (id->device == PCIE_KAPTURE_DEVICE_ID) {
+		mod_info("Found KAPTURE board at %s\n", dev_name(&pdev->dev));
 	    } else {
 		mod_info("Found unknown Xilinx device (%x) at %s\n", id->device, dev_name(&pdev->dev));
 	    }

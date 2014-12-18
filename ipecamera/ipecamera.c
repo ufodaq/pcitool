@@ -23,12 +23,8 @@
 #include "events.h"
 #include "data.h"
 
-#include "dma/nwl_dma.h"
 
-#ifdef IPECAMERA_DEBUG
 #include "dma/nwl.h"
-#endif /* IPECAMERA_DEBUG */
-
 
 #define FIND_REG(var, bank, name)  \
         ctx->var = pcilib_find_register(pcilib, bank, name); \

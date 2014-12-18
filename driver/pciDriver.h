@@ -65,6 +65,7 @@
 
 /* Identifies the PCI-E IPE Camera */
 #define PCIE_IPECAMERA_DEVICE_ID 0x6081
+#define PCIE_KAPTURE_DEVICE_ID 0x6028
 //#define PCIE_IPECAMERA_DEVICE_ID 0x6018
 
 

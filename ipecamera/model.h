@@ -152,8 +152,12 @@ extern pcilib_event_data_type_description_t ipecamera_data_types[];
 
 #ifdef _IPECAMERA_IMAGE_C
 pcilib_event_api_description_t ipecamera_image_api = {
+    "ipecamera",
+    
     ipecamera_init,
     ipecamera_free,
+
+    ipecamera_init_dma,
 
     ipecamera_reset,
     ipecamera_start,
@@ -163,8 +167,7 @@ pcilib_event_api_description_t ipecamera_image_api = {
     ipecamera_stream,
     ipecamera_next_event,
     ipecamera_get,
-    ipecamera_return,
-    ipecamera_init_dma
+    ipecamera_return
 };
 #else
 extern pcilib_event_api_description_t ipecamera_image_api;

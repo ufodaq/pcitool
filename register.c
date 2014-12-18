@@ -25,7 +25,6 @@ int pcilib_add_registers(pcilib_t *ctx, size_t n, pcilib_register_description_t 
 	for (n = 0; registers[n].bits; n++);
     }
 
-
     if (ctx->model_info.registers == pcilib_model[ctx->model].registers) {
         for (n_present = 0; ctx->model_info.registers[n_present].bits; n_present++);
 	for (size = 1024; size < 2 * (n + n_present + 1); size<<=1);

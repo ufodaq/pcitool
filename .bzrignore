@@ -23,3 +23,5 @@ apps/pio_test
 apps/compare_to_value
 apps/heb_strip_bad_values
 *.out
+apps/check_counter
+apps/lorenzo_ipedma_test

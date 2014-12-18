@@ -1,67 +1,46 @@
-#ifndef _PCILIB_NWL_H
-#define _PCILIB_NWL_H
+#ifndef _PCILIB_DMA_NWL_H
+#define _PCILIB_DMA_NWL_H
 
-typedef struct nwl_dma_s nwl_dma_t;
-typedef struct pcilib_nwl_engine_description_s pcilib_nwl_engine_description_t;
+#include <stdio.h>
+#include "../pcilib.h"
 
-#define NWL_DMA_IRQ_SOURCE 0
+#define PCILIB_NWL_MODIFICATION_IPECAMERA 0x100
 
-#define NWL_XAUI_ENGINE 0
-#define NWL_XRAWDATA_ENGINE 1
-#define NWL_MAX_PACKET_SIZE 4096 //16384
-//#define NWL_GENERATE_DMA_IRQ
+pcilib_dma_context_t *dma_nwl_init(pcilib_t *ctx, pcilib_dma_modification_t type, void *arg);
+void  dma_nwl_free(pcilib_dma_context_t *vctx);
 
-#define PCILIB_NWL_ALIGNMENT 			64  // in bytes
-#define PCILIB_NWL_DMA_DESCRIPTOR_SIZE		64  // in bytes
-#define PCILIB_NWL_DMA_PAGES			256 // 1024
+int dma_nwl_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers);
 
-//#define DEBUG_HARDWARE
-//#define DEBUG_NWL
+int dma_nwl_enable_irq(pcilib_dma_context_t *vctx, pcilib_irq_type_t type, pcilib_dma_flags_t flags);
+int dma_nwl_disable_irq(pcilib_dma_context_t *vctx, pcilib_dma_flags_t flags);
+int dma_nwl_acknowledge_irq(pcilib_dma_context_t *ctx, pcilib_irq_type_t irq_type, pcilib_irq_source_t irq_source);
 
-#include "nwl_dma.h"
-#include "nwl_irq.h"
-#include "nwl_register.h"
-#include "nwl_engine.h"
-#include "nwl_loopback.h"
+int dma_nwl_start(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
+int dma_nwl_stop(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
 
-#define nwl_read_register(var, ctx, base, reg) pcilib_datacpy(&var, base + reg, 4, 1, ctx->dma_bank->raw_endianess)
-#define nwl_write_register(var, ctx, base, reg) pcilib_datacpy(base + reg, &var, 4, 1, ctx->dma_bank->raw_endianess)
+int dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, void *data, size_t *written);
+int dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, pcilib_dma_callback_t cb, void *cbattr);
+double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction);
 
-struct pcilib_nwl_engine_description_s {
-    pcilib_dma_engine_description_t desc;
-    char *base_addr;
-    
-    size_t ring_size, page_size;
-    size_t head, tail;
-    pcilib_kmem_handle_t *ring;
-    pcilib_kmem_handle_t *pages;
-    
-    int started;			/**< indicates that DMA buffers are initialized and reading is allowed */
-    int writting;			/**< indicates that we are in middle of writting packet */
-    int reused;				/**< indicates that DMA was found intialized, buffers were reused, and no additional initialization is needed */
-    int preserve;			/**< indicates that DMA should not be stopped during clean-up */
+
+#ifdef _PCILIB_DMA_NWL_C
+pcilib_dma_api_description_t nwl_dma_api = {
+    "nwl_dma",
+    dma_nwl_init,
+    dma_nwl_free,
+    dma_nwl_get_status,
+    dma_nwl_enable_irq,
+    dma_nwl_disable_irq,
+    dma_nwl_acknowledge_irq,
+    dma_nwl_start,
+    dma_nwl_stop,
+    dma_nwl_write_fragment,
+    dma_nwl_stream_read,
+    dma_nwl_benchmark
 };
+#else
+extern pcilib_dma_api_description_t nwl_dma_api;
+#endif
 
 
-struct nwl_dma_s {
-    struct pcilib_dma_context_s dmactx;
-    
-    pcilib_t *pcilib;
-    
-    pcilib_dma_modification_t type;
-    
-    pcilib_register_bank_description_t *dma_bank;
-    char *base_addr;
-
-    pcilib_irq_type_t irq_enabled;	/**< indicates that IRQs are enabled */
-    pcilib_irq_type_t irq_preserve;	/**< indicates that IRQs should not be disabled during clean-up */
-    int started;			/**< indicates that DMA subsystem is initialized and DMA engine can start */
-    int irq_started;			/**< indicates that IRQ subsystem is initialized (detecting which types should be preserverd) */    
-    int loopback_started;		/**< indicates that benchmarking subsystem is initialized */
-
-    pcilib_dma_engine_t n_engines;
-    pcilib_nwl_engine_description_t engines[PCILIB_MAX_DMA_ENGINES + 1];
-};
-
-
-#endif /* _PCILIB_NWL_H */
+#endif /* _PCILIB_DMA_NWL_H */

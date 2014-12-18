@@ -43,7 +43,8 @@ typedef enum {
 typedef enum {
     PCILIB_MODEL_DETECT,
     PCILIB_MODEL_PCI,
-    PCILIB_MODEL_IPECAMERA
+    PCILIB_MODEL_IPECAMERA,
+    PCILIB_MODEL_KAPTURE
 } pcilib_model_t;
 
 typedef enum {

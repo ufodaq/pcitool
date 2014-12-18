@@ -2641,6 +2641,7 @@ int main(int argc, char **argv) {
 	    case OPT_MODEL:
 		if (!strcasecmp(optarg, "pci")) model = PCILIB_MODEL_PCI;
 		else if (!strcasecmp(optarg, "ipecamera")) model = PCILIB_MODEL_IPECAMERA;
+		else if (!strcasecmp(optarg, "kapture")) model = PCILIB_MODEL_KAPTURE;
 		else Usage(argc, argv, "Invalid memory model (%s) is specified", optarg);
 	    break;
 	    case OPT_BAR:

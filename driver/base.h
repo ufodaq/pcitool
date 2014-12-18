@@ -47,6 +47,7 @@ static void pcidriver_exit(void);
 static const __devinitdata struct pci_device_id pcidriver_ids[] = {
 	{ PCI_DEVICE( PCIE_XILINX_VENDOR_ID, PCIE_ML605_DEVICE_ID ) },          // PCI-E Xilinx ML605
 	{ PCI_DEVICE( PCIE_XILINX_VENDOR_ID, PCIE_IPECAMERA_DEVICE_ID ) },      // PCI-E IPE Camera
+	{ PCI_DEVICE( PCIE_XILINX_VENDOR_ID, PCIE_KAPTURE_DEVICE_ID ) },        // PCI-E KAPTURE board for HEB
 	{0,0,0,0},
 };
 

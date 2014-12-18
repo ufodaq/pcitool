@@ -12,7 +12,7 @@
 #include "error.h"
 #include "tools.h"
 
-#include "nwl.h"
+#include "nwl_private.h"
 #include "nwl_register.h"
 
 int nwl_add_registers(nwl_dma_t *ctx) {

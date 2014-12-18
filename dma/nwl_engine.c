@@ -10,7 +10,7 @@
 #include "pcilib.h"
 #include "error.h"
 #include "tools.h"
-#include "nwl.h"
+#include "nwl_private.h"
 
 #include "nwl_defines.h"
 

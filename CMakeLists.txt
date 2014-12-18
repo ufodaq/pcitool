@@ -1,7 +1,7 @@
 project(pcitool)
 
-set(PCILIB_VERSION "0.0.1")
-set(PCILIB_ABI_VERSION "0")
+set(PCILIB_VERSION "0.1.0")
+set(PCILIB_ABI_VERSION "1")
 
 cmake_minimum_required(VERSION 2.6)
 
@@ -24,6 +24,7 @@ add_definitions("-fPIC --std=c99 -Wall -O2")
 
 add_subdirectory(dma)
 add_subdirectory(ipecamera)
+add_subdirectory(kapture)
 add_subdirectory(pcitool)
 add_subdirectory(apps)
 
@@ -37,7 +38,7 @@ link_directories(
 )
 
 add_library(pcilib SHARED pci.c register.c kmem.c irq.c dma.c event.c default.c tools.c error.c) 
-target_link_libraries(pcilib dma ipecamera ${CMAKE_THREAD_LIBS_INIT} ${UFODECODE_LIBRARIES} )
+target_link_libraries(pcilib dma ipecamera kapture ${CMAKE_THREAD_LIBS_INIT} ${UFODECODE_LIBRARIES} )
 add_dependencies(pcilib dma ipecamera)
 
 set_target_properties(pcilib PROPERTIES

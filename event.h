@@ -17,8 +17,12 @@
  */
 
 struct pcilib_event_api_description_s {
+    const char *title;
+    
     pcilib_context_t *(*init)(pcilib_t *ctx);
     void (*free)(pcilib_context_t *ctx);
+
+    pcilib_dma_context_t *(*init_dma)(pcilib_context_t *ctx);
 
     int (*reset)(pcilib_context_t *ctx);
 
@@ -31,8 +35,6 @@ struct pcilib_event_api_description_s {
 
     int (*get_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, size_t arg_size, void *arg, size_t *size, void **data);
     int (*return_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, void *data);
-    
-    pcilib_dma_context_t *(*init_dma)(pcilib_context_t *ctx);
 };
 
 

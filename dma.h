@@ -21,6 +21,8 @@ typedef struct {
 } pcilib_dma_buffer_status_t;
 
 struct pcilib_dma_api_description_s {
+    const char *title;
+
     pcilib_dma_context_t *(*init)(pcilib_t *ctx, pcilib_dma_modification_t type, void *arg);
     void (*free)(pcilib_dma_context_t *ctx);
     

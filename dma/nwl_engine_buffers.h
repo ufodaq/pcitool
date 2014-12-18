@@ -94,10 +94,10 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_des
     pcilib_kmem_handle_t *ring = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, PCILIB_NWL_DMA_PAGES * PCILIB_NWL_DMA_DESCRIPTOR_SIZE, PCILIB_NWL_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, sub_use), flags);
     pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->pcilib, type, PCILIB_NWL_DMA_PAGES, 0, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, sub_use), flags);
 
-    if (err) {
+    if (!ring||!pages) {
 	if (pages) pcilib_free_kernel_memory(ctx->pcilib, pages, 0);
-	if (ring) pcilib_free_kernel_memory(ctx->pcilib, ring, 0);    
-	return err;
+	if (ring) pcilib_free_kernel_memory(ctx->pcilib, ring, 0);
+	return PCILIB_ERROR_MEMORY;
     }
 
     reuse_ring = pcilib_kmem_is_reused(ctx->pcilib, ring);

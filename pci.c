@@ -22,6 +22,7 @@
 #include "error.h"
 
 #include "ipecamera/model.h"
+#include "kapture/model.h"
 
 
 pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
@@ -88,6 +89,8 @@ pcilib_model_t pcilib_get_model(pcilib_t *ctx) {
 
 	if ((board_info->vendor_id == PCIE_XILINX_VENDOR_ID)&&(board_info->device_id == PCIE_IPECAMERA_DEVICE_ID))
 	    ctx->model = PCILIB_MODEL_IPECAMERA;
+	else if ((board_info->vendor_id == PCIE_XILINX_VENDOR_ID)&&(board_info->device_id == PCIE_KAPTURE_DEVICE_ID))
+	    ctx->model = PCILIB_MODEL_KAPTURE;
 	else
 	    ctx->model = PCILIB_MODEL_PCI;
     }
