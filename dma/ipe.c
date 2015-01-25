@@ -84,7 +84,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     volatile void *desc_va;
     volatile uint32_t *last_written_addr_ptr;
 
-    pcilib_register_value_t value;
+    pcilib_register_value_t value, value2;
 
     if (dma == PCILIB_DMA_ENGINE_INVALID) return 0;
     else if (dma > 1) return PCILIB_ERROR_INVALID_BANK;
@@ -116,7 +116,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 #ifndef IPEDMA_BUG_DMARD
 		RD(IPEDMA_REG_PAGE_COUNT, value);
 
-		if ((value + 1) != IPEDMA_DMA_PAGES) pcilib_warning("Inconsistent DMA buffers are found (Number of allocated buffers does not match current request), reinitializing...");
+		if (value != IPEDMA_DMA_PAGES) pcilib_warning("Inconsistent DMA buffers are found (Number of allocated buffers (%lu) does not match current request (%lu)), reinitializing...", value + 1, IPEDMA_DMA_PAGES);
 		else
 #endif /* IPEDMA_BUG_DMARD */
 		    preserve = 1;
@@ -152,18 +152,20 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
 	    // Disable DMA
 	WR(IPEDMA_REG_CONTROL, 0x0);
+	usleep(100000);
 	
 	    // Reset DMA engine
 	WR(IPEDMA_REG_RESET, 0x1);
 	usleep(100000);
 	WR(IPEDMA_REG_RESET, 0x0);
+	usleep(100000);
 
 #ifndef IPEDMA_BUG_DMARD
 	    // Verify PCIe link status
 	RD(IPEDMA_REG_RESET, value);
-	if (value != 0x14031700) pcilib_warning("PCIe is not ready");
+	if (value != 0x14031700) pcilib_warning("PCIe is not ready, code is %lx", value);
 #endif /* IPEDMA_BUG_DMARD */
- 
+
 	    // Configuring TLP and PACKET sizes (40 bit mode can be used with big pre-allocated buffers later)
         WR(IPEDMA_REG_TLP_SIZE, IPEDMA_TLP_SIZE);
         WR(IPEDMA_REG_TLP_COUNT, IPEDMA_PAGE_SIZE / (4 * IPEDMA_TLP_SIZE * IPEDMA_CORES));
@@ -183,14 +185,20 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
 	
 	for (i = 0; i < IPEDMA_DMA_PAGES; i++) {
-	    uintptr_t bus_addr = pcilib_kmem_get_block_ba(ctx->pcilib, pages, i);
+	    uintptr_t bus_addr_check, bus_addr = pcilib_kmem_get_block_ba(ctx->pcilib, pages, i);
 	    WR(IPEDMA_REG_PAGE_ADDR, bus_addr);
 	    if (bus_addr%4096) printf("Bad address %lu: %lx\n", i, bus_addr);
+	    
+	    RD(IPEDMA_REG_PAGE_ADDR, bus_addr_check);
+	    if (bus_addr_check != bus_addr) {
+		pcilib_error("Written (%x) and read (%x) bus addresses does not match\n", bus_addr, bus_addr_check);
+	    }
+	    
 	    usleep(1000);
 	}
 	
 	    // Enable DMA
-	WR(IPEDMA_REG_CONTROL, 0x1);
+//	WR(IPEDMA_REG_CONTROL, 0x1);
 	
 	ctx->last_read = IPEDMA_DMA_PAGES - 1;
 
@@ -203,7 +211,8 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 #endif /* IPEDMA_BUG_DMARD */
     }
 
-    ctx->last_read_addr = htonl(pcilib_kmem_get_block_ba(ctx->pcilib, pages, ctx->last_read));
+//    ctx->last_read_addr = htonl(pcilib_kmem_get_block_ba(ctx->pcilib, pages, ctx->last_read));
+    ctx->last_read_addr = pcilib_kmem_get_block_ba(ctx->pcilib, pages, ctx->last_read);
 
 
     ctx->desc = desc;
@@ -237,14 +246,17 @@ int dma_ipe_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
 
 	    // Disable DMA
 	WR(IPEDMA_REG_CONTROL, 0);
+	usleep(100000);
 	
 	    // Reset DMA engine
 	WR(IPEDMA_REG_RESET, 0x1);
 	usleep(100000);
 	WR(IPEDMA_REG_RESET, 0x0);
+	usleep(100000);
 
 	    // Reseting configured DMA pages
         WR(IPEDMA_REG_PAGE_COUNT, 0);
+	usleep(100000);
     }
 
 	// Clean buffers
@@ -392,7 +404,8 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	WR(IPEDMA_REG_LAST_READ, ctx->last_read + 1);
 
 	ctx->last_read = cur_read;
-	ctx->last_read_addr = htonl(pcilib_kmem_get_block_ba(ctx->pcilib, ctx->pages, cur_read));
+//	ctx->last_read_addr = htonl(pcilib_kmem_get_block_ba(ctx->pcilib, ctx->pages, cur_read));
+	ctx->last_read_addr = pcilib_kmem_get_block_ba(ctx->pcilib, ctx->pages, cur_read);
 
 #ifdef IPEDMA_BUG_DMARD
 	FILE *f = fopen("/tmp/pcitool_lastread", "w");
