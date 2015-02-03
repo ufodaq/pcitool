@@ -98,7 +98,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
     err = pcilib_skip_dma(ctx->pcilib, readid);
     if (err) {
 	pcilib_error("Can't start benchmark, devices continuously writes unexpected data using DMA engine");
-	return err;
+	return -1;
     }
 
 #ifdef NWL_GENERATE_DMA_IRQ
