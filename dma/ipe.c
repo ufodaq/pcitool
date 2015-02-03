@@ -85,7 +85,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     volatile void *desc_va;
     volatile uint32_t *last_written_addr_ptr;
 
-    pcilib_register_value_t value, value2;
+    pcilib_register_value_t value;
     
     uint32_t address64;
     
@@ -352,16 +352,25 @@ int dma_ipe_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcil
 int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, pcilib_dma_callback_t cb, void *cbattr) {
     int err, ret = PCILIB_STREAMING_REQ_PACKET;
 
-    pcilib_register_value_t value;
 
     pcilib_timeout_t wait = 0;
     struct timeval start, cur;
 
     volatile void *desc_va;
     volatile uint32_t *last_written_addr_ptr;
-    
+
+    pcilib_dma_flags_t packet_flags = PCILIB_DMA_FLAG_EOP;
+
+#ifdef IPEDMA_DETECT_PACKETS
+    volatile uint32_t *empty_detected_ptr;
+#endif /* IPEDMA_DETECT_PACKETS */
+
+#ifdef IPEDMA_BUG_DMARD
+    pcilib_register_value_t value;
+#endif /* IPEDMA_BUG_DMARD */
+
     size_t cur_read;
-    
+
     ipe_dma_t *ctx = (ipe_dma_t*)vctx;
 
     err = dma_ipe_start(vctx, dma, PCILIB_DMA_FLAGS_DEFAULT);
@@ -371,6 +380,10 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
     if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
     else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
+
+#ifdef IPEDMA_DETECT_PACKETS
+    empty_detected_ptr = last_written_addr_ptr - 1;
+#endif /* IPEDMA_DETECT_PACKETS */
 
     do {
 	switch (ret&PCILIB_STREAMING_TIMEOUT_MASK) {
@@ -401,10 +414,15 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 #ifdef IPEDMA_DEBUG
 	printf("Reading: %u (last read) 0x%x (last read addr) 0x%x (last_written)\n", cur_read, ctx->last_read_addr, *last_written_addr_ptr);
 #endif /* IPEDMA_DEBUG */
+
+#ifdef IPEDMA_DETECT_PACKETS
+	if ((*empty_detected_ptr)&&(pcilib_kmem_get_block_ba(ctx->pcilib, ctx->pages, cur_read) == (*last_written_addr_ptr))) packet_flags = PCILIB_DMA_FLAG_EOP;
+	else packet_flags = 0;
+#endif /* IPEDMA_DETECT_PACKETS */
 	
 	pcilib_kmem_sync_block(ctx->pcilib, ctx->pages, PCILIB_KMEM_SYNC_FROMDEVICE, cur_read);
         void *buf = pcilib_kmem_get_block_ua(ctx->pcilib, ctx->pages, cur_read);
-	ret = cb(cbattr, PCILIB_DMA_FLAG_EOP, ctx->page_size, buf);
+	ret = cb(cbattr, packet_flags, ctx->page_size, buf);
 	if (ret < 0) return -ret;
 	
 //	DS: Fixme, it looks like we can avoid calling this for the sake of performance
