@@ -143,7 +143,8 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	fclose(f);
 #else /* IPEDMA_BUG_DMARD */
 	RD(IPEDMA_REG_LAST_READ, value);
-	if (value == IPEDMA_DMA_PAGES) value = 0;
+	    // Numbered from 1 in FPGA
+	value--;
 #endif /* IPEDMA_BUG_DMARD */
 
 	ctx->last_read = value;
@@ -177,7 +178,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
         WR(IPEDMA_REG_PAGE_COUNT, 0);
         
 	    // Setting current read position and configuring progress register
-	WR(IPEDMA_REG_LAST_READ, IPEDMA_DMA_PAGES - 2 + 1);
+	WR(IPEDMA_REG_LAST_READ, IPEDMA_DMA_PAGES);
 	WR(IPEDMA_REG_UPDATE_ADDR, pcilib_kmem_get_block_ba(ctx->pcilib, desc, 0));
 
 	    // Instructing DMA engine that writting should start from the first DMA page
@@ -366,8 +367,8 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
     do {
 	switch (ret&PCILIB_STREAMING_TIMEOUT_MASK) {
-	    case PCILIB_STREAMING_CONTINUE: wait = PCILIB_DMA_TIMEOUT; break;
-	    case PCILIB_STREAMING_WAIT: wait = timeout; break;
+	    case PCILIB_STREAMING_CONTINUE: wait = IPEDMA_DMA_TIMEOUT; break;
+	    case PCILIB_STREAMING_WAIT: wait = ((timeout<IPEDMA_DMA_TIMEOUT)?IPEDMA_DMA_TIMEOUT:timeout); break;
 //	    case PCILIB_STREAMING_CHECK: wait = 0; break;
 	}
 
@@ -376,6 +377,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 #endif /* IPEDMA_DEBUG */
 
 	gettimeofday(&start, NULL);
+	memcpy(&cur, &start, sizeof(struct timeval));
 	while (((*last_written_addr_ptr == 0)||(ctx->last_read_addr == (*last_written_addr_ptr)))&&((wait == PCILIB_TIMEOUT_INFINITE)||(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < wait))) {
 	    usleep(10);
 	    gettimeofday(&cur, NULL);
@@ -401,7 +403,8 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 //	DS: Fixme, it looks like we can avoid calling this for the sake of performance
 //	pcilib_kmem_sync_block(ctx->pcilib, ctx->pages, PCILIB_KMEM_SYNC_TODEVICE, cur_read);
 
-	WR(IPEDMA_REG_LAST_READ, ctx->last_read + 1);
+	    // Numbered from 1
+	WR(IPEDMA_REG_LAST_READ, cur_read + 1);
 
 	ctx->last_read = cur_read;
 //	ctx->last_read_addr = htonl(pcilib_kmem_get_block_ba(ctx->pcilib, ctx->pages, cur_read));
@@ -421,5 +424,67 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 }
 
 double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction) {
-    return 0;
+    int err = 0;
+
+    ipe_dma_t *ctx = (ipe_dma_t*)vctx;
+
+    int iter;
+    size_t us = 0;
+    struct timeval start, cur;
+    
+    void *buf;
+    size_t bytes, rbytes;
+
+    if ((direction == PCILIB_DMA_TO_DEVICE)||(direction == PCILIB_DMA_BIDIRECTIONAL)) return -1.;
+
+    if ((dma != PCILIB_DMA_ENGINE_INVALID)&&(dma > 1)) return -1.;
+
+    err = dma_ipe_start(vctx, 0, PCILIB_DMA_FLAGS_DEFAULT);
+    if (err) return err;
+
+    WR(IPEDMA_REG_CONTROL, 0x0);
+
+    err = pcilib_skip_dma(ctx->pcilib, 0);
+    if (err) {
+	pcilib_error("Can't start benchmark, devices continuously writes unexpected data using DMA engine");
+	return -1;
+    }
+
+    if (size%IPEDMA_PAGE_SIZE) size = (1 + size / IPEDMA_PAGE_SIZE) * IPEDMA_PAGE_SIZE;
+
+	// Allocate memory and prepare data
+    buf = malloc(size);
+    if (!buf) return -1;
+
+    for (iter = 0; iter < iterations; iter++) {
+	gettimeofday(&start, NULL);
+
+	    // Starting DMA
+	WR(IPEDMA_REG_CONTROL, 0x1);
+	
+	for (bytes = 0; bytes < size; bytes += rbytes) {
+	    err = pcilib_read_dma(ctx->pcilib, 0, addr, size - bytes, buf + bytes, &rbytes);
+	    if (err) {
+		pcilib_error("Can't read data from DMA, error %i", err);
+	        return -1;
+	    }
+	}
+
+	    // Stopping DMA
+	WR(IPEDMA_REG_CONTROL, 0x0);
+	if (err) break;
+	
+	gettimeofday(&cur, NULL);
+	us += ((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec));
+	    
+	err = pcilib_skip_dma(ctx->pcilib, 0);
+	if (err) {
+	    pcilib_error("Can't start iteration, devices continuously writes unexpected data using DMA engine");
+	    break;
+	}
+    }
+
+    free(buf);
+
+    return err?-1:((1. * size * iterations * 1000000) / (1024. * 1024. * us));
 }
