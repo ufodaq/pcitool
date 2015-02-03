@@ -32,6 +32,7 @@ pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, pcilib_dma_modification_t t
     if (ctx) {
 	memset(ctx, 0, sizeof(ipe_dma_t));
 	ctx->pcilib = pcilib;
+//	ctx->mode64 = 1;
 	
 	memset(ctx->engine, 0, 2 * sizeof(pcilib_dma_engine_description_t));
 	ctx->engine[0].addr = 0;
@@ -85,6 +86,9 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     volatile uint32_t *last_written_addr_ptr;
 
     pcilib_register_value_t value, value2;
+    
+    uint32_t address64;
+    
 
     if (dma == PCILIB_DMA_ENGINE_INVALID) return 0;
     else if (dma > 1) return PCILIB_ERROR_INVALID_BANK;
@@ -167,8 +171,11 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	if (value != 0x14031700) pcilib_warning("PCIe is not ready, code is %lx", value);
 #endif /* IPEDMA_BUG_DMARD */
 
-	    // Configuring TLP and PACKET sizes (40 bit mode can be used with big pre-allocated buffers later)
-        WR(IPEDMA_REG_TLP_SIZE, IPEDMA_TLP_SIZE);
+	    // Enable 64 bit addressing and configure TLP and PACKET sizes (40 bit mode can be used with big pre-allocated buffers later)
+	if (ctx->mode64) address64 = 0x8000 | (0<<24);
+	else address64 = 0;
+	
+        WR(IPEDMA_REG_TLP_SIZE,  address64 | IPEDMA_TLP_SIZE);
         WR(IPEDMA_REG_TLP_COUNT, IPEDMA_PAGE_SIZE / (4 * IPEDMA_TLP_SIZE * IPEDMA_CORES));
 
 	    // Setting progress register threshold
