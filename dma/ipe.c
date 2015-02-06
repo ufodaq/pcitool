@@ -388,7 +388,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
     do {
 	switch (ret&PCILIB_STREAMING_TIMEOUT_MASK) {
 	    case PCILIB_STREAMING_CONTINUE: wait = IPEDMA_DMA_TIMEOUT; break;
-	    case PCILIB_STREAMING_WAIT: wait = ((timeout<IPEDMA_DMA_TIMEOUT)?IPEDMA_DMA_TIMEOUT:timeout); break;
+	    case PCILIB_STREAMING_WAIT: wait = timeout; break;
 //	    case PCILIB_STREAMING_CHECK: wait = 0; break;
 	}
 

@@ -12,7 +12,7 @@
 //#define IPEDMA_DEBUG
 //#define IPEDMA_BUG_DMARD				/**< No register read during DMA transfer */
 //#define IPEDMA_DETECT_PACKETS				/**< Using empty_deceted flag */
-#define IPEDMA_DMA_TIMEOUT PCILIB_DMA_TIMEOUT		/**< us, overrides PCILIB_DMA_TIMEOUT */
+#define IPEDMA_DMA_TIMEOUT 100000			/**< us, overrides PCILIB_DMA_TIMEOUT (actual hardware timeout is 50ms according to Lorenzo) */
 
 #define IPEDMA_REG_RESET		0x00
 #define IPEDMA_REG_CONTROL		0x04
