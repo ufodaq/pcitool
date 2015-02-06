@@ -358,12 +358,9 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
     volatile void *desc_va;
     volatile uint32_t *last_written_addr_ptr;
+    volatile uint32_t *empty_detected_ptr;
 
     pcilib_dma_flags_t packet_flags = PCILIB_DMA_FLAG_EOP;
-
-#ifdef IPEDMA_DETECT_PACKETS
-    volatile uint32_t *empty_detected_ptr;
-#endif /* IPEDMA_DETECT_PACKETS */
 
 #ifdef IPEDMA_BUG_DMARD
     pcilib_register_value_t value;
@@ -381,14 +378,22 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
     if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
     else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
 
-#ifdef IPEDMA_DETECT_PACKETS
-    empty_detected_ptr = last_written_addr_ptr - 1;
-#endif /* IPEDMA_DETECT_PACKETS */
+    empty_detected_ptr = last_written_addr_ptr - 2;
 
     do {
 	switch (ret&PCILIB_STREAMING_TIMEOUT_MASK) {
-	    case PCILIB_STREAMING_CONTINUE: wait = IPEDMA_DMA_TIMEOUT; break;
-	    case PCILIB_STREAMING_WAIT: wait = timeout; break;
+	    case PCILIB_STREAMING_CONTINUE: 
+		    // Hardware indicates that there is no more data pending and we can safely stop if there is no data in the kernel buffers already
+#ifdef IPEDMA_SUPPORT_EMPTY_DETECTED
+		if (*empty_detected_ptr)
+		    wait = 0;
+		else
+#endif /* IPEDMA_SUPPORT_EMPTY_DETECTED */
+		    wait = IPEDMA_DMA_TIMEOUT; 
+	    break;
+	    case PCILIB_STREAMING_WAIT: 
+		wait = (timeout > IPEDMA_DMA_TIMEOUT)?timeout:IPEDMA_DMA_TIMEOUT;
+	    break;
 //	    case PCILIB_STREAMING_CHECK: wait = 0; break;
 	}
 
@@ -404,8 +409,15 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	}
 	
 	    // Failing out if we exited on timeout
-	if ((ctx->last_read_addr == (*last_written_addr_ptr))||(*last_written_addr_ptr == 0))
+	if ((ctx->last_read_addr == (*last_written_addr_ptr))||(*last_written_addr_ptr == 0)) {
+#ifdef IPEDMA_SUPPORT_EMPTY_DETECTED
+//# ifdef IPEDMA_DEBUG
+	    if (wait) 
+		pcilib_warning("The empty_detected flag is not set, but no data arrived within %lu us\n", wait);
+//# endif /* IPEDMA_DEBUG */
+#endif /* IPEDMA_SUPPORT_EMPTY_DETECTED */
 	    return (ret&PCILIB_STREAMING_FAIL)?PCILIB_ERROR_TIMEOUT:0;
+	}
 
 	    // Getting next page to read
 	cur_read = ctx->last_read + 1;
