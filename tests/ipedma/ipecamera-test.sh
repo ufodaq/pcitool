@@ -3,7 +3,7 @@
 size=65536
 
 function pci {
-    PCILIB_PATH=`pwd`/../../..
+    PCILIB_PATH=`pwd`/../..
     LD_LIBRARY_PATH="$PCILIB_PATH" $PCILIB_PATH/pci -m ipedma $*
 }
 
@@ -37,4 +37,4 @@ done
 
 pci --stop-dma dma0r
 
-../../../apps/check_counter bench.out
+../../apps/check_counter bench.out
