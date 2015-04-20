@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
 
 	for (; i < n; i++) {
 	    if ((buf[i]) != ++value) {
-		printf("Pos %lx (Block %i, dword %i) expected %x, but got %x\n", block * 4096 + i * 4, block, i, value, (buf[i]));
+		printf("Pos %lx (Block %i, dword %i) expected %x, but got %x\n", block * 4096l + i * 4, block, i, value, (buf[i]));
 		exit(1);
 	    }
 	}

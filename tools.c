@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 
+#include "pci.h"
 #include "tools.h"
 #include "error.h"
 

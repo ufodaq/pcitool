@@ -57,64 +57,83 @@
  */
 
 #include <linux/ioctl.h>
-#include "../pcilib_types.h"
 
 /* Identifies the PCI-E Xilinx ML605 */
 #define PCIE_XILINX_VENDOR_ID 0x10ee
 #define PCIE_ML605_DEVICE_ID 0x6024
 
-/* Identifies the PCI-E IPE Camera */
+/* Identifies the PCI-E IPE Hardware */
 #define PCIE_IPECAMERA_DEVICE_ID 0x6081
 #define PCIE_KAPTURE_DEVICE_ID 0x6028
-//#define PCIE_IPECAMERA_DEVICE_ID 0x6018
 
 
 /* Possible values for ioctl commands */
 
 /* PCI mmap areas */
-#define	PCIDRIVER_BAR0		0
-#define	PCIDRIVER_BAR1		1
-#define	PCIDRIVER_BAR2		2
-#define	PCIDRIVER_BAR3		3
-#define	PCIDRIVER_BAR4		4
-#define	PCIDRIVER_BAR5		5
+#define	PCIDRIVER_BAR0			0
+#define	PCIDRIVER_BAR1			1
+#define	PCIDRIVER_BAR2			2
+#define	PCIDRIVER_BAR3			3
+#define	PCIDRIVER_BAR4			4
+#define	PCIDRIVER_BAR5			5
 
 /* mmap mode of the device */
-#define PCIDRIVER_MMAP_PCI	0
-#define PCIDRIVER_MMAP_KMEM 1
+#define PCIDRIVER_MMAP_PCI		0
+#define PCIDRIVER_MMAP_KMEM 		1
 
 /* Direction of a DMA operation */
 #define PCIDRIVER_DMA_BIDIRECTIONAL 	0
-#define	PCIDRIVER_DMA_TODEVICE		PCILIB_KMEM_SYNC_TODEVICE
-#define PCIDRIVER_DMA_FROMDEVICE	PCILIB_KMEM_SYNC_FROMDEVICE
+#define	PCIDRIVER_DMA_TODEVICE		1//PCILIB_KMEM_SYNC_TODEVICE
+#define PCIDRIVER_DMA_FROMDEVICE	2//PCILIB_KMEM_SYNC_FROMDEVICE
 
 /* Possible sizes in a PCI command */
-#define PCIDRIVER_PCI_CFG_SZ_BYTE  1
-#define PCIDRIVER_PCI_CFG_SZ_WORD  2
-#define PCIDRIVER_PCI_CFG_SZ_DWORD 3
+#define PCIDRIVER_PCI_CFG_SZ_BYTE  	1
+#define PCIDRIVER_PCI_CFG_SZ_WORD  	2
+#define PCIDRIVER_PCI_CFG_SZ_DWORD 	3
 
 /* Possible types of SG lists */
-#define PCIDRIVER_SG_NONMERGED 0
-#define PCIDRIVER_SG_MERGED 1
+#define PCIDRIVER_SG_NONMERGED 		0
+#define PCIDRIVER_SG_MERGED 		1
 
 /* Maximum number of interrupt sources */
-#define PCIDRIVER_INT_MAXSOURCES 16
+#define PCIDRIVER_INT_MAXSOURCES 	16
 
+#define KMEM_REF_HW 		0x80000000				/**< Special reference to indicate hardware access */
+#define KMEM_REF_COUNT		0x0FFFFFFF				/**< Mask of reference counter (mmap/munmap), couting in mmaped memory pages */
 
-#define KMEM_FLAG_REUSE 1	/**< Try to reuse existing buffer with the same use & item */
-#define KMEM_FLAG_EXCLUSIVE 2	/**< Allow only a single application accessing a specified use & item */
-#define KMEM_FLAG_PERSISTENT 4	/**< Sets persistent mode */
-#define KMEM_FLAG_HW 8		/**< The buffer may be accessed by hardware, the hardware access will not occur any more if passed to _free function */
-#define KMEM_FLAG_FORCE 16	/**< Force memory cleanup even if references are present */
-#define KMEM_FLAG_MASS 32	/**< Apply to all buffers of selected use */
-#define KMEM_FLAG_TRY 64	/**< Do not allocate buffers, try to reuse and fail if not possible */
+#define KMEM_MODE_REUSABLE	0x80000000				/**< Indicates reusable buffer */
+#define KMEM_MODE_EXCLUSIVE	0x40000000				/**< Only a single process is allowed to mmap the buffer */
+#define KMEM_MODE_PERSISTENT	0x20000000				/**< Persistent mode instructs kmem_free to preserve buffer in memory */
+#define KMEM_MODE_COUNT		0x0FFFFFFF				/**< Mask of reuse counter (alloc/free) */
 
-#define KMEM_FLAG_REUSED 1		/**< Indicates if buffer with specified use & item was already allocated and reused */
-#define KMEM_FLAG_REUSED_PERSISTENT 4	/**< Indicates that reused buffer was persistent before the call */
-#define KMEM_FLAG_REUSED_HW 8		/**< Indicates that reused buffer had a HW reference before the call */
+#define KMEM_FLAG_REUSE 		PCILIB_KMEM_FLAG_REUSE		/**< Try to reuse existing buffer with the same use & item */
+#define KMEM_FLAG_EXCLUSIVE 		PCILIB_KMEM_FLAG_EXCLUSIVE	/**< Allow only a single application accessing a specified use & item */
+#define KMEM_FLAG_PERSISTENT		PCILIB_KMEM_FLAG_PERSISTENT	/**< Sets persistent mode */
+#define KMEM_FLAG_HW			PCILIB_KMEM_FLAG_HARDWARE	/**< The buffer may be accessed by hardware, the hardware access will not occur any more if passed to _free function */
+#define KMEM_FLAG_FORCE			PCILIB_KMEM_FLAG_FORCE		/**< Force memory cleanup even if references are present */
+#define KMEM_FLAG_MASS			PCILIB_KMEM_FLAG_MASS		/**< Apply to all buffers of selected use */
+#define KMEM_FLAG_TRY			PCILIB_KMEM_FLAG_TRY		/**< Do not allocate buffers, try to reuse and fail if not possible */
 
+#define KMEM_FLAG_REUSED 		PCILIB_KMEM_FLAG_REUSE		/**< Indicates if buffer with specified use & item was already allocated and reused */
+#define KMEM_FLAG_REUSED_PERSISTENT 	PCILIB_KMEM_FLAG_PERSISTENT	/**< Indicates that reused buffer was persistent before the call */
+#define KMEM_FLAG_REUSED_HW 		PCILIB_KMEM_FLAG_HARDWARE	/**< Indicates that reused buffer had a HW reference before the call */
 
 /* Types */
+typedef struct {
+    unsigned short vendor_id;
+    unsigned short device_id;
+    unsigned short bus;
+    unsigned short slot;
+    unsigned short func;
+    unsigned short devfn;
+    unsigned char interrupt_pin;
+    unsigned char interrupt_line;
+    unsigned int irq;
+    unsigned long bar_start[6];
+    unsigned long bar_length[6];
+    unsigned long bar_flags[6];
+} pcilib_board_info_t;
+
 typedef struct {
 	unsigned long type;
 	unsigned long pa;
@@ -165,22 +184,6 @@ typedef struct {
 		unsigned int dword; 	/* not strict C, but if not can have problems */
 	} val;
 } pci_cfg_cmd;
-
-typedef struct {
-	unsigned short vendor_id;
-	unsigned short device_id;
-	unsigned short bus;
-	unsigned short slot;
-	unsigned short func;
-	unsigned short devfn;
-	unsigned char interrupt_pin;
-	unsigned char interrupt_line;
-	unsigned int irq;
-	unsigned long bar_start[6];
-	unsigned long bar_length[6];
-	unsigned long bar_flags[6];
-} pcilib_board_info_t;
-
 
 /* ioctl interface */
 /* See documentation for a detailed usage explanation */

@@ -15,25 +15,25 @@
 
 #include "ipe.h"
 #include "ipe_private.h"
-#include "ipe_registers.h"
 
 
 #define WR(addr, value) { *(uint32_t*)(ctx->base_addr + addr) = value; }
 #define RD(addr, value) { value = *(uint32_t*)(ctx->base_addr + addr); }
 
 
-pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, pcilib_dma_modification_t type, void *arg) {
-    int err = 0;
+pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const void *arg) {
+//    int err = 0;
     
-    pcilib_model_description_t *model_info = pcilib_get_model_description(pcilib);
+    const pcilib_model_description_t *model_info = pcilib_get_model_description(pcilib);
 
     ipe_dma_t *ctx = malloc(sizeof(ipe_dma_t));
 
     if (ctx) {
 	memset(ctx, 0, sizeof(ipe_dma_t));
-	ctx->pcilib = pcilib;
+	ctx->dmactx.pcilib = pcilib;
 //	ctx->mode64 = 1;
-	
+
+/*	
 	memset(ctx->engine, 0, 2 * sizeof(pcilib_dma_engine_description_t));
 	ctx->engine[0].addr = 0;
 	ctx->engine[0].type = PCILIB_DMA_TYPE_PACKET;
@@ -41,8 +41,21 @@ pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, pcilib_dma_modification_t t
 	ctx->engine[0].addr_bits = 32;
 	pcilib_set_dma_engine_description(pcilib, 0, &ctx->engine[0]);
 	pcilib_set_dma_engine_description(pcilib, 1, NULL);
+*/
 
-	pcilib_register_bank_t dma_bank = pcilib_find_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
+	pcilib_register_bank_t dma_bank = pcilib_find_register_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
+/*
+	if (dma_bank == PCILIB_REGISTER_BANK_INVALID) {
+	    err = pcilib_add_register_banks(ctx->pcilib, 0, ipe_dma_register_banks);
+	    if (err) {
+		free(ctx);
+		pcilib_error("Error (%i) adding DMA register bank");
+		return NULL;
+	    }
+	}
+
+	dma_bank = pcilib_find_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
+*/
 	if (dma_bank == PCILIB_REGISTER_BANK_INVALID) {
 	    free(ctx);
 	    pcilib_error("DMA Register Bank could not be found");
@@ -52,12 +65,14 @@ pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, pcilib_dma_modification_t t
 	ctx->dma_bank = model_info->banks + dma_bank;
 	ctx->base_addr = pcilib_resolve_register_address(pcilib, ctx->dma_bank->bar, ctx->dma_bank->read_addr);
 
+/*
 	err = pcilib_add_registers(ctx->pcilib, 0, ipe_dma_registers);
 	if (err) {
 	    free(ctx);
 	    pcilib_error("Error adding DMA registers");
 	    return NULL;
 	}
+*/
     }
 
     return (pcilib_dma_context_t*)ctx;
@@ -100,16 +115,16 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     if (ctx->pages) return 0;
     
     kflags = PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_EXCLUSIVE|PCILIB_KMEM_FLAG_HARDWARE|(ctx->preserve?PCILIB_KMEM_FLAG_PERSISTENT:0);
-    pcilib_kmem_handle_t *desc = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, IPEDMA_DESCRIPTOR_SIZE, IPEDMA_DESCRIPTOR_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, 0x00), kflags);
-    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->pcilib, PCILIB_KMEM_TYPE_DMA_C2S_PAGE, IPEDMA_DMA_PAGES, 0, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, 0x00), kflags);
+    pcilib_kmem_handle_t *desc = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, IPEDMA_DESCRIPTOR_SIZE, IPEDMA_DESCRIPTOR_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, 0x00), kflags);
+    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_DMA_C2S_PAGE, IPEDMA_DMA_PAGES, 0, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, 0x00), kflags);
 
     if (!desc||!pages) {
-	if (pages) pcilib_free_kernel_memory(ctx->pcilib, pages, 0);
-	if (desc) pcilib_free_kernel_memory(ctx->pcilib, desc, 0);
+	if (pages) pcilib_free_kernel_memory(ctx->dmactx.pcilib, pages, 0);
+	if (desc) pcilib_free_kernel_memory(ctx->dmactx.pcilib, desc, 0);
 	return PCILIB_ERROR_MEMORY;
     }
-    reuse_desc = pcilib_kmem_is_reused(ctx->pcilib, desc);
-    reuse_pages = pcilib_kmem_is_reused(ctx->pcilib, pages);
+    reuse_desc = pcilib_kmem_is_reused(ctx->dmactx.pcilib, desc);
+    reuse_pages = pcilib_kmem_is_reused(ctx->dmactx.pcilib, pages);
 
     if (reuse_desc == reuse_pages) {
 	if (reuse_desc & PCILIB_KMEM_REUSE_PARTIAL) pcilib_warning("Inconsistent DMA buffers are found (only part of required buffers is available), reinitializing...");
@@ -128,7 +143,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	}
     } else pcilib_warning("Inconsistent DMA buffers (modes of ring and page buffers does not match), reinitializing....");
 
-    desc_va = pcilib_kmem_get_ua(ctx->pcilib, desc);
+    desc_va = pcilib_kmem_get_ua(ctx->dmactx.pcilib, desc);
     if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
     else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
 
@@ -186,14 +201,14 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
         
 	    // Setting current read position and configuring progress register
 	WR(IPEDMA_REG_LAST_READ, IPEDMA_DMA_PAGES);
-	WR(IPEDMA_REG_UPDATE_ADDR, pcilib_kmem_get_block_ba(ctx->pcilib, desc, 0));
+	WR(IPEDMA_REG_UPDATE_ADDR, pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, desc, 0));
 
 	    // Instructing DMA engine that writting should start from the first DMA page
-	*last_written_addr_ptr = 0;//htonl(pcilib_kmem_get_block_ba(ctx->pcilib, pages, IPEDMA_DMA_PAGES - 1));
+	*last_written_addr_ptr = 0;//htonl(pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, pages, IPEDMA_DMA_PAGES - 1));
 
 	
 	for (i = 0; i < IPEDMA_DMA_PAGES; i++) {
-	    uintptr_t bus_addr_check, bus_addr = pcilib_kmem_get_block_ba(ctx->pcilib, pages, i);
+	    uintptr_t bus_addr_check, bus_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, pages, i);
 	    WR(IPEDMA_REG_PAGE_ADDR, bus_addr);
 	    if (bus_addr%4096) printf("Bad address %lu: %lx\n", i, bus_addr);
 	    
@@ -219,13 +234,13 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 #endif /* IPEDMA_BUG_DMARD */
     }
 
-//    ctx->last_read_addr = htonl(pcilib_kmem_get_block_ba(ctx->pcilib, pages, ctx->last_read));
-    ctx->last_read_addr = pcilib_kmem_get_block_ba(ctx->pcilib, pages, ctx->last_read);
+//    ctx->last_read_addr = htonl(pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, pages, ctx->last_read));
+    ctx->last_read_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, pages, ctx->last_read);
 
 
     ctx->desc = desc;
     ctx->pages = pages;
-    ctx->page_size = pcilib_kmem_get_block_size(ctx->pcilib, pages, 0);;
+    ctx->page_size = pcilib_kmem_get_block_size(ctx->dmactx.pcilib, pages, 0);;
     ctx->ring_size = IPEDMA_DMA_PAGES;
 
     return 0;
@@ -269,12 +284,12 @@ int dma_ipe_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
 
 	// Clean buffers
     if (ctx->desc) {
-	pcilib_free_kernel_memory(ctx->pcilib, ctx->desc, kflags);
+	pcilib_free_kernel_memory(ctx->dmactx.pcilib, ctx->desc, kflags);
 	ctx->desc = NULL;
     }
 
     if (ctx->pages) {
-	pcilib_free_kernel_memory(ctx->pcilib, ctx->pages, kflags);
+	pcilib_free_kernel_memory(ctx->dmactx.pcilib, ctx->pages, kflags);
 	ctx->pages = NULL;
     }
 
@@ -286,7 +301,7 @@ int dma_ipe_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcil
     size_t i;
     ipe_dma_t *ctx = (ipe_dma_t*)vctx;
 
-    void *desc_va = (void*)pcilib_kmem_get_ua(ctx->pcilib, ctx->desc);
+    void *desc_va = (void*)pcilib_kmem_get_ua(ctx->dmactx.pcilib, ctx->desc);
     uint32_t *last_written_addr_ptr;
     uint32_t last_written_addr;
     
@@ -307,7 +322,7 @@ int dma_ipe_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcil
 
 	// Find where the ring head is actually are
     for (i = 0; i < ctx->ring_size; i++) {
-	uintptr_t bus_addr = pcilib_kmem_get_block_ba(ctx->pcilib, ctx->pages, i);
+	uintptr_t bus_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, i);
 
 	if (bus_addr == last_written_addr) {
 	    status->ring_head = bus_addr;
@@ -373,7 +388,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
     err = dma_ipe_start(vctx, dma, PCILIB_DMA_FLAGS_DEFAULT);
     if (err) return err;
 
-    desc_va = (void*)pcilib_kmem_get_ua(ctx->pcilib, ctx->desc);
+    desc_va = (void*)pcilib_kmem_get_ua(ctx->dmactx.pcilib, ctx->desc);
 
     if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
     else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
@@ -428,24 +443,24 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 #endif /* IPEDMA_DEBUG */
 
 #ifdef IPEDMA_DETECT_PACKETS
-	if ((*empty_detected_ptr)&&(pcilib_kmem_get_block_ba(ctx->pcilib, ctx->pages, cur_read) == (*last_written_addr_ptr))) packet_flags = PCILIB_DMA_FLAG_EOP;
+	if ((*empty_detected_ptr)&&(pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, cur_read) == (*last_written_addr_ptr))) packet_flags = PCILIB_DMA_FLAG_EOP;
 	else packet_flags = 0;
 #endif /* IPEDMA_DETECT_PACKETS */
 	
-	pcilib_kmem_sync_block(ctx->pcilib, ctx->pages, PCILIB_KMEM_SYNC_FROMDEVICE, cur_read);
-        void *buf = pcilib_kmem_get_block_ua(ctx->pcilib, ctx->pages, cur_read);
+	pcilib_kmem_sync_block(ctx->dmactx.pcilib, ctx->pages, PCILIB_KMEM_SYNC_FROMDEVICE, cur_read);
+        void *buf = pcilib_kmem_get_block_ua(ctx->dmactx.pcilib, ctx->pages, cur_read);
 	ret = cb(cbattr, packet_flags, ctx->page_size, buf);
 	if (ret < 0) return -ret;
 	
 //	DS: Fixme, it looks like we can avoid calling this for the sake of performance
-//	pcilib_kmem_sync_block(ctx->pcilib, ctx->pages, PCILIB_KMEM_SYNC_TODEVICE, cur_read);
+//	pcilib_kmem_sync_block(ctx->dmactx.pcilib, ctx->pages, PCILIB_KMEM_SYNC_TODEVICE, cur_read);
 
 	    // Numbered from 1
 	WR(IPEDMA_REG_LAST_READ, cur_read + 1);
 
 	ctx->last_read = cur_read;
-//	ctx->last_read_addr = htonl(pcilib_kmem_get_block_ba(ctx->pcilib, ctx->pages, cur_read));
-	ctx->last_read_addr = pcilib_kmem_get_block_ba(ctx->pcilib, ctx->pages, cur_read);
+//	ctx->last_read_addr = htonl(pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, cur_read));
+	ctx->last_read_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, cur_read);
 
 #ifdef IPEDMA_BUG_DMARD
 	FILE *f = fopen("/tmp/pcitool_lastread", "w");
@@ -481,7 +496,7 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
     WR(IPEDMA_REG_CONTROL, 0x0);
 
-    err = pcilib_skip_dma(ctx->pcilib, 0);
+    err = pcilib_skip_dma(ctx->dmactx.pcilib, 0);
     if (err) {
 	pcilib_error("Can't start benchmark, devices continuously writes unexpected data using DMA engine");
 	return -1;
@@ -500,7 +515,7 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	WR(IPEDMA_REG_CONTROL, 0x1);
 	
 	for (bytes = 0; bytes < size; bytes += rbytes) {
-	    err = pcilib_read_dma(ctx->pcilib, 0, addr, size - bytes, buf + bytes, &rbytes);
+	    err = pcilib_read_dma(ctx->dmactx.pcilib, 0, addr, size - bytes, buf + bytes, &rbytes);
 	    if (err) {
 		pcilib_error("Can't read data from DMA, error %i", err);
 	        return -1;
@@ -514,7 +529,7 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	gettimeofday(&cur, NULL);
 	us += ((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec));
 	    
-	err = pcilib_skip_dma(ctx->pcilib, 0);
+	err = pcilib_skip_dma(ctx->dmactx.pcilib, 0);
 	if (err) {
 	    pcilib_error("Can't start iteration, devices continuously writes unexpected data using DMA engine");
 	    break;

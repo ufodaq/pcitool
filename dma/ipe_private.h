@@ -1,6 +1,8 @@
 #ifndef _PCILIB_DMA_IPE_PRIVATE_H
 #define _PCILIB_DMA_IPE_PRIVATE_H
 
+#include "dma.h"
+
 #define IPEDMA_CORES			1
 #define IPEDMA_TLP_SIZE			32
 #define IPEDMA_PAGE_SIZE		4096
@@ -30,12 +32,10 @@
 typedef struct ipe_dma_s ipe_dma_t;
 
 struct ipe_dma_s {
-    struct pcilib_dma_context_s dmactx;
-    pcilib_dma_engine_description_t engine[2];
+    pcilib_dma_context_t dmactx;
+    //pcilib_dma_engine_description_t engine[2];
 
-    pcilib_t *pcilib;
-    
-    pcilib_register_bank_description_t *dma_bank;
+    const pcilib_register_bank_description_t *dma_bank;
     char *base_addr;
 
     pcilib_irq_type_t irq_enabled;	/**< indicates that IRQs are enabled */

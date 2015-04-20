@@ -1,6 +1,6 @@
-#define _PCILIB_PCI_C
 //#define PCILIB_FILE_IO
-#define _POSIX_C_SOURCE 199309L
+#define _BSD_SOURCE
+#define _POSIX_C_SOURCE 200809L
 
 #include <stdio.h>
 #include <string.h>
@@ -17,20 +17,72 @@
 
 #include "pcilib.h"
 #include "pci.h"
-#include "kernel.h"
 #include "tools.h"
 #include "error.h"
+#include "model.h"
 
-#include "ipecamera/model.h"
-#include "kapture/model.h"
+static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
+    int i, j;
+
+	// Registers & Banks must be copied!
+
+    if (model) {
+	    // Check for DMA models
+	for (i = 0; pcilib_dma[i].name; i++) {
+	    if (!strcasecmp(model, pcilib_dma[i].name))
+		break;
+	}
+
+	if (pcilib_dma[i].api) {
+	    memcpy(&ctx->dma, &pcilib_dma[i], sizeof(pcilib_dma_description_t));
+	    ctx->model_info.dma = &ctx->dma;
+
+	    if (pcilib_dma[i].banks)
+	        pcilib_add_register_banks(ctx, 0, pcilib_dma[i].banks);
+	    
+	    if (pcilib_dma[i].registers)
+		pcilib_add_registers(ctx, 0, pcilib_dma[i].registers);
+
+	    if (pcilib_dma[i].engines) {
+		for (j = 0; pcilib_dma[i].engines[j].addr_bits; j++)
+		memcpy(ctx->engines, pcilib_dma[i].engines, j * sizeof(pcilib_dma_engine_description_t));
+		ctx->num_engines = j;
+	    } else
+		ctx->dma.engines = ctx->engines;
+
+	    return 0;
+	}
+
+	// Check for XML models (DMA + XML registers)
+
+	// Check for specified model
+	
+	// Iterate other all other models
+    }
+
+    // Check for all installed models
+    // memcpy(&ctx->model_info, model, sizeof(pcilib_model_description_t));
+    // how we reconcile the banks from event model and dma description? The banks specified in the DMA description should override corresponding banks of events...
 
 
-pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
+    if (model)
+	return PCILIB_ERROR_NOTFOUND;
+
+	// Otherwise, simple pci access (all model members are set to NULL)
+
+    return 0;
+}
+
+
+
+pcilib_t *pcilib_open(const char *device, const char *model) {
+    int err;
+    size_t i;
     pcilib_t *ctx = malloc(sizeof(pcilib_t));
 
     if (ctx) {
-	memset(ctx, 0, sizeof(pcilib_t));	
-    
+	memset(ctx, 0, sizeof(pcilib_t));
+	
 	ctx->handle = open(device, O_RDWR);
 	if (ctx->handle < 0) {
 	    pcilib_error("Error opening device (%s)", device);
@@ -39,21 +91,66 @@ pcilib_t *pcilib_open(const char *device, pcilib_model_t model) {
 	}
 	
 	ctx->page_mask = (uintptr_t)-1;
-	ctx->model = model;
+	ctx->model = model?strdup(model):NULL;
 
-	if (!model) model = pcilib_get_model(ctx);
+	ctx->alloc_reg = PCILIB_DEFAULT_REGISTER_SPACE;
+	ctx->registers = (pcilib_register_description_t *)malloc(PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_description_t));
+/*	ctx->banks = (pcilib_register_bank_context_t *)malloc(PCILIB_MAX_BANKS * sizeof(pcilib_register_bank_context_t));
+	ctx->ranges = (pcilib_register_range_t *)malloc(PCILIB_MAX_RANGES * sizeof(pcilib_register_range_t));
+	ctx->protocols
+	ctx->engines*/
 	
-	memcpy(&ctx->model_info, pcilib_model + model, sizeof(pcilib_model_description_t));
+	if ((!ctx->registers)/*||(!ctx->banks)||(!ctx->ranges)*/) {
+	    pcilib_error("Error allocating memory for register model");
+	    pcilib_close(ctx);
+	    free(ctx);
+	    return NULL;
+	}
+	
+	memset(ctx->registers, 0, sizeof(pcilib_register_description_t));
+	memset(ctx->banks, 0, sizeof(pcilib_register_bank_description_t));
+	memset(ctx->ranges, 0, sizeof(pcilib_register_range_t));
+	
+	for (i = 0; pcilib_protocols[i].api; i++);
+	memcpy(ctx->protocols, pcilib_protocols, i * sizeof(pcilib_register_protocol_description_t));
 
-	pcilib_init_event_engine(ctx);
+	ctx->model_info.registers = ctx->registers;
+	ctx->model_info.banks = ctx->banks;
+	ctx->model_info.protocols = ctx->protocols;
+	ctx->model_info.ranges = ctx->ranges;
+
+	err = pcilib_detect_model(ctx, model);
+	if (err) {
+	    const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
+	    if (board_info)
+	        pcilib_error("Error (%i) configuring model %s (%x:%x)", err, (model?model:""), board_info->vendor_id, board_info->device_id);
+	    else
+	        pcilib_error("Error (%i) configuring model %s", err, (model?model:""));
+	    pcilib_close(ctx);
+	    free(ctx);
+	    return NULL;
+	}
+
+	err = pcilib_init_register_banks(ctx);
+	if (err) {
+	    pcilib_error("Error (%i) initializing regiser banks\n", err);
+	    pcilib_close(ctx);
+	    free(ctx);
+	    return NULL;
+	}
+	
+	err = pcilib_init_event_engine(ctx);
+	if (err) {
+	    pcilib_error("Error (%i) initializing event engine\n", err);
+	    pcilib_close(ctx);
+	    free(ctx);
+	    return NULL;
+	}
     }
 
     return ctx;
 }
 
-pcilib_model_description_t *pcilib_get_model_description(pcilib_t *ctx) {
-    return &ctx->model_info;
-}
 
 const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx) {
     int ret;
@@ -72,31 +169,10 @@ const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx) {
 }
 
 
-
 pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx) {
     return ctx->event_ctx;
 }
 
-pcilib_model_t pcilib_get_model(pcilib_t *ctx) {
-    if (ctx->model == PCILIB_MODEL_DETECT) {
-//	unsigned short vendor_id;
-//	unsigned short device_id;
-
-	//return PCILIB_MODEL_PCI;
-	
-	const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
-	if (!board_info) return PCILIB_MODEL_PCI;
-
-	if ((board_info->vendor_id == PCIE_XILINX_VENDOR_ID)&&(board_info->device_id == PCIE_IPECAMERA_DEVICE_ID))
-	    ctx->model = PCILIB_MODEL_IPECAMERA;
-	else if ((board_info->vendor_id == PCIE_XILINX_VENDOR_ID)&&(board_info->device_id == PCIE_KAPTURE_DEVICE_ID))
-	    ctx->model = PCILIB_MODEL_KAPTURE;
-	else
-	    ctx->model = PCILIB_MODEL_PCI;
-    }
-    
-    return ctx->model;
-}
 
 static pcilib_bar_t pcilib_detect_bar(pcilib_t *ctx, uintptr_t addr, size_t size) {
     int n = 0;
@@ -105,7 +181,7 @@ static pcilib_bar_t pcilib_detect_bar(pcilib_t *ctx, uintptr_t addr, size_t size
     const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
     if (!board_info) return PCILIB_BAR_INVALID;
 		
-    for (i = 0; i < PCILIB_MAX_BANKS; i++) {
+    for (i = 0; i < PCILIB_MAX_BARS; i++) {
 	if (board_info->bar_length[i] > 0) {
 	    if ((addr >= board_info->bar_start[i])&&((board_info->bar_start[i] + board_info->bar_length[i]) >= (addr + size))) return i;
 
@@ -201,8 +277,8 @@ int pcilib_map_register_space(pcilib_t *ctx) {
     pcilib_register_bank_t i;
     
     if (!ctx->reg_bar_mapped)  {
-	pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
-	pcilib_register_bank_description_t *banks = model_info->banks;
+	const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+	const pcilib_register_bank_description_t *banks = model_info->banks;
     
 	for (i = 0; ((banks)&&(banks[i].access)); i++) {
 //	    uint32_t buf[2];
@@ -235,8 +311,10 @@ int pcilib_map_register_space(pcilib_t *ctx) {
 //		pcilib_memcpy(&buf, reg_space, 8);
 		
 	    }
+	    
 	    if (!i) ctx->reg_bar = bar;
 	}
+	
 	
 	ctx->reg_bar_mapped = 1;
     }
@@ -260,7 +338,7 @@ int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
 	
 	int data_bar = -1;	
 	
-	for (i = 0; i < PCILIB_MAX_BANKS; i++) {
+	for (i = 0; i < PCILIB_MAX_BARS; i++) {
 	    if ((ctx->bar_space[i])||(!board_info->bar_length[i])) continue;
 	    
 	    if (addr) {
@@ -302,22 +380,6 @@ int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
     return 0;
 }
 	
-/*
-static void pcilib_unmap_register_space(pcilib_t *ctx) {
-    if (ctx->reg_space) {
-	pcilib_unmap_bar(ctx, ctx->reg_bar, ctx->reg_space);
-	ctx->reg_space = NULL;
-    }
-}
-
-static void pcilib_unmap_data_space(pcilib_t *ctx) {
-    if (ctx->data_space) {
-	pcilib_unmap_bar(ctx, ctx->data_bar, ctx->data_space);
-	ctx->data_space = NULL;
-    }
-}
-*/
-
 char  *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr) {
     if (bar == PCILIB_BAR_DETECT) {
 	    // First checking the default register bar
@@ -378,19 +440,18 @@ char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size) {
 
 void pcilib_close(pcilib_t *ctx) {
     pcilib_bar_t i;
-    
+
     if (ctx) {
-	pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
-	pcilib_event_api_description_t *eapi = model_info->event_api;
-	pcilib_dma_api_description_t *dapi = model_info->dma_api;
-    
+	const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+	const pcilib_event_api_description_t *eapi = model_info->api;
+	const pcilib_dma_api_description_t *dapi = NULL;
+	
+	if (model_info->dma) dapi = model_info->dma->api;
+
         if ((eapi)&&(eapi->free)) eapi->free(ctx->event_ctx);
         if ((dapi)&&(dapi->free)) dapi->free(ctx->dma_ctx);
-	
-	if (ctx->model_info.registers != model_info->registers) {
-	    free(ctx->model_info.registers);
-	    ctx->model_info.registers = pcilib_model[ctx->model].registers;
-	}
+
+	pcilib_free_register_banks(ctx);
 	
 	if (ctx->kmem_list) {
 	    pcilib_warning("Not all kernel buffers are properly cleaned");
@@ -399,15 +460,23 @@ void pcilib_close(pcilib_t *ctx) {
 		pcilib_free_kernel_memory(ctx, ctx->kmem_list, 0);
 	    }
 	}
-
-	for (i = 0; i < PCILIB_MAX_BANKS; i++) {
+	
+	for (i = 0; i < PCILIB_MAX_BARS; i++) {
 	    if (ctx->bar_space[i]) {
 		char *ptr = ctx->bar_space[i];
 		ctx->bar_space[i] = NULL;
 		pcilib_unmap_bar(ctx, i, ptr);
 	    }
 	}
-	close(ctx->handle);
+
+	if (ctx->registers)
+	    free(ctx->registers);
+	
+	if (ctx->model)
+	    free(ctx->model);
+	
+	if (ctx->handle >= 0)
+	    close(ctx->handle);
 	
 	free(ctx);
     }

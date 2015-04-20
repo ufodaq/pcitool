@@ -1,5 +1,6 @@
 #define _PCILIB_DMA_NWL_C
 #define _BSD_SOURCE
+#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,8 +12,8 @@
 #include "pcilib.h"
 #include "error.h"
 #include "tools.h"
-#include "nwl_private.h"
 
+#include "nwl_private.h"
 #include "nwl_defines.h"
 
 int dma_nwl_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags) {
@@ -25,7 +26,7 @@ int dma_nwl_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     }
 
     if (dma == PCILIB_DMA_ENGINE_INVALID) return 0;
-    else if (dma > ctx->n_engines) return PCILIB_ERROR_INVALID_BANK;
+    else if (dma > ctx->dmactx.pcilib->num_engines) return PCILIB_ERROR_INVALID_BANK;
 
     if (flags&PCILIB_DMA_FLAG_PERSISTENT) ctx->engines[dma].preserve = 1;
 
@@ -44,7 +45,7 @@ int dma_nwl_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
     
 	// stop everything
     if (dma == PCILIB_DMA_ENGINE_INVALID) {
-        for (dma = 0; dma < ctx->n_engines; dma++) {
+        for (dma = 0; dma < ctx->dmactx.pcilib->num_engines; dma++) {
 	    if (flags&PCILIB_DMA_FLAG_PERSISTENT) {
 		ctx->engines[dma].preserve = 0;
 	    }
@@ -63,7 +64,7 @@ int dma_nwl_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
 	return 0;
     }
     
-    if (dma > ctx->n_engines) return PCILIB_ERROR_INVALID_BANK;
+    if (dma > ctx->dmactx.pcilib->num_engines) return PCILIB_ERROR_INVALID_BANK;
     
 	    // ignorign previous setting if flag specified
     if (flags&PCILIB_DMA_FLAG_PERSISTENT) {
@@ -74,55 +75,99 @@ int dma_nwl_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
 }
 
 
-pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib, pcilib_dma_modification_t type, void *arg) {
-    int i;
+pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib, const char *model, const void *arg) {
+    int i, j;
     int err;
-    pcilib_dma_engine_t n_engines;
-
-    pcilib_model_description_t *model_info = pcilib_get_model_description(pcilib);
+    
+    pcilib_dma_engine_t dma;
+    pcilib_register_description_t eregs[NWL_MAX_DMA_ENGINE_REGISTERS];
+    const pcilib_model_description_t *model_info = pcilib_get_model_description(pcilib);
     
     nwl_dma_t *ctx = malloc(sizeof(nwl_dma_t));
-    if (ctx) {
-	memset(ctx, 0, sizeof(nwl_dma_t));
-	ctx->pcilib = pcilib;
-	ctx->type = type;
+    if (!ctx) return NULL;
 
-	if (type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
-	    ctx->dmactx.ignore_eop = 1;
-	}
+    memset(ctx, 0, sizeof(nwl_dma_t));
 
-	pcilib_register_bank_t dma_bank = pcilib_find_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
-	if (dma_bank == PCILIB_REGISTER_BANK_INVALID) {
-	    free(ctx);
-	    pcilib_error("DMA Register Bank could not be found");
-	    return NULL;
-	}
-	
-	ctx->dma_bank = model_info->banks + dma_bank;
-	ctx->base_addr = pcilib_resolve_register_address(pcilib, ctx->dma_bank->bar, ctx->dma_bank->read_addr);
+    pcilib_register_bank_t dma_bank = pcilib_find_register_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
+    if (dma_bank == PCILIB_REGISTER_BANK_INVALID) {
+	free(ctx);
+	pcilib_error("DMA Register Bank could not be found");
+	return NULL;
+    }
 
-	for (i = 0, n_engines = 0; i < 2 * PCILIB_MAX_DMA_ENGINES; i++) {
-	    char *addr = ctx->base_addr + DMA_OFFSET + i * DMA_ENGINE_PER_SIZE;
+    ctx->dma_bank = model_info->banks + dma_bank;
+    ctx->base_addr = pcilib_resolve_register_address(pcilib, ctx->dma_bank->bar, ctx->dma_bank->read_addr);
 
-	    memset(ctx->engines + n_engines, 0, sizeof(pcilib_nwl_engine_description_t));
-
-	    err = dma_nwl_read_engine_config(ctx, ctx->engines + n_engines, addr);
-	    if (err) continue;
+    if ((model)&&(strcasestr(model, "ipecamera"))) {
+	ctx->type = NWL_MODIFICATION_IPECAMERA;
+	ctx->ignore_eop = 1;
+    } else {
+	ctx->type = NWL_MODIFICATION_DEFAULT;
 	    
-	    pcilib_set_dma_engine_description(pcilib, n_engines, (pcilib_dma_engine_description_t*)(ctx->engines + n_engines));
-	    ++n_engines;
-	}
-	pcilib_set_dma_engine_description(pcilib, n_engines, NULL);
-	
-	ctx->n_engines = n_engines;
-	
-	err = nwl_add_registers(ctx);
+	err = pcilib_add_registers(pcilib, 0, nwl_xrawdata_registers);
 	if (err) {
 	    free(ctx);
-	    pcilib_error("Failed to add DMA registers");
+	    pcilib_error("Error (%i) adding NWL XRAWDATA registers", err);
 	    return NULL;
 	}
     }
+
+    for (j = 0; nwl_dma_engine_registers[j].bits; j++);
+    if (j > NWL_MAX_DMA_ENGINE_REGISTERS) {
+	free(ctx);
+	pcilib_error("Too many (%i) engine registers defined, only %i supported", j, NWL_MAX_DMA_ENGINE_REGISTERS);
+	return NULL;
+    }
+
+    memcpy(eregs, nwl_dma_engine_registers, j * sizeof(pcilib_register_description_t));
+
+    for (i = 0; i < 2 * PCILIB_MAX_DMA_ENGINES; i++) {
+	pcilib_dma_engine_description_t edesc;
+	char *addr = ctx->base_addr + DMA_OFFSET + i * DMA_ENGINE_PER_SIZE;
+
+	memset(&edesc, 0, sizeof(pcilib_dma_engine_description_t));
+
+	err = dma_nwl_read_engine_config(ctx, &edesc, addr);
+	if (err) continue;
+
+	for (j = 0; nwl_dma_engine_registers[j].bits; j++) {
+	    int dma_addr_len = (PCILIB_MAX_DMA_ENGINES > 9)?2:1;
+	    const char *dma_direction;
+
+	    eregs[j].name = nwl_dma_engine_register_names[i * NWL_MAX_DMA_ENGINE_REGISTERS + j];
+	    eregs[j].addr = nwl_dma_engine_registers[j].addr + (addr - ctx->base_addr);
+	    
+	    switch (edesc.direction) {
+		case PCILIB_DMA_FROM_DEVICE:
+		    dma_direction =  "r";
+		break;
+		case PCILIB_DMA_TO_DEVICE:
+		    dma_direction = "w";
+		break;
+		default:
+		    dma_direction = "";
+	    }    
+	    sprintf((char*)eregs[j].name, nwl_dma_engine_registers[j].name, dma_addr_len, edesc.addr, dma_direction);
+	}
+	
+        err = pcilib_add_registers(pcilib, j, eregs);
+	if (err) {
+	    free(ctx);
+	    pcilib_error("Error (%i) adding NWL DMA registers for engine %i", err, edesc.addr);
+	    return NULL;
+	}
+    
+	dma = pcilib_add_dma_engine(pcilib, &edesc);
+	if (dma == PCILIB_DMA_ENGINE_INVALID) {
+	    free(ctx);
+	    pcilib_error("Problem while registering DMA engine");
+	    return NULL;
+	}
+	
+	ctx->engines[dma].desc = &pcilib->engines[dma];
+	ctx->engines[dma].base_addr = addr;
+    }
+
     return (pcilib_dma_context_t*)ctx;
 }
 
@@ -130,7 +175,7 @@ void  dma_nwl_free(pcilib_dma_context_t *vctx) {
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
 
     if (ctx) {
-	if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) dma_nwl_stop_loopback(ctx);
+	if (ctx->type == NWL_MODIFICATION_DEFAULT) dma_nwl_stop_loopback(ctx);
 	dma_nwl_free_irq(ctx);
 	dma_nwl_stop(vctx, PCILIB_DMA_ENGINE_ALL, PCILIB_DMA_FLAGS_DEFAULT);
 	    

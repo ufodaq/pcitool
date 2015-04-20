@@ -2,7 +2,7 @@
 #define _PCILIB_DMA_NWL_PRIVATE_H
 
 typedef struct nwl_dma_s nwl_dma_t;
-typedef struct pcilib_nwl_engine_description_s pcilib_nwl_engine_description_t;
+typedef struct pcilib_nwl_engine_context_s pcilib_nwl_engine_context_t;
 
 #define NWL_DMA_IRQ_SOURCE 0
 
@@ -20,17 +20,17 @@ typedef struct pcilib_nwl_engine_description_s pcilib_nwl_engine_description_t;
 
 #include "nwl.h"
 #include "nwl_irq.h"
-#include "nwl_register.h"
 #include "nwl_engine.h"
 #include "nwl_loopback.h"
 
 #define nwl_read_register(var, ctx, base, reg) pcilib_datacpy(&var, base + reg, 4, 1, ctx->dma_bank->raw_endianess)
 #define nwl_write_register(var, ctx, base, reg) pcilib_datacpy(base + reg, &var, 4, 1, ctx->dma_bank->raw_endianess)
 
-struct pcilib_nwl_engine_description_s {
-    pcilib_dma_engine_description_t desc;
+
+struct pcilib_nwl_engine_context_s {
+    const pcilib_dma_engine_description_t *desc;
     char *base_addr;
-    
+
     size_t ring_size, page_size;
     size_t head, tail;
     pcilib_kmem_handle_t *ring;
@@ -42,15 +42,18 @@ struct pcilib_nwl_engine_description_s {
     int preserve;			/**< indicates that DMA should not be stopped during clean-up */
 };
 
+typedef enum {
+    NWL_MODIFICATION_DEFAULT,
+    NWL_MODIFICATION_IPECAMERA
+} nwl_modification_t;
 
 struct nwl_dma_s {
-    struct pcilib_dma_context_s dmactx;
-    
-    pcilib_t *pcilib;
-    
-    pcilib_dma_modification_t type;
-    
-    pcilib_register_bank_description_t *dma_bank;
+    pcilib_dma_context_t dmactx;
+
+    nwl_modification_t type;
+    int ignore_eop;			/**< always set end-of-packet */
+
+    const pcilib_register_bank_description_t *dma_bank;
     char *base_addr;
 
     pcilib_irq_type_t irq_enabled;	/**< indicates that IRQs are enabled */
@@ -59,9 +62,10 @@ struct nwl_dma_s {
     int irq_started;			/**< indicates that IRQ subsystem is initialized (detecting which types should be preserverd) */    
     int loopback_started;		/**< indicates that benchmarking subsystem is initialized */
 
-    pcilib_dma_engine_t n_engines;
-    pcilib_nwl_engine_description_t engines[PCILIB_MAX_DMA_ENGINES + 1];
+//    pcilib_dma_engine_t n_engines;
+    pcilib_nwl_engine_context_t engines[PCILIB_MAX_DMA_ENGINES + 1];
 };
 
+int nwl_add_registers(nwl_dma_t *ctx);
 
 #endif /* _PCILIB_DMA_NWL_PRIVATE_H */

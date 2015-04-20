@@ -12,23 +12,21 @@ find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
 #Check in sibling directory
-pkg_check_modules(UFODECODE ufodecode>=0.2 REQUIRED)
-
 if (NOT DISABLE_PCITOOL)
     pkg_check_modules(FASTWRITER fastwriter REQUIRED)
 endif (NOT DISABLE_PCITOOL)
 
-set(HEADERS pcilib.h pci.h register.h kmem.h irq.h dma.h event.h default.h tools.h error.h)
-add_definitions("-fPIC --std=c99 -Wall -O2")
-#add_definitions("-fPIC --std=c99 -Wall -O2 -pthread")
+set(HEADERS pcilib.h pci.h config.h model.h bank.h register.h kmem.h irq.h dma.h event.h tools.h error.h)
+add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3")
+#add_definitions("-fPIC --std=c99 -Wall -O2")
 
 add_subdirectory(dma)
-add_subdirectory(ipecamera)
-add_subdirectory(kapture)
+add_subdirectory(protocols)
 add_subdirectory(pcitool)
 add_subdirectory(apps)
 
 include_directories(
+    .
     ${FASTWRITER_INCLUDE_DIRS}
 )
 
@@ -37,15 +35,13 @@ link_directories(
     ${UFODECODE_LIBRARY_DIRS}
 )
 
-add_library(pcilib SHARED pci.c register.c kmem.c irq.c dma.c event.c default.c tools.c error.c) 
-target_link_libraries(pcilib dma ipecamera kapture ${CMAKE_THREAD_LIBS_INIT} ${UFODECODE_LIBRARIES} )
-add_dependencies(pcilib dma ipecamera)
+add_library(pcilib SHARED pci.c config.c model.c bank.c register.c kmem.c irq.c dma.c event.c tools.c error.c) 
+target_link_libraries(pcilib dma protocols ${CMAKE_THREAD_LIBS_INIT} ${UFODECODE_LIBRARIES} )
+add_dependencies(pcilib dma protocols pcitool)
 
 set_target_properties(pcilib PROPERTIES
     VERSION ${PCILIB_VERSION}
     SOVERSION ${PCILIB_ABI_VERSION}
-#    LINK_FLAGS "-pthread"
-#    LINK_FLAGS "-pthread -Wl,--whole-archive,dma/libdma.a,ipecamera/libipecamera.a,--no-whole-archive"
 )
 
 if (NOT DISABLE_PCITOOL)
@@ -78,4 +74,8 @@ endif (NOT DISABLE_PCITOOL)
 
 install(FILES pcilib.h
     DESTINATION include
+)
+
+install(FILES bank.h register.h dma.h event.h model.h error.h tools.h
+    DESTINATION include/pcilib
 )

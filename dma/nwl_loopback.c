@@ -25,7 +25,7 @@ int dma_nwl_start_loopback(nwl_dma_t *ctx,  pcilib_dma_direction_t direction, si
     val = packet_size;
     nwl_write_register(val, ctx, ctx->base_addr, PKT_SIZE_ADDRESS);
 
-    if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) {
+    if (ctx->type == NWL_MODIFICATION_DEFAULT) {
 	switch (direction) {
           case PCILIB_DMA_BIDIRECTIONAL:
 	    val = LOOPBACK;
@@ -54,7 +54,7 @@ int dma_nwl_stop_loopback(nwl_dma_t *ctx) {
 	engine initialized in previous run, and benchmark is only actual usage.
 	Otherwise, we should detect current loopback status during initialization */
 
-    if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) {
+    if (ctx->type == NWL_MODIFICATION_DEFAULT) {
 	nwl_write_register(val, ctx, ctx->base_addr, TX_CONFIG_ADDRESS);
 	nwl_write_register(val, ctx, ctx->base_addr, RX_CONFIG_ADDRESS);
     }
@@ -77,25 +77,25 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
 
-    pcilib_dma_engine_t readid = pcilib_find_dma_by_addr(ctx->pcilib, PCILIB_DMA_FROM_DEVICE, dma);
-    pcilib_dma_engine_t writeid = pcilib_find_dma_by_addr(ctx->pcilib, PCILIB_DMA_TO_DEVICE, dma);
+    pcilib_dma_engine_t readid = pcilib_find_dma_by_addr(ctx->dmactx.pcilib, PCILIB_DMA_FROM_DEVICE, dma);
+    pcilib_dma_engine_t writeid = pcilib_find_dma_by_addr(ctx->dmactx.pcilib, PCILIB_DMA_TO_DEVICE, dma);
 
     if (size%sizeof(uint32_t)) size = 1 + size / sizeof(uint32_t);
     else size /= sizeof(uint32_t);
 
 	// Not supported
-    if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) {
+    if (ctx->type == NWL_MODIFICATION_DEFAULT) {
 	if (direction == PCILIB_DMA_TO_DEVICE) return -1.;
     }
-//    else if ((direction == PCILIB_DMA_FROM_DEVICE)&&(ctx->type != PCILIB_DMA_MODIFICATION_DEFAULT)) return -1.;
+//    else if ((direction == PCILIB_DMA_FROM_DEVICE)&&(ctx->type != NWL_MODIFICATION_DEFAULT)) return -1.;
 
 	// Stop Generators and drain old data
-    if (ctx->type == PCILIB_DMA_MODIFICATION_DEFAULT) dma_nwl_stop_loopback(ctx);
+    if (ctx->type == NWL_MODIFICATION_DEFAULT) dma_nwl_stop_loopback(ctx);
 //    dma_nwl_stop_engine(ctx, readid); // DS: replace with something better
 
     __sync_synchronize();
 
-    err = pcilib_skip_dma(ctx->pcilib, readid);
+    err = pcilib_skip_dma(ctx->dmactx.pcilib, readid);
     if (err) {
 	pcilib_error("Can't start benchmark, devices continuously writes unexpected data using DMA engine");
 	return -1;
@@ -125,31 +125,31 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	return -1;
     }
 
-    if (ctx->type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
-	pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e5);
+    if (ctx->type == NWL_MODIFICATION_IPECAMERA) {
+	pcilib_write_register(ctx->dmactx.pcilib, NULL, "control", 0x1e5);
 	usleep(100000);
-	pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e1);
+	pcilib_write_register(ctx->dmactx.pcilib, NULL, "control", 0x1e1);
 
 	    // This way causes more problems with garbage
-	//pcilib_write_register(ctx->pcilib, NULL, "control", 0x3e1);
+	//pcilib_write_register(ctx->dmactx.pcilib, NULL, "control", 0x3e1);
     }
 
 	// Benchmark
     for (iter = 0; iter < iterations; iter++) {
         memset(cmp, 0x13 + iter, size * sizeof(uint32_t));
 
-	if (ctx->type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
-	    pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e1);
+	if (ctx->type == NWL_MODIFICATION_IPECAMERA) {
+	    pcilib_write_register(ctx->dmactx.pcilib, NULL, "control", 0x1e1);
 	}
 
-	if ((direction&PCILIB_DMA_TO_DEVICE)||(ctx->type != PCILIB_DMA_MODIFICATION_DEFAULT)) {
+	if ((direction&PCILIB_DMA_TO_DEVICE)||(ctx->type != NWL_MODIFICATION_DEFAULT)) {
 	    memcpy(buf, cmp, size * sizeof(uint32_t));
 
     	    if (direction&PCILIB_DMA_TO_DEVICE) {
 		gettimeofday(&start, NULL);
 	    }
 	    
-	    err = pcilib_write_dma(ctx->pcilib, writeid, addr, size * sizeof(uint32_t), buf, &bytes);
+	    err = pcilib_write_dma(ctx->dmactx.pcilib, writeid, addr, size * sizeof(uint32_t), buf, &bytes);
 	    if ((err)||(bytes != size * sizeof(uint32_t))) {
 		error = "Write failed";
 	    	break;
@@ -165,8 +165,8 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	    }
 	}
 
-	if (ctx->type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
-	    pcilib_write_register(ctx->pcilib, NULL, "control", 0x3e1);
+	if (ctx->type == NWL_MODIFICATION_IPECAMERA) {
+	    pcilib_write_register(ctx->dmactx.pcilib, NULL, "control", 0x3e1);
 	}
 
 	memset(buf, 0, size * sizeof(uint32_t));
@@ -180,7 +180,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	    retry:
 #endif
     
-	    err = pcilib_read_dma(ctx->pcilib, readid, addr, packet_size * sizeof(uint32_t), buf + (bytes>>2), &rbytes);
+	    err = pcilib_read_dma(ctx->dmactx.pcilib, readid, addr, packet_size * sizeof(uint32_t), buf + (bytes>>2), &rbytes);
 	    if ((err)||(rbytes%sizeof(uint32_t))) {
 		break;
 	    } 
@@ -227,8 +227,8 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 #endif
     }
 
-    if (ctx->type == PCILIB_NWL_MODIFICATION_IPECAMERA) {
-	pcilib_write_register(ctx->pcilib, NULL, "control", 0x1e1);
+    if (ctx->type == NWL_MODIFICATION_IPECAMERA) {
+	pcilib_write_register(ctx->dmactx.pcilib, NULL, "control", 0x1e1);
     }
 
     if (error) {
@@ -245,7 +245,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
     __sync_synchronize();
     
     if (direction == PCILIB_DMA_FROM_DEVICE) {
-	pcilib_skip_dma(ctx->pcilib, readid);
+	pcilib_skip_dma(ctx->dmactx.pcilib, readid);
     }
     
     free(cmp);

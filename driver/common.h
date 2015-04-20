@@ -1,8 +1,7 @@
 #ifndef _PCIDRIVER_COMMON_H
 #define _PCIDRIVER_COMMON_H
 
-#include "pcilib_types.h"
-
+#include "../kmem.h"
 /*************************************************************************/
 /* Private data types and structures */
 

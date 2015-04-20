@@ -28,10 +28,11 @@
 #include "pcitool/sysinfo.h"
 #include "pcitool/formaters.h"
 
-//#include "pci.h"
+#include "pci.h"
 #include "tools.h"
-#include "kernel.h"
+#include "kmem.h"
 #include "error.h"
+#include "model.h"
 
 /* defines */
 #define MAX_KBUF 14
@@ -353,17 +354,17 @@ void Error(const char *format, ...) {
 void Silence(const char *format, ...) {
 }
 
-void List(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, int details) {
+void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, int details) {
     int i,j;
-    pcilib_register_bank_description_t *banks;
-    pcilib_register_description_t *registers;
-    pcilib_event_description_t *events;
-    pcilib_event_data_type_description_t *types;
+    const pcilib_register_bank_description_t *banks;
+    const pcilib_register_description_t *registers;
+    const pcilib_event_description_t *events;
+    const pcilib_event_data_type_description_t *types;
 
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
-    const pcilib_dma_info_t *dma_info = pcilib_get_dma_info(handle);
+    const pcilib_dma_description_t *dma_info = pcilib_get_dma_info(handle);
     
-    for (i = 0; i < PCILIB_MAX_BANKS; i++) {
+    for (i = 0; i < PCILIB_MAX_BARS; i++) {
 	if (board_info->bar_length[i] > 0) {
 	    printf(" BAR %d - ", i);
 
@@ -384,8 +385,8 @@ void List(pcilib_t *handle, pcilib_model_description_t *model_info, const char *
     
     if ((dma_info)&&(dma_info->engines)) {
 	printf("DMA Engines: \n");
-	for (i = 0; dma_info->engines[i]; i++) {
-	    pcilib_dma_engine_description_t *engine = dma_info->engines[i];
+	for (i = 0; dma_info->engines[i].addr_bits; i++) {
+	    const pcilib_dma_engine_description_t *engine = &dma_info->engines[i];
 	    printf(" DMA %2d ", engine->addr);
 	    switch (engine->direction) {
 		case PCILIB_DMA_FROM_DEVICE:
@@ -436,8 +437,8 @@ void List(pcilib_t *handle, pcilib_model_description_t *model_info, const char *
     if (registers) {
         pcilib_register_bank_addr_t bank_addr = 0;
 	if (bank) {
-	    pcilib_register_bank_t bank_id = pcilib_find_bank(handle, bank);
-	    pcilib_register_bank_description_t *b = model_info->banks + bank_id;
+	    pcilib_register_bank_t bank_id = pcilib_find_register_bank(handle, bank);
+	    const pcilib_register_bank_description_t *b = model_info->banks + bank_id;
 
 	    bank_addr = b->addr;
 	    if (b->description) printf("%s:\n", b->description);
@@ -506,7 +507,7 @@ void List(pcilib_t *handle, pcilib_model_description_t *model_info, const char *
     }
 }
 
-void Info(pcilib_t *handle, pcilib_model_description_t *model_info) {
+void Info(pcilib_t *handle, const pcilib_model_description_t *model_info) {
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
 
     printf("Vendor: %x, Device: %x, Bus: %x, Slot: %x, Function: %x\n", board_info->vendor_id, board_info->device_id, board_info->bus, board_info->slot, board_info->func);
@@ -578,7 +579,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	unsigned long maxlength = 0;
 	
 
-	for (i = 0; i < PCILIB_MAX_BANKS; i++) {
+	for (i = 0; i < PCILIB_MAX_REGISTER_BANKS; i++) {
 	    if ((addr >= board_info->bar_start[i])&&((board_info->bar_start[i] + board_info->bar_length[i]) >= (addr + access))) {
 		bar = i;
 		break;
@@ -895,7 +896,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
 
 
 
-int ReadRegister(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, const char *reg) {
+int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, const char *reg) {
     int i;
     int err;
     const char *format;
@@ -907,7 +908,7 @@ int ReadRegister(pcilib_t *handle, pcilib_model_description_t *model_info, const
     
     if (reg) {
 	pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
-        bank_id = pcilib_find_bank_by_addr(handle, model_info->registers[regid].bank);
+        bank_id = pcilib_find_register_bank_by_addr(handle, model_info->registers[regid].bank);
         format = model_info->banks[bank_id].format;
         if (!format) format = "%lu";
 
@@ -925,14 +926,14 @@ int ReadRegister(pcilib_t *handle, pcilib_model_description_t *model_info, const
     
 	if (model_info->registers) {
 	    if (bank) {
-		bank_id = pcilib_find_bank(handle, bank);
+		bank_id = pcilib_find_register_bank(handle, bank);
 		bank_addr = model_info->banks[bank_id].addr;
 	    }
 	    
 	    printf("Registers:\n");
 	    for (i = 0; model_info->registers[i].bits; i++) {
 		if ((model_info->registers[i].mode & PCILIB_REGISTER_R)&&((!bank)||(model_info->registers[i].bank == bank_addr))&&(model_info->registers[i].type != PCILIB_REGISTER_BITS)) { 
-		    bank_id = pcilib_find_bank_by_addr(handle, model_info->registers[i].bank);
+		    bank_id = pcilib_find_register_bank_by_addr(handle, model_info->registers[i].bank);
 		    format = model_info->banks[bank_id].format;
 		    if (!format) format = "%lu";
 
@@ -966,12 +967,12 @@ int ReadRegister(pcilib_t *handle, pcilib_model_description_t *model_info, const
     fwrite(tbuf, access/8, n, o); \
 }
 
-int ReadRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, long addr_shift, size_t n, FILE *o) {
+int ReadRegisterRange(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, long addr_shift, size_t n, FILE *o) {
     int err;
     int i;
 
-    pcilib_register_bank_description_t *banks = model_info->banks;
-    pcilib_register_bank_t bank_id = pcilib_find_bank(handle, bank);
+    const pcilib_register_bank_description_t *banks = model_info->banks;
+    pcilib_register_bank_t bank_id = pcilib_find_register_bank(handle, bank);
 
     if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
 	if (bank) Error("Invalid register bank is specified (%s)", bank);
@@ -1087,7 +1088,7 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
     return 0;
 }
 
-int WriteRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, long addr_shift, size_t n, char ** data) {
+int WriteRegisterRange(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, uintptr_t addr, long addr_shift, size_t n, char ** data) {
     pcilib_register_value_t *buf, *check;
     int res, i, err;
     unsigned long value;
@@ -1122,7 +1123,7 @@ int WriteRegisterRange(pcilib_t *handle, pcilib_model_description_t *model_info,
 
 }
 
-int WriteRegister(pcilib_t *handle, pcilib_model_description_t *model_info, const char *bank, const char *reg, char ** data) {
+int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, const char *reg, char ** data) {
     int err;
 
     unsigned long val;
@@ -1756,20 +1757,20 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
     return 0;
 }
 
-int StartStopDMA(pcilib_t *handle,  pcilib_model_description_t *model_info, pcilib_dma_engine_addr_t dma, pcilib_dma_direction_t dma_direction, int start) {
+int StartStopDMA(pcilib_t *handle,  const pcilib_model_description_t *model_info, pcilib_dma_engine_addr_t dma, pcilib_dma_direction_t dma_direction, int start) {
     int err;
     pcilib_dma_engine_t dmaid;
     
     if (dma == PCILIB_DMA_ENGINE_ADDR_INVALID) {
-        const pcilib_dma_info_t *dma_info = pcilib_get_dma_info(handle);
+        const pcilib_dma_description_t *dma_info = pcilib_get_dma_info(handle);
 
         if (start) Error("DMA engine should be specified");
 
-	for (dmaid = 0; dma_info->engines[dmaid]; dmaid++) {
+	for (dmaid = 0; dma_info->engines[dmaid].addr_bits; dmaid++) {
 	    err = pcilib_start_dma(handle, dmaid, 0);
-	    if (err) Error("Error starting DMA Engine (%s %i)", ((dma_info->engines[dmaid]->direction == PCILIB_DMA_FROM_DEVICE)?"C2S":"S2C"), dma_info->engines[dmaid]->addr);
+	    if (err) Error("Error starting DMA Engine (%s %i)", ((dma_info->engines[dmaid].direction == PCILIB_DMA_FROM_DEVICE)?"C2S":"S2C"), dma_info->engines[dmaid].addr);
 	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
-	    if (err) Error("Error stopping DMA Engine (%s %i)", ((dma_info->engines[dmaid]->direction == PCILIB_DMA_FROM_DEVICE)?"C2S":"S2C"), dma_info->engines[dmaid]->addr);
+	    if (err) Error("Error stopping DMA Engine (%s %i)", ((dma_info->engines[dmaid].direction == PCILIB_DMA_FROM_DEVICE)?"C2S":"S2C"), dma_info->engines[dmaid].addr);
 	}
 	
 	return 0;
@@ -1851,6 +1852,7 @@ size_t FindUse(size_t *n_uses, kmem_use_info_t *uses, pcilib_kmem_use_t use) {
     
     if (n == MAX_USES) return 0;
 
+    memset(&uses[n], 0, sizeof(pcilib_kmem_use_t));
     uses[n].use = use;
     return (*n_uses)++;
 }
@@ -1878,7 +1880,7 @@ int ParseKMEM(pcilib_t *handle, const char *device, size_t *uses_number, kmem_us
 
     size_t useid, n_uses = 1;	// Use 0 is for others
 
-    memset(uses, 0, sizeof(uses));
+    memset(uses, 0, sizeof(kmem_use_info_t));
     
     pos = strrchr(device, '/');
     if (pos) ++pos;
@@ -1905,12 +1907,15 @@ int ParseKMEM(pcilib_t *handle, const char *device, size_t *uses_number, kmem_us
 	if (!f) Error("Can't access file (%s)", fname);
 
 	while(!feof(f)) {
-	    fgets(info, 256, f);
+	    if (!fgets(info, 256, f))
+		break;
+
 	    if (!strncmp(info, "use:", 4)) use = strtoul(info+4, NULL, 16);
 	    if (!strncmp(info, "size:", 5)) size = strtoul(info+5, NULL, 10);
 	    if (!strncmp(info, "refs:", 5)) refs = strtoul(info+5, NULL, 10);
 	    if (!strncmp(info, "mode:", 5)) mode = strtoul(info+5, NULL, 16);
 	    if (!strncmp(info, "hw ref:", 7)) hwref = strtoul(info+7, NULL, 10);
+
 	}
 	fclose(f);
 
@@ -1960,9 +1965,9 @@ int ListKMEM(pcilib_t *handle, const char *device) {
 	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_USER)	printf("User %04x         ", uses[i].use&0xFFFF);
 	else printf ("                   ");
 	printf("  ");
-	printf("% 6lu", uses[i].count);
+	printf("%6zu", uses[i].count);
 	printf("     ");
-	printf("% 10s", GetPrintSize(stmp, uses[i].size));
+	printf("%10s", GetPrintSize(stmp, uses[i].size));
 	printf("      ");
 	if (uses[i].referenced&&uses[i].hw_lock) printf("HW+SW");
 	else if (uses[i].referenced) printf("   SW");
@@ -2122,7 +2127,7 @@ int FreeKMEM(pcilib_t *handle, const char *device, const char *use, int force) {
     return 0;
 }
 
-int ListDMA(pcilib_t *handle, const char *device, pcilib_model_description_t *model_info) {
+int ListDMA(pcilib_t *handle, const char *device, const pcilib_model_description_t *model_info) {
     int err;
     
     DIR *dir;
@@ -2163,7 +2168,9 @@ int ListDMA(pcilib_t *handle, const char *device, pcilib_model_description_t *mo
 	if (!f) Error("Can't access file (%s)", fname);
 
 	while(!feof(f)) {
-	    fgets(info, 256, f);
+	    if (!fgets(info, 256, f))
+		break;
+
 	    if (!strncmp(info, "use:", 4)) use = strtoul(info+4, NULL, 16);
 //	    if (!strncmp(info, "size:", 5)) size = strtoul(info+5, NULL, 10);
 //	    if (!strncmp(info, "refs:", 5)) refs = strtoul(info+5, NULL, 10);
@@ -2207,7 +2214,7 @@ int ListDMA(pcilib_t *handle, const char *device, pcilib_model_description_t *mo
 	else printf("D");
 
 	printf("        ");
-	printf("% 10s", GetPrintSize(stmp, status.ring_size * status.buffer_size));
+	printf("%10s", GetPrintSize(stmp, status.ring_size * status.buffer_size));
 	
 	printf("         ");
 	printf("%zu - %zu (of %zu)", status.ring_tail, status.ring_head, status.ring_size);
@@ -2223,7 +2230,7 @@ int ListDMA(pcilib_t *handle, const char *device, pcilib_model_description_t *mo
     return 0;
 }
 
-int ListBuffers(pcilib_t *handle, const char *device, pcilib_model_description_t *model_info, pcilib_dma_engine_addr_t dma, pcilib_dma_direction_t dma_direction) {
+int ListBuffers(pcilib_t *handle, const char *device, const pcilib_model_description_t *model_info, pcilib_dma_engine_addr_t dma, pcilib_dma_direction_t dma_direction) {
     int err;
     size_t i;
     pcilib_dma_engine_t dmaid;
@@ -2253,7 +2260,7 @@ int ListBuffers(pcilib_t *handle, const char *device, pcilib_model_description_t
     for (i = 0; i < status.ring_size; i++) {
 	printf("%8zu    ", i);
         printf("%c%c %c%c ", buffer[i].used?'U':' ',  buffer[i].error?'E':' ', buffer[i].first?'F':' ', buffer[i].last?'L':' ');
-	printf("% 10s", GetPrintSize(stmp, buffer[i].size));
+	printf("%10s", GetPrintSize(stmp, buffer[i].size));
 	printf("\n");
     }
 
@@ -2267,7 +2274,7 @@ int ListBuffers(pcilib_t *handle, const char *device, pcilib_model_description_t
     return 0;
 }
 
-int ReadBuffer(pcilib_t *handle, const char *device, pcilib_model_description_t *model_info, pcilib_dma_engine_addr_t dma, pcilib_dma_direction_t dma_direction, size_t block, FILE *o) {
+int ReadBuffer(pcilib_t *handle, const char *device, const pcilib_model_description_t *model_info, pcilib_dma_engine_addr_t dma, pcilib_dma_direction_t dma_direction, size_t block, FILE *o) {
     int err;
     pcilib_dma_engine_t dmaid;
     pcilib_dma_engine_status_t status;
@@ -2303,7 +2310,7 @@ int ReadBuffer(pcilib_t *handle, const char *device, pcilib_model_description_t 
 }
 
 
-int EnableIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_type_t irq_type) {
+int EnableIRQ(pcilib_t *handle, const pcilib_model_description_t *model_info, pcilib_irq_type_t irq_type) {
     int err;
 
     err = pcilib_enable_irq(handle, irq_type, 0);
@@ -2315,7 +2322,7 @@ int EnableIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_i
     return err;
 }
 
-int DisableIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_type_t irq_type) {
+int DisableIRQ(pcilib_t *handle, const pcilib_model_description_t *model_info, pcilib_irq_type_t irq_type) {
     int err;
     
     err = pcilib_disable_irq(handle, 0);
@@ -2327,12 +2334,12 @@ int DisableIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_
     return err;
 }
 
-int AckIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_hw_source_t irq_source) {
+int AckIRQ(pcilib_t *handle, const pcilib_model_description_t *model_info, pcilib_irq_hw_source_t irq_source) {
     pcilib_clear_irq(handle, irq_source);
     return 0;
 }
 
-int WaitIRQ(pcilib_t *handle, pcilib_model_description_t *model_info, pcilib_irq_hw_source_t irq_source, pcilib_timeout_t timeout) {
+int WaitIRQ(pcilib_t *handle, const pcilib_model_description_t *model_info, pcilib_irq_hw_source_t irq_source, pcilib_timeout_t timeout) {
     int err;
     size_t count;
 
@@ -2361,8 +2368,8 @@ int main(int argc, char **argv) {
     int force = 0;
     int verify = 0;
     
-    pcilib_model_t model = PCILIB_MODEL_DETECT;
-    pcilib_model_description_t *model_info;
+    const char *model = NULL;
+    const pcilib_model_description_t *model_info;
     MODE mode = MODE_INVALID;
     GRAB_MODE grab_mode = 0;
     size_t trigger_time = 0;
@@ -2639,10 +2646,11 @@ int main(int argc, char **argv) {
 		fpga_device = optarg;
 	    break;
 	    case OPT_MODEL:
-		if (!strcasecmp(optarg, "pci")) model = PCILIB_MODEL_PCI;
+		model = optarg;
+/*		if (!strcasecmp(optarg, "pci")) model = PCILIB_MODEL_PCI;
 		else if (!strcasecmp(optarg, "ipecamera")) model = PCILIB_MODEL_IPECAMERA;
 		else if (!strcasecmp(optarg, "kapture")) model = PCILIB_MODEL_KAPTURE;
-		else Usage(argc, argv, "Invalid memory model (%s) is specified", optarg);
+		else Usage(argc, argv, "Invalid memory model (%s) is specified", optarg);*/
 	    break;
 	    case OPT_BAR:
 		bank = optarg;
@@ -2838,7 +2846,6 @@ int main(int argc, char **argv) {
     handle = pcilib_open(fpga_device, model);
     if (handle < 0) Error("Failed to open FPGA device: %s", fpga_device);
 
-    model = pcilib_get_model(handle);
     model_info = pcilib_get_model_description(handle);
 
     switch (mode) {
@@ -2866,7 +2873,8 @@ int main(int argc, char **argv) {
         else Usage(argc, argv, "The %i data values is specified, but %i required", argc - optind, size);
      case MODE_READ:
         if (!addr) {
-	    if (model == PCILIB_MODEL_PCI) {
+	    if (((!model_info->dma)||(!model_info->dma->api))&&(!model_info->api)) {
+//	    if (model == PCILIB_MODEL_PCI) {
 		if ((amode != ACCESS_DMA)&&(amode != ACCESS_CONFIG)) 
 		    Usage(argc, argv, "The address is not specified");
 	    } else ++mode;
@@ -2927,7 +2935,7 @@ int main(int argc, char **argv) {
 	    addr = NULL;
 	} else if ((isxnumber(addr))&&(sscanf(addr, "%lx", &start) == 1)) {
 		// check if the address in the register range
-	    pcilib_register_range_t *ranges =  model_info->ranges;
+	    const pcilib_register_range_t *ranges =  model_info->ranges;
 	    
 	    if (ranges) {
 		for (i = 0; ranges[i].start != ranges[i].end; i++) 
@@ -2935,7 +2943,7 @@ int main(int argc, char **argv) {
 	    		
 		    // register access in plain mode
 		if (ranges[i].start != ranges[i].end) {
-		    pcilib_register_bank_t regbank = pcilib_find_bank_by_addr(handle, ranges[i].bank);
+		    pcilib_register_bank_t regbank = pcilib_find_register_bank_by_addr(handle, ranges[i].bank);
 		    if (regbank == PCILIB_REGISTER_BANK_INVALID) Error("Configuration error: register bank specified in the address range is not found");
 		    
 		    bank = model_info->banks[regbank].name;
@@ -2991,12 +2999,12 @@ int main(int argc, char **argv) {
 	    case MODE_BENCHMARK:
 	    case MODE_READ:
 	    case MODE_WRITE:
-		if ((!isnumber(bank))||(sscanf(bank,"%li", &itmp) != 1)||(itmp < 0)||(itmp >= PCILIB_MAX_BANKS)) 
+		if ((!isnumber(bank))||(sscanf(bank,"%li", &itmp) != 1)||(itmp < 0)||(itmp >= PCILIB_MAX_REGISTER_BANKS)) 
 		    Usage(argc, argv, "Invalid data bank (%s) is specified", bank);
 		else bar = itmp;
 	    break;
 	    default:
-		if (pcilib_find_bank(handle, bank) == PCILIB_REGISTER_BANK_INVALID)
+		if (pcilib_find_register_bank(handle, bank) == PCILIB_REGISTER_BANK_INVALID)
 		    Usage(argc, argv, "Invalid data bank (%s) is specified", bank);
 	}
     }

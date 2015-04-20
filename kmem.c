@@ -20,7 +20,7 @@
 int pcilib_clean_kernel_memory(pcilib_t *ctx, pcilib_kmem_use_t use, pcilib_kmem_flags_t flags) {
     kmem_handle_t kh = {0};
     kh.use = use;
-    kh.flags = flags|KMEM_FLAG_MASS;
+    kh.flags = flags|PCILIB_KMEM_FLAG_MASS;
 
     return ioctl(ctx->handle, PCIDRIVER_IOC_KMEM_FREE, &kh);
 }

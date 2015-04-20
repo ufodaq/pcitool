@@ -25,10 +25,8 @@ enum {
     PCILIB_ERROR_BUSY = EBUSY
 } pcilib_errot_t;
 
-
-#ifndef _PCILIB_ERROR_C
+void pcilib_print_error(const char *msg, ...);
 extern void (*pcilib_error)(const char *msg, ...);
 extern void (*pcilib_warning)(const char *msg, ...);
-#endif /* _PCILIB_ERROR_C */
 
 #endif /* _PCILIB_ERROR_H */

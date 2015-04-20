@@ -1,4 +1,5 @@
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 200809L
+#define _BSD_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +16,7 @@
 #include "pcilib.h"
 #include "irq.h"
 #include "kmem.h"
+#include "pci.h"
 
 //#include <sys/ipc.h>
 //#include <sys/shm.h>
@@ -33,10 +35,10 @@
                                     // if set to 0, the update only happens when INT is received
 
 #define HUGE_PAGE       1           // number of pages per huge page
-#define TLP_SIZE        32          // TLP SIZE = 64 for 256B payload, 32 for 128B payload
+#define TLP_SIZE        64          // TLP SIZE = 64 for 256B payload, 32 for 128B payload
 #define PAGE_SIZE       4096        // other values are not supported in the kernel
 
-//#define USE_64                    // Lorenzo: use 64bit addressing
+#define USE_64                    // Lorenzo: use 64bit addressing
 
 //#define DUAL_CORE                 // Lorenzo: DUAL Core
 
@@ -138,28 +140,31 @@ int main() {
 
 
     int err;
-    long i, j, k;
+    int i, j, k;
     int mem_diff;
     pcilib_t *pci;
     pcilib_kmem_handle_t *kdesc;
     pcilib_kmem_handle_t *kbuf;
     struct timeval start, end;
-    size_t run_time, size;
-    long long int size_mb;
+    size_t run_time;
+    size_t size_mb;
     void* volatile bar;
     uintptr_t bus_addr[BUFFERS];
     uintptr_t kdesc_bus;
     volatile uint32_t *desc;
     typedef volatile uint32_t *Tbuf;
     Tbuf ptr[BUFFERS];
+
+#ifdef SWITCH_GENERATOR
     int switch_generator = 0;
-   
+#endif /* SWITCH_GENERATOR */
+ 
     float performance, perf_counter; 
     pcilib_bar_t bar_tmp = BAR; 
     uintptr_t offset = 0;
 
     unsigned int temp;
-    int iterations_completed, buffers_filled;
+    unsigned iterations_completed, buffers_filled;
 
 
 //    int shmid;
@@ -167,10 +172,9 @@ int main() {
 
     printf("\n\n**** **** **** KIT-DMA TEST **** **** ****\n\n");
 
-    size = ITERATIONS * BUFFERS * HUGE_PAGE * PAGE_SIZE;
     size_mb = ITERATIONS * BUFFERS * HUGE_PAGE * 4 / 1024;
     printf("Total size of memory buffer: \t %.3lf GBytes\n", (float)size_mb/1024 );
-    printf("Using %d Buffers with %d iterations\n\n", BUFFERS, ITERATIONS );
+    printf("Using %u Buffers with %u iterations\n\n", BUFFERS, ITERATIONS );
 
 #ifdef ADD_DELAYS
     long rpt = 0, rpt2 = 0;
@@ -235,7 +239,7 @@ int main() {
         // Pointers for Virtualized Mem
         for (j = 0; j < BUFFERS; j++) {
             ptr[j] = (volatile uint32_t*)pcilib_kmem_get_block_ua(pci, kbuf, j);
-            memset((ptr[j]), 0, HUGE_PAGE * PAGE_SIZE);
+            memset((void*)ptr[j], 0, HUGE_PAGE * PAGE_SIZE);
         }
 
         err = 0;
@@ -268,7 +272,6 @@ int main() {
     FILE * error_log;
 
 #ifdef CHECK_RESULTS
-
     uint32_t *temp_data[ITERATIONS][BUFFERS];
 
     for (j=0; j < ITERATIONS; j++) {
@@ -329,11 +332,11 @@ int main() {
 #ifdef CHECK_READY       
     printf("* PCIe: Testing...");
     RD(0x0, err);
-    if (err != 335746816) {
+    if (err == 335746816 || err == 335681280) {
+        printf("\xE2\x9C\x93 \n");
+    } else {
         printf("\xE2\x9C\x98\n PCIe not ready!\n");
         exit(0);
-    } else {
-        printf("\xE2\x9C\x93 \n");
     }
 #endif
     
@@ -400,7 +403,7 @@ int main() {
         bus_addr[j] = pcilib_kmem_get_block_ba(pci, kbuf, j);
         // LEAVE THIS DELAY???!?!?!?!
         usleep(1000);
-        printf("Writing descriptor num. %ld: \t %08lx \r", j, bus_addr[j]);
+        printf("Writing descriptor num. %d: \t %08lx \r", j, bus_addr[j]);
         WR(0x50, bus_addr[j]);
     }
 
@@ -538,9 +541,9 @@ int main() {
 
         do {
 #ifdef USE_64   
-                hwptr = htonl(desc[3]);
+                hwptr = desc[3];
 #else // 32-bit
-                hwptr = htonl(desc[4]);
+                hwptr = desc[4];
 #endif
         j++;    
         //printf("\rcurptr: %lx \t \t hwptr: %lx", curptr, hwptr);
@@ -549,10 +552,10 @@ int main() {
         do {    
             pcilib_kmem_sync_block(pci, kbuf, PCILIB_KMEM_SYNC_FROMDEVICE, curbuf);
 #ifdef CHECK_RESULTS   
-            memcpy(temp_data[i][curbuf], ptr[curbuf], 4096);
+            memcpy(temp_data[i][curbuf], (void*)ptr[curbuf], 4096);
 #endif
 #ifdef SHARED_MEMORY
-            memcpy(shared_memory, ptr[curbuf], 4096); 
+            memcpy(shared_memory, (void*)ptr[curbuf], 4096); 
 #endif            
             //printf("\ncurbuf: %08x", curbuf); 
             //printf("\nbus_addr[curbuf]\n: %08x",bus_addr[curbuf]);
@@ -615,7 +618,7 @@ int main() {
 
     iterations_completed   = i;
     buffers_filled      = curbuf;
-    if (empty) printf("* DMA: Empty FIFO! Last iteration: %li of %li\n", i+1, ITERATIONS);
+    if (empty) printf("* DMA: Empty FIFO! Last iteration: %u of %u\n", i+1, ITERATIONS);
     printf ("* DMA: Stop\n\n");
 
 #ifdef CHECK_RESULTS
@@ -631,9 +634,8 @@ int main() {
 
 
     run_time = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
-    size = (long long int) (( BUFFERS * (iterations_completed)  + buffers_filled) * HUGE_PAGE * PAGE_SIZE);
     size_mb = (long long int) (( BUFFERS * (iterations_completed)  + buffers_filled) * HUGE_PAGE * 4 / 1024);
-    printf("Performance: transfered %zu Mbytes in %zu us using %d buffers\n", (size_mb), run_time, BUFFERS);
+    printf("Performance: transfered %zu Mbytes in %zu us using %u buffers\n", (size_mb), run_time, BUFFERS);
     //printf("Buffers: \t %d \n", BUFFERS);
     //printf("Buf_Size: \t %d \n", PAGE_SIZE);
     //printf("Perf_counter: \t %f \n", perf_counter);
@@ -647,7 +649,7 @@ int main() {
     // ******************************************************************
 
 
-    #ifdef PRINT_RESULTS
+#ifdef PRINT_RESULTS
     printf("Writing Data to HDD... \n");
     for (i=0; i < iterations_completed; i++) {
         for (j=0; j < BUFFERS; j++)
@@ -666,9 +668,9 @@ int main() {
         fclose(Output);
     }   
     printf("Data saved in data.out. \n");
-    #endif
+#endif
 
-   #ifdef CHECK_RESULTS
+#ifdef CHECK_RESULTS
     err = 0;
     error_log = fopen ("error_log.txt", "a");
     printf("\nChecking data ...\n");
@@ -681,7 +683,7 @@ int main() {
                 if ((mem_diff == -1) || (k == 1023) ) 
                     {;}
                 else {
-                    fprintf(error_log, "Error in: \t IT %li \t BUF : %li \t OFFSET: %li \t | %08x --> %08x - DIFF: %d \n", i, j, k, temp_data[i][j][k], temp_data[i][j][k+1], mem_diff);
+                    fprintf(error_log, "Error in: \t IT %u \t BUF : %u \t OFFSET: %u \t | %08x --> %08x - DIFF: %d \n", i, j, k, temp_data[i][j][k], temp_data[i][j][k+1], mem_diff);
                     err++;
                 }
             }
@@ -691,7 +693,7 @@ int main() {
                 if (mem_diff == (1)) 
                     {;}
                 else {
-                    fprintf(error_log, "Error_2 in: \t IT %li \t BUF : %li \t OFFSET: %li \t | %08x --> %08x - DIFF: %d \n", i, j, k, temp_data[i][j+1][0], temp_data[i][j][1023], mem_diff);
+                    fprintf(error_log, "Error_2 in: \t IT %u \t BUF : %u \t OFFSET: %u \t | %08x --> %08x - DIFF: %d \n", i, j, k, temp_data[i][j+1][0], temp_data[i][j][1023], mem_diff);
                     err++;
                 }
             }
@@ -700,23 +702,22 @@ int main() {
         loadBar(i+1, ITERATIONS, ITERATIONS, 30);
     }
     for (j = 0; j < buffers_filled; j++) {
-        for (k = 0; k < 1024 ; k++) 
-        {
+        for (k = 0; k < 1024 ; k++) {
             mem_diff = ((uint32_t)temp_data[iterations_completed][j][k] - (uint32_t)temp_data[iterations_completed][j][k+1]);
-                if ((mem_diff == -1) || (k == 1023) ) 
-                {;}
-            else {
-                fprintf(error_log, "Error in: \t IT %li \t BUF : %li \t OFFSET: %li \t | %08x --> %08x - DIFF: %d \n", iterations_completed, j, k, temp_data[iterations_completed][j][k], temp_data[iterations_completed][j][k+1], mem_diff);
+            if ((mem_diff == -1) || (k == 1023) ) {
+        	;
+    	    } else {
+                fprintf(error_log, "Error in: \t IT %u \t BUF : %u \t OFFSET: %u \t | %08x --> %08x - DIFF: %d \n", iterations_completed, j, k, temp_data[iterations_completed][j][k], temp_data[iterations_completed][j][k+1], mem_diff);
                 err++;
             }
         }
-        if (j != buffers_filled-1) {
+        if (j < (buffers_filled-1)) {
         // Check first and Last
             mem_diff = (uint32_t)(temp_data[i][j+1][0] - temp_data[i][j][1023]);
-            if (mem_diff == (1)) 
-                {;}
-            else {
-                fprintf(error_log, "Error_2 in: \t IT %li \t BUF : %li \t OFFSET: %li \t | %08x --> %08x - DIFF: %d \n", iterations_completed, j, k, temp_data[iterations_completed][j+1][0], temp_data[iterations_completed][j][1023], mem_diff);
+            if (mem_diff == (1)) {
+                ;
+            } else {
+                fprintf(error_log, "Error_2 in: \t IT %u \t BUF : %u \t OFFSET: %u \t | %08x --> %08x - DIFF: %d \n", iterations_completed, j, k, temp_data[iterations_completed][j+1][0], temp_data[iterations_completed][j][1023], mem_diff);
                 err++;
             }
         }
@@ -724,7 +725,7 @@ int main() {
     if (err != 0) printf("\rChecking data: \xE2\x9C\x98 %d errors found  \n See \"error_log.txt\" for details \n\n", err);
     else printf("\rChecking data: \xE2\x9C\x93 no errors found  \n\n");
     fclose(error_log);
-    #endif
+#endif
 
 
     // *********** Free Memory
@@ -735,7 +736,7 @@ int main() {
             free(temp_data[i][j]);
         }
     }
-#endif CHECK_RESULTS
+#endif /* CHECK_RESULTS */
 
     pcilib_free_kernel_memory(pci, kbuf,  free_flags);
     pcilib_free_kernel_memory(pci, kdesc,  free_flags);

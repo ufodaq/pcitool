@@ -1,19 +1,49 @@
 #ifndef _PCILIB_KMEM_H
 #define _PCILIB_KMEM_H
 
-#include "pcilib.h"
-
+typedef struct pcilib_s pcilib_t;
 typedef struct pcilib_kmem_list_s pcilib_kmem_list_t;
 
-#include "tools.h"
+typedef enum {
+    PCILIB_TRISTATE_NO = 0,
+    PCILIB_TRISTATE_PARTIAL = 1,
+    PCILIB_TRISTATE_YES = 2
+} pcilib_tristate_t;
+
+#define PCILIB_KMEM_TYPE_MASK	0xFFFF0000
+#define PCILIB_KMEM_USE(type, subtype) (((type) << 16)|(subtype))
 
 typedef enum {
-    PCILIB_KMEM_FLAG_REUSE = KMEM_FLAG_REUSE,
-    PCILIB_KMEM_FLAG_EXCLUSIVE = KMEM_FLAG_EXCLUSIVE,
-    PCILIB_KMEM_FLAG_PERSISTENT = KMEM_FLAG_PERSISTENT,
-    PCILIB_KMEM_FLAG_HARDWARE = KMEM_FLAG_HW,
-    PCILIB_KMEM_FLAG_FORCE = KMEM_FLAG_FORCE,
-    PCILIB_KMEM_FLAG_TRY =  KMEM_FLAG_TRY
+    PCILIB_KMEM_TYPE_CONSISTENT = 0x00000,
+    PCILIB_KMEM_TYPE_PAGE = 0x10000,
+    PCILIB_KMEM_TYPE_DMA_S2C_PAGE = 0x10001,
+    PCILIB_KMEM_TYPE_DMA_C2S_PAGE = 0x10002,
+    PCILIB_KMEM_TYPE_REGION = 0x20000,
+    PCILIB_KMEM_TYPE_REGION_S2C = 0x20001,
+    PCILIB_KMEM_TYPE_REGION_C2S = 0x20002
+} pcilib_kmem_type_t;
+
+typedef enum {
+    PCILIB_KMEM_USE_STANDARD = 0,
+    PCILIB_KMEM_USE_DMA_RING = 1,
+    PCILIB_KMEM_USE_DMA_PAGES = 2,
+    PCILIB_KMEM_USE_USER = 0x10
+} pcilib_kmem_use_t;
+
+typedef enum {
+    PCILIB_KMEM_SYNC_BIDIRECTIONAL = 0,
+    PCILIB_KMEM_SYNC_TODEVICE = 1,
+    PCILIB_KMEM_SYNC_FROMDEVICE = 2
+} pcilib_kmem_sync_direction_t;
+
+typedef enum {
+    PCILIB_KMEM_FLAG_REUSE = 1,				/**< Try to reuse existing buffer with the same use & item */
+    PCILIB_KMEM_FLAG_EXCLUSIVE = 2,			/**< Allow only a single application accessing a specified use & item */
+    PCILIB_KMEM_FLAG_PERSISTENT = 4,			/**< Sets persistent mode */
+    PCILIB_KMEM_FLAG_HARDWARE = 8,			/**< The buffer may be accessed by hardware, the hardware access will not occur any more if passed to _free function */
+    PCILIB_KMEM_FLAG_FORCE = 16,			/**< Force memory cleanup even if references are present */
+    PCILIB_KMEM_FLAG_MASS = 32,				/**< Apply to all buffers of selected use */
+    PCILIB_KMEM_FLAG_TRY =  64				/**< Do not allocate buffers, try to reuse and fail if not possible */
 } pcilib_kmem_flags_t;
 
 

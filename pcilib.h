@@ -1,31 +1,16 @@
 #ifndef _PCITOOL_PCILIB_H
 #define _PCITOOL_PCILIB_H
 
-#define PCILIB_MAX_BANKS 6
-#define PCILIB_MAX_DMA_ENGINES 32
-
 #include <sys/time.h>
+#include <stddef.h>
 #include <stdint.h>
-
-#define pcilib_memcpy pcilib_memcpy32
-#define pcilib_datacpy pcilib_datacpy32
 
 typedef struct pcilib_s pcilib_t;
 typedef struct pcilib_event_context_s pcilib_context_t;
-typedef struct pcilib_dma_context_s pcilib_dma_context_t;
-
-
-typedef struct pcilib_dma_api_description_s pcilib_dma_api_description_t;
-typedef struct pcilib_event_api_description_s pcilib_event_api_description_t;
-typedef struct  pcilib_protocol_description_s pcilib_protocol_description_t;
-typedef unsigned int pcilib_irq_hw_source_t;
-typedef uint32_t pcilib_irq_source_t;
 
 typedef uint8_t pcilib_bar_t;			/**< Type holding the PCI Bar number */
-typedef uint8_t pcilib_register_t;		/**< Type holding the register ID within the Bank */
-typedef uint32_t pcilib_register_addr_t;	/**< Type holding the register ID within the Bank */
-typedef uint8_t pcilib_register_bank_t;		/**< Type holding the register bank number */
-typedef uint8_t pcilib_register_bank_addr_t;	/**< Type holding the register bank number */
+typedef uint16_t pcilib_register_t;		/**< Type holding the register position within the field listing registers in the model */
+typedef uint32_t pcilib_register_addr_t;	/**< Type holding the register address within address-space of BARs */
 typedef uint8_t pcilib_register_size_t;		/**< Type holding the size in bits of the register */
 typedef uint32_t pcilib_register_value_t;	/**< Type holding the register value */
 typedef uint8_t pcilib_dma_engine_addr_t;
@@ -33,6 +18,8 @@ typedef uint8_t pcilib_dma_engine_t;
 typedef uint64_t pcilib_event_id_t;
 typedef uint32_t pcilib_event_t;
 typedef uint64_t pcilib_timeout_t;		/**< In microseconds */
+typedef unsigned int pcilib_irq_hw_source_t;
+typedef uint32_t pcilib_irq_source_t;
 
 typedef enum {
     PCILIB_HOST_ENDIAN = 0,
@@ -41,50 +28,29 @@ typedef enum {
 } pcilib_endianess_t;
 
 typedef enum {
-    PCILIB_MODEL_DETECT,
-    PCILIB_MODEL_PCI,
-    PCILIB_MODEL_IPECAMERA,
-    PCILIB_MODEL_KAPTURE
-} pcilib_model_t;
+    PCILIB_DMA_IRQ = 1,
+    PCILIB_EVENT_IRQ = 2
+} pcilib_irq_type_t;
 
-typedef enum {
-    PCILIB_REGISTER_R = 1,
-    PCILIB_REGISTER_W = 2,
-    PCILIB_REGISTER_RW = 3,
-    PCILIB_REGISTER_W1C = 4,		/**< writting 1 resets the flag */
-    PCILIB_REGISTER_RW1C = 5
-} pcilib_register_mode_t;
-
-typedef enum {
-    PCILIB_DEFAULT_PROTOCOL,
-    IPECAMERA_REGISTER_PROTOCOL
-} pcilib_register_protocol_t;
-
-typedef enum {
-    PCILIB_EVENT_DATA = 0,		/**< default data format */
-    PCILIB_EVENT_RAW_DATA = 1		/**< raw data */
+typedef enum {					/**< 0x8000 and up are reserved for driver-specific types */
+    PCILIB_EVENT_DATA = 0,			/**< default data format */
+    PCILIB_EVENT_RAW_DATA = 1			/**< raw data */
 } pcilib_event_data_type_t;
 
 typedef enum {
-    PCILIB_DMA_FLAGS_DEFAULT = 0,
-    PCILIB_DMA_FLAG_EOP = 1,		/**< last buffer of the packet */
-    PCILIB_DMA_FLAG_WAIT = 2,		/**< wait completion of write operation / wait for data during read operation */
-    PCILIB_DMA_FLAG_MULTIPACKET = 4,	/**< read multiple packets */
-    PCILIB_DMA_FLAG_PERSISTENT = 8,	/**< do not stop DMA engine on application termination / permanently close DMA engine on dma_stop */
-    PCILIB_DMA_FLAG_IGNORE_ERRORS = 16	/**< do not crash on errors, but return appropriate error codes */
-} pcilib_dma_flags_t;
+    PCILIB_DMA_TO_DEVICE = 1,
+    PCILIB_DMA_FROM_DEVICE = 2,
+    PCILIB_DMA_BIDIRECTIONAL = 3
+} pcilib_dma_direction_t;
 
 typedef enum {
-    PCILIB_STREAMING_STOP = 0, 		/**< stop streaming */
-    PCILIB_STREAMING_CONTINUE = 1, 	/**< wait the default DMA timeout for a new data */
-    PCILIB_STREAMING_WAIT = 2,		/**< wait the specified timeout for a new data */
-    PCILIB_STREAMING_CHECK = 3,		/**< do not wait for the data, bail out imideatly if no data ready */
-    PCILIB_STREAMING_FAIL = 4,		/**< fail if data is not available on timeout */
-    PCILIB_STREAMING_REQ_FRAGMENT = 5,	/**< only fragment of a packet is read, wait for next fragment and fail if no data during DMA timeout */
-    PCILIB_STREAMING_REQ_PACKET = 6,	/**< wait for next packet and fail if no data during the specified timeout */
-    PCILIB_STREAMING_TIMEOUT_MASK = 3	/**< mask specifying all timeout modes */
-} pcilib_streaming_action_t;
-
+    PCILIB_DMA_FLAGS_DEFAULT = 0,
+    PCILIB_DMA_FLAG_EOP = 1,			/**< last buffer of the packet */
+    PCILIB_DMA_FLAG_WAIT = 2,			/**< wait completion of write operation / wait for data during read operation */
+    PCILIB_DMA_FLAG_MULTIPACKET = 4,		/**< read multiple packets */
+    PCILIB_DMA_FLAG_PERSISTENT = 8,		/**< do not stop DMA engine on application termination / permanently close DMA engine on dma_stop */
+    PCILIB_DMA_FLAG_IGNORE_ERRORS = 16		/**< do not crash on errors, but return appropriate error codes */
+} pcilib_dma_flags_t;
 
 typedef enum {
     PCILIB_EVENT_FLAGS_DEFAULT = 0,
@@ -98,11 +64,14 @@ typedef enum {
     PCILIB_EVENT_INFO_FLAG_BROKEN = 1		/**< Indicates broken frames (if this flag is fales, the frame still can be broken) */
 } pcilib_event_info_flags_t;
 
-typedef enum {
-    PCILIB_REGISTER_STANDARD = 0,
-    PCILIB_REGISTER_FIFO,
-    PCILIB_REGISTER_BITS
-} pcilib_register_type_t;
+typedef struct {
+    pcilib_event_t type;
+    uint64_t seqnum;				/**< we will add seqnum_overflow if required */
+    uint64_t offset;				/**< nanoseconds */
+    struct timeval timestamp;			/**< most accurate timestamp */
+    pcilib_event_info_flags_t flags;		/**< flags */
+} pcilib_event_info_t;
+
 
 #define PCILIB_BAR_DETECT 		((pcilib_bar_t)-1)
 #define PCILIB_BAR_INVALID		((pcilib_bar_t)-1)
@@ -114,12 +83,6 @@ typedef enum {
 #define PCILIB_DMA_ENGINE_ADDR_INVALID	((pcilib_dma_engine_addr_t)-1)
 #define PCILIB_REGISTER_INVALID		((pcilib_register_t)-1)
 #define PCILIB_ADDRESS_INVALID		((uintptr_t)-1)
-#define PCILIB_REGISTER_BANK_INVALID	((pcilib_register_bank_t)-1)
-#define PCILIB_REGISTER_BANK0 		0
-#define PCILIB_REGISTER_BANK1 		1
-#define PCILIB_REGISTER_BANK2 		2
-#define PCILIB_REGISTER_BANK3 		3
-#define PCILIB_REGISTER_BANK_DMA	128
 #define PCILIB_EVENT0			1
 #define PCILIB_EVENT1			2
 #define PCILIB_EVENT2			4
@@ -131,16 +94,8 @@ typedef enum {
 #define PCILIB_TIMEOUT_IMMEDIATE	0
 #define PCILIB_IRQ_TYPE_ALL 		0
 #define PCILIB_IRQ_SOURCE_DEFAULT	0
-#define PCILIB_REGISTER_NO_BITS		0
-#define PCILIB_REGISTER_ALL_BITS	((pcilib_register_value_t)-1)
+#define PCILIB_MODEL_DETECT		NULL
 
-typedef struct {
-    pcilib_event_t type;
-    uint64_t seqnum;			/**< we will add seqnum_overflow if required */
-    uint64_t offset;			/**< nanoseconds */
-    struct timeval timestamp;		/**< most accurate timestamp */
-    pcilib_event_info_flags_t flags;	/**< flags */
-} pcilib_event_info_t;
 
 /**<
  * Callback function called when new data is read by DMA streaming function
@@ -161,115 +116,11 @@ typedef int (*pcilib_dma_callback_t)(void *ctx, pcilib_dma_flags_t flags, size_t
 typedef int (*pcilib_event_callback_t)(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user);
 typedef int (*pcilib_event_rawdata_callback_t)(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event_flags_t flags, size_t size, void *data, void *user);
 
-typedef struct {
-    pcilib_register_bank_addr_t addr;
 
-    pcilib_bar_t bar;			// optional
-    size_t size;
-    
-    pcilib_register_protocol_t protocol;
-
-    uintptr_t read_addr;		// or offset if bar specified
-    uintptr_t write_addr;		// or offset if bar specified
-    uint8_t raw_endianess;
-
-    uint8_t access;
-    uint8_t endianess;
-    
-    const char *format;
-    const char *name;
-    const char *description;
-} pcilib_register_bank_description_t;
-
-typedef struct {
-    pcilib_register_addr_t addr;
-    pcilib_register_size_t offset;
-    pcilib_register_size_t bits;
-    pcilib_register_value_t defvalue;
-    pcilib_register_value_t rwmask;	/**< 1 - read before write bits, 0 - zero should be written to preserve value 
-					Used to define how external bits of PCILIB_REGISTER_BITS registers are treated.
-					Currently it is a bit confusing, we may find a better way in the next release */
-    pcilib_register_mode_t mode;
-    pcilib_register_type_t type;
-    
-    pcilib_register_bank_t bank;
-    
-    const char *name;
-    const char *description;
-} pcilib_register_description_t;
-
-/**
-  * Default mappings
-  */
-typedef struct {
-    uintptr_t start;
-    uintptr_t end;
-    pcilib_register_bank_addr_t bank;
-    long addr_shift;
-} pcilib_register_range_t;
-
-typedef struct {
-    pcilib_event_t evid;
-    const char *name;
-    const char *description;
-} pcilib_event_description_t;
-
-typedef struct {
-    pcilib_event_data_type_t data_type;
-    pcilib_event_t evid;
-    const char *name;
-    const char *description;
-} pcilib_event_data_type_description_t;
-
-typedef enum {
-    PCILIB_DMA_IRQ = 1,
-    PCILIB_EVENT_IRQ = 2
-} pcilib_irq_type_t;
-
-typedef enum {
-    PCILIB_DMA_TO_DEVICE = 1,
-    PCILIB_DMA_FROM_DEVICE = 2,
-    PCILIB_DMA_BIDIRECTIONAL = 3
-} pcilib_dma_direction_t;
-
-typedef enum {
-    PCILIB_DMA_TYPE_BLOCK,
-    PCILIB_DMA_TYPE_PACKET,
-    PCILIB_DMA_TYPE_UNKNOWN
-} pcilib_dma_engine_type_t;
-
-typedef struct {
-    pcilib_dma_engine_addr_t addr;
-    pcilib_dma_engine_type_t type;
-    pcilib_dma_direction_t direction;
-    size_t addr_bits;
-} pcilib_dma_engine_description_t;
-
-typedef struct {
-    pcilib_dma_engine_description_t *engines[PCILIB_MAX_DMA_ENGINES +  1];
-} pcilib_dma_info_t;
-
-typedef struct {
-    uint8_t access;
-    uint8_t endianess;
-    
-    pcilib_register_description_t *registers;
-    pcilib_register_bank_description_t *banks;
-    pcilib_register_range_t *ranges;
-    pcilib_event_description_t *events;
-    pcilib_event_data_type_description_t *data_types;
-
-    pcilib_dma_api_description_t *dma_api;    
-    pcilib_event_api_description_t *event_api;
-} pcilib_model_description_t;
 
 int pcilib_set_error_handler(void (*err)(const char *msg, ...), void (*warn)(const char *msg, ...));
 
-pcilib_model_t pcilib_get_model(pcilib_t *ctx);
-pcilib_model_description_t *pcilib_get_model_description(pcilib_t *ctx);
-pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx);
-
-pcilib_t *pcilib_open(const char *device, pcilib_model_t model);
+pcilib_t *pcilib_open(const char *device, const char *model);
 void pcilib_close(pcilib_t *ctx);
 
 int pcilib_start_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
@@ -288,9 +139,6 @@ void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data);
 char *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr);	// addr is offset if bar is specified
 char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size);
 
-pcilib_register_bank_t pcilib_find_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank);
-pcilib_register_bank_t pcilib_find_bank_by_name(pcilib_t *ctx, const char *bankname);
-pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, const char *bank);
 pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const char *reg);
 pcilib_event_t pcilib_find_event(pcilib_t *ctx, const char *event);
 pcilib_event_data_type_t pcilib_find_event_data_type(pcilib_t *ctx, pcilib_event_t event, const char *data_type);
@@ -367,8 +215,6 @@ void *pcilib_get_data_with_argument(pcilib_t *ctx, pcilib_event_id_t event_id, p
  * the time return_data is called it will return error. 
  */
 int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, void *data);
-
-
 
 /*
  * @param data - will be allocated and shuld be freed if NULL, otherwise used and size should contain correct size.

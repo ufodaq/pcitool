@@ -1,14 +1,51 @@
 #ifndef _PCILIB_REGISTER_H
 #define _PCILIB_REGISTER_H
 
-#include "pcilib.h"
+#include <pcilib.h>
+#include <bank.h>
 
-struct pcilib_protocol_description_s {
-    int (*read)(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, pcilib_register_value_t *value);
-    int (*write)(pcilib_t *ctx, pcilib_register_bank_description_t *bank, pcilib_register_addr_t addr, pcilib_register_value_t value);
-};
+typedef enum {
+    PCILIB_REGISTER_R = 1,			/**< reading from register is allowed */
+    PCILIB_REGISTER_W = 2,			/**< normal writting to register is allowed */
+    PCILIB_REGISTER_RW = 3,
+    PCILIB_REGISTER_W1C = 4,			/**< writting 1 resets the bit, writting 0 keeps the value */
+    PCILIB_REGISTER_RW1C = 5,
+    PCILIB_REGISTER_W1I = 8,			/**< writting 1 inversts the bit, writting 0 keeps the value */
+    PCILIB_REGISTER_RW1I = 9,
+} pcilib_register_mode_t;
 
-    // we don't copy strings, they should be statically allocated
-int pcilib_add_registers(pcilib_t *ctx, size_t n, pcilib_register_description_t *registers);
+typedef enum {
+    PCILIB_REGISTER_STANDARD = 0,
+    PCILIB_REGISTER_FIFO,
+    PCILIB_REGISTER_BITS
+} pcilib_register_type_t;
+
+typedef struct {
+    pcilib_register_addr_t addr;		/**< Register address in the bank */
+    pcilib_register_size_t offset;		/**< Register offset in the byte (in bits) */
+    pcilib_register_size_t bits;		/**< Register size in bits */
+    pcilib_register_value_t defvalue;		/**< Default register value (some protocols, i.e. software registers, may set it during the initialization) */
+    pcilib_register_value_t rwmask;		/**< Used to define how external bits of PCILIB_REGISTER_BITS registers are treated. 
+						To keep bit value unchanged, we need to observe the following behavior depending on status of corresponding bit in this field:
+						1 - standard bit (i.e. if we want to keep the bit value we need to read it, and, the write back), 
+						0 - non-standard bit which behavior is defined by mode (only partially implemented. 
+						    so far only 1C/1I modes (zero should be written to preserve the value) are supported */
+    pcilib_register_mode_t mode;		/**< Register access (ro/wo/rw) and how writting to register works (if value just set as specified or, for instance, the bits which
+						are on in the value are cleared/inverted). For information only, no preprocessing on bits is performed. */
+    pcilib_register_type_t type;		/**< Defines type of register is it standard register, subregister for bit fields or view, fifo */
+    pcilib_register_bank_addr_t bank;		/**< Specified the address of the bank this register belongs to */
+    
+    const char *name;				/**< The access name of the register */
+    const char *description;			/**< Brief description of the register */
+} pcilib_register_description_t;
+
+/*
+typedef struct {
+    pcilib_register_bank_t bank;
+} pcilib_register_context_t;
+*/
+
+int pcilib_add_registers(pcilib_t *ctx, size_t n, const pcilib_register_description_t *registers);
+
 
 #endif /* _PCILIB_REGISTER_H */

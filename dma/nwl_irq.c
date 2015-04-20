@@ -49,7 +49,7 @@ int dma_nwl_enable_irq(pcilib_dma_context_t *vctx, pcilib_irq_type_t type, pcili
     val &= ~(DMA_INT_ENABLE|DMA_USER_INT_ENABLE);
     nwl_write_register(val, ctx, ctx->base_addr, REG_DMA_CTRL_STATUS);
     
-    pcilib_clear_irq(ctx->pcilib, NWL_DMA_IRQ_SOURCE);
+    pcilib_clear_irq(ctx->dmactx.pcilib, NWL_DMA_IRQ_SOURCE);
 
     if (type & PCILIB_DMA_IRQ) val |= DMA_INT_ENABLE;
     if (type & PCILIB_EVENT_IRQ) val |= DMA_USER_INT_ENABLE;
@@ -104,15 +104,15 @@ int dma_nwl_acknowledge_irq(pcilib_dma_context_t *vctx, pcilib_irq_type_t irq_ty
     uint32_t val;
     
     nwl_dma_t *ctx = (nwl_dma_t*)vctx;
-    pcilib_nwl_engine_description_t *info = ctx->engines + irq_source;
+    pcilib_nwl_engine_context_t *ectx = ctx->engines + irq_source;
 
     if (irq_type != PCILIB_DMA_IRQ) return PCILIB_ERROR_NOTSUPPORTED;
-    if (irq_source >= ctx->n_engines) return PCILIB_ERROR_NOTAVAILABLE;
+    if (irq_source >= ctx->dmactx.pcilib->num_engines) return PCILIB_ERROR_NOTAVAILABLE;
 
-    nwl_read_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
+    nwl_read_register(val, ctx, ectx->base_addr, REG_DMA_ENG_CTRL_STATUS);
     if (val & DMA_ENG_INT_ACTIVE_MASK) {
 	val |= DMA_ENG_ALLINT_MASK;
-	nwl_write_register(val, ctx, info->base_addr, REG_DMA_ENG_CTRL_STATUS);
+	nwl_write_register(val, ctx, ectx->base_addr, REG_DMA_ENG_CTRL_STATUS);
     }
     
     return 0;

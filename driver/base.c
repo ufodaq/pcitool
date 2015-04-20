@@ -313,25 +313,23 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 		mod_info("Found unknown Xilinx device (%x) at %s\n", id->device, dev_name(&pdev->dev));
 	    }
 	} else {
-		/* It is something else */
-		mod_info( "Found unknown board (%x:%x) at %s\n", id->vendor, id->device, dev_name(&pdev->dev));
+	    /* It is something else */
+	    mod_info( "Found unknown board (%x:%x) at %s\n", id->vendor, id->device, dev_name(&pdev->dev));
 	}
 
 	/* Enable the device */
 	if ((err = pci_enable_device(pdev)) != 0) {
-		mod_info("Couldn't enable device\n");
-		goto probe_pcien_fail;
+	    mod_info("Couldn't enable device\n");
+	    goto probe_pcien_fail;
 	}
 	
 	/* Bus master & dma */
-	if ((id->vendor == PCIE_XILINX_VENDOR_ID)&&(id->device == PCIE_IPECAMERA_DEVICE_ID)) {
-	    pci_set_master(pdev);
+	pci_set_master(pdev);
 	    
-	    err = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
-	    if (err < 0) {
-		printk(KERN_ERR "pci_set_dma_mask failed\n");
-		goto probe_dma_fail;
-	    }
+	err = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
+	if (err < 0) {
+	    printk(KERN_ERR "pci_set_dma_mask failed\n");
+	    goto probe_dma_fail;
 	}
 
 	/* Set Memory-Write-Invalidate support */

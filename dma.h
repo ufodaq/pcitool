@@ -2,15 +2,29 @@
 #define _PCILIB_DMA_H
 
 #define PCILIB_DMA_BUFFER_INVALID ((size_t)-1)
-#define PCILIB_DMA_MODIFICATION_DEFAULT 0		/**< first 0x100 are reserved */
 
-typedef uint32_t pcilib_dma_modification_t;
 
 typedef struct {
     int started;
     size_t ring_size, buffer_size;
     size_t ring_head, ring_tail;
 } pcilib_dma_engine_status_t;
+
+typedef enum {
+    PCILIB_DMA_TYPE_BLOCK,
+    PCILIB_DMA_TYPE_PACKET,
+    PCILIB_DMA_TYPE_UNKNOWN
+} pcilib_dma_engine_type_t;
+
+typedef struct {
+    pcilib_dma_engine_addr_t addr;
+    pcilib_dma_engine_type_t type;
+    pcilib_dma_direction_t direction;
+    size_t addr_bits;
+
+    const char *name;
+    const char *description;
+} pcilib_dma_engine_description_t;
 
 typedef struct {
     int used;
@@ -20,10 +34,19 @@ typedef struct {
     size_t size;
 } pcilib_dma_buffer_status_t;
 
-struct pcilib_dma_api_description_s {
-    const char *title;
+/*
+typedef struct {
+    int ignore_eop;
+} pcilib_dma_parameters_t;
+*/
 
-    pcilib_dma_context_t *(*init)(pcilib_t *ctx, pcilib_dma_modification_t type, void *arg);
+typedef struct {
+//    pcilib_dma_parameters_t params;
+    pcilib_t *pcilib;
+} pcilib_dma_context_t;
+
+typedef struct {
+    pcilib_dma_context_t *(*init)(pcilib_t *ctx, const char *model, const void *arg);
     void (*free)(pcilib_dma_context_t *ctx);
     
     int (*status)(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers);
@@ -39,14 +62,25 @@ struct pcilib_dma_api_description_s {
     int (*stream)(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, pcilib_dma_callback_t cb, void *cbattr);
 
     double (*benchmark)(pcilib_dma_context_t *ctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction);
-};
-
-struct pcilib_dma_context_s {
-    int ignore_eop;
-};
+} pcilib_dma_api_description_t;
 
 
-int pcilib_set_dma_engine_description(pcilib_t *ctx, pcilib_dma_engine_t engine, pcilib_dma_engine_description_t *desc);
+typedef struct {
+    const pcilib_dma_api_description_t *api;
+    const pcilib_register_bank_description_t *banks;
+    const pcilib_register_description_t *registers;
+    const pcilib_dma_engine_description_t *engines;
+    const char *model;
+    const void *args;
+    const char *name;
+    const char *description;
+} pcilib_dma_description_t;
+
+
+const pcilib_dma_description_t *pcilib_get_dma_info(pcilib_t *ctx);
+pcilib_dma_engine_t pcilib_add_dma_engine(pcilib_t *ctx, pcilib_dma_engine_description_t *desc);
 int pcilib_get_dma_status(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers);
+int pcilib_init_dma(pcilib_t *ctx);
+
 
 #endif /* _PCILIB_DMA_H */

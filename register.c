@@ -13,135 +13,58 @@
 #include <assert.h>
 
 #include "pci.h"
+#include "bank.h"
 
 #include "tools.h"
 #include "error.h"
 
-int pcilib_add_registers(pcilib_t *ctx, size_t n, pcilib_register_description_t *registers) {
+
+int pcilib_add_registers(pcilib_t *ctx, size_t n, const pcilib_register_description_t *registers) {
+	// DS: What we are doing if register exists?
+	
     pcilib_register_description_t *regs;
-    size_t size, n_present = 0;
+    size_t size;
 
     if (!n) {
 	for (n = 0; registers[n].bits; n++);
     }
 
-    if (ctx->model_info.registers == pcilib_model[ctx->model].registers) {
-        for (n_present = 0; ctx->model_info.registers[n_present].bits; n_present++);
-	for (size = 1024; size < 2 * (n + n_present + 1); size<<=1);
-	regs = (pcilib_register_description_t*)malloc(size * sizeof(pcilib_register_description_t));
+    if ((ctx->num_reg + n + 1) > ctx->alloc_reg) {
+	for (size = ctx->alloc_reg; size < 2 * (n + ctx->num_reg + 1); size<<=1);
+
+	regs = (pcilib_register_description_t*)realloc(ctx->registers, size * sizeof(pcilib_register_description_t));
 	if (!regs) return PCILIB_ERROR_MEMORY;
-	
+
+	ctx->registers = regs;
 	ctx->model_info.registers = regs;
-	ctx->num_reg = n + n_present;
 	ctx->alloc_reg = size;
-	
-	memcpy(ctx->model_info.registers, pcilib_model[ctx->model].registers, (n_present + 1) * sizeof(pcilib_register_description_t));
-    } else {
-	n_present = ctx->num_reg;
-	if ((n_present + n + 1) > ctx->alloc_reg) {
-	    for (size = ctx->alloc_reg; size < 2 * (n + n_present + 1); size<<=1);
-
-	    regs = (pcilib_register_description_t*)realloc(ctx->model_info.registers, size * sizeof(pcilib_register_description_t));
-	    if (!regs) return PCILIB_ERROR_MEMORY;
-
-	    ctx->model_info.registers = regs;
-	    ctx->alloc_reg = size;
-	}
-	ctx->num_reg += n;
     }
 
-    memcpy(ctx->model_info.registers + ctx->num_reg, ctx->model_info.registers + n_present, sizeof(pcilib_register_description_t));
-    memcpy(ctx->model_info.registers + n_present, registers, n * sizeof(pcilib_register_description_t));
+    memcpy(ctx->registers + ctx->num_reg, registers, n * sizeof(pcilib_register_description_t));
+    memset(ctx->registers + ctx->num_reg + n, 0, sizeof(pcilib_register_description_t));
+    ctx->num_reg += n;
 
     return 0;
 }
 
-pcilib_register_bank_t pcilib_find_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank) {
-    pcilib_register_bank_t i;
-    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
-    pcilib_register_bank_description_t *banks = model_info->banks;
-
-    for (i = 0; banks[i].access; i++)
-	if (banks[i].addr == bank) return i;
-
-    return -1;
-}
-
-pcilib_register_bank_t pcilib_find_bank_by_name(pcilib_t *ctx, const char *bankname) {
-    pcilib_register_bank_t i;
-    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
-    pcilib_register_bank_description_t *banks = model_info->banks;
-
-    for (i = 0; banks[i].access; i++)
-	if (!strcasecmp(banks[i].name, bankname)) return i;
-
-    return -1;
-}
-
-pcilib_register_bank_t pcilib_find_bank(pcilib_t *ctx, const char *bank) {
-    pcilib_register_bank_t res;
-    unsigned long addr;
-    
-    if (!bank) {
-        pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
-	pcilib_register_bank_description_t *banks = model_info->banks;
-	if ((banks)&&(banks[0].access)) return (pcilib_register_bank_t)0;
-	return -1;
-    }
-    
-    if (pcilib_isxnumber(bank)&&(sscanf(bank,"%lx", &addr) == 1)) {
-	res = pcilib_find_bank_by_addr(ctx, addr);
-	if (res != PCILIB_REGISTER_BANK_INVALID) return res;
-    }
-    
-    return pcilib_find_bank_by_name(ctx, bank);
-}
-
-    // FIXME create hash during map_register space
-pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const char *reg) {
-    pcilib_register_t i;
-    pcilib_register_bank_t bank_id;
-    pcilib_register_bank_addr_t bank_addr = 0;
-
-    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
-    pcilib_register_description_t *registers =  model_info->registers;
-    
-    if (bank) {
-	bank_id = pcilib_find_bank(ctx, bank);
-	if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
-	    pcilib_error("Invalid bank (%s) is specified", bank);
-	    return -1;
-	}
-	
-	bank_addr = model_info->banks[bank_id].addr;
-    }
-    
-    for (i = 0; registers[i].bits; i++) {
-	if ((!strcasecmp(registers[i].name, reg))&&((!bank)||(registers[i].bank == bank_addr))) return i;
-    }
-    
-    if ((ctx->model_info.dma_api)&&(!ctx->dma_ctx)&&(pcilib_get_dma_info(ctx))) {
-        registers =  model_info->registers;
-
-	for (; registers[i].bits; i++) {
-	    if ((!strcasecmp(registers[i].name, reg))&&((!bank)||(registers[i].bank == bank_addr))) return i;
-	}
-    }
-    
-    return (pcilib_register_t)-1;
-};
 
 static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, pcilib_register_size_t offset, pcilib_register_size_t bits, pcilib_register_value_t *buf) {
     int err;
     size_t i;
-    
-    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
-    pcilib_register_bank_description_t *b = model_info->banks + bank;
-    
+
+    pcilib_register_bank_context_t *bctx = ctx->bank_ctx[bank];
+    const pcilib_register_protocol_api_description_t *bapi = bctx->api;
+    const pcilib_register_bank_description_t *b = bctx->bank;
+
     int access = b->access / 8;
 
     assert(bits < 8 * sizeof(pcilib_register_value_t));
-    
+
+    if (!bapi->read) {
+	pcilib_error("Used register protocol does not define a way to read register value");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
     if (((addr + n) > b->size)||(((addr + n) == b->size)&&(bits))) {
 	if ((b->format)&&(strchr(b->format, 'x')))
 	    pcilib_error("Accessing register (%u regs at addr 0x%x) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
@@ -150,23 +73,20 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
 	return PCILIB_ERROR_OUTOFRANGE;
     }
 
-    err = pcilib_map_register_space(ctx);
-    if (err) {
-	pcilib_error("Failed to map the register space");
-	return err;
-    }
+    //err = pcilib_init_register_banks(ctx);
+    //if (err) return err;
     
     //n += bits / b->access;
     //bits %= b->access; 
     
     for (i = 0; i < n; i++) {
-	err = pcilib_protocol[b->protocol].read(ctx, b, addr + i * access, buf + i);
+	err = bapi->read(ctx, bctx, addr + i * access, buf + i);
 	if (err) break;
     }
     
     if ((bits > 0)&&(!err)) {
 	pcilib_register_value_t val = 0;
-	err = pcilib_protocol[b->protocol].read(ctx, b, addr + n * access, &val);
+	err = bapi->read(ctx, bctx, addr + n * access, &val);
 
 	val = (val >> offset)&BIT_MASK(bits);
 	memcpy(buf + n, &val, sizeof(pcilib_register_value_t));
@@ -176,7 +96,7 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
 }
 
 int pcilib_read_register_space(pcilib_t *ctx, const char *bank, pcilib_register_addr_t addr, size_t n, pcilib_register_value_t *buf) {
-    pcilib_register_bank_t bank_id = pcilib_find_bank(ctx, bank);
+    pcilib_register_bank_t bank_id = pcilib_find_register_bank(ctx, bank);
     if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
 	if (bank) pcilib_error("Invalid register bank is specified (%s)", bank);
 	else pcilib_error("Register bank should be specified");
@@ -192,13 +112,13 @@ int pcilib_read_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_regi
     pcilib_register_size_t bits;
     pcilib_register_value_t res;
     pcilib_register_bank_t bank;
-    pcilib_register_description_t *r;
-    pcilib_register_bank_description_t *b;
-    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+    const pcilib_register_description_t *r;
+    const pcilib_register_bank_description_t *b;
+    const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
 
     r = model_info->registers + reg;
     
-    bank = pcilib_find_bank_by_addr(ctx, r->bank);
+    bank = pcilib_find_register_bank_by_addr(ctx, r->bank);
     if (bank == PCILIB_REGISTER_BANK_INVALID) return PCILIB_ERROR_INVALID_BANK;
     
     b = model_info->banks + bank;
@@ -228,13 +148,13 @@ int pcilib_read_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_regi
 
 int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t *value) {
     int reg;
-    
+
     reg = pcilib_find_register(ctx, bank, regname);
     if (reg < 0) {
 	pcilib_error("Register (%s) is not found", regname);
 	return PCILIB_ERROR_NOTFOUND;
     }
-    
+
     return pcilib_read_register_by_id(ctx, reg, value);
 }
 
@@ -242,13 +162,19 @@ int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, p
 static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, pcilib_register_size_t offset, pcilib_register_size_t bits, pcilib_register_value_t rwmask, pcilib_register_value_t *buf) {
     int err;
     size_t i;
-    
-    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
-    pcilib_register_bank_description_t *b = model_info->banks + bank;
+
+    pcilib_register_bank_context_t *bctx = ctx->bank_ctx[bank];
+    const pcilib_register_protocol_api_description_t *bapi = bctx->api;
+    const pcilib_register_bank_description_t *b = bctx->bank;
 
     int access = b->access / 8;
 
     assert(bits < 8 * sizeof(pcilib_register_value_t));
+
+    if (!bapi->write) {
+	pcilib_error("Used register protocol does not define a way to write value into the register");
+	return PCILIB_ERROR_NOTSUPPORTED;
+    }
 
     if (((addr + n) > b->size)||(((addr + n) == b->size)&&(bits))) {
 	if ((b->format)&&(strchr(b->format, 'x')))
@@ -258,17 +184,14 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
 	return PCILIB_ERROR_OUTOFRANGE;
     }
 
-    err = pcilib_map_register_space(ctx);
-    if (err) {
-	pcilib_error("Failed to map the register space");
-	return err;
-    }
+    //err = pcilib_init_register_banks(ctx);
+    //if (err) return err;
     
     //n += bits / b->access;
     //bits %= b->access; 
     
     for (i = 0; i < n; i++) {
-	err = pcilib_protocol[b->protocol].write(ctx, b, addr + i * access, buf[i]);
+	err = bapi->write(ctx, bctx, addr + i * access, buf[i]);
 	if (err) break;
     }
     
@@ -278,21 +201,26 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
 
 	if (~mask&rwmask) {
 	    pcilib_register_value_t rval;
-	    
-	    err = pcilib_protocol[b->protocol].read(ctx, b, addr + n * access, &rval); 
+
+	    if (!bapi->read) {
+		pcilib_error("Used register protocol does not define a way to read register. Therefore, it is only possible to write a full bank word, not partial as required by the accessed register");
+		return PCILIB_ERROR_NOTSUPPORTED;
+	    }
+
+	    err = bapi->read(ctx, bctx, addr + n * access, &rval); 
 	    if (err) return err;
-	    
+
 	    val |= (rval & rwmask & ~mask);
 	}
 	
-	err = pcilib_protocol[b->protocol].write(ctx, b, addr + n * access, val);
+	err = bapi->write(ctx, bctx, addr + n * access, val);
     }
     
     return err;
 }
 
 int pcilib_write_register_space(pcilib_t *ctx, const char *bank, pcilib_register_addr_t addr, size_t n, pcilib_register_value_t *buf) {
-    pcilib_register_bank_t bank_id = pcilib_find_bank(ctx, bank);
+    pcilib_register_bank_t bank_id = pcilib_find_register_bank(ctx, bank);
     if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
 	if (bank) pcilib_error("Invalid register bank is specified (%s)", bank);
 	else pcilib_error("Register bank should be specified");
@@ -309,13 +237,13 @@ int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_reg
     pcilib_register_size_t bits;
     pcilib_register_bank_t bank;
     pcilib_register_value_t res;
-    pcilib_register_description_t *r;
-    pcilib_register_bank_description_t *b;
-    pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+    const pcilib_register_description_t *r;
+    const pcilib_register_bank_description_t *b;
+    const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
 
     r = model_info->registers + reg;
 
-    bank = pcilib_find_bank_by_addr(ctx, r->bank);
+    bank = pcilib_find_register_bank_by_addr(ctx, r->bank);
     if (bank == PCILIB_REGISTER_BANK_INVALID) return PCILIB_ERROR_INVALID_BANK;
 
     b = model_info->banks + bank;
