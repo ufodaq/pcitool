@@ -420,16 +420,19 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	memcpy(&cur, &start, sizeof(struct timeval));
 	while (((*last_written_addr_ptr == 0)||(ctx->last_read_addr == (*last_written_addr_ptr)))&&((wait == PCILIB_TIMEOUT_INFINITE)||(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < wait))) {
 	    usleep(10);
+#ifdef IPEDMA_SUPPORT_EMPTY_DETECTED
+	    if (*empty_detected_ptr) break;
+#endif /* IPEDMA_SUPPORT_EMPTY_DETECTED */
 	    gettimeofday(&cur, NULL);
 	}
 	
 	    // Failing out if we exited on timeout
 	if ((ctx->last_read_addr == (*last_written_addr_ptr))||(*last_written_addr_ptr == 0)) {
 #ifdef IPEDMA_SUPPORT_EMPTY_DETECTED
-//# ifdef IPEDMA_DEBUG
-	    if ((wait)&&(*last_written_addr_ptr))
+# ifdef IPEDMA_DEBUG
+	    if ((wait)&&(*last_written_addr_ptr)&&(!*empty_detected_ptr))
 		pcilib_warning("The empty_detected flag is not set, but no data arrived within %lu us\n", wait);
-//# endif /* IPEDMA_DEBUG */
+# endif /* IPEDMA_DEBUG */
 #endif /* IPEDMA_SUPPORT_EMPTY_DETECTED */
 	    return (ret&PCILIB_STREAMING_FAIL)?PCILIB_ERROR_TIMEOUT:0;
 	}
