@@ -221,7 +221,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	}
 	
 	    // Enable DMA
-//	WR(IPEDMA_REG_CONTROL, 0x1);
+	WR(IPEDMA_REG_CONTROL, 0x1);
 	
 	ctx->last_read = IPEDMA_DMA_PAGES - 1;
 
@@ -240,7 +240,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
     ctx->desc = desc;
     ctx->pages = pages;
-    ctx->page_size = pcilib_kmem_get_block_size(ctx->dmactx.pcilib, pages, 0);;
+    ctx->page_size = pcilib_kmem_get_block_size(ctx->dmactx.pcilib, pages, 0);
     ctx->ring_size = IPEDMA_DMA_PAGES;
 
     return 0;
@@ -311,54 +311,67 @@ int dma_ipe_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcil
     if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
     else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
 
-    last_written_addr = ntohl(*last_written_addr_ptr);
+    last_written_addr = *last_written_addr_ptr;
 
     status->started = ctx->started;
     status->ring_size = ctx->ring_size;
     status->buffer_size = ctx->page_size;
 
-    status->ring_tail = ctx->last_read + 1;
-    if (status->ring_tail == status->ring_size) status->ring_tail = 0;
+	// For simplicity, we keep last_read here, and fix in the end
+    status->ring_tail = ctx->last_read;
 
 	// Find where the ring head is actually are
     for (i = 0; i < ctx->ring_size; i++) {
 	uintptr_t bus_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, i);
 
 	if (bus_addr == last_written_addr) {
-	    status->ring_head = bus_addr;
+	    status->ring_head = i;
 	    break;
 	}
     }
     
     if (i == ctx->ring_size) {
-	// ERROR
+	if (last_written_addr) {
+	    pcilib_warning("DMA is in unknown state, last_written_addr does not correspond any of available buffers");
+	    return PCILIB_ERROR_FAILED;
+	}
+	status->ring_head = 0;
+	status->ring_tail = 0;
     }
-    
+
     if (n_buffers > ctx->ring_size) n_buffers = ctx->ring_size;
 
-    memset(buffers, 0, n_buffers * sizeof(pcilib_dma_engine_status_t));
+    if (buffers) {
+	memset(buffers, 0, n_buffers * sizeof(pcilib_dma_buffer_status_t));
 
-    if (status->ring_head > status->ring_tail) {
-	for (i = status->ring_tail; i <= status->ring_head; i++) {
-	    buffers[i].used = 1;
-	    buffers[i].size = ctx->page_size;
-	    buffers[i].first = 1;
-	    buffers[i].last = 1;
-	}
-    } else {
-	for (i = 0; i <= status->ring_tail; i++) {
-	    buffers[i].used = 1;
-	    buffers[i].size = ctx->page_size;
-	    buffers[i].first = 1;
-	    buffers[i].last = 1;
-	} 
+	if (status->ring_head >= status->ring_tail) {
+	    for (i = status->ring_tail + 1; (i <= status->ring_head)&&(i < n_buffers); i++) {
+		buffers[i].used = 1;
+		buffers[i].size = ctx->page_size;
+		buffers[i].first = 1;
+		buffers[i].last = 1;
+	    }
+	} else {
+	    for (i = 0; (i <= status->ring_head)&&(i < n_buffers); i++) {
+	        buffers[i].used = 1;
+		buffers[i].size = ctx->page_size;
+	        buffers[i].first = 1;
+	        buffers[i].last = 1;
+	    } 
 	
-	for (i = status->ring_head; i < status->ring_size; i++) {
-	    buffers[i].used = 1;
-	    buffers[i].size = ctx->page_size;
-	    buffers[i].first = 1;
-	    buffers[i].last = 1;
-	} 
+	    for (i = status->ring_tail + 1; (i < status->ring_size)&&(i < n_buffers); i++) {
+		buffers[i].used = 1;
+	        buffers[i].size = ctx->page_size;
+		buffers[i].first = 1;
+	        buffers[i].last = 1;
+	    } 
+	}
+    }
+
+	// We actually keep last_read in the ring_tail, so need to increase
+    if (status->ring_tail != status->ring_head) {
+	status->ring_tail++;
+	if (status->ring_tail == status->ring_size) status->ring_tail = 0;
     }
 
     return 0;
@@ -421,7 +434,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	while (((*last_written_addr_ptr == 0)||(ctx->last_read_addr == (*last_written_addr_ptr)))&&((wait == PCILIB_TIMEOUT_INFINITE)||(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < wait))) {
 	    usleep(10);
 #ifdef IPEDMA_SUPPORT_EMPTY_DETECTED
-	    if (*empty_detected_ptr) break;
+	    if ((ret != PCILIB_STREAMING_REQ_PACKET)&&(*empty_detected_ptr)) break;
 #endif /* IPEDMA_SUPPORT_EMPTY_DETECTED */
 	    gettimeofday(&cur, NULL);
 	}
