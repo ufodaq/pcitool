@@ -1,7 +1,7 @@
 include_directories(
     ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/pcilib
 )
-
 
 set(HEADERS ${HEADERS} nwl.h nwl_private.h nwl_engine.h nwl_irq.h nwl_loopback.h ipe.h ipe_private.h)
 

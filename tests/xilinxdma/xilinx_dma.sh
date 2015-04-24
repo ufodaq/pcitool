@@ -6,8 +6,8 @@ ITERATIONS=2
 BUFFERS=16
 
 function pci {
-    PCILIB_PATH=`pwd`/..
-    LD_LIBRARY_PATH="$PCILIB_PATH" $PCILIB_PATH/pci $*
+    PCILIB_PATH=`pwd`/../..
+    LD_LIBRARY_PATH="$PCILIB_PATH/pcilib" $PCILIB_PATH/pcitool/pci $*
 }
 
 

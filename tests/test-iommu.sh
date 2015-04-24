@@ -1,5 +1,10 @@
 #! /bin/bash
 
+function pci {
+    PCILIB_PATH=".."
+    LD_LIBRARY_PATH="$PCILIB_PATH/pcilib" $PCILIB_PATH/pcitool/pci $*
+}
+
 i=1
 while [ 1 ]; do
     pci --start-dma dma1r

@@ -59,7 +59,6 @@ int pcilib_init_event_engine(pcilib_t *ctx) {
 
     api = model_info->api;
 
-//    api = pcilib_model[model].api;
     if ((api)&&(api->init)) {
 	ctx->event_ctx = api->init(ctx);
 	if (ctx->event_ctx) {

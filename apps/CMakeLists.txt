@@ -1,8 +1,11 @@
 include_directories(
     ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/pcilib
 )
 
-link_directories(${UFODECODE_LIBRARY_DIRS})
+link_directories(
+    ${CMAKE_SOURCE_DIR}/pcilib
+)
 
 add_executable(xilinx xilinx.c)
 target_link_libraries(xilinx pcilib rt)

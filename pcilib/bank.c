@@ -38,9 +38,12 @@ int pcilib_init_register_banks(pcilib_t *ctx) {
 	
 	bapi = ctx->protocols[protocol].api;
 
-	if (bapi->init) 
-	    bank_ctx = bapi->init(ctx, ctx->num_banks_init, ctx->protocols[protocol].model, ctx->protocols[protocol].args);
-	else
+	if (bapi->init) {
+	    const char *model = ctx->protocols[protocol].model;
+	    if (!model) model = ctx->model;
+
+	    bank_ctx = bapi->init(ctx, ctx->num_banks_init, model, ctx->protocols[protocol].args);
+	} else
 	    bank_ctx = (pcilib_register_bank_context_t*)malloc(sizeof(pcilib_register_bank_context_t));
 	
 	if (!bank_ctx)

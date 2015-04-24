@@ -1,8 +1,8 @@
 #!/bin/bash
 
 function pci {
-    PCILIB_PATH="/root/pcitool"
-    LD_LIBRARY_PATH="$PCILIB_PATH" $PCILIB_PATH/pci $*
+    PCILIB_PATH="../.."
+    LD_LIBRARY_PATH="$PCILIB_PATH/pcilib" $PCILIB_PATH/pcitool/pci $*
 }
 
 size=16

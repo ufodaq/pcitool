@@ -362,7 +362,7 @@ void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
     const pcilib_event_data_type_description_t *types;
 
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
-    const pcilib_dma_description_t *dma_info = pcilib_get_dma_info(handle);
+    const pcilib_dma_description_t *dma_info = pcilib_get_dma_description(handle);
     
     for (i = 0; i < PCILIB_MAX_BARS; i++) {
 	if (board_info->bar_length[i] > 0) {
@@ -922,7 +922,7 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 	}
     } else {
 	    // Adding DMA registers
-	pcilib_get_dma_info(handle);	
+	pcilib_get_dma_description(handle);	
     
 	if (model_info->registers) {
 	    if (bank) {
@@ -1762,7 +1762,7 @@ int StartStopDMA(pcilib_t *handle,  const pcilib_model_description_t *model_info
     pcilib_dma_engine_t dmaid;
     
     if (dma == PCILIB_DMA_ENGINE_ADDR_INVALID) {
-        const pcilib_dma_description_t *dma_info = pcilib_get_dma_info(handle);
+        const pcilib_dma_description_t *dma_info = pcilib_get_dma_description(handle);
 
         if (start) Error("DMA engine should be specified");
 
@@ -2370,6 +2370,7 @@ int main(int argc, char **argv) {
     
     const char *model = NULL;
     const pcilib_model_description_t *model_info;
+    const pcilib_dma_description_t *dma_info;
     MODE mode = MODE_INVALID;
     GRAB_MODE grab_mode = 0;
     size_t trigger_time = 0;
@@ -2847,6 +2848,7 @@ int main(int argc, char **argv) {
     if (handle < 0) Error("Failed to open FPGA device: %s", fpga_device);
 
     model_info = pcilib_get_model_description(handle);
+    dma_info = pcilib_get_dma_description(handle);
 
     switch (mode) {
      case MODE_WRITE:
@@ -2873,7 +2875,7 @@ int main(int argc, char **argv) {
         else Usage(argc, argv, "The %i data values is specified, but %i required", argc - optind, size);
      case MODE_READ:
         if (!addr) {
-	    if (((!model_info->dma)||(!model_info->dma->api))&&(!model_info->api)) {
+	    if (((!dma_info)||(!dma_info->api))&&(!model_info->api)) {
 //	    if (model == PCILIB_MODEL_PCI) {
 		if ((amode != ACCESS_DMA)&&(amode != ACCESS_CONFIG)) 
 		    Usage(argc, argv, "The address is not specified");

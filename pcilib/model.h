@@ -1,14 +1,15 @@
 #ifndef _PCILIB_MODEL_H
 #define _PCILIB_MODEL_H
 
-#include <bank.h>
-#include <register.h>
-#include <dma.h>
-#include <event.h>
+#include <pcilib/bank.h>
+#include <pcilib/register.h>
+#include <pcilib/dma.h>
+#include <pcilib/event.h>
+#include <pcilib/config.h>
 
 typedef struct {
-    uint8_t access;
-    pcilib_endianess_t endianess;
+    const pcilib_event_api_description_t *api;
+    const pcilib_dma_description_t *dma;
 
     const pcilib_register_description_t *registers;
     const pcilib_register_bank_description_t *banks;
@@ -17,9 +18,6 @@ typedef struct {
 
     const pcilib_event_description_t *events;
     const pcilib_event_data_type_description_t *data_types;
-
-    const pcilib_dma_description_t *dma;
-    const pcilib_event_api_description_t *api;
 
     const char *name;
     const char *description;

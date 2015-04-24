@@ -2,7 +2,7 @@
 #define _PCILIB_DMA_IPE_H
 
 #include <stdio.h>
-#include "../pcilib.h"
+#include "pcilib.h"
 
 //#define PCILIB_NWL_MODIFICATION_IPECAMERA 0x100
 
@@ -38,7 +38,7 @@ static const pcilib_dma_engine_description_t ipe_dma_engines[] = {
 };
 
 static const pcilib_register_bank_description_t ipe_dma_banks[] = {
-    { PCILIB_REGISTER_BANK_DMA, PCILIB_BAR0, 0xA000, PCILIB_REGISTER_PROTOCOL_DEFAULT, 0,                        0,                        PCILIB_LITTLE_ENDIAN, 32, PCILIB_LITTLE_ENDIAN, "0x%lx", "dma", "DMA Registers"},
+    { PCILIB_REGISTER_BANK_DMA, PCILIB_REGISTER_PROTOCOL_DEFAULT, PCILIB_BAR0, 0, 0, 32, 0x0200, PCILIB_LITTLE_ENDIAN, PCILIB_LITTLE_ENDIAN, "0x%lx", "dma", "DMA Registers"},
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL }
 };
 

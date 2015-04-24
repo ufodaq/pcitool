@@ -8,7 +8,7 @@ int pcilib_default_read(pcilib_t *ctx, pcilib_register_bank_context_t *bank, pci
 int pcilib_default_write(pcilib_t *ctx, pcilib_register_bank_context_t *bank, pcilib_register_addr_t addr, pcilib_register_value_t value);
 
 #ifdef _PCILIB_CONFIG_C
-static pcilib_register_protocol_api_description_t pcilib_default_protocol_api =
+const pcilib_register_protocol_api_description_t pcilib_default_protocol_api =
     { NULL, NULL, pcilib_default_read, pcilib_default_write };
 #endif /* _PCILIB_CONFIG_C */
 

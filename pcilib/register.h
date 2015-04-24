@@ -2,7 +2,7 @@
 #define _PCILIB_REGISTER_H
 
 #include <pcilib.h>
-#include <bank.h>
+#include <pcilib/bank.h>
 
 typedef enum {
     PCILIB_REGISTER_R = 1,			/**< reading from register is allowed */

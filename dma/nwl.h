@@ -2,7 +2,7 @@
 #define _PCILIB_DMA_NWL_H
 
 #include <stdio.h>
-#include "../pcilib.h"
+#include "pcilib.h"
 
 pcilib_dma_context_t *dma_nwl_init(pcilib_t *ctx, const char *model, const void *arg);
 void  dma_nwl_free(pcilib_dma_context_t *vctx);
@@ -36,7 +36,7 @@ static const pcilib_dma_api_description_t nwl_dma_api = {
 };
 
 static pcilib_register_bank_description_t nwl_dma_banks[] = {
-    { PCILIB_REGISTER_BANK_DMA, PCILIB_BAR0, 0xA000, PCILIB_REGISTER_PROTOCOL_DEFAULT    , 0,                        0,                        PCILIB_LITTLE_ENDIAN, 32, PCILIB_LITTLE_ENDIAN, "0x%lx", "dma", "DMA Registers"},
+    { PCILIB_REGISTER_BANK_DMA, PCILIB_REGISTER_PROTOCOL_DEFAULT, PCILIB_BAR0, 0, 0, 32, 0xA000, PCILIB_LITTLE_ENDIAN, PCILIB_LITTLE_ENDIAN, "0x%lx", "dma", "DMA Registers"},
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL }
 };
 

@@ -1,7 +1,7 @@
 #ifndef _PCILIB_EVENT_H
 #define _PCILIB_EVENT_H
 
-#include "pcilib.h"
+#include <pcilib.h>
 
 typedef struct {
     size_t max_events;

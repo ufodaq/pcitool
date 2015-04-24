@@ -4,7 +4,7 @@ size=65536
 
 function pci {
     PCILIB_PATH=`pwd`/../..
-    LD_LIBRARY_PATH="$PCILIB_PATH" $PCILIB_PATH/pci -m ipedma $*
+    LD_LIBRARY_PATH="$PCILIB_PATH/pcilib" $PCILIB_PATH/pcitool/pci -m ipedma $*
 }
 
 

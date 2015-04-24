@@ -444,10 +444,8 @@ void pcilib_close(pcilib_t *ctx) {
     if (ctx) {
 	const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
 	const pcilib_event_api_description_t *eapi = model_info->api;
-	const pcilib_dma_api_description_t *dapi = NULL;
+	const pcilib_dma_api_description_t *dapi = ctx->dma.api;
 	
-	if (model_info->dma) dapi = model_info->dma->api;
-
         if ((eapi)&&(eapi->free)) eapi->free(ctx->event_ctx);
         if ((dapi)&&(dapi->free)) dapi->free(ctx->dma_ctx);
 
