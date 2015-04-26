@@ -6,7 +6,6 @@
 #define PCILIB_TRIGGER_TIMEOUT 100000		/**< us */
 #define PCILIB_DMA_TIMEOUT 10000		/**< us */
 #define PCILIB_DMA_SKIP_TIMEOUT 1000000		/**< us */
-#define PCILIB_REGISTER_TIMEOUT 10000		/**< us */
 #define PCILIB_MAX_BARS 6			/**< this is defined by PCI specification */
 #define PCILIB_DEFAULT_REGISTER_SPACE 1024	/**< number of registers to allocate on init */
 #define PCILIB_MAX_REGISTER_BANKS 32		/**< maximum number of register banks to allocate space for */
@@ -24,7 +23,7 @@
 #include "dma.h"
 #include "event.h"
 #include "model.h"
-#include "config.h"
+#include "export.h"
 
 struct pcilib_s {
     int handle;										/**< file handle of device */

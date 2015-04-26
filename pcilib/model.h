@@ -5,9 +5,11 @@
 #include <pcilib/register.h>
 #include <pcilib/dma.h>
 #include <pcilib/event.h>
-#include <pcilib/config.h>
+#include <pcilib/export.h>
 
 typedef struct {
+    const unsigned int interface_version;
+
     const pcilib_event_api_description_t *api;
     const pcilib_dma_description_t *dma;
 

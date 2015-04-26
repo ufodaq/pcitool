@@ -1,6 +1,10 @@
 #ifndef _PCILIB_DMA_H
 #define _PCILIB_DMA_H
 
+#include <pcilib.h>
+#include <pcilib/bank.h>
+#include <pcilib/register.h>
+
 #define PCILIB_DMA_BUFFER_INVALID ((size_t)-1)
 
 typedef struct {

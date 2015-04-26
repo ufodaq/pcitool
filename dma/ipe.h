@@ -17,7 +17,7 @@ int dma_ipe_stop(pcilib_dma_context_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_
 int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, pcilib_dma_callback_t cb, void *cbattr);
 double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction);
 
-#ifdef _PCILIB_CONFIG_C
+#ifdef _PCILIB_EXPORT_C
 static const pcilib_dma_api_description_t ipe_dma_api = {
     dma_ipe_init,
     dma_ipe_free,
@@ -79,7 +79,7 @@ static const pcilib_register_description_t ipe_dma_registers[] = {
     {0x0060, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "update_thresh",  		"Update threshold of progress register"},
     {0,		0,	0,	0,	0x00000000,	0,                                           0,                        0, NULL, 			NULL}
 };
-#endif /* _PCILIB_CONFIG_C */
+#endif /* _PCILIB_EXPORT_C */
 
 
 #endif /* _PCILIB_DMA_IPE_H */

@@ -1,5 +1,5 @@
-#ifndef _PCILIB_CONFIG_H
-#define _PCILIB_CONFIG_H
+#ifndef _PCILIB_EXPORT_H
+#define _PCILIB_EXPORT_H
 
 
 #include <pcilib/register.h>
@@ -14,4 +14,4 @@ extern const pcilib_register_protocol_api_description_t pcilib_default_protocol_
 extern const pcilib_dma_description_t pcilib_ipedma;
 extern const pcilib_dma_description_t pcilib_nwldma;
 
-#endif /* _PCILIB_CONFIG_H */
+#endif /* _PCILIB_EXPORT_H */

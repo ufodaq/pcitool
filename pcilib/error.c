@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "config.h"
+#include "export.h"
 #include "error.h"
 
 void pcilib_print_error(const char *msg, ...) {

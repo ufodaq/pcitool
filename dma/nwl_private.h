@@ -15,6 +15,8 @@ typedef struct pcilib_nwl_engine_context_s pcilib_nwl_engine_context_t;
 #define PCILIB_NWL_DMA_DESCRIPTOR_SIZE		64  // in bytes
 #define PCILIB_NWL_DMA_PAGES			256 // 1024
 
+#define PCILIB_NWL_REGISTER_TIMEOUT 10000	/**< us */
+
 //#define DEBUG_HARDWARE
 //#define DEBUG_NWL
 

@@ -93,7 +93,7 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	do {
 	    nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
     	    gettimeofday(&cur, NULL);
-	} while ((val & (DMA_ENG_STATE_MASK|DMA_ENG_USER_RESET))&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_REGISTER_TIMEOUT));
+	} while ((val & (DMA_ENG_STATE_MASK|DMA_ENG_USER_RESET))&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_NWL_REGISTER_TIMEOUT));
     
 	if (val & (DMA_ENG_STATE_MASK|DMA_ENG_USER_RESET)) {
 	    pcilib_error("Timeout during reset of DMA engine %i", ectx->desc->addr);
@@ -110,7 +110,7 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	do {
 	    nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
     	    gettimeofday(&cur, NULL);
-	} while ((val & DMA_ENG_RESET)&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_REGISTER_TIMEOUT));
+	} while ((val & DMA_ENG_RESET)&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_NWL_REGISTER_TIMEOUT));
     
 	if (val & DMA_ENG_RESET) {
 	    pcilib_error("Timeout during reset of DMA engine %i", ectx->desc->addr);
@@ -183,7 +183,7 @@ int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	do {
 	    nwl_read_register(val, ctx, base, REG_DMA_ENG_CTRL_STATUS);
     	    gettimeofday(&cur, NULL);
-	} while ((val & (DMA_ENG_RUNNING))&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_REGISTER_TIMEOUT));
+	} while ((val & (DMA_ENG_RUNNING))&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_NWL_REGISTER_TIMEOUT));
 
 	if (ectx->ring) {
 	    ring_pa = pcilib_kmem_get_pa(ctx->dmactx.pcilib, ectx->ring);
