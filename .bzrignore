@@ -25,6 +25,6 @@ apps/heb_strip_bad_values
 *.out
 apps/check_counter
 apps/lorenzo_ipedma_test
-pci
 pcitool.pc
 config.h
+pcitool/pci
