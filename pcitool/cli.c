@@ -540,10 +540,9 @@ void Info(pcilib_t *handle, const pcilib_model_description_t *model_info) {
 	    if (plugin) {
 		info = pcilib_get_plugin_model(handle, plugin, 0, 0, NULL);
 		if (info) {
-		    printf(" %s => ", entry->d_name);
+		    printf(" %s\n", entry->d_name);
 		    for (j = 0; info[j].name; j++)
-			printf("%s ", info[j].name);
-		    printf("\n");
+			printf("   %-12s - %s\n", info[j].name, info[j].description?info[j].description:"");
 		}
 		pcilib_plugin_close(plugin);
 	    } else {
@@ -555,12 +554,12 @@ void Info(pcilib_t *handle, const pcilib_model_description_t *model_info) {
 	closedir(dir);
     }
 
-    printf(" DMA => ");
+//    printf(" XML\n");
+
+    printf(" Internal Models\n");
     for (i = 0; pcilib_dma[i].api; i++)
-	printf("%s ", pcilib_dma[i].name);
-    printf("\n");
-    printf(" XML =>\n");
-    printf(" Plain => pci\n\n");
+	printf("   %-12s - %s\n", pcilib_dma[i].name, pcilib_dma[i].description?pcilib_dma[i].description:"");
+    printf("   %-12s - Plain PCI-access model\n\n", "pci");
 
 }
 
