@@ -32,6 +32,7 @@ static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
     if (model_info) {
 	memcpy(&ctx->model_info, model_info, sizeof(pcilib_model_description_t));
 	memcpy(&ctx->dma, model_info->dma, sizeof(pcilib_dma_description_t));
+	ctx->model = strdup(model_info->name);
     } else if (model) {
 	    // If not found, check for DMA models
 	for (i = 0; pcilib_dma[i].name; i++) {
@@ -109,7 +110,6 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	}
 	
 	ctx->page_mask = (uintptr_t)-1;
-	ctx->model = model?strdup(model):NULL;
 
 	ctx->alloc_reg = PCILIB_DEFAULT_REGISTER_SPACE;
 	ctx->registers = (pcilib_register_description_t *)malloc(PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_description_t));
@@ -144,6 +144,9 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    free(ctx);
 	    return NULL;
 	}
+
+	if (!ctx->model)
+	    ctx->model = strdup(model?model:"pci");
 
 	ctx->model_info.registers = ctx->registers;
 	ctx->model_info.banks = ctx->banks;
