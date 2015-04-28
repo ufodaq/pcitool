@@ -4,6 +4,9 @@
 #include <pcilib.h>
 #include <pcilib/bank.h>
 
+#define PCILIB_REGISTER_NO_BITS			0
+#define PCILIB_REGISTER_ALL_BITS		((pcilib_register_value_t)-1)
+
 typedef enum {
     PCILIB_REGISTER_R = 1,			/**< reading from register is allowed */
     PCILIB_REGISTER_W = 2,			/**< normal writting to register is allowed */

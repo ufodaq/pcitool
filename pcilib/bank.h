@@ -16,9 +16,6 @@
 #define PCILIB_REGISTER_PROTOCOL_DMA		96					/**< First PROTOCOL address to be used by DMA engines */
 #define PCILIB_REGISTER_PROTOCOL_DYNAMIC	128					/**< First PROTOCOL address to be used by plugins */
 
-#define PCILIB_REGISTER_NO_BITS			0
-#define PCILIB_REGISTER_ALL_BITS		((pcilib_register_value_t)-1)
-
 typedef uint8_t pcilib_register_bank_t;						/**< Type holding the bank position within the field listing register banks in the model */
 typedef uint8_t pcilib_register_bank_addr_t;					/**< Type holding the bank address number */
 typedef uint8_t pcilib_register_protocol_t;					/**< Type holding the protocol position within the field listing register protocols in the model */
@@ -89,7 +86,10 @@ struct pcilib_register_bank_context_s {
     // we don't copy strings, they should be statically allocated
 int pcilib_init_register_banks(pcilib_t *ctx);
 void pcilib_free_register_banks(pcilib_t *ctx);
+
 int pcilib_add_register_banks(pcilib_t *ctx, size_t n, const pcilib_register_bank_description_t *banks);
+int pcilib_add_register_protocols(pcilib_t *ctx, size_t n, const pcilib_register_protocol_description_t *protocols);
+int pcilib_add_register_ranges(pcilib_t *ctx, size_t n, const pcilib_register_range_t *ranges);
 
 pcilib_register_bank_t pcilib_find_register_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank);
 pcilib_register_bank_t pcilib_find_register_bank_by_name(pcilib_t *ctx, const char *bankname);

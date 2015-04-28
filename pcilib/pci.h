@@ -40,11 +40,12 @@ struct pcilib_s {
     pcilib_kmem_list_t *kmem_list;							/**< List of currently allocated kernel memory */
 
     char *model;									/**< Requested model */
+    void *event_plugin;									/**< Currently loaded event engine */
     pcilib_model_description_t model_info;						/**< Current model description combined from the information returned by the event plugin and all dynamic sources (XML, DMA registers, etc.). Contains only pointers, no deep copy of information returned by event plugin */
 
     size_t num_banks_init;								/**< Number of initialized banks */
     size_t num_reg, alloc_reg;								/**< Number of registered and allocated registers */
-    size_t num_banks, num_ranges;							/**< Number of registered banks and register ranges */
+    size_t num_banks, num_protocols, num_ranges;					/**< Number of registered banks, protocols, and register ranges */
     size_t num_engines;									/**> Number of configured DMA engines */
     pcilib_register_description_t *registers;						/**< List of currently defined registers (from all sources) */
     pcilib_register_bank_description_t banks[PCILIB_MAX_REGISTER_BANKS + 1];		/**< List of currently defined register banks (from all sources) */

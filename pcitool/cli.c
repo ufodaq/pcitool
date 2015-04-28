@@ -20,6 +20,7 @@
 #include <dirent.h>
 #include <pthread.h>
 #include <signal.h>
+#include <dlfcn.h>
 
 #include <getopt.h>
 
@@ -29,6 +30,8 @@
 #include "pcitool/formaters.h"
 
 #include "pci.h"
+#include "plugin.h"
+#include "config.h"
 #include "tools.h"
 #include "kmem.h"
 #include "error.h"
@@ -508,11 +511,57 @@ void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
 }
 
 void Info(pcilib_t *handle, const pcilib_model_description_t *model_info) {
+    int i, j;
+    DIR *dir;
+    void *plugin;
+    const char *path;
+    struct dirent *entry;
+    const pcilib_model_description_t *info = NULL;
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
+
+    path = getenv("PCILIB_PLUGIN_DIR");
+    if (!path) path = PCILIB_PLUGIN_DIR;
 
     printf("Vendor: %x, Device: %x, Bus: %x, Slot: %x, Function: %x\n", board_info->vendor_id, board_info->device_id, board_info->bus, board_info->slot, board_info->func);
     printf(" Interrupt - Pin: %i, Line: %i\n", board_info->interrupt_pin, board_info->interrupt_line);
+
     List(handle, model_info, (char*)-1, 0);
+
+    printf("\n");
+    printf("Available models:\n");
+
+    dir = opendir(path);
+    if (dir) {
+	while ((entry = readdir(dir))) {
+	    const char *suffix = strstr(entry->d_name, ".so");
+	    if ((!suffix)||(strlen(suffix) != 3)) continue;
+
+	    plugin = pcilib_plugin_load(entry->d_name);
+	    if (plugin) {
+		info = pcilib_get_plugin_model(handle, plugin, 0, 0, NULL);
+		if (info) {
+		    printf(" %s => ", entry->d_name);
+		    for (j = 0; info[j].name; j++)
+			printf("%s ", info[j].name);
+		    printf("\n");
+		}
+		pcilib_plugin_close(plugin);
+	    } else {
+		const char *msg = dlerror();
+		if (msg) 
+		    printf(" %s: %s\n", entry->d_name, msg);
+	    }
+	}
+	closedir(dir);
+    }
+
+    printf(" DMA => ");
+    for (i = 0; pcilib_dma[i].api; i++)
+	printf("%s ", pcilib_dma[i].name);
+    printf("\n");
+    printf(" XML =>\n");
+    printf(" Plain => pci\n\n");
+
 }
 
 

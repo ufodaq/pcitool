@@ -78,7 +78,7 @@ void pcilib_free_register_banks(pcilib_t *ctx) {
 
 
 int pcilib_add_register_banks(pcilib_t *ctx, size_t n, const pcilib_register_bank_description_t *banks) {
-	// DS: What we are doing if bank exists? 
+	// DS: Override existing banks 
 	
     if (!n) {
 	for (n = 0; banks[n].access; n++);
@@ -87,7 +87,6 @@ int pcilib_add_register_banks(pcilib_t *ctx, size_t n, const pcilib_register_ban
     if ((ctx->num_banks + n + 1) > PCILIB_MAX_REGISTER_BANKS)
 	return PCILIB_ERROR_TOOBIG;
 	
-    memset(ctx->banks + ctx->num_banks + n, 0, sizeof(pcilib_register_bank_description_t));
     memcpy(ctx->banks + ctx->num_banks, banks, n * sizeof(pcilib_register_bank_description_t));
     ctx->num_banks += n;
 
@@ -98,6 +97,39 @@ int pcilib_add_register_banks(pcilib_t *ctx, size_t n, const pcilib_register_ban
         return pcilib_init_register_banks(ctx);
     }
     
+    return 0;
+}
+
+int pcilib_add_register_protocols(pcilib_t *ctx, size_t n, const pcilib_register_protocol_description_t *protocols) {
+	// DS: Override existing banks 
+	
+    if (!n) {
+	for (n = 0; protocols[n].api; n++);
+    }
+
+    if ((ctx->num_protocols + n + 1) > PCILIB_MAX_REGISTER_PROTOCOLS)
+	return PCILIB_ERROR_TOOBIG;
+	
+    memcpy(ctx->protocols + ctx->num_protocols, protocols, n * sizeof(pcilib_register_protocol_description_t));
+    ctx->num_protocols += n;
+
+    return 0;
+}
+
+
+int pcilib_add_register_ranges(pcilib_t *ctx, size_t n, const pcilib_register_range_t *ranges) {
+	// DS: Override existing banks 
+	
+    if (!n) {
+	for (n = 0; ranges[n].end; n++);
+    }
+
+    if ((ctx->num_ranges + n + 1) > PCILIB_MAX_REGISTER_RANGES)
+	return PCILIB_ERROR_TOOBIG;
+	
+    memcpy(ctx->ranges + ctx->num_ranges, ranges, n * sizeof(pcilib_register_range_t));
+    ctx->num_ranges += n;
+
     return 0;
 }
 

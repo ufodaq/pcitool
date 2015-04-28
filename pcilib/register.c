@@ -20,7 +20,7 @@
 
 
 int pcilib_add_registers(pcilib_t *ctx, size_t n, const pcilib_register_description_t *registers) {
-	// DS: What we are doing if register exists?
+	// DS: Overrride existing registers 
 	
     pcilib_register_description_t *regs;
     size_t size;

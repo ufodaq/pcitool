@@ -20,55 +20,73 @@
 #include "tools.h"
 #include "error.h"
 #include "model.h"
+#include "plugin.h"
 
 static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
     int i, j;
 
-	// Registers & Banks must be copied!
+    const pcilib_model_description_t *model_info = NULL;
+    const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
 
-    if (model) {
-	    // Check for DMA models
+    model_info = pcilib_find_plugin_model(ctx, board_info->vendor_id, board_info->device_id, model);
+    if (model_info) {
+	memcpy(&ctx->model_info, model_info, sizeof(pcilib_model_description_t));
+	memcpy(&ctx->dma, model_info->dma, sizeof(pcilib_dma_description_t));
+    } else if (model) {
+	    // If not found, check for DMA models
 	for (i = 0; pcilib_dma[i].name; i++) {
 	    if (!strcasecmp(model, pcilib_dma[i].name))
 		break;
 	}
 
 	if (pcilib_dma[i].api) {
+	    model_info = &ctx->model_info;
 	    memcpy(&ctx->dma, &pcilib_dma[i], sizeof(pcilib_dma_description_t));
 	    ctx->model_info.dma = &ctx->dma;
+	}
+    }
 
-	    if (pcilib_dma[i].banks)
-	        pcilib_add_register_banks(ctx, 0, pcilib_dma[i].banks);
-	    
-	    if (pcilib_dma[i].registers)
-		pcilib_add_registers(ctx, 0, pcilib_dma[i].registers);
+	    // Precedens of register configuration: DMA/Event Initialization (top), XML, Event Description, DMA Description (least)
+    if (model_info) {
+	const pcilib_dma_description_t *dma = model_info->dma;
 
-	    if (pcilib_dma[i].engines) {
-		for (j = 0; pcilib_dma[i].engines[j].addr_bits; j++)
-		memcpy(ctx->engines, pcilib_dma[i].engines, j * sizeof(pcilib_dma_engine_description_t));
+	if (dma) {
+	    if (dma->banks)
+		pcilib_add_register_banks(ctx, 0, dma->banks);
+
+	    if (dma->registers)
+		pcilib_add_registers(ctx, 0, dma->registers);
+
+	    if (dma->engines) {
+		for (j = 0; dma->engines[j].addr_bits; j++);
+		memcpy(ctx->engines, dma->engines, j * sizeof(pcilib_dma_engine_description_t));
 		ctx->num_engines = j;
 	    } else
 		ctx->dma.engines = ctx->engines;
-
-	    return 0;
 	}
 
-	// Check for XML models (DMA + XML registers)
+	if (model_info->protocols)
+	    pcilib_add_register_protocols(ctx, 0, model_info->protocols);
+		
+	if (model_info->banks)
+	    pcilib_add_register_banks(ctx, 0, model_info->banks);
 
-	// Check for specified model
-	
-	// Iterate other all other models
+	if (model_info->registers)
+	    pcilib_add_registers(ctx, 0, model_info->registers);
+		
+	if (model_info->ranges)
+	    pcilib_add_register_ranges(ctx, 0, model_info->ranges);
     }
+
+    // Load XML registers
 
     // Check for all installed models
     // memcpy(&ctx->model_info, model, sizeof(pcilib_model_description_t));
     // how we reconcile the banks from event model and dma description? The banks specified in the DMA description should override corresponding banks of events...
 
 
-    if (model)
+    if ((model)&&(!model_info)/*&&(no xml)*/)
 	return PCILIB_ERROR_NOTFOUND;
-
-	// Otherwise, simple pci access (all model members are set to NULL)
 
     return 0;
 }
@@ -113,11 +131,7 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	
 	for (i = 0; pcilib_protocols[i].api; i++);
 	memcpy(ctx->protocols, pcilib_protocols, i * sizeof(pcilib_register_protocol_description_t));
-
-	ctx->model_info.registers = ctx->registers;
-	ctx->model_info.banks = ctx->banks;
-	ctx->model_info.protocols = ctx->protocols;
-	ctx->model_info.ranges = ctx->ranges;
+	ctx->num_protocols = i;
 
 	err = pcilib_detect_model(ctx, model);
 	if (err) {
@@ -130,6 +144,12 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    free(ctx);
 	    return NULL;
 	}
+
+	ctx->model_info.registers = ctx->registers;
+	ctx->model_info.banks = ctx->banks;
+	ctx->model_info.protocols = ctx->protocols;
+	ctx->model_info.ranges = ctx->ranges;
+
 
 	err = pcilib_init_register_banks(ctx);
 	if (err) {
@@ -450,6 +470,9 @@ void pcilib_close(pcilib_t *ctx) {
         if ((dapi)&&(dapi->free)) dapi->free(ctx->dma_ctx);
 
 	pcilib_free_register_banks(ctx);
+	
+	if (ctx->event_plugin)
+	    pcilib_plugin_close(ctx->event_plugin);
 	
 	if (ctx->kmem_list) {
 	    pcilib_warning("Not all kernel buffers are properly cleaned");
