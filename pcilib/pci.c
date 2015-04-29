@@ -113,12 +113,9 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 
 	ctx->alloc_reg = PCILIB_DEFAULT_REGISTER_SPACE;
 	ctx->registers = (pcilib_register_description_t *)malloc(PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_description_t));
-/*	ctx->banks = (pcilib_register_bank_context_t *)malloc(PCILIB_MAX_BANKS * sizeof(pcilib_register_bank_context_t));
-	ctx->ranges = (pcilib_register_range_t *)malloc(PCILIB_MAX_RANGES * sizeof(pcilib_register_range_t));
-	ctx->protocols
-	ctx->engines*/
+	ctx->register_ctx = (pcilib_register_context_t *)malloc(PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_context_t));
 	
-	if ((!ctx->registers)/*||(!ctx->banks)||(!ctx->ranges)*/) {
+	if ((!ctx->registers)||(!ctx->register_ctx)) {
 	    pcilib_error("Error allocating memory for register model");
 	    pcilib_close(ctx);
 	    free(ctx);
@@ -128,6 +125,9 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	memset(ctx->registers, 0, sizeof(pcilib_register_description_t));
 	memset(ctx->banks, 0, sizeof(pcilib_register_bank_description_t));
 	memset(ctx->ranges, 0, sizeof(pcilib_register_range_t));
+
+	memset(ctx->register_ctx, 0, PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_context_t));
+
 	
 	for (i = 0; pcilib_protocols[i].api; i++);
 	memcpy(ctx->protocols, pcilib_protocols, i * sizeof(pcilib_register_protocol_description_t));
@@ -474,6 +474,9 @@ void pcilib_close(pcilib_t *ctx) {
 
 	pcilib_free_register_banks(ctx);
 	
+	if (ctx->register_ctx)
+	    free(ctx->register_ctx);
+
 	if (ctx->event_plugin)
 	    pcilib_plugin_close(ctx->event_plugin);
 	

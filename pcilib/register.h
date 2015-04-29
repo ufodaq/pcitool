@@ -42,11 +42,10 @@ typedef struct {
     const char *description;			/**< Brief description of the register */
 } pcilib_register_description_t;
 
-/*
+
 typedef struct {
     pcilib_register_bank_t bank;
 } pcilib_register_context_t;
-*/
 
 int pcilib_add_registers(pcilib_t *ctx, size_t n, const pcilib_register_description_t *registers);
 

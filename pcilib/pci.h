@@ -54,12 +54,10 @@ struct pcilib_s {
     pcilib_dma_description_t dma;							/**< Configuration of used DMA implementation */
     pcilib_dma_engine_description_t engines[PCILIB_MAX_DMA_ENGINES +  1];		/**< List of engines defined by the DMA implementation */
 
-//    pcilib_register_context_t *register_ctx;						/**< Contexts for registers */
+    pcilib_register_context_t *register_ctx;						/**< Contexts for registers */
     pcilib_register_bank_context_t *bank_ctx[PCILIB_MAX_REGISTER_BANKS];		/**< Contexts for registers banks if required by register protocol */
     pcilib_dma_context_t *dma_ctx;							/**< DMA context */
     pcilib_context_t *event_ctx;							/**< Implmentation context */
-
-//    pcilib_dma_info_t dma_info;
 
 #ifdef PCILIB_FILE_IO
     int file_io_handle;

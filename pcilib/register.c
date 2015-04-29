@@ -21,8 +21,10 @@
 
 int pcilib_add_registers(pcilib_t *ctx, size_t n, const pcilib_register_description_t *registers) {
 	// DS: Overrride existing registers 
+	// Registers identified by addr + offset + size + type or name
 	
     pcilib_register_description_t *regs;
+    pcilib_register_context_t *reg_ctx;
     size_t size;
 
     if (!n) {
@@ -37,6 +39,14 @@ int pcilib_add_registers(pcilib_t *ctx, size_t n, const pcilib_register_descript
 
 	ctx->registers = regs;
 	ctx->model_info.registers = regs;
+
+	reg_ctx = (pcilib_register_context_t*)realloc(ctx->registers, size * sizeof(pcilib_register_context_t));
+	if (!reg_ctx) return PCILIB_ERROR_MEMORY;
+	
+	memset(reg_ctx + ctx->alloc_reg, 0, (size - ctx->alloc_reg) * sizeof(pcilib_register_context_t));
+
+	ctx->register_ctx = reg_ctx;
+
 	ctx->alloc_reg = size;
     }
 
