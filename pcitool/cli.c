@@ -876,7 +876,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
 	}
 	if (bytes <= 0) {
 	    pcilib_warning("No data is returned by DMA engine");
-	    return 0;
+	    return -1;
 	}
 	size = bytes;
 	n = bytes / abs(access);
@@ -2413,6 +2413,7 @@ int WaitIRQ(pcilib_t *handle, const pcilib_model_description_t *model_info, pcil
 
 
 int main(int argc, char **argv) {
+    int err = 0;
     int i;
     long itmp;
     size_t ztmp;
@@ -3097,11 +3098,11 @@ int main(int argc, char **argv) {
      break;
      case MODE_READ:
 	if (amode == ACCESS_DMA) {
-	    ReadData(handle, amode, flags, dma, bar, start, size_set?size:0, access, endianess, timeout_set?timeout:(size_t)-1, ofile);
+	    err = ReadData(handle, amode, flags, dma, bar, start, size_set?size:0, access, endianess, timeout_set?timeout:(size_t)-1, ofile);
 	} else if (amode == ACCESS_CONFIG) {
-	    ReadData(handle, amode, flags, dma, bar, addr?start:0, (addr||size_set)?size:(256/abs(access)), access, endianess, (size_t)-1, ofile);
+	    err = ReadData(handle, amode, flags, dma, bar, addr?start:0, (addr||size_set)?size:(256/abs(access)), access, endianess, (size_t)-1, ofile);
 	} else if (addr) {
-	    ReadData(handle, amode, flags, dma, bar, start, size, access, endianess, (size_t)-1, ofile);
+	    err = ReadData(handle, amode, flags, dma, bar, start, size, access, endianess, (size_t)-1, ofile);
 	} else {
 	    Error("Address to read is not specified");
 	}
@@ -3172,4 +3173,6 @@ int main(int argc, char **argv) {
     pcilib_close(handle);
     
     if (data != argv + optind) free(data);
+
+    return err;
 }
