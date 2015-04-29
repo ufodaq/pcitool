@@ -4,6 +4,7 @@
 #include <sys/time.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdarg.h>
 
 typedef struct pcilib_s pcilib_t;
 typedef struct pcilib_event_context_s pcilib_context_t;
@@ -20,6 +21,12 @@ typedef uint32_t pcilib_event_t;
 typedef uint64_t pcilib_timeout_t;		/**< In microseconds */
 typedef unsigned int pcilib_irq_hw_source_t;
 typedef uint32_t pcilib_irq_source_t;
+
+typedef enum {
+    PCILIB_LOG_INFO,
+    PCILIB_LOG_WARNING,
+    PCILIB_LOG_ERROR
+} pcilib_log_priority_t;
 
 typedef enum {
     PCILIB_HOST_ENDIAN = 0,
@@ -97,6 +104,8 @@ typedef struct {
 #define PCILIB_MODEL_DETECT		NULL
 
 
+typedef void (*pcilib_logger_t)(void *arg, const char *file, int line, pcilib_log_priority_t prio, const char *msg, va_list va);
+
 /**<
  * Callback function called when new data is read by DMA streaming function
  * @ctx - DMA Engine context
@@ -117,8 +126,7 @@ typedef int (*pcilib_event_callback_t)(pcilib_event_id_t event_id, pcilib_event_
 typedef int (*pcilib_event_rawdata_callback_t)(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event_flags_t flags, size_t size, void *data, void *user);
 
 
-
-int pcilib_set_error_handler(void (*err)(const char *msg, ...), void (*warn)(const char *msg, ...));
+int pcilib_set_logger(pcilib_log_priority_t min_prio, pcilib_logger_t logger, void *arg);
 
 pcilib_t *pcilib_open(const char *device, const char *model);
 void pcilib_close(pcilib_t *ctx);
@@ -198,6 +206,7 @@ int pcilib_configure_rawdata_callback(pcilib_t *ctx, pcilib_event_rawdata_callba
  */
 int pcilib_configure_preprocessing_threads(pcilib_t *ctx, size_t max_threads);
 
+pcilib_context_t *pcilib_get_event_engine(pcilib_t *ctx);
 
 int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, pcilib_event_flags_t flags);
 int pcilib_stop(pcilib_t *ctx, pcilib_event_flags_t flags);

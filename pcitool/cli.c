@@ -340,22 +340,30 @@ static void signal_exit_handler(int signo) {
 	exit(-1);
 }
 
-
-void Error(const char *format, ...) {
-    va_list ap;
-    
-    va_start(ap, format);
-    printf("Error %i: ", errno);
+void LogError(void *arg, const char *file, int line, pcilib_log_priority_t prio, const char *format, va_list ap) {
     vprintf(format, ap);
-    if (errno) printf("\n errno: %s", strerror(errno));
+
+    if (prio == PCILIB_LOG_ERROR) {
+	if (errno) printf("\nerrno: %i (%s)", errno, strerror(errno));
+    }
+
     printf("\n\n");
-    va_end(ap);
-    
-    exit(-1);
+
+    if (prio == PCILIB_LOG_ERROR) {
+	printf("Exiting at [%s:%u]\n\n", file, line);
+	exit(-1);
+    }
 }
 
-void Silence(const char *format, ...) {
+void ErrorInternal(void *arg, const char *file, int line, pcilib_log_priority_t prio, const char *format, ...) {
+     va_list ap;
+     va_start(ap, format);
+     LogError(arg, file, line, prio, format, ap);
+     va_end(ap);
 }
+
+#define Error(...) ErrorInternal(NULL, __FILE__, __LINE__, PCILIB_LOG_ERROR, __VA_ARGS__)
+
 
 void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, int details) {
     int i,j;
@@ -2419,6 +2427,8 @@ int main(int argc, char **argv) {
     int force = 0;
     int verify = 0;
     
+    pcilib_log_priority_t log_priority;
+    
     const char *model = NULL;
     const pcilib_model_description_t *model_info;
     const pcilib_dma_description_t *dma_info;
@@ -2893,7 +2903,11 @@ int main(int argc, char **argv) {
 	else Usage(argc, argv, NULL);
     }
 
-    pcilib_set_error_handler(&Error, quiete?Silence:NULL);
+    if (verbose) log_priority = PCILIB_LOG_INFO;
+    else if (quiete) log_priority = PCILIB_LOG_ERROR;
+    else log_priority = PCILIB_LOG_WARNING;
+
+    pcilib_set_logger(log_priority, &LogError, NULL);
 
     handle = pcilib_open(fpga_device, model);
     if (handle < 0) Error("Failed to open FPGA device: %s", fpga_device);

@@ -69,6 +69,10 @@ int pcilib_init_event_engine(pcilib_t *ctx) {
     return 0;
 }
 
+pcilib_context_t *pcilib_get_event_engine(pcilib_t *ctx) {
+    return ctx->event_ctx;
+}
+
 int pcilib_reset(pcilib_t *ctx) {
     const pcilib_event_api_description_t *api;
     

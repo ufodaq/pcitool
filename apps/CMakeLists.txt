@@ -4,7 +4,7 @@ include_directories(
 )
 
 link_directories(
-    ${CMAKE_SOURCE_DIR}/pcilib
+    ${CMAKE_BINARY_DIR}/pcilib
 )
 
 add_executable(xilinx xilinx.c)

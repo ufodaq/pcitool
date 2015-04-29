@@ -2,7 +2,8 @@
 #define _PCILIB_ERROR_H
 
 #include <errno.h>
- 
+#include <pcilib.h>
+
 enum {
     PCILIB_ERROR_SUCCESS = 0,
     PCILIB_ERROR_MEMORY = ENOMEM,
@@ -25,8 +26,14 @@ enum {
     PCILIB_ERROR_BUSY = EBUSY
 } pcilib_errot_t;
 
-void pcilib_print_error(const char *msg, ...);
-extern void (*pcilib_error)(const char *msg, ...);
-extern void (*pcilib_warning)(const char *msg, ...);
+void pcilib_log_message(const char *file, int line, pcilib_log_priority_t prio, const char *msg, ...);
+
+#define pcilib_log(prio, ...) \
+    pcilib_log_message(__FILE__, __LINE__, prio, __VA_ARGS__)
+
+#define pcilib_error(...)		pcilib_log(PCILIB_LOG_ERROR, __VA_ARGS__)
+#define pcilib_warning(...)	pcilib_log(PCILIB_LOG_WARNING, __VA_ARGS__)
+#define pcilib_info(...)		pcilib_log(PCILIB_LOG_INFO, __VA_ARGS__)
+
 
 #endif /* _PCILIB_ERROR_H */

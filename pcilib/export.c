@@ -2,14 +2,9 @@
 
 #include <stdio.h>
 
-#include "error.h"
 #include "export.h"
 
 #include "protocols/default.h"
-
-
-void (*pcilib_error)(const char *msg, ...) = pcilib_print_error;
-void (*pcilib_warning)(const char *msg, ...) = pcilib_print_error;
 
 
 const pcilib_register_protocol_description_t pcilib_protocols[] = {
