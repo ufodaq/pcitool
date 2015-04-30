@@ -17,9 +17,6 @@ typedef struct pcilib_nwl_engine_context_s pcilib_nwl_engine_context_t;
 
 #define PCILIB_NWL_REGISTER_TIMEOUT 10000	/**< us */
 
-//#define DEBUG_HARDWARE
-//#define DEBUG_NWL
-
 #include "nwl.h"
 #include "nwl_irq.h"
 #include "nwl_engine.h"

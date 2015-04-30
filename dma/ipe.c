@@ -12,6 +12,7 @@
 #include "pcilib.h"
 #include "error.h"
 #include "tools.h"
+#include "debug.h"
 
 #include "ipe.h"
 #include "ipe_private.h"
@@ -425,9 +426,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 //	    case PCILIB_STREAMING_CHECK: wait = 0; break;
 	}
 
-#ifdef IPEDMA_DEBUG
-	printf("Waiting for data: %u (last read) 0x%x (last read addr) 0x%x (last_written)\n", ctx->last_read, ctx->last_read_addr, *last_written_addr_ptr);
-#endif /* IPEDMA_DEBUG */
+	pcilib_debug(DMA, "Waiting for data: %u (last read) 0x%x (last read addr) 0x%x (last_written)\n", ctx->last_read, ctx->last_read_addr, *last_written_addr_ptr);
 
 	gettimeofday(&start, NULL);
 	memcpy(&cur, &start, sizeof(struct timeval));
@@ -442,10 +441,10 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	    // Failing out if we exited on timeout
 	if ((ctx->last_read_addr == (*last_written_addr_ptr))||(*last_written_addr_ptr == 0)) {
 #ifdef IPEDMA_SUPPORT_EMPTY_DETECTED
-# ifdef IPEDMA_DEBUG
+# ifdef PCILIB_DEBUG_DMA
 	    if ((wait)&&(*last_written_addr_ptr)&&(!*empty_detected_ptr))
-		pcilib_warning("The empty_detected flag is not set, but no data arrived within %lu us\n", wait);
-# endif /* IPEDMA_DEBUG */
+		pcilib_debug(DMA, "The empty_detected flag is not set, but no data arrived within %lu us\n", wait);
+# endif /* PCILIB_DEBUG_DMA */
 #endif /* IPEDMA_SUPPORT_EMPTY_DETECTED */
 	    return (ret&PCILIB_STREAMING_FAIL)?PCILIB_ERROR_TIMEOUT:0;
 	}
@@ -454,9 +453,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	cur_read = ctx->last_read + 1;
 	if (cur_read == ctx->ring_size) cur_read = 0;
 
-#ifdef IPEDMA_DEBUG
-	printf("Reading: %u (last read) 0x%x (last read addr) 0x%x (last_written)\n", cur_read, ctx->last_read_addr, *last_written_addr_ptr);
-#endif /* IPEDMA_DEBUG */
+	pcilib_debug(DMA, "Reading: %u (last read) 0x%x (last read addr) 0x%x (last_written)\n", cur_read, ctx->last_read_addr, *last_written_addr_ptr);
 
 #ifdef IPEDMA_DETECT_PACKETS
 	if ((*empty_detected_ptr)&&(pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, cur_read) == (*last_written_addr_ptr))) packet_flags = PCILIB_DMA_FLAG_EOP;

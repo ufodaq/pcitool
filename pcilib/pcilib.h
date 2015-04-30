@@ -23,9 +23,10 @@ typedef unsigned int pcilib_irq_hw_source_t;
 typedef uint32_t pcilib_irq_source_t;
 
 typedef enum {
-    PCILIB_LOG_INFO,
-    PCILIB_LOG_WARNING,
-    PCILIB_LOG_ERROR
+    PCILIB_LOG_DEBUG = 0,			/**< Debug messages will be always printed as they should be filtered based on setting of corresponding environmental variable */
+    PCILIB_LOG_INFO,				/**< Informational message are suppresed by default */
+    PCILIB_LOG_WARNING,				/**< Warnings messages indicate that something unexpected happen, but application can continue */
+    PCILIB_LOG_ERROR				/**< The error which is impossible to handle on this level of library */
 } pcilib_log_priority_t;
 
 typedef enum {

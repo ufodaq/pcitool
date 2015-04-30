@@ -27,6 +27,7 @@ enum {
 } pcilib_errot_t;
 
 void pcilib_log_message(const char *file, int line, pcilib_log_priority_t prio, const char *msg, ...);
+void pcilib_log_vmessage(const char *file, int line, pcilib_log_priority_t prio, const char *msg, va_list va);
 
 #define pcilib_log(prio, ...) \
     pcilib_log_message(__FILE__, __LINE__, prio, __VA_ARGS__)

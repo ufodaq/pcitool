@@ -11,7 +11,6 @@
 #define IPEDMA_DESCRIPTOR_SIZE		128
 #define IPEDMA_DESCRIPTOR_ALIGNMENT	64
 
-//#define IPEDMA_DEBUG
 //#define IPEDMA_BUG_DMARD				/**< No register read during DMA transfer */
 //#define IPEDMA_DETECT_PACKETS				/**< Using empty_deceted flag */
 #define  IPEDMA_SUPPORT_EMPTY_DETECTED			/**< Avoid waiting for data when empty_detected flag is set in hardware */

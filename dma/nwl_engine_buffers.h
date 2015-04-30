@@ -33,9 +33,7 @@ static int dma_nwl_compute_read_s2c_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_c
 	return PCILIB_ERROR_INVALID_STATE;
     }
 
-#ifdef DEBUG_NWL    
-    printf("S2C: %lu %lu\n", ectx->tail, ectx->head);
-#endif /* DEBUG_NWL */
+    pcilib_debug(DMA, "S2C: %lu %lu\n", ectx->tail, ectx->head);
 
     return 0;
 }
@@ -61,9 +59,7 @@ static int dma_nwl_compute_read_c2s_pointers(nwl_dma_t *ctx, pcilib_nwl_engine_c
     ectx->tail = ectx->head + 1;
     if (ectx->tail == PCILIB_NWL_DMA_PAGES) ectx->tail = 0;
 
-#ifdef DEBUG_NWL    
-    printf("C2S: %lu %lu\n", ectx->tail, ectx->head);
-#endif /* DEBUG_NWL */
+    pcilib_debug(DMA, "C2S: %lu %lu\n", ectx->tail, ectx->head);
 
     return 0;
 }

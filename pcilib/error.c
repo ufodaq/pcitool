@@ -19,10 +19,16 @@ static pcilib_logger_t pcilib_logger = pcilib_print_error;
 void pcilib_log_message(const char *file, int line, pcilib_log_priority_t prio, const char *msg, ...) {
     va_list va;
 
-    if (prio >= pcilib_logger_min_prio) {
+    if ((!prio)||(prio >= pcilib_logger_min_prio)) {
 	va_start(va, msg);
 	pcilib_logger(pcilib_logger_argument, file, line, prio, msg, va);
 	va_end(va);
+    }
+}
+
+void pcilib_log_vmessage(const char *file, int line, pcilib_log_priority_t prio, const char *msg, va_list va) {
+    if ((!prio)||(prio >= pcilib_logger_min_prio)) {
+	pcilib_logger(pcilib_logger_argument, file, line, prio, msg, va);
     }
 }
 
