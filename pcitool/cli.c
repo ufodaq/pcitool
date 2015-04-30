@@ -35,6 +35,7 @@
 #include "tools.h"
 #include "kmem.h"
 #include "error.h"
+#include "debug.h"
 #include "model.h"
 
 /* defines */
@@ -1294,8 +1295,14 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
     ctx->event_pending = 0;
     ctx->event_count++;
 
-    if (ctx->last_num)
-	ctx->missing_count += (info->seqnum - ctx->last_num) - 1;
+    if (ctx->last_num) {
+	size_t missing_count = (info->seqnum - ctx->last_num) - 1;
+	ctx->missing_count += missing_count; 
+#ifdef PCILIB_DEBUG_MISSING_EVENTS
+	if (missing_count)
+	    pcilib_debug(MISSING_EVENTS, "%zu missing events between %zu and %zu", missing_count, ctx->last_num, info->seqnum);
+#endif /* PCILIB_DEBUG_MISSING_EVENTS */
+    }
 
     ctx->last_num = info->seqnum;
     
@@ -1371,8 +1378,15 @@ int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event
 	}
 
 	ctx->event_count++;
-	if (ctx->last_num)
-	    ctx->missing_count += (info->seqnum - ctx->last_num) - 1;
+	if (ctx->last_num) {
+	    size_t missing_count = (info->seqnum - ctx->last_num) - 1;
+	    ctx->missing_count += missing_count;
+#ifdef PCILIB_DEBUG_MISSING_EVENTS
+	    if (missing_count)
+		pcilib_debug(MISSING_EVENTS, "%zu missing events between %zu and %zu", missing_count, ctx->last_num, info->seqnum);
+#endif /* PCILIB_DEBUG_MISSING_EVENTS */
+
+	}
 	ctx->last_num = info->seqnum;
     }
 
