@@ -1,0 +1,9 @@
+Supported environmental variables
+=================================
+ PCILIB_PLUGIN_DIR 		- override path to directory with plugins
+ 
+ PCILIB_DEBUG_DMA 		- Enable DMA debugging
+ PCILIB_DEBUG_MISSING_EVENTS	- Enable debugging of missing events (frames for instance)
+ IPECAMERA_DEBUG_BROKEN_FRAMES	- Store broken frames in the specified directory (variable may specify directory)
+ IPECAMERA_DEBUG_RAW_PACKETS	- Store all raw packets read from DMA grouped in frames (variable may specify directory)
+ IPECAMERA_DEBUG_RAW_FRAMES	- Store all raw frames (variable may specify directory)

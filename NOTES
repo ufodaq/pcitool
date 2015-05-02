@@ -1,7 +1,3 @@
-Environment
-===========
- PCILIB_PLUGIN_DIR - override path to directory with plugins
-
 Memory Addressing
 =================
  There is 3 types of addresses: virtual, physical, and bus. For DMA a bus
