@@ -49,6 +49,8 @@ typedef struct {
 } pcilib_dma_context_t;
 
 typedef struct {
+    pcilib_version_t version;
+
     pcilib_dma_context_t *(*init)(pcilib_t *ctx, const char *model, const void *arg);
     void (*free)(pcilib_dma_context_t *ctx);
     

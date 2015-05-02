@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include "pcilib.h"
+#include "version.h"
 
 //#define PCILIB_NWL_MODIFICATION_IPECAMERA 0x100
 
@@ -19,6 +20,7 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
 #ifdef _PCILIB_EXPORT_C
 static const pcilib_dma_api_description_t ipe_dma_api = {
+    PCILIB_VERSION,
     dma_ipe_init,
     dma_ipe_free,
     dma_ipe_get_status,

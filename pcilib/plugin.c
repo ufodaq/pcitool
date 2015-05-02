@@ -53,7 +53,7 @@ const pcilib_model_description_t *pcilib_get_plugin_model(pcilib_t *pcilib, void
     model_info = ((const pcilib_model_description_t *(*)(pcilib_t *pcilib, unsigned short vendor_id, unsigned short device_id, const char *model))get_model)(pcilib, vendor_id, device_id, model);
     if (!model_info) return model_info;
 
-    if (model_info->interface_version != PCILIB_EVENT_INTERFACE_VERSION) {
+    if ((PCILIB_VERSION_GET_MAJOR(model_info->interface_version) != PCILIB_VERSION_MAJOR)||(PCILIB_VERSION_GET_MINOR(model_info->interface_version) != PCILIB_VERSION_MINOR)) {
 	pcilib_warning("Plugin %s exposes outdated interface version (%lu), pcitool supports (%lu)", model_info->name, model_info->interface_version, PCILIB_EVENT_INTERFACE_VERSION);
 	return NULL;
     }

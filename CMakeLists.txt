@@ -7,6 +7,7 @@ cmake_minimum_required(VERSION 2.6)
 
 set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library") 
 
+#list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
@@ -18,6 +19,10 @@ endif (NOT DISABLE_PCITOOL)
 
 add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3")
 #add_definitions("-fPIC --std=c99 -Wall -O2")
+
+include(cmake/version.cmake)
+VERSION_TO_VARS(${PCILIB_VERSION} PCILIB_VERSION_MAJOR PCILIB_VERSION_MINOR PCILIB_VERSION_MICRO)
+
 
 add_subdirectory(dma)
 add_subdirectory(protocols)
@@ -64,8 +69,11 @@ set(PCILIB_DEBUG_DIR "." CACHE PATH "Directory to write debug information")
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcitool.pc.in ${CMAKE_CURRENT_BINARY_DIR}/pcitool.pc)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/config.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/version.h)
 
 install(FILES 
     ${CMAKE_CURRENT_BINARY_DIR}/pcitool.pc 
     DESTINATION ${LIB_INSTALL_DIR}/pkgconfig
 )
+
+message("-- Configured pcitool ${PCILIB_VERSION_MAJOR}.${PCILIB_VERSION_MINOR}.${PCILIB_VERSION_MICRO} with public ABI ${PCILIB_ABI_VERSION}")

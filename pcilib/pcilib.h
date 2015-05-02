@@ -9,6 +9,8 @@
 typedef struct pcilib_s pcilib_t;
 typedef struct pcilib_event_context_s pcilib_context_t;
 
+typedef uint32_t pcilib_version_t;
+
 typedef uint8_t pcilib_bar_t;			/**< Type holding the PCI Bar number */
 typedef uint16_t pcilib_register_t;		/**< Type holding the register position within the field listing registers in the model */
 typedef uint32_t pcilib_register_addr_t;	/**< Type holding the register address within address-space of BARs */

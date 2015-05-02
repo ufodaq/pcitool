@@ -28,3 +28,4 @@ apps/lorenzo_ipedma_test
 pcitool.pc
 config.h
 pcitool/pci
+version.h

@@ -2,9 +2,10 @@
 #define _PCILIB_EVENT_H
 
 #include <pcilib.h>
+#include <pcilib/version.h>
 #include <pcilib/dma.h>
 
-#define PCILIB_EVENT_INTERFACE_VERSION 0
+#define PCILIB_EVENT_INTERFACE_VERSION PCILIB_VERSION
 
 typedef struct {
     size_t max_events;
@@ -68,6 +69,8 @@ typedef enum {
  */
 
 typedef struct {
+    pcilib_version_t version;
+
     pcilib_context_t *(*init)(pcilib_t *ctx);
     void (*free)(pcilib_context_t *ctx);
 

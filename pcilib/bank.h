@@ -25,6 +25,8 @@ typedef uint8_t pcilib_register_protocol_addr_t;				/**< Type holding the protoc
 typedef struct pcilib_register_bank_context_s pcilib_register_bank_context_t;
 
 typedef struct {
+    pcilib_version_t version;
+
     pcilib_register_bank_context_t *(*init)(pcilib_t *ctx, pcilib_register_bank_t bank, const char *model, const void *args);			/**< Optional API call to initialize bank context */
     void (*free)(pcilib_register_bank_context_t *ctx);												/**< Optional API call to cleanup bank context */
     int (*read)(pcilib_t *pcilib, pcilib_register_bank_context_t *ctx, pcilib_register_addr_t addr, pcilib_register_value_t *value);		/**< Read from register, mandatory for RO/RW registers */

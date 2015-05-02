@@ -550,8 +550,14 @@ void Info(pcilib_t *handle, const pcilib_model_description_t *model_info) {
 		info = pcilib_get_plugin_model(handle, plugin, 0, 0, NULL);
 		if (info) {
 		    printf(" %s\n", entry->d_name);
-		    for (j = 0; info[j].name; j++)
-			printf("   %-12s - %s\n", info[j].name, info[j].description?info[j].description:"");
+		    for (j = 0; info[j].name; j++) {
+			pcilib_version_t version = info[j].api->version;
+			printf("   %-12s %u.%u.%u - %s\n", info[j].name, 
+				PCILIB_VERSION_GET_MAJOR(version), 
+				PCILIB_VERSION_GET_MINOR(version),
+				PCILIB_VERSION_GET_MICRO(version),
+				info[j].description?info[j].description:"");
+		    }
 		}
 		pcilib_plugin_close(plugin);
 	    } else {

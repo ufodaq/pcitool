@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include "pcilib.h"
+#include "version.h"
 
 pcilib_dma_context_t *dma_nwl_init(pcilib_t *ctx, const char *model, const void *arg);
 void  dma_nwl_free(pcilib_dma_context_t *vctx);
@@ -22,6 +23,7 @@ double dma_nwl_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
 #ifdef _PCILIB_EXPORT_C
 static const pcilib_dma_api_description_t nwl_dma_api = {
+    PCILIB_VERSION,
     dma_nwl_init,
     dma_nwl_free,
     dma_nwl_get_status,
