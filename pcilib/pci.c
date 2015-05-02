@@ -118,7 +118,6 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	if ((!ctx->registers)||(!ctx->register_ctx)) {
 	    pcilib_error("Error allocating memory for register model");
 	    pcilib_close(ctx);
-	    free(ctx);
 	    return NULL;
 	}
 	
@@ -141,7 +140,6 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    else
 	        pcilib_error("Error (%i) configuring model %s", err, (model?model:""));
 	    pcilib_close(ctx);
-	    free(ctx);
 	    return NULL;
 	}
 
@@ -158,7 +156,6 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	if (err) {
 	    pcilib_error("Error (%i) initializing regiser banks\n", err);
 	    pcilib_close(ctx);
-	    free(ctx);
 	    return NULL;
 	}
 	
@@ -166,7 +163,6 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	if (err) {
 	    pcilib_error("Error (%i) initializing event engine\n", err);
 	    pcilib_close(ctx);
-	    free(ctx);
 	    return NULL;
 	}
     }
