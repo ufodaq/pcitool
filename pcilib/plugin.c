@@ -54,7 +54,15 @@ const pcilib_model_description_t *pcilib_get_plugin_model(pcilib_t *pcilib, void
     if (!model_info) return model_info;
 
     if ((PCILIB_VERSION_GET_MAJOR(model_info->interface_version) != PCILIB_VERSION_MAJOR)||(PCILIB_VERSION_GET_MINOR(model_info->interface_version) != PCILIB_VERSION_MINOR)) {
-	pcilib_warning("Plugin %s exposes outdated interface version (%lu), pcitool supports (%lu)", model_info->name, model_info->interface_version, PCILIB_EVENT_INTERFACE_VERSION);
+	printf("%u %u\n", model_info->interface_version, PCILIB_EVENT_INTERFACE_VERSION);
+	pcilib_warning("Plugin %s exposes outdated interface version (%u.%u.%u), pcilib interface version is (%u.%u.%u)", model_info->name, 
+		PCILIB_VERSION_GET_MAJOR(model_info->interface_version),
+		PCILIB_VERSION_GET_MINOR(model_info->interface_version),
+		PCILIB_VERSION_GET_MICRO(model_info->interface_version),
+		PCILIB_VERSION_GET_MAJOR(PCILIB_EVENT_INTERFACE_VERSION),
+		PCILIB_VERSION_GET_MINOR(PCILIB_EVENT_INTERFACE_VERSION),
+		PCILIB_VERSION_GET_MICRO(PCILIB_EVENT_INTERFACE_VERSION)
+	);
 	return NULL;
     }
 

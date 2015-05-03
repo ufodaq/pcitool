@@ -33,7 +33,7 @@ void pcilib_log_vmessage(const char *file, int line, pcilib_log_priority_t prio,
     pcilib_log_message(__FILE__, __LINE__, prio, __VA_ARGS__)
 
 #define pcilib_error(...)		pcilib_log(PCILIB_LOG_ERROR, __VA_ARGS__)
-#define pcilib_warning(...)	pcilib_log(PCILIB_LOG_WARNING, __VA_ARGS__)
+#define pcilib_warning(...)		pcilib_log(PCILIB_LOG_WARNING, __VA_ARGS__)
 #define pcilib_info(...)		pcilib_log(PCILIB_LOG_INFO, __VA_ARGS__)
 
 
