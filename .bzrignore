@@ -29,3 +29,5 @@ pcitool.pc
 config.h
 pcitool/pci
 version.h
+Doxyfile
+html

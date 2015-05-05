@@ -65,14 +65,16 @@ endif(NOT DEFINED LOCALE_INSTALL_DIR)
 set(PCILIB_PLUGIN_DIR "${LIB_INSTALL_DIR}/pcilib" CACHE PATH "Directory to install plugins")
 set(PCILIB_DATA_DIR "${DATA_INSTALL_DIR}/pcilib" CACHE PATH "Directory to install data files")
 set(PCILIB_MODEL_DIR "${PCILIB_DATA_DIR}/models" CACHE PATH "Directory to install XML models")
+set(PCILIB_DOC_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs/" CACHE PATH "Directory to install documentation")
 set(PCILIB_DEBUG_DIR "." CACHE PATH "Directory to write debug information")
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcitool.pc.in ${CMAKE_CURRENT_BINARY_DIR}/pcitool.pc)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcitool.pc.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/config.h)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/version.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/docs/Doxyfile)
 
 install(FILES 
-    ${CMAKE_CURRENT_BINARY_DIR}/pcitool.pc 
+    ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc
     DESTINATION ${LIB_INSTALL_DIR}/pkgconfig
 )
 
