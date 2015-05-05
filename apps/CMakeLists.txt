@@ -10,10 +10,6 @@ link_directories(
 add_executable(xilinx xilinx.c)
 target_link_libraries(xilinx pcilib rt)
 
-add_executable(lorenzo_ipedma_test lorenzo_ipedma_test.c)
-target_link_libraries(lorenzo_ipedma_test pcilib rt)
-set_target_properties(lorenzo_ipedma_test PROPERTIES COMPILE_FLAGS -Wno-array-bounds)
-
 add_executable(pio_test pio_test.c)
 target_link_libraries(pio_test pcilib rt)
 
