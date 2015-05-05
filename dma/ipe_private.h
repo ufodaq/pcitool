@@ -3,6 +3,7 @@
 
 #include "dma.h"
 
+#define IPEDMA_64BIT_MODE		1		/**< 64-bit mode addressing is required to support PCIe gen3 */
 #define IPEDMA_CORES			1
 #define IPEDMA_TLP_SIZE			32
 #define IPEDMA_PAGE_SIZE		4096
@@ -10,6 +11,8 @@
 #define IPEDMA_DMA_PROGRESS_THRESHOLD	1		/**< how many pages the DMA engine should fill before reporting progress */
 #define IPEDMA_DESCRIPTOR_SIZE		128
 #define IPEDMA_DESCRIPTOR_ALIGNMENT	64
+
+#define IPEDMA_BUG_LAST_READ				/**< We should forbid writting the second last available DMA buffer (the last is forbidden by design) */
 
 //#define IPEDMA_BUG_DMARD				/**< No register read during DMA transfer */
 //#define IPEDMA_DETECT_PACKETS				/**< Using empty_deceted flag */

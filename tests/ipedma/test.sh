@@ -23,11 +23,12 @@ pci -w 0x4 0x1
 #done
 
 echo "Reading the data from DMA..."
-for i in `seq 1 100`; do
-    pci -r dma0 --multipacket -s $size -o bench.out
+for i in `seq 1 1000`; do
+    pci -r dma0 --multipacket -s $size -o bench.out --timeout 1000000
+#    pci -r dma0 --multipacket -s $size -o /dev/null --timeout 10000000
     if [ $? -ne 0 ]; then
 	echo "Stopping DMA due to the error..."
-	pci --stop-dma dma0r
+#	pci --stop-dma dma0r
 	exit
     fi
 done

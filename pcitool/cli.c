@@ -348,7 +348,7 @@ void LogError(void *arg, const char *file, int line, pcilib_log_priority_t prio,
 	if (errno) printf("\nerrno: %i (%s)", errno, strerror(errno));
     }
 
-    printf("\n\n");
+    printf("\n");
 
     if (prio == PCILIB_LOG_ERROR) {
 	printf("Exiting at [%s:%u]\n\n", file, line);
