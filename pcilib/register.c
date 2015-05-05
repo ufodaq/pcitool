@@ -160,7 +160,7 @@ int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, p
     int reg;
 
     reg = pcilib_find_register(ctx, bank, regname);
-    if (reg < 0) {
+    if (reg == PCILIB_REGISTER_INVALID) {
 	pcilib_error("Register (%s) is not found", regname);
 	return PCILIB_ERROR_NOTFOUND;
     }
@@ -291,7 +291,7 @@ int pcilib_write_register(pcilib_t *ctx, const char *bank, const char *regname, 
     int reg;
     
     reg = pcilib_find_register(ctx, bank, regname);
-    if (reg < 0) {
+    if (reg == PCILIB_REGISTER_INVALID) {
 	pcilib_error("Register (%s) is not found", regname);
 	return PCILIB_ERROR_NOTFOUND;
     }
