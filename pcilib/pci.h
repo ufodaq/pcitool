@@ -70,6 +70,5 @@ const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx);
 
 int pcilib_map_register_space(pcilib_t *ctx);
 int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr);
-int pcilib_detect_address(pcilib_t *ctx, pcilib_bar_t *bar, uintptr_t *addr, size_t size);
 
 #endif /* _PCITOOL_PCI_H */

@@ -12,7 +12,7 @@
 #include "pcilib.h"
 #include "irq.h"
 #include "kmem.h"
-#include "pci.h"
+#include "bar.h"
 
 #define DEVICE "/dev/fpga0"
 #define BAR PCILIB_BAR0
