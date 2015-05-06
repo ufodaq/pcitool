@@ -7,12 +7,15 @@
 #define IPEDMA_CORES			1
 #define IPEDMA_TLP_SIZE			32
 #define IPEDMA_PAGE_SIZE		4096
-#define IPEDMA_DMA_PAGES		16		/**< number of DMA pages in the ring buffer to allocate */
+#define IPEDMA_DMA_PAGES		32		/**< number of DMA pages in the ring buffer to allocate */
 #define IPEDMA_DMA_PROGRESS_THRESHOLD	1		/**< how many pages the DMA engine should fill before reporting progress */
 #define IPEDMA_DESCRIPTOR_SIZE		128
 #define IPEDMA_DESCRIPTOR_ALIGNMENT	64
 
 #define IPEDMA_BUG_LAST_READ				/**< We should forbid writting the second last available DMA buffer (the last is forbidden by design) */
+#define IPEDMA_RESET_DELAY		100000		/**< Sleep between accessing DMA control and reset registers */
+#define IPEDMA_ADD_PAGE_DELAY		1000		/**< Delay between submitting successive DMA pages into IPEDMA_REG_PAGE_ADDR register */
+#define IPEDMA_NODATA_SLEEP		10		/**< To keep CPU free */
 
 //#define IPEDMA_BUG_DMARD				/**< No register read during DMA transfer */
 //#define IPEDMA_DETECT_PACKETS				/**< Using empty_deceted flag */
@@ -29,6 +32,9 @@
 #define IPEDMA_REG_PAGE_COUNT		0x5C
 #define IPEDMA_REG_UPDATE_THRESHOLD	0x60
 
+
+#define WR(addr, value) { *(uint32_t*)(ctx->base_addr + addr) = value; }
+#define RD(addr, value) { value = *(uint32_t*)(ctx->base_addr + addr); }
 
 
 typedef struct ipe_dma_s ipe_dma_t;

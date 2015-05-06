@@ -374,6 +374,8 @@ int dma_nwl_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcil
     status->ring_size = ectx->ring_size;
     status->buffer_size = ectx->page_size;
     status->ring_tail = ectx->tail;
+    status->written_buffers = 0;
+    status->written_bytes = 0;
     
     if (ectx->desc->direction == PCILIB_DMA_FROM_DEVICE) {
 	size_t pos = 0;
@@ -402,7 +404,16 @@ int dma_nwl_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcil
 
 	    ring += PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
 	}
+    } 
+
+    for (i = 0; (i < ectx->ring_size)&&(i < n_buffers); i++) {
+	bstatus = NWL_RING_GET(ring, DMA_BD_BUFL_STATUS_OFFSET);
+	if (bstatus & DMA_BD_COMP_MASK) {
+	    status->written_buffers++;
+	    if ((bstatus & (DMA_BD_ERROR_MASK)) == 0)
+		status->written_bytes += bstatus & DMA_BD_BUFL_MASK;
+	}
     }
-    
+
     return 0;
 }

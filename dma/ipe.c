@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sched.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
 
@@ -18,8 +19,6 @@
 #include "ipe_private.h"
 
 
-#define WR(addr, value) { *(uint32_t*)(ctx->base_addr + addr) = value; }
-#define RD(addr, value) { value = *(uint32_t*)(ctx->base_addr + addr); }
 
 
 pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const void *arg) {
@@ -156,9 +155,6 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	ctx->reused = 1;
 	ctx->preserve = 1;
 	
-
-//	usleep(100000);
-
 	    // Detect the current state of DMA engine
 #ifdef IPEDMA_BUG_DMARD
 	FILE *f = fopen("/tmp/pcitool_lastread", "r");
@@ -182,13 +178,13 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
 	    // Disable DMA
 	WR(IPEDMA_REG_CONTROL, 0x0);
-	usleep(100000);
+	usleep(IPEDMA_RESET_DELAY);
 	
 	    // Reset DMA engine
 	WR(IPEDMA_REG_RESET, 0x1);
-	usleep(100000);
+	usleep(IPEDMA_RESET_DELAY);
 	WR(IPEDMA_REG_RESET, 0x0);
-	usleep(100000);
+	usleep(IPEDMA_RESET_DELAY);
 
 #ifndef IPEDMA_BUG_DMARD
 	    // Verify PCIe link status
@@ -226,15 +222,15 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	    uintptr_t bus_addr_check, bus_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, pages, i);
 	    WR(IPEDMA_REG_PAGE_ADDR, bus_addr);
 	    if (bus_addr%4096) printf("Bad address %lu: %lx\n", i, bus_addr);
-	    
+
 	    RD(IPEDMA_REG_PAGE_ADDR, bus_addr_check);
 	    if (bus_addr_check != bus_addr) {
 		pcilib_error("Written (%x) and read (%x) bus addresses does not match\n", bus_addr, bus_addr_check);
 	    }
-	    
-	    usleep(1000);
+
+	    usleep(IPEDMA_ADD_PAGE_DELAY);
 	}
-	
+
 	    // Enable DMA
 	WR(IPEDMA_REG_CONTROL, 0x1);
 	
@@ -284,17 +280,17 @@ int dma_ipe_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
 
 	    // Disable DMA
 	WR(IPEDMA_REG_CONTROL, 0);
-	usleep(100000);
+	usleep(IPEDMA_RESET_DELAY);
 	
 	    // Reset DMA engine
 	WR(IPEDMA_REG_RESET, 0x1);
-	usleep(100000);
+	usleep(IPEDMA_RESET_DELAY);
 	WR(IPEDMA_REG_RESET, 0x0);
-	usleep(100000);
+	usleep(IPEDMA_RESET_DELAY);
 
 	    // Reseting configured DMA pages
         WR(IPEDMA_REG_PAGE_COUNT, 0);
-	usleep(100000);
+	usleep(IPEDMA_RESET_DELAY);
     }
 
 	// Clean buffers
@@ -348,6 +344,8 @@ int dma_ipe_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcil
     status->started = ctx->started;
     status->ring_size = ctx->ring_size;
     status->buffer_size = ctx->page_size;
+    status->written_buffers = 0;
+    status->written_bytes = 0;
 
 	// For simplicity, we keep last_read here, and fix in the end
     status->ring_tail = ctx->last_read;
@@ -365,31 +363,45 @@ int dma_ipe_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcil
 
     if (n_buffers > ctx->ring_size) n_buffers = ctx->ring_size;
 
-    if (buffers) {
+    if (buffers)
 	memset(buffers, 0, n_buffers * sizeof(pcilib_dma_buffer_status_t));
 
-	if (status->ring_head >= status->ring_tail) {
-	    for (i = status->ring_tail + 1; (i <= status->ring_head)&&(i < n_buffers); i++) {
+    if (status->ring_head >= status->ring_tail) {
+	for (i = status->ring_tail + 1; i <= status->ring_head; i++) {
+	    status->written_buffers++;
+	    status->written_bytes += ctx->page_size;
+
+	    if ((buffers)&&(i < n_buffers)) {
 		buffers[i].used = 1;
 		buffers[i].size = ctx->page_size;
 		buffers[i].first = 1;
 		buffers[i].last = 1;
 	    }
-	} else {
-	    for (i = 0; (i <= status->ring_head)&&(i < n_buffers); i++) {
+	}
+    } else {
+	for (i = 0; i <= status->ring_head; i++) {
+	    status->written_buffers++;
+	    status->written_bytes += ctx->page_size;
+
+	    if ((buffers)&&(i < n_buffers)) {
 	        buffers[i].used = 1;
 		buffers[i].size = ctx->page_size;
 	        buffers[i].first = 1;
 	        buffers[i].last = 1;
-	    } 
+	    }
+	} 
 	
-	    for (i = status->ring_tail + 1; (i < status->ring_size)&&(i < n_buffers); i++) {
+	for (i = status->ring_tail + 1; i < status->ring_size; i++) {
+	    status->written_buffers++;
+	    status->written_bytes += ctx->page_size;
+
+	    if ((buffers)&&(i < n_buffers)) {
 		buffers[i].used = 1;
 	        buffers[i].size = ctx->page_size;
 		buffers[i].first = 1;
 	        buffers[i].last = 1;
-	    } 
-	}
+	    }
+	} 
     }
 
 	// We actually keep last_read in the ring_tail, so need to increase
@@ -414,10 +426,21 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
     volatile uint32_t *empty_detected_ptr;
 
     pcilib_dma_flags_t packet_flags = PCILIB_DMA_FLAG_EOP;
+    size_t nodata_sleep;
 
 #ifdef IPEDMA_BUG_DMARD
     pcilib_register_value_t value;
 #endif /* IPEDMA_BUG_DMARD */
+
+    switch (sched_getscheduler(0)) {
+     case SCHED_FIFO:
+     case SCHED_RR:
+	nodata_sleep = IPEDMA_NODATA_SLEEP;
+	break;
+     default:
+	pcilib_info_once("Streaming DMA data using non real-time thread (may cause extra CPU load)", errno);
+	nodata_sleep = 0;
+    }
 
     size_t cur_read;
 
@@ -458,7 +481,9 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	gettimeofday(&start, NULL);
 	memcpy(&cur, &start, sizeof(struct timeval));
 	while (((*last_written_addr_ptr == 0)||(ctx->last_read_addr == (*last_written_addr_ptr)))&&((wait == PCILIB_TIMEOUT_INFINITE)||(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < wait))) {
-	    usleep(10);
+	    if (nodata_sleep) 
+		usleep(nodata_sleep);
+		
 #ifdef IPEDMA_SUPPORT_EMPTY_DETECTED
 	    if ((ret != PCILIB_STREAMING_REQ_PACKET)&&(*empty_detected_ptr)) break;
 #endif /* IPEDMA_SUPPORT_EMPTY_DETECTED */
@@ -526,70 +551,4 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
     } while (ret);
 
     return 0;
-}
-
-double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dma, uintptr_t addr, size_t size, size_t iterations, pcilib_dma_direction_t direction) {
-    int err = 0;
-
-    ipe_dma_t *ctx = (ipe_dma_t*)vctx;
-
-    int iter;
-    size_t us = 0;
-    struct timeval start, cur;
-    
-    void *buf;
-    size_t bytes, rbytes;
-
-    if ((direction == PCILIB_DMA_TO_DEVICE)||(direction == PCILIB_DMA_BIDIRECTIONAL)) return -1.;
-
-    if ((dma != PCILIB_DMA_ENGINE_INVALID)&&(dma > 1)) return -1.;
-
-    err = dma_ipe_start(vctx, 0, PCILIB_DMA_FLAGS_DEFAULT);
-    if (err) return err;
-
-    WR(IPEDMA_REG_CONTROL, 0x0);
-
-    err = pcilib_skip_dma(ctx->dmactx.pcilib, 0);
-    if (err) {
-	pcilib_error("Can't start benchmark, devices continuously writes unexpected data using DMA engine");
-	return -1;
-    }
-
-    if (size%IPEDMA_PAGE_SIZE) size = (1 + size / IPEDMA_PAGE_SIZE) * IPEDMA_PAGE_SIZE;
-
-	// Allocate memory and prepare data
-    buf = malloc(size);
-    if (!buf) return -1;
-
-    for (iter = 0; iter < iterations; iter++) {
-	gettimeofday(&start, NULL);
-
-	    // Starting DMA
-	WR(IPEDMA_REG_CONTROL, 0x1);
-	
-	for (bytes = 0; bytes < size; bytes += rbytes) {
-	    err = pcilib_read_dma(ctx->dmactx.pcilib, 0, addr, size - bytes, buf + bytes, &rbytes);
-	    if (err) {
-		pcilib_error("Can't read data from DMA, error %i", err);
-	        return -1;
-	    }
-	}
-
-	    // Stopping DMA
-	WR(IPEDMA_REG_CONTROL, 0x0);
-	if (err) break;
-	
-	gettimeofday(&cur, NULL);
-	us += ((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec));
-	    
-	err = pcilib_skip_dma(ctx->dmactx.pcilib, 0);
-	if (err) {
-	    pcilib_error("Can't start iteration, devices continuously writes unexpected data using DMA engine");
-	    break;
-	}
-    }
-
-    free(buf);
-
-    return err?-1:((1. * size * iterations * 1000000) / (1024. * 1024. * us));
 }

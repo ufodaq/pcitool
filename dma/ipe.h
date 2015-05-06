@@ -5,8 +5,6 @@
 #include "pcilib.h"
 #include "version.h"
 
-//#define PCILIB_NWL_MODIFICATION_IPECAMERA 0x100
-
 pcilib_dma_context_t *dma_ipe_init(pcilib_t *ctx, const char *model, const void *arg);
 void  dma_ipe_free(pcilib_dma_context_t *vctx);
 

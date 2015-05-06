@@ -19,6 +19,7 @@ typedef struct {
     int started;				/**< Informs if the engine is currently started or not */
     size_t ring_size, buffer_size;		/**< The number of allocated DMA buffers and size of each buffer in bytes */
     size_t ring_head, ring_tail;		/**< The first and the last buffer containing the data */
+    size_t written_buffers, written_bytes;	/**< Number of pending buffers and total number of written bytes */
 } pcilib_dma_engine_status_t;
 
 typedef enum {
