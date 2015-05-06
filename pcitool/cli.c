@@ -2501,6 +2501,8 @@ int main(int argc, char **argv) {
     int timeout_set = 0;
 //    int run_time_set = 0;
 
+    struct sched_param sched_param = {0};
+
     while ((c = getopt_long(argc, argv, "hqilr::w::g::d:m:t:b:a:s:e:o:", long_options, NULL)) != (unsigned char)-1) {
 	extern int optind;
 	switch (c) {
@@ -3104,7 +3106,23 @@ int main(int argc, char **argv) {
 	if (!ofile) {
 	    Error("Failed to open file \"%s\"", output);
 	}
-    }    
+    }
+
+	// Requesting real-time priority when needed
+    switch (mode) {
+     case MODE_READ:
+     case MODE_WRITE:
+        if (amode != ACCESS_DMA)
+	    break;
+     case MODE_BENCHMARK:
+     case MODE_GRAB:
+        sched_param.sched_priority = sched_get_priority_min(SCHED_FIFO);
+        err = sched_setscheduler(0, SCHED_FIFO, &sched_param);
+        if (err) pcilib_info("Failed to acquire real-time priority (errno: %i)", errno);
+     break;
+     default:
+        ;
+    }
 
     switch (mode) {
      case MODE_INFO:
