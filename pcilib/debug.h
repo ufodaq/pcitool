@@ -28,7 +28,7 @@
 #endif /* PCILIB_DEBUG_MISSING_EVENTS */
 
 #define pcilib_debug(function, ...) \
-    PCILIB_DEBUG_##function##_MESSAGE(PCILIB_DEBUG_##function, __VA_ARGS__)
+    PCILIB_DEBUG_##function##_MESSAGE(PCILIB_DEBUG_##function, PCILIB_LOG_DEFAULT, __VA_ARGS__)
 
 #define pcilib_debug_buffer(function, ...) \
     PCILIB_DEBUG_##function##_BUFFER(PCILIB_DEBUG_##function, __VA_ARGS__)
@@ -38,7 +38,7 @@ typedef enum {
     PCILIB_DEBUG_BUFFER_MKDIR = 2
 } pcilib_debug_buffer_flags_t; 
 
-void pcilib_debug_message(const char *function, const char *file, int line, const char *format, ...);
+void pcilib_debug_message(const char *function, const char *file, int line, pcilib_log_flags_t flags, const char *format, ...);
 void pcilib_debug_data_buffer(const char *function, size_t size, void *buffer, pcilib_debug_buffer_flags_t flags, const char *file, ...);
 
 

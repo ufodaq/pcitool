@@ -11,13 +11,13 @@
 
 #define PCILIB_MAX_DEBUG_FILENAME_LENGTH 1023
 
-void pcilib_debug_message(const char *function, const char *file, int line, const char *format, ...) {
+void pcilib_debug_message(const char *function, const char *file, int line, pcilib_log_flags_t flags, const char *format, ...) {
     va_list va;
 
     if (!getenv(function)) return;
 
     va_start(va, format);
-    pcilib_log_vmessage(file, line, PCILIB_LOG_DEBUG, format, va);
+    pcilib_log_vmessage(file, line, PCILIB_LOG_DEBUG, flags, format, va);
     va_end(va);
 }
 
