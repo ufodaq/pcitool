@@ -206,7 +206,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 #else /* IPEDMA_TLP_SIZE */
 	link_info = pcilib_get_pcie_link_info(vctx->pcilib);
 	if (link_info) {
-	    tlp_size = 1<<link_info->max_payload;
+	    tlp_size = 1<<link_info->payload;
 	    if (tlp_size > IPEDMA_MAX_TLP_SIZE)
 		tlp_size = IPEDMA_MAX_TLP_SIZE;
 	} else tlp_size = 128;
