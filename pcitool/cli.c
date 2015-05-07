@@ -527,12 +527,20 @@ void Info(pcilib_t *handle, const pcilib_model_description_t *model_info) {
     struct dirent *entry;
     const pcilib_model_description_t *info = NULL;
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
+    const pcilib_pcie_link_info_t *link_info = pcilib_get_pcie_link_info(handle);
 
     path = getenv("PCILIB_PLUGIN_DIR");
     if (!path) path = PCILIB_PLUGIN_DIR;
 
-    printf("Vendor: %x, Device: %x, Bus: %x, Slot: %x, Function: %x, Model: %s\n", board_info->vendor_id, board_info->device_id, board_info->bus, board_info->slot, board_info->func, handle->model);
-    printf(" Interrupt - Pin: %i, Line: %i\n", board_info->interrupt_pin, board_info->interrupt_line);
+    if (board_info)
+	printf("Vendor: %x, Device: %x, Bus: %x, Slot: %x, Function: %x, Model: %s\n", board_info->vendor_id, board_info->device_id, board_info->bus, board_info->slot, board_info->func, handle->model);
+
+    if (link_info) {
+	printf(" PCIe x%u (gen%u), DMA Payload: %u (of %u)\n", link_info->link_width, link_info->link_speed, 1<<link_info->payload, 1<<link_info->max_payload);
+    }
+
+    if (board_info)
+	printf(" Interrupt - Pin: %i, Line: %i\n", board_info->interrupt_pin, board_info->interrupt_line);
 
     List(handle, model_info, (char*)-1, 0);
 

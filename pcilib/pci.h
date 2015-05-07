@@ -25,12 +25,23 @@
 #include "model.h"
 #include "export.h"
 
+typedef struct {
+    uint8_t max_link_speed, link_speed;
+    uint8_t max_link_width, link_width;
+    uint8_t max_payload, payload;
+} pcilib_pcie_link_info_t;
+
 struct pcilib_s {
     int handle;										/**< file handle of device */
     
     uintptr_t page_mask;								/**< Selects bits which define offset within the page */
     pcilib_board_info_t board_info;							/**< The mandatory information about board as defined by PCI specification */
+    pcilib_pcie_link_info_t link_info;							/**< Infomation about PCIe connection */
     char *bar_space[PCILIB_MAX_BARS];							/**< Pointers to the mapped BARs in virtual address space */
+
+    int pci_cfg_space_fd;								/**< File descriptor linking to PCI configuration space in sysfs */
+    uint32_t pci_cfg_space_cache[64];							/**< Cached PCI configuration space */
+    const uint32_t *pcie_capabilities;							/**< PCI Capbility structure (just a pointer at appropriate place in the pci_cfg_space) */
 
     int reg_bar_mapped;									/**< Indicates that all BARs used to access registers are mapped */
     pcilib_bar_t reg_bar;								/**< Default BAR to look for registers, other BARs will be looked as well */
@@ -64,9 +75,9 @@ struct pcilib_s {
 #endif /* PCILIB_FILE_IO */
 };
 
-
 pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx);
 const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx);
+const pcilib_pcie_link_info_t *pcilib_get_pcie_link_info(pcilib_t *ctx);
 
 int pcilib_map_register_space(pcilib_t *ctx);
 int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr);

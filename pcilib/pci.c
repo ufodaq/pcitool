@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <assert.h>
@@ -106,6 +108,7 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 
     if (ctx) {
 	memset(ctx, 0, sizeof(pcilib_t));
+	ctx->pci_cfg_space_fd = -1;
 	
 	ctx->handle = open(device, O_RDWR);
 	if (ctx->handle < 0) {
@@ -197,6 +200,7 @@ pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx) {
     return ctx->event_ctx;
 }
 
+
 int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
     int err;
     pcilib_bar_t i;
@@ -211,7 +215,7 @@ int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
 	    return err;
 	}
 	
-	int data_bar = -1;	
+	int data_bar = -1;
 	
 	for (i = 0; i < PCILIB_MAX_BARS; i++) {
 	    if ((ctx->bar_space[i])||(!board_info->bar_length[i])) continue;
@@ -255,7 +259,7 @@ int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
     return 0;
 }
 	
-char  *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr) {
+char *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr) {
     if (bar == PCILIB_BAR_DETECT) {
 	    // First checking the default register bar
 	size_t offset = addr - ctx->board_info.bar_start[ctx->reg_bar];
@@ -347,6 +351,9 @@ void pcilib_close(pcilib_t *ctx) {
 		pcilib_unmap_bar(ctx, i, ptr);
 	    }
 	}
+	
+	if (ctx->pci_cfg_space_fd >= 0)
+	    close(ctx->pci_cfg_space_fd);
 
 	if (ctx->registers)
 	    free(ctx->registers);
@@ -361,3 +368,104 @@ void pcilib_close(pcilib_t *ctx) {
     }
 }
 
+static int pcilib_update_pci_configuration_space(pcilib_t *ctx) {
+    int err;
+    int size;
+
+    if (ctx->pci_cfg_space_fd < 0) {
+	char fname[128];
+
+	const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
+	if (!board_info) {
+	    pcilib_error("Failed to acquire board info");
+	    return PCILIB_ERROR_FAILED;
+	}
+
+	sprintf(fname, "/sys/bus/pci/devices/0000:%02x:%02x.%1x/config", board_info->bus, board_info->slot, board_info->func);
+
+	ctx->pci_cfg_space_fd = open(fname, O_RDONLY);
+	if (ctx->pci_cfg_space_fd < 0) {
+	    pcilib_error("Failed to open configuration space in %s", fname);
+	    return PCILIB_ERROR_FAILED;
+	}
+    } else {
+	err = lseek(ctx->pci_cfg_space_fd, SEEK_SET, 0);
+	if (err) {
+	    close(ctx->pci_cfg_space_fd);
+	    ctx->pci_cfg_space_fd = -1;
+	    return pcilib_update_pci_configuration_space(ctx);
+	}
+    }
+
+    size = read(ctx->pci_cfg_space_fd, ctx->pci_cfg_space_cache, 256);
+    if (size != 256) {
+	pcilib_error("Failed to read PCI configuration from sysfs");
+	return PCILIB_ERROR_FAILED;
+    }
+
+    return 0;
+}
+
+
+static uint32_t *pcilib_get_pci_capabilities(pcilib_t *ctx, int cap_id) {
+    int err;
+
+    uint32_t cap;
+    uint8_t cap_offset;		/**< Offset of capability in the configuration space */
+
+    if (!ctx->pci_cfg_space_fd) {
+	err = pcilib_update_pci_configuration_space(ctx);
+	if (err) {
+	    pcilib_error("Error (%i) reading PCI configuration space", err);
+	    return NULL;
+	}
+    }
+
+	// This is just a pointer to the first cap
+    cap = ctx->pci_cfg_space_cache[(0x34>>2)];
+    cap_offset = cap&0xFC;
+
+    while ((cap_offset)&&(cap_offset < 256)) {
+	cap = ctx->pci_cfg_space_cache[cap_offset>>2];
+	if ((cap&0xFF) == cap_id)
+	    return &ctx->pci_cfg_space_cache[cap_offset>>2];
+	cap_offset = (cap>>8)&0xFC;
+    }
+
+    return NULL;
+};
+
+
+static const uint32_t *pcilib_get_pcie_capabilities(pcilib_t *ctx) {
+    if (ctx->pcie_capabilities)
+	return ctx->pcie_capabilities;
+
+    ctx->pcie_capabilities = pcilib_get_pci_capabilities(ctx, 0x10);
+    return ctx->pcie_capabilities;
+}
+
+
+const pcilib_pcie_link_info_t *pcilib_get_pcie_link_info(pcilib_t *ctx) {
+    int err;
+    const uint32_t *cap;
+
+    err = pcilib_update_pci_configuration_space(ctx);
+    if (err) {
+	pcilib_error("Error (%i) updating PCI configuration space", err);
+	return NULL;
+    }
+
+    cap = pcilib_get_pcie_capabilities(ctx);
+    if (!cap) return NULL;
+
+	// Generally speaking this can be updated during the application life time
+    
+    ctx->link_info.max_payload = (cap[1] & 0x07) + 7;
+    ctx->link_info.payload = ((cap[2] >> 5) & 0x07) + 7;
+    ctx->link_info.link_speed = (cap[3]&0xF);
+    ctx->link_info.link_width = (cap[3]&0x3F0) >> 4;
+    ctx->link_info.max_link_speed = (cap[4]&0xF0000) >> 16;
+    ctx->link_info.max_link_width = (cap[4]&0x3F00000) >> 20;
+
+    return &ctx->link_info;
+}
