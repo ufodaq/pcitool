@@ -97,6 +97,10 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
     ipe_dma_t *ctx = (ipe_dma_t*)vctx;
 
+#ifndef IPEDMA_TLP_SIZE
+    const pcilib_pcie_link_info_t *link_info;
+#endif /* ! IPEDMA_TLP_SIZE */
+
     int preserve = 0;
     pcilib_kmem_flags_t kflags;
     pcilib_kmem_reuse_state_t reuse_desc, reuse_pages;
@@ -105,9 +109,9 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     volatile uint32_t *last_written_addr_ptr;
 
     pcilib_register_value_t value;
-    
+
+    int tlp_size;
     uint32_t address64;
-    
 
     if (dma == PCILIB_DMA_ENGINE_INVALID) return 0;
     else if (dma > 1) return PCILIB_ERROR_INVALID_BANK;
@@ -196,9 +200,19 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	    // Enable 64 bit addressing and configure TLP and PACKET sizes (40 bit mode can be used with big pre-allocated buffers later)
 	if (ctx->mode64) address64 = 0x8000 | (0<<24);
 	else address64 = 0;
-	
-        WR(IPEDMA_REG_TLP_SIZE,  address64 | IPEDMA_TLP_SIZE);
-        WR(IPEDMA_REG_TLP_COUNT, IPEDMA_PAGE_SIZE / (4 * IPEDMA_TLP_SIZE * IPEDMA_CORES));
+
+#ifdef IPEDMA_TLP_SIZE	
+	tlp_size = IPEDMA_TLP_SIZE;
+#else /* IPEDMA_TLP_SIZE */
+	link_info = pcilib_get_pcie_link_info(vctx->pcilib);
+	if (link_info) {
+	    tlp_size = 1<<link_info->max_payload;
+	    if (tlp_size > IPEDMA_MAX_TLP_SIZE)
+		tlp_size = IPEDMA_MAX_TLP_SIZE;
+	} else tlp_size = 128;
+#endif /* IPEDMA_TLP_SIZE */
+        WR(IPEDMA_REG_TLP_SIZE,  address64 | (tlp_size>>2));
+        WR(IPEDMA_REG_TLP_COUNT, IPEDMA_PAGE_SIZE / (tlp_size * IPEDMA_CORES));
 
 	    // Setting progress register threshold
 	WR(IPEDMA_REG_UPDATE_THRESHOLD, IPEDMA_DMA_PROGRESS_THRESHOLD);

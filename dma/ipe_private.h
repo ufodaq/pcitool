@@ -5,22 +5,25 @@
 
 #define IPEDMA_64BIT_MODE		1		/**< 64-bit mode addressing is required to support PCIe gen3 */
 #define IPEDMA_CORES			1
-#define IPEDMA_TLP_SIZE			32
+#define IPEDMA_MAX_TLP_SIZE		256		/**< Defines maximum TLP in bytes supported by device */
+//#define IPEDMA_TLP_SIZE		128		/**< If set, enforces the specified TLP size */
+
 #define IPEDMA_PAGE_SIZE		4096
 #define IPEDMA_DMA_PAGES		32		/**< number of DMA pages in the ring buffer to allocate */
 #define IPEDMA_DMA_PROGRESS_THRESHOLD	1		/**< how many pages the DMA engine should fill before reporting progress */
 #define IPEDMA_DESCRIPTOR_SIZE		128
 #define IPEDMA_DESCRIPTOR_ALIGNMENT	64
 
-#define IPEDMA_BUG_LAST_READ				/**< We should forbid writting the second last available DMA buffer (the last is forbidden by design) */
+
+//#define IPEDMA_BUG_DMARD				/**< No register read during DMA transfer */
+//#define IPEDMA_BUG_LAST_READ				/**< We should forbid writting the second last available DMA buffer (the last is forbidden by design) */
+//#define IPEDMA_DETECT_PACKETS				/**< Using empty_deceted flag */
+#define  IPEDMA_SUPPORT_EMPTY_DETECTED			/**< Avoid waiting for data when empty_detected flag is set in hardware */
+
+#define IPEDMA_DMA_TIMEOUT 		100000		/**< us, overrides PCILIB_DMA_TIMEOUT (actual hardware timeout is 50ms according to Lorenzo) */
 #define IPEDMA_RESET_DELAY		100000		/**< Sleep between accessing DMA control and reset registers */
 #define IPEDMA_ADD_PAGE_DELAY		1000		/**< Delay between submitting successive DMA pages into IPEDMA_REG_PAGE_ADDR register */
 #define IPEDMA_NODATA_SLEEP		10		/**< To keep CPU free */
-
-//#define IPEDMA_BUG_DMARD				/**< No register read during DMA transfer */
-//#define IPEDMA_DETECT_PACKETS				/**< Using empty_deceted flag */
-#define  IPEDMA_SUPPORT_EMPTY_DETECTED			/**< Avoid waiting for data when empty_detected flag is set in hardware */
-#define IPEDMA_DMA_TIMEOUT 100000			/**< us, overrides PCILIB_DMA_TIMEOUT (actual hardware timeout is 50ms according to Lorenzo) */
 
 #define IPEDMA_REG_RESET		0x00
 #define IPEDMA_REG_CONTROL		0x04
