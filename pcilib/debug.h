@@ -2,6 +2,7 @@
 #define _PCILIB_DEBUG_H
 
 #include <stdarg.h>
+#include <pcilib/env.h>
 
 #define PCILIB_DEBUG
 
@@ -12,16 +13,16 @@
 
 
 #ifdef PCILIB_DEBUG_DMA
-# define PCILIB_DEBUG_DMA_MESSAGE(function, ...) pcilib_debug_message (#function, __FILE__, __LINE__, __VA_ARGS__) 
-# define PCILIB_DEBUG_DMA_BUFFER(function, ...) pcilib_debug_data_buffer (#function, __VA_ARGS__) 
+# define PCILIB_DEBUG_DMA_MESSAGE(function, ...) if (pcilib_getenv(function##_ENV, #function)) { pcilib_debug_message (#function, __FILE__, __LINE__, __VA_ARGS__); }
+# define PCILIB_DEBUG_DMA_BUFFER(function, ...) if (pcilib_getenv(function##_ENV, #function)) { pcilib_debug_data_buffer (#function, __VA_ARGS__); }
 #else /* PCILIB_DEBUG_DMA */
 # define PCILIB_DEBUG_DMA_MESSAGE(function, ...)
 # define PCILIB_DEBUG_DMA_BUFFER(function, ...)
 #endif /* PCILIB_DEBUG_DMA */
 
 #ifdef PCILIB_DEBUG_MISSING_EVENTS
-# define PCILIB_DEBUG_MISSING_EVENTS_MESSAGE(function, ...) pcilib_debug_message (#function, __FILE__, __LINE__, __VA_ARGS__) 
-# define PCILIB_DEBUG_MISSING_EVENTS_BUFFER(function, ...) pcilib_debug_data_buffer (#function, __VA_ARGS__) 
+# define PCILIB_DEBUG_MISSING_EVENTS_MESSAGE(function, ...) if (pcilib_getenv(function##_ENV, #function)) { pcilib_debug_message (#function, __FILE__, __LINE__, __VA_ARGS__); }
+# define PCILIB_DEBUG_MISSING_EVENTS_BUFFER(function, ...) if (pcilib_getenv(function##_ENV #function)) { pcilib_debug_data_buffer (#function, __VA_ARGS__); }
 #else /* PCILIB_DEBUG_MISSING_EVENTS */
 # define PCILIB_DEBUG_MISSING_EVENTS_MESSAGE(function, ...)
 # define PCILIB_DEBUG_MISSING_EVENTS_BUFFER(function, ...)
@@ -32,6 +33,7 @@
 
 #define pcilib_debug_buffer(function, ...) \
     PCILIB_DEBUG_##function##_BUFFER(PCILIB_DEBUG_##function, __VA_ARGS__)
+
 
 typedef enum {
     PCILIB_DEBUG_BUFFER_APPEND = 1,
