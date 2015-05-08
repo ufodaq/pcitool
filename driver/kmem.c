@@ -396,11 +396,39 @@ int pcidriver_kmem_sync_entry( pcidriver_privdata_t *privdata, pcidriver_kmem_en
  */
 int pcidriver_kmem_sync( pcidriver_privdata_t *privdata, kmem_sync_t *kmem_sync )
 {
-	pcidriver_kmem_entry_t *kmem_entry;
+	pcidriver_kmem_entry_t *kmem_entry = NULL;
 
-	/* Find the associated kmem_entry for this buffer */
-	if ((kmem_entry = pcidriver_kmem_find_entry(privdata, &(kmem_sync->handle))) == NULL)
+	    /*
+	     * This is a shortcut to quickly find a next item in big multi-page kernel buffers 
+	     */
+	spin_lock(&(privdata->kmemlist_lock));
+	if (privdata->kmem_last_sync) {
+	    if (privdata->kmem_last_sync->id == kmem_sync->handle.handle_id) 
+		kmem_entry = privdata->kmem_last_sync;
+	    else {
+		 privdata->kmem_last_sync = container_of(privdata->kmem_last_sync->list.next, pcidriver_kmem_entry_t, list);
+		
+		if (privdata->kmem_last_sync) {
+		    if (privdata->kmem_last_sync->id == kmem_sync->handle.handle_id) 
+			kmem_entry = privdata->kmem_last_sync;
+		    else
+			privdata->kmem_last_sync = NULL;
+		}
+	    }
+	}
+	spin_unlock(&(privdata->kmemlist_lock));
+	
+	    /*
+	     * If not found go the standard way
+	     */
+	if (!kmem_entry) {
+	    if ((kmem_entry = pcidriver_kmem_find_entry(privdata, &(kmem_sync->handle))) == NULL)
 		return -EINVAL;					/* kmem_handle is not valid */
+	
+	    spin_lock(&(privdata->kmemlist_lock));
+	    privdata->kmem_last_sync = kmem_entry;
+	    spin_unlock(&(privdata->kmemlist_lock));
+	} 
 
 	return pcidriver_kmem_sync_entry(privdata, kmem_entry, kmem_sync->dir);
 }
@@ -466,6 +494,8 @@ int pcidriver_kmem_free_entry(pcidriver_privdata_t *privdata, pcidriver_kmem_ent
 
 	/* Remove the kmem list entry */
 	spin_lock( &(privdata->kmemlist_lock) );
+	if (privdata->kmem_last_sync == kmem_entry)
+	    privdata->kmem_last_sync = NULL;
 	list_del( &(kmem_entry->list) );
 	spin_unlock( &(privdata->kmemlist_lock) );
 

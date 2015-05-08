@@ -1,7 +1,7 @@
 #ifndef _PCIDRIVER_COMMON_H
 #define _PCIDRIVER_COMMON_H
 
-#include "../kmem.h"
+#include "../pcilib/kmem.h"
 /*************************************************************************/
 /* Private data types and structures */
 
@@ -64,6 +64,7 @@ typedef struct  {
 	
 	spinlock_t kmemlist_lock;			/* Spinlock to lock kmem list operations */
 	struct list_head kmem_list;			/* List of 'kmem_list_entry's associated with this device */
+	pcidriver_kmem_entry_t *kmem_last_sync;		/* Last accessed kmem entry */
 	atomic_t kmem_count;				/* id for next kmem entry */
 
 	int kmem_cur_id;				/* Currently selected kmem buffer, for mmap */
