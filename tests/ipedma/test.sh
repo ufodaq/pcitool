@@ -14,8 +14,11 @@ echo "Stopping DMA and skipping exiting data..."
 pci --stop-dma dma0r
 echo "Starting DMA..."
 pci --start-dma dma0r
-echo "Enabling data generation..."
+echo "Enabling DMA..."
 pci -w 0x4 0x1
+echo "Starting data generation..."
+pci -w 0x9000 0x1
+
 
 # Clean DMA buffers
 #while [ $? -eq 0 ]; do
