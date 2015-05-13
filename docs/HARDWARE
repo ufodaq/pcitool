@@ -1,0 +1,88 @@
+BIOS
+====
+ The important options in BIOS:
+ - IOMMU (Intel VT-d) 			- Enable hardware translation between physcal and bus addresses
+ - No Snoop				- Disables hardware cache coherency between DMA and CPU
+ - Max Payload (MMIO Size)		- Maximal (useful) payload for PCIe protocol
+ - Above 4G Decoding			- This seesm to allow bus addresses wider than 32-bit
+ - Memory performance 			- Frequency, Channel-interleaving, Hardware prefetcher affect memory performance
+ 
+ 
+IOMMU
+=====
+ - As many PCI-devices can address only 32-bit memory, for DMA operation some address
+ translation mechanism is required (also it helps with security limiting PCI devices 
+ to only allowed address range). There are several methods to achieve this.
+ * Linux provides so called Bounce Buffers (or SWIOTLB). This is just a small memory
+ buffer in the lower 4 GB of memory. The DMA is actually performed into this buffer
+ and data is, then, copied to the appropriate location. One problem with SWIOTLB
+ is that it does not gurantee 4K aligned address when mapping memory pages (to
+ optimally use space). This is not properly supported neither by NWLDMA nor by IPEDMA.
+ * Alternatively hardware IOMMU can be used which will provide hardware address 
+ translation between physical and bus addresses. To allow it, we need to 
+ allow the technology in the BIOS and in the kernel. 
+    + Intel VT-d or AMD-Vi (AMD IOMMU) virtualization technologies have to be enabled
+    + Intel is enabled with  "intel_iommu=on" kernel parameter (alternative is to build kernel with CONFIG_INTEL_IOMMU_DEFAULT_ON)
+    + Checking: dmesg | grep -e IOMMU -e DMAR -e PCI-DMA
+ 
+DMA Cache Coherency
+===================
+ DMA API distinguishes two types of memory coherent and non-coherent. 
+ - For the coherent memory, the hardware will care for cache consistency. This is often
+ achieved by snooping (No Snoop should be disabled in the BIOS). Alternatively, the same
+ effect can be achieved by using non-cached memory. There is architectures with 100%
+ cache coherent memory and others where only part of memory is kept cache coherent.
+ For such architectures the coherent memory can be allocated with
+    dma_alloc_coheretnt(...) / dma_alloc_attrs(...)
+ * However, the coherent memory could be slow (especially on large SMP systems). Also
+ minimal allocation unit may be restricted to page. Therefore, it is useful to group
+ consistent mapping into the groups.
+ 
+ - On other hand, it is possible to allocate streaming DMA memory which are synchronized
+ using:
+    pci_dma_sync_single_for_device / pci_dma_sync_single_for_cpu
+
+ - It may happen that all memory is coherent anyway and we do not need to call this 2
+ functions. Currently, it seems not required on x86_64 which may indicate that snooping
+ is performed for all available memory. On other hand,  may be only because nothing
+ was get cached luckely so far.
+
+
+PCIe Payload
+============
+ - Kind of MTU for PCI protocol. Higher the value, the lower will be slow down due to
+ protocol headers while streaming large amount of data. The current values can be checked
+ with 'lspci -vv'. For each device, there is 2 values:
+ * MaxPayload under DevCap which indicates MaxPayload supported by the dvice
+ * MaxPayload under DevCtl indicates MaxPayload negotiated between device and chipset.
+ Negotiated MaxPayload is a minimal value among all the infrastructure between the device 
+ chipset. Normally, it is limited by the MaxPaylod supported by the PCIe root port on 
+ the chipset. Most systems currently restricted to 256 bytes.
+
+
+Memory Performance
+==================
+ - Memory performance is quite critical as we currently tripple the PCIe bandwidth:
+ DMA writes to memory, we read memory (it is not in cache), we write memory.
+ - The most important to enable Channel Interleaving (otherwise a single-channel copy
+ will be performed). On other hand, Rank Interleaving does not matter much.
+ - On some motherboards (Asrock X79 for instance), when the memory speed is set 
+ manually, the interleaving is switched off in AUTO mode. So, it is safer to set 
+ interleaving manually on.
+ - Hardware prefetching helps a little bit and should be turned on
+ - Faster memory frequency helps. As we are streaming I guess this is more important
+ compared even to slighly higher CAS & RAS latencies, but I have not checked. 
+ - The memory bank conflicts sometimes may significant harm performance. Bank conflict
+ will happen if we read and write from/to different rows of the same bank (also there 
+ could be conflict with DMA operation). I don't have a good idea how to prevent this
+ now.
+ - The most efficient memcpy performance depends on CPU generation. For latest models,
+ AVX seems to be most efficient. Filling all AVX registers before writting increases
+ performance. It also gives quite much of performance, if multiple pages copied in 
+ parallel (still first we reading from multiple pages and then writting to multiple
+ pages, see ssebench). 
+ - Usage of HugePages makes performance more stable. Using page-locked memory does not
+ help at all.
+ - This still will give about 10 - 15 GB/s at max. On multiprocessor systems about 5 GB/s,
+ because of performance penalties due to snooping. Therefore, copying with multiple
+ threads is preferable.
