@@ -111,10 +111,12 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	    else if ((reuse_desc & PCILIB_KMEM_REUSE_HARDWARE) == 0) pcilib_warning("Lost DMA buffers are found (missing HW reference), reinitializing...");
 	    else {
 #ifndef IPEDMA_BUG_DMARD
+# ifndef IPEDMA_STREAMING_MODE
 		RD(IPEDMA_REG_PAGE_COUNT, value);
 
 		if (value != IPEDMA_DMA_PAGES) pcilib_warning("Inconsistent DMA buffers are found (Number of allocated buffers (%lu) does not match current request (%lu)), reinitializing...", value + 1, IPEDMA_DMA_PAGES);
 		else
+# endif /* IPEDMA_STREAMING_MODE */
 #endif /* IPEDMA_BUG_DMARD */
 		    preserve = 1;
 	    }
@@ -501,8 +503,20 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	ret = cb(cbattr, packet_flags, ctx->page_size, buf);
 	if (ret < 0) return -ret;
 	
-	    // We don't need this because hardwaredoes not intend to read anything from the memory
+	    // We don't need this because hardware does not intend to read anything from the memory
 //	pcilib_kmem_sync_block(ctx->dmactx.pcilib, ctx->pages, PCILIB_KMEM_SYNC_TODEVICE, cur_read);
+
+	    // Return buffer into the DMA pool when processed
+#ifdef IPEDMA_STREAMING_MODE
+	uintptr_t buf_ba = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, cur_read);
+	WR(IPEDMA_REG_PAGE_ADDR, buf_ba);    
+# ifdef IPEDMA_STREAMING_CHECKS
+	pcilib_register_value_t streaming_status;
+	RD(IPEDMA_REG_STREAMING_STATUS, streaming_status);
+	if (streaming_status)
+	    pcilib_error("Invalid status (0x%lx) adding a DMA buffer into the queue", streaming_status);
+# endif /* IPEDMA_STREAMING_MODE */
+#endif /* IPEDMA_STREAMING_MODE */
 
 	    // Numbered from 1
 #ifdef IPEDMA_BUG_LAST_READ

@@ -1,0 +1,8 @@
+IPEDMA
+======
+ - Normally, we are using register 0x5C to get number of buffers configured in the hardware
+ and check if it is consistent with number of allocated buffers. However, in streaming mode
+ this does not work at the moment. After writting the buffers, the hardware forgets them 
+ and only stores the current queue of free buffers. Currently, the check is disabled in the
+ streaming mode. Can we handle it somehow?
+ 

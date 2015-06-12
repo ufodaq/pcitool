@@ -8,6 +8,8 @@
 #define IPEDMA_MAX_TLP_SIZE		256		/**< Defines maximum TLP in bytes supported by device */
 //#define IPEDMA_TLP_SIZE		128		/**< If set, enforces the specified TLP size */
 
+#define IPEDMA_STREAMING_MODE				/**< Enables streaming DMA operation mode instead of ring-buffer, the page is written once and forgotten and need to be pushed in queue again */
+#define IPEDMA_STREAMING_CHECKS				/**< Enables status checks in streaming mode (it will cause performance penalty) */
 #define IPEDMA_PAGE_SIZE		4096
 #define IPEDMA_DMA_PAGES		1024		/**< number of DMA pages in the ring buffer to allocate */
 #define IPEDMA_DMA_PROGRESS_THRESHOLD	1		/**< how many pages the DMA engine should fill before reporting progress */
@@ -31,9 +33,11 @@
 #define IPEDMA_REG_TLP_COUNT		0x10
 #define IPEDMA_REG_PAGE_ADDR		0x50
 #define IPEDMA_REG_UPDATE_ADDR		0x54
-#define IPEDMA_REG_LAST_READ		0x58
+#define IPEDMA_REG_LAST_READ		0x58		/**< In streaming mode, we can use it freely to track current status */
 #define IPEDMA_REG_PAGE_COUNT		0x5C
 #define IPEDMA_REG_UPDATE_THRESHOLD	0x60
+#define IPEDMA_REG_STREAMING_STATUS	0x68
+
 
 #define WR(addr, value) { *(uint32_t*)(ctx->base_addr + addr) = value; }
 #define RD(addr, value) { value = *(uint32_t*)(ctx->base_addr + addr); }
