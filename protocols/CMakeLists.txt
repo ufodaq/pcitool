@@ -3,6 +3,6 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/pcilib
 )
 
-set(HEADERS ${HEADERS} default.h)
+set(HEADERS ${HEADERS} default.h software_registers.h)
 
-add_library(protocols STATIC default.c)
+add_library(protocols STATIC default.c software_registers.c)
