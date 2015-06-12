@@ -7,7 +7,6 @@
 #include <pcilib/event.h>
 #include <pcilib/export.h>
 
-
 typedef struct {
     const pcilib_version_t interface_version;
 
@@ -24,6 +23,7 @@ typedef struct {
 
     const char *name;
     const char *description;
+
 } pcilib_model_description_t;
 
 

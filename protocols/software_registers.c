@@ -20,9 +20,7 @@
  */
 pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pcilib_register_bank_t bank,const char* model, const void *args){
 	pcilib_register_bank_context_t* bank_ctx;
-	pcilib_register_value_t *init=NULL;
 	pcilib_kmem_handle_t *test;
-	int i;
 	int j;
 	
 	bank_ctx=calloc(1,sizeof(pcilib_register_bank_context_t));
@@ -35,11 +33,10 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 		bank_ctx->bank_software_register_adress=test;
 	}else{
 		bank_ctx->bank_software_register_adress=test;
-		init=test;		
 		j=0;
 		while(ctx->model_info.registers[j].name!=NULL){
-		  if(ctx->model_info.registers[j].bank==(ctx->banks + bank).addr){
-		    pcilib_write_register_by_id(ctx,ctx->model_info.registers[j],ctx->model_info.registers[j].defvalue);
+		  if(ctx->model_info.registers[j].bank==(ctx->banks+bank)->addr){
+		    pcilib_write_register_by_id(ctx,ctx->model_info.registers[j].addr,ctx->model_info.registers[j].defvalue);
 			}	
 			j++;
 		}		

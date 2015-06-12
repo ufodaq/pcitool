@@ -2,6 +2,8 @@
 #define _PCILIB_BANK_H
 
 #include <pcilib.h>
+#include <libxml/tree.h>
+#include <libxml/xpath.h>
 
 #define PCILIB_REGISTER_BANK_INVALID		((pcilib_register_bank_t)-1)
 #define PCILIB_REGISTER_BANK0 			0					/**< First BANK to be used in the event engine */
@@ -13,6 +15,7 @@
 #define PCILIB_REGISTER_PROTOCOL_INVALID	((pcilib_register_protocol_t)-1)
 #define PCILIB_REGISTER_PROTOCOL0		0					/**< First PROTOCOL address to be used in the event engine */
 #define PCILIB_REGISTER_PROTOCOL_DEFAULT	64					/**< Default memmap based protocol */
+#define PCILIB_REGISTER_PROTOCOL_KERNEL 32		/**< Protocol with registers registered in kernel directly*/
 #define PCILIB_REGISTER_PROTOCOL_DMA		96					/**< First PROTOCOL address to be used by DMA engines */
 #define PCILIB_REGISTER_PROTOCOL_DYNAMIC	128					/**< First PROTOCOL address to be used by plugins */
 
@@ -28,7 +31,7 @@ typedef struct {
     pcilib_version_t version;
 
     pcilib_register_bank_context_t *(*init)(pcilib_t *ctx, pcilib_register_bank_t bank, const char *model, const void *args);			/**< Optional API call to initialize bank context */
-    void (*free)(pcilib_register_bank_context_t *ctx);												/**< Optional API call to cleanup bank context */
+    void (*free)(pcilib_register_bank_context_t *bank_ctx);												/**< Optional API call to cleanup bank context */
     int (*read)(pcilib_t *pcilib, pcilib_register_bank_context_t *ctx, pcilib_register_addr_t addr, pcilib_register_value_t *value);		/**< Read from register, mandatory for RO/RW registers */
     int (*write)(pcilib_t *pcilib, pcilib_register_bank_context_t *ctx, pcilib_register_addr_t addr, pcilib_register_value_t value);		/**< Write to register, mandatory for WO/RW registers */
 } pcilib_register_protocol_api_description_t;
@@ -60,6 +63,7 @@ typedef struct {
     const char *format;								/**< printf format for the registers, either %lu for decimal output or 0x%lx for hexdecimal */
     const char *name;								/**< short bank name */
     const char *description;							/**< longer bank description */
+	xmlNodePtr xmlNode;					/**<pointer to xmlNode of the bank in the file*/
 } pcilib_register_bank_description_t;
 
 /**
@@ -82,6 +86,9 @@ typedef struct {
 struct pcilib_register_bank_context_s {
     const pcilib_register_bank_description_t *bank;				/**< Corresponding bank description */
     const pcilib_register_protocol_api_description_t *api;			/**< API functions */
+	xmlNodeSetPtr banks_nodes;
+	void *bank_software_register_adress;
+	pcilib_t *ctx;
 };
 
 
