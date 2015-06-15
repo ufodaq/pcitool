@@ -18,6 +18,7 @@
 #define PCILIB_REGISTER_PROTOCOL_KERNEL 32		/**< Protocol with registers registered in kernel directly*/
 #define PCILIB_REGISTER_PROTOCOL_DMA		96					/**< First PROTOCOL address to be used by DMA engines */
 #define PCILIB_REGISTER_PROTOCOL_DYNAMIC	128					/**< First PROTOCOL address to be used by plugins */
+#define PCILIB_REGISTER_PROTOCOL_SOFTWARE_REGISTERS 32
 
 typedef uint8_t pcilib_register_bank_t;						/**< Type holding the bank position within the field listing register banks in the model */
 typedef uint8_t pcilib_register_bank_addr_t;					/**< Type holding the bank address number */
