@@ -39,7 +39,7 @@ static const pcilib_dma_engine_description_t ipe_dma_engines[] = {
 
 static const pcilib_register_bank_description_t ipe_dma_banks[] = {
     { PCILIB_REGISTER_BANK_DMA, PCILIB_REGISTER_PROTOCOL_DEFAULT, PCILIB_BAR0, 0, 0, 32, 0x0200, PCILIB_LITTLE_ENDIAN, PCILIB_LITTLE_ENDIAN, "0x%lx", "dma", "DMA Registers"},
-    { PCILIB_REGISTER_BANK0, PCILIB_REGISTER_PROTOCOL_SOFTWARE_REGISTERS, PCILIB_BAR1, 0, 0, 32, 0x0003, PCILIB_LITTLE_ENDIAN, PCILIB_LITTLE_ENDIAN, "0x%lx", "test", "test Registers"},
+    { PCILIB_REGISTER_BANK_DMA + 1, PCILIB_REGISTER_PROTOCOL_SOFTWARE_REGISTERS, PCILIB_BARUNDEF, 0, 0, 32, 0x0003, PCILIB_LITTLE_ENDIAN, PCILIB_LITTLE_ENDIAN, "0x%lx", "test", "test Registers"},
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL }
 };
 
@@ -78,9 +78,9 @@ static const pcilib_register_description_t ipe_dma_registers[] = {
     {0x0058, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "last_descriptor_read",	"Last descriptor read by the host"},
     {0x005C, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "desc_mem_addr", 		"Number of descriptors configured"},
     {0x0060, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "update_thresh",  		"Update threshold of progress register"},
-    {0x0001, 	0, 	32, 	0x1, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK0, "test1",  		"ister"},
-    {0x0002, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK0, "test2",  		"ter"},
-    {0x0003, 	0, 	32, 	0x020, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK0, "test3",  		"er"},
+   {0x0001, 	0, 	32, 	0x1, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA +1, "test1",  		"ister"},
+    {0x0002, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA +1, "test2",  		"ter"},
+    {0x0003, 	0, 	32, 	0x020, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA +1, "test3",  		"er"},
     {0,		0,	0,	0,	0x00000000,	0,                                           0,                        0, NULL, 			NULL}
 };
 #endif /* _PCILIB_EXPORT_C */

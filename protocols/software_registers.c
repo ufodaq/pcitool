@@ -8,6 +8,7 @@
 #include "pcilib.h"
 #include "pci.h"
 
+#include <stdio.h>
 
 /**
  * pcilib_software_registers_open
@@ -20,27 +21,39 @@
  */
 pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pcilib_register_bank_t bank,const char* model, const void *args){
 	pcilib_register_bank_context_t* bank_ctx;
-	pcilib_kmem_handle_t *test;
+	pcilib_kmem_handle_t *handle;
 	int j;
+	/* the protocol thing is here to make sure to avoid segfault in write_registers_internal, but is not useful as it is now*/
+	pcilib_register_protocol_t protocol;
+	protocol = pcilib_find_register_protocol_by_addr(ctx, ctx->banks[bank].protocol);
 	
 	bank_ctx=calloc(1,sizeof(pcilib_register_bank_context_t));
 	bank_ctx->bank=ctx->banks + bank;
-	
-	test=pcilib_alloc_kernel_memory(ctx, 0, 0, 0, 0,PCILIB_KMEM_USE_STANDARD,PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_PERSISTENT);
-	if (!test)pcilib_error("allocation of kernel memory for registers has failed");
+	bank_ctx->ctx=ctx;
+	bank_ctx->api=ctx->protocols[protocol].api;
+	ctx->bank_ctx[bank]=bank_ctx;
 
-	if(pcilib_kmem_is_reused(ctx,test)== PCILIB_KMEM_REUSE_ALLOCATED){
-		bank_ctx->bank_software_register_adress=test;
-	}else{
-		bank_ctx->bank_software_register_adress=test;
+	handle=pcilib_alloc_kernel_memory(ctx, PCILIB_KMEM_TYPE_PAGE, 1, 0, 1,PCILIB_KMEM_USE_STANDARD,PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_PERSISTENT);
+
+	if (!handle)pcilib_error("allocation of kernel memory for registers has failed");
+	
+	bank_ctx->kmem_base_address=handle;
+
+	if(pcilib_kmem_is_reused(ctx,handle)!= PCILIB_KMEM_REUSE_ALLOCATED){
 		j=0;
 		while(ctx->model_info.registers[j].name!=NULL){
 		  if(ctx->model_info.registers[j].bank==(ctx->banks+bank)->addr){
-		    pcilib_write_register_by_id(ctx,ctx->model_info.registers[j].addr,ctx->model_info.registers[j].defvalue);
+		/* !!!!!warning!!!!! 
+		hey suren,
+		you may check here too  :the programm seems to always go this path, so pcilib_write_register_by_id always write the original value, kmem_is_reused working?
+		*/
+		pcilib_write_register_by_id(ctx,j,ctx->model_info.registers[j].defvalue);
+			
 			}	
 			j++;
 		}		
 	}
+
 	return bank_ctx;
 }
 
@@ -51,11 +64,11 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
  * @param[in] bank_ctx the bank context running that we get from the initialisation function
  */	
 void pcilib_software_registers_close(pcilib_register_bank_context_t *bank_ctx){
-	int err=1;
-
-	err=pcilib_clean_kernel_memory(bank_ctx->ctx, 0, 0);
+	/*!!!!! to check!!!!
 	
-	if(err) pcilib_error("Error closing register kernel space");
+	ps: i am using uint32_t to calculate registers adress, may it change in the future? should we define some #define?	
+	*/
+	pcilib_free_kernel_memory(bank_ctx->ctx,bank_ctx->kmem_base_address, 0);
 }
 
 /**
@@ -68,7 +81,14 @@ void pcilib_software_registers_close(pcilib_register_bank_context_t *bank_ctx){
  * @return 0 in case of success
  */
 int pcilib_software_registers_read(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx,pcilib_register_addr_t addr, pcilib_register_value_t *value){
-  *value= *(pcilib_register_value_t*) bank_ctx->bank_software_register_adress+addr;
+	int i;
+	void* base_addr;
+	
+	base_addr=pcilib_kmem_get_block_ua(ctx,bank_ctx->kmem_base_address,0);
+	for(i=0;ctx->registers[i].name!=NULL;i++){
+		if(ctx->registers[i].addr==addr) break;
+	}
+	*value=*(pcilib_register_value_t*)(base_addr+i*sizeof(uint32_t));
 	return 0;
 }
 
@@ -82,6 +102,13 @@ int pcilib_software_registers_read(pcilib_t *ctx, pcilib_register_bank_context_t
  * @return 0 in case of success
  */
 int pcilib_software_registers_write(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx, pcilib_register_addr_t addr, pcilib_register_value_t value){
-	*(pcilib_register_value_t*)(bank_ctx->bank_software_register_adress+addr)=value;
+	int i;
+	void* base_addr;
+	
+	base_addr=pcilib_kmem_get_block_ua(ctx,bank_ctx->kmem_base_address,0);
+	for(i=0;ctx->registers[i].name!=NULL;i++){
+		if(ctx->registers[i].addr==addr) break;
+	}
+	*(pcilib_register_value_t*)(base_addr+i*sizeof(uint32_t))=value;
 	return 0;
 }
