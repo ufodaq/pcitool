@@ -238,7 +238,7 @@ static int pcidriver_kmem_free_check(pcidriver_privdata_t *privdata, kmem_handle
 
 	    if (kmem_entry->refs) {
 		kmem_entry->mode += 1;
-		mod_info("can't free referenced kmem_entry\n");
+		mod_info("can't free referenced kmem_entry, refs = %lx\n", kmem_entry->refs);
 		return -EBUSY;
 	    }
 	

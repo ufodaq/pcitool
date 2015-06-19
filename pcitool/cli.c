@@ -2689,6 +2689,7 @@ int main(int argc, char **argv) {
 	    case OPT_LIST_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 		mode = MODE_LIST_KMEM;
+		if (!model) model = "pci";
 		
 		if (optarg) use = optarg;
 		else if ((optind < argc)&&(argv[optind][0] != '-'))  use = argv[optind++];
@@ -2708,6 +2709,7 @@ int main(int argc, char **argv) {
 	    case OPT_READ_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 		mode = MODE_READ_KMEM;
+		if (!model) model = "pci";
 
 		num_offset = strchr(optarg, ':');
 
@@ -2724,6 +2726,7 @@ int main(int argc, char **argv) {
 	    case OPT_ALLOC_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 		mode = MODE_ALLOC_KMEM;
+		model = "pci";
 
 		if (optarg) use = optarg;
 		else if ((optind < argc)&&(argv[optind][0] != '-')) use = argv[optind++];
@@ -2731,6 +2734,7 @@ int main(int argc, char **argv) {
 	    case OPT_FREE_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 		mode = MODE_FREE_KMEM;
+		if (!model) model = "pci";
 
 		if (optarg) use = optarg;
 		else if ((optind < argc)&&(argv[optind][0] != '-')) use = argv[optind++];
