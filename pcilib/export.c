@@ -5,10 +5,11 @@
 #include "export.h"
 
 #include "protocols/default.h"
-
+#include "protocols/software.h"
 
 const pcilib_register_protocol_description_t pcilib_protocols[] = {
     { PCILIB_REGISTER_PROTOCOL_DEFAULT, &pcilib_default_protocol_api, NULL, NULL, "default", "" },
+    { PCILIB_REGISTER_PROTOCOL_SOFTWARE, &pcilib_register_software_protocol_api, NULL, NULL, "software_registers", "" },
     { 0 }
 };
 

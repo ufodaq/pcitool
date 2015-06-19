@@ -4,6 +4,8 @@
 typedef struct pcilib_s pcilib_t;
 typedef struct pcilib_kmem_list_s pcilib_kmem_list_t;
 
+#define PCILIB_KMEM_PAGE_SIZE	0x1000
+
 typedef enum {
     PCILIB_TRISTATE_NO = 0,
     PCILIB_TRISTATE_PARTIAL = 1,
@@ -27,6 +29,7 @@ typedef enum {
     PCILIB_KMEM_USE_STANDARD = 0,
     PCILIB_KMEM_USE_DMA_RING = 1,
     PCILIB_KMEM_USE_DMA_PAGES = 2,
+    PCILIB_KMEM_USE_SOFTWARE_REGISTERS = 3,
     PCILIB_KMEM_USE_USER = 0x10
 } pcilib_kmem_use_t;
 

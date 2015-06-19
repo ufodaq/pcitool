@@ -131,6 +131,9 @@ int pcilib_map_register_space(pcilib_t *ctx) {
 //	    uint32_t buf[2];
 	    void *reg_space;
             pcilib_bar_t bar = banks[i].bar;
+            
+            if (bar == PCILIB_BAR_NOBAR)
+        	continue;
 
 	    if (bar == PCILIB_BAR_DETECT) {
 		uintptr_t addr = banks[0].read_addr;

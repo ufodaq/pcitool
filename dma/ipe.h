@@ -39,6 +39,7 @@ static const pcilib_dma_engine_description_t ipe_dma_engines[] = {
 
 static const pcilib_register_bank_description_t ipe_dma_banks[] = {
     { PCILIB_REGISTER_BANK_DMA, PCILIB_REGISTER_PROTOCOL_DEFAULT, PCILIB_BAR0, 0, 0, 32, 0x0200, PCILIB_LITTLE_ENDIAN, PCILIB_LITTLE_ENDIAN, "0x%lx", "dma", "DMA Registers"},
+    { PCILIB_REGISTER_BANK_DMACONF, PCILIB_REGISTER_PROTOCOL_SOFTWARE, PCILIB_BAR_NOBAR, 0, 0, 32, 0x1000, PCILIB_HOST_ENDIAN, PCILIB_HOST_ENDIAN, "0x%lx", "dmaconf", "DMA Software Registers"},
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL }
 };
 
@@ -77,6 +78,7 @@ static const pcilib_register_description_t ipe_dma_registers[] = {
     {0x0058, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "last_descriptor_read",	"Last descriptor read by the host"},
     {0x005C, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "desc_mem_addr", 		"Number of descriptors configured"},
     {0x0060, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "update_thresh",  		"Update threshold of progress register"},
+    {0x0000, 	0, 	32, 	PCILIB_VERSION, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_version",  		"Version of DMA engine"},
     {0,		0,	0,	0,	0x00000000,	0,                                           0,                        0, NULL, 			NULL}
 };
 #endif /* _PCILIB_EXPORT_C */

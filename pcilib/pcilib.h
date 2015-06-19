@@ -85,6 +85,7 @@ typedef struct {
 
 #define PCILIB_BAR_DETECT 		((pcilib_bar_t)-1)
 #define PCILIB_BAR_INVALID		((pcilib_bar_t)-1)
+#define PCILIB_BAR_NOBAR		((pcilib_bar_t)-2)
 #define PCILIB_BAR0			0
 #define PCILIB_BAR1			1
 #define PCILIB_DMA_ENGINE_INVALID	((pcilib_dma_engine_t)-1)

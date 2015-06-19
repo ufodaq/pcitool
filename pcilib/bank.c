@@ -65,7 +65,7 @@ void pcilib_free_register_banks(pcilib_t *ctx) {
 	
 	if (ctx->bank_ctx[i]) {
 	    if (bapi->free)
-		bapi->free(ctx->bank_ctx[i]);
+		bapi->free(ctx, ctx->bank_ctx[i]);
 	    else
 		free(ctx->bank_ctx[i]);
 		

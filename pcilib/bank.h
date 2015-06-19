@@ -9,10 +9,12 @@
 #define PCILIB_REGISTER_BANK2 			2
 #define PCILIB_REGISTER_BANK3 			3
 #define PCILIB_REGISTER_BANK_DMA		64					/**< First BANK address to be used by DMA engines */
+#define PCILIB_REGISTER_BANK_DMACONF		65					/**< DMA configuration in the software registers */
 #define PCILIB_REGISTER_BANK_DYNAMIC		128					/**< First BANK address to map dynamic XML configuration */
 #define PCILIB_REGISTER_PROTOCOL_INVALID	((pcilib_register_protocol_t)-1)
 #define PCILIB_REGISTER_PROTOCOL0		0					/**< First PROTOCOL address to be used in the event engine */
 #define PCILIB_REGISTER_PROTOCOL_DEFAULT	64					/**< Default memmap based protocol */
+#define PCILIB_REGISTER_PROTOCOL_SOFTWARE	65					/**< Software registers */
 #define PCILIB_REGISTER_PROTOCOL_DMA		96					/**< First PROTOCOL address to be used by DMA engines */
 #define PCILIB_REGISTER_PROTOCOL_DYNAMIC	128					/**< First PROTOCOL address to be used by plugins */
 
@@ -28,7 +30,7 @@ typedef struct {
     pcilib_version_t version;
 
     pcilib_register_bank_context_t *(*init)(pcilib_t *ctx, pcilib_register_bank_t bank, const char *model, const void *args);			/**< Optional API call to initialize bank context */
-    void (*free)(pcilib_register_bank_context_t *ctx);												/**< Optional API call to cleanup bank context */
+    void (*free)(pcilib_t *pcilib, pcilib_register_bank_context_t *ctx);									/**< Optional API call to cleanup bank context */
     int (*read)(pcilib_t *pcilib, pcilib_register_bank_context_t *ctx, pcilib_register_addr_t addr, pcilib_register_value_t *value);		/**< Read from register, mandatory for RO/RW registers */
     int (*write)(pcilib_t *pcilib, pcilib_register_bank_context_t *ctx, pcilib_register_addr_t addr, pcilib_register_value_t value);		/**< Write to register, mandatory for WO/RW registers */
 } pcilib_register_protocol_api_description_t;
@@ -83,7 +85,6 @@ struct pcilib_register_bank_context_s {
     const pcilib_register_bank_description_t *bank;				/**< Corresponding bank description */
     const pcilib_register_protocol_api_description_t *api;			/**< API functions */
 };
-
 
     // we don't copy strings, they should be statically allocated
 int pcilib_init_register_banks(pcilib_t *ctx);
