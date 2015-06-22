@@ -75,11 +75,19 @@ struct pcilib_s {
 #endif /* PCILIB_FILE_IO */
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx);
 const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx);
 const pcilib_pcie_link_info_t *pcilib_get_pcie_link_info(pcilib_t *ctx);
 
 int pcilib_map_register_space(pcilib_t *ctx);
 int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PCITOOL_PCI_H */

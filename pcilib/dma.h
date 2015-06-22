@@ -83,10 +83,17 @@ typedef struct {
 } pcilib_dma_description_t;
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 const pcilib_dma_description_t *pcilib_get_dma_description(pcilib_t *ctx);
 pcilib_dma_engine_t pcilib_add_dma_engine(pcilib_t *ctx, pcilib_dma_engine_description_t *desc);
 int pcilib_get_dma_status(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_engine_status_t *status, size_t n_buffers, pcilib_dma_buffer_status_t *buffers);
 int pcilib_init_dma(pcilib_t *ctx);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PCILIB_DMA_H */

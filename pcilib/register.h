@@ -47,7 +47,15 @@ typedef struct {
     pcilib_register_bank_t bank;
 } pcilib_register_context_t;
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int pcilib_add_registers(pcilib_t *ctx, size_t n, const pcilib_register_description_t *registers);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PCILIB_REGISTER_H */

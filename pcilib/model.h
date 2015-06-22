@@ -27,6 +27,14 @@ typedef struct {
 } pcilib_model_description_t;
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 const pcilib_model_description_t *pcilib_get_model_description(pcilib_t *ctx);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PCILIB_MODEL_H */

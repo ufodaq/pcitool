@@ -31,8 +31,17 @@ enum {
     PCILIB_ERROR_BUSY = EBUSY
 } pcilib_errot_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void pcilib_log_message(const char *file, int line, pcilib_log_flags_t flags, pcilib_log_priority_t prio, const char *msg, ...);
 void pcilib_log_vmessage(const char *file, int line, pcilib_log_flags_t flags, pcilib_log_priority_t prio, const char *msg, va_list va);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #define pcilib_log(prio, ...) \
     pcilib_log_message(__FILE__, __LINE__, PCILIB_LOG_DEFAULT, prio, __VA_ARGS__)

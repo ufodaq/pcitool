@@ -89,8 +89,15 @@ typedef struct {
     int (*return_data)(pcilib_context_t *ctx, pcilib_event_id_t event_id, pcilib_event_data_type_t data_type, void *data);
 } pcilib_event_api_description_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int pcilib_init_event_engine(pcilib_t *ctx);
 
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PCILIB_EVENT_H */

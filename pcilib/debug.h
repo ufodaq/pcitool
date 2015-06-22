@@ -40,8 +40,18 @@ typedef enum {
     PCILIB_DEBUG_BUFFER_MKDIR = 2
 } pcilib_debug_buffer_flags_t; 
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void pcilib_debug_message(const char *function, const char *file, int line, pcilib_log_flags_t flags, const char *format, ...);
 void pcilib_debug_data_buffer(const char *function, size_t size, void *buffer, pcilib_debug_buffer_flags_t flags, const char *file, ...);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif /* _PCILIB_DEBUG_H */

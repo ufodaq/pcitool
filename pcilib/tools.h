@@ -14,6 +14,10 @@
 #define min2(a, b) (((a)<(b))?(a):(b))
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int pcilib_isnumber(const char *str);
 int pcilib_isxnumber(const char *str);
 int pcilib_isnumber_n(const char *str, size_t len);
@@ -40,5 +44,9 @@ pcilib_timeout_t pcilib_calc_time_to_deadline(struct timeval *tve);
 int pcilib_sleep_until_deadline(struct timeval *tv);
 int pcilib_timecmp(struct timeval *tv1, struct timeval *tv2);
 pcilib_timeout_t pcilib_timediff(struct timeval *tve, struct timeval *tvs);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PCITOOL_TOOS_H */

@@ -13,7 +13,8 @@ typedef enum {
 } pcilib_tristate_t;
 
 #define PCILIB_KMEM_TYPE_MASK	0xFFFF0000
-#define PCILIB_KMEM_USE(type, subtype) (((type) << 16)|(subtype))
+#define PCILIB_KMEM_USE(type, subtype) ((pcilib_kmem_use_t)(((type) << 16)|(subtype)))
+
 
 typedef enum {
     PCILIB_KMEM_TYPE_CONSISTENT = 0x00000,
@@ -95,6 +96,10 @@ struct pcilib_kmem_list_s {
     pcilib_kmem_buffer_t buf;	// variable size, should be last item in struct
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type_t type, size_t nmemb, size_t size, size_t alignment, pcilib_kmem_use_t use, pcilib_kmem_flags_t flags);
 void pcilib_free_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kmem_flags_t flags);
 //int pcilib_kmem_sync(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kmem_sync_direction_t dir);
@@ -109,5 +114,9 @@ size_t pcilib_kmem_get_block_size(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t
 pcilib_kmem_reuse_state_t pcilib_kmem_is_reused(pcilib_t *ctx, pcilib_kmem_handle_t *k);
 
 int pcilib_clean_kernel_memory(pcilib_t *ctx, pcilib_kmem_use_t use, pcilib_kmem_flags_t flags);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PCILIB_KMEM_H */

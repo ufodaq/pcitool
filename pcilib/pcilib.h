@@ -129,6 +129,10 @@ typedef int (*pcilib_dma_callback_t)(void *ctx, pcilib_dma_flags_t flags, size_t
 typedef int (*pcilib_event_callback_t)(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user);
 typedef int (*pcilib_event_rawdata_callback_t)(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event_flags_t flags, size_t size, void *data, void *user);
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 int pcilib_set_logger(pcilib_log_priority_t min_prio, pcilib_logger_t logger, void *arg);
 
@@ -235,5 +239,9 @@ int pcilib_return_data(pcilib_t *ctx, pcilib_event_id_t event_id, pcilib_event_d
  * @param timeout - will be autotriggered if NULL
  */
 int pcilib_grab(pcilib_t *ctx, pcilib_event_t event_mask, size_t *size, void **data, pcilib_timeout_t timeout);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PCITOOL_PCILIB_H */

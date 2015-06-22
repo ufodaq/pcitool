@@ -86,6 +86,10 @@ struct pcilib_register_bank_context_s {
     const pcilib_register_protocol_api_description_t *api;			/**< API functions */
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
     // we don't copy strings, they should be statically allocated
 int pcilib_init_register_banks(pcilib_t *ctx);
 void pcilib_free_register_banks(pcilib_t *ctx);
@@ -101,5 +105,9 @@ pcilib_register_bank_t pcilib_find_register_bank(pcilib_t *ctx, const char *bank
 pcilib_register_protocol_t pcilib_find_register_protocol_by_addr(pcilib_t *ctx, pcilib_register_protocol_addr_t protocol);
 pcilib_register_protocol_t pcilib_find_register_protocol_by_name(pcilib_t *ctx, const char *name);
 pcilib_register_protocol_t pcilib_find_register_protocol(pcilib_t *ctx, const char *name);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PCILIB_BANK_H */
