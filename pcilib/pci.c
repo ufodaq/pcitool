@@ -24,6 +24,7 @@
 #include "model.h"
 #include "plugin.h"
 #include "bar.h"
+#include "xml.h"
 
 static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
     int i, j;
@@ -105,6 +106,26 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
     int err;
     size_t i;
     pcilib_t *ctx = malloc(sizeof(pcilib_t));
+	
+	pcilib_register_description_t *registers=NULL;
+	pcilib_register_bank_description_t *banks=NULL;
+	int number_registers, number_banks;
+		
+	char *xmlfile;
+	pcilib_xml_read_config(&xmlfile,3);
+	xmlDocPtr doc;
+	doc=pcilib_xml_getdoc(xmlfile);
+	
+	xmlXPathContextPtr context;
+	context=pcilib_xml_getcontext(doc);
+
+	number_registers=pcilib_xml_getnumberregisters(context);
+	number_banks=pcilib_xml_getnumberbanks(context);
+
+	if(number_registers)registers=calloc((number_registers),sizeof(pcilib_register_description_t));
+	else pcilib_error("no registers in the xml file");
+	if(number_banks)banks=calloc((number_banks),sizeof(pcilib_register_bank_description_t));
+	else pcilib_error("no banks in the xml file");
 
     if (ctx) {
 	memset(ctx, 0, sizeof(pcilib_t));
@@ -154,6 +175,17 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	if (!ctx->model)
 	    ctx->model = strdup(model?model:"pci");
 
+	if(registers){
+		pcilib_xml_initialize_registers(doc,registers);
+		pcilib_xml_arrange_registers(registers,number_registers);
+	    pcilib_add_registers(ctx,number_registers,registers);
+	}else pcilib_error("no memory for registers");
+	
+	if(banks){
+		pcilib_xml_initialize_banks(doc,banks);
+		pcilib_add_register_banks(ctx,number_banks,banks);
+	}else pcilib_error("no memory for banks");
+	
 	ctx->model_info.registers = ctx->registers;
 	ctx->model_info.banks = ctx->banks;
 	ctx->model_info.protocols = ctx->protocols;
@@ -166,6 +198,7 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    pcilib_close(ctx);
 	    return NULL;
 	}
+
 	
 	err = pcilib_init_event_engine(ctx);
 	if (err) {

@@ -37,6 +37,7 @@
 #include "error.h"
 #include "debug.h"
 #include "model.h"
+#include "xml.h"
 
 /* defines */
 #define MAX_KBUF 14
@@ -89,7 +90,8 @@ typedef enum {
     MODE_ALLOC_KMEM,
     MODE_LIST_KMEM,
     MODE_READ_KMEM,
-    MODE_FREE_KMEM
+    MODE_FREE_KMEM,
+	MODE_VALIDATE_XML
 } MODE;
 
 typedef enum {
@@ -135,6 +137,7 @@ typedef enum {
     OPT_GRAB = 'g',
     OPT_QUIETE = 'q',
     OPT_HELP = 'h',
+	OPT_VALIDATE_XML= 'v',
     OPT_RESET = 128,
     OPT_BENCHMARK,
     OPT_TRIGGER,
@@ -182,6 +185,7 @@ static struct option long_options[] = {
     {"iterations",		required_argument, 0, OPT_ITERATIONS },
     {"info",			no_argument, 0, OPT_INFO },
     {"list",			no_argument, 0, OPT_LIST },
+	{"validate",		no_argument,0,OPT_VALIDATE_XML},
     {"reset",			no_argument, 0, OPT_RESET },
     {"benchmark",		optional_argument, 0, OPT_BENCHMARK },
     {"read",			optional_argument, 0, OPT_READ },
@@ -328,6 +332,8 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "	Data can be specified as sequence of hexdecimal number or\n"
 "	a single value prefixed with '*'. In this case it will be\n"
 "	replicated the specified amount of times\n"
+"  XML:\n"
+"  -v		-validates the xml file against xsd"	
 "\n\n",
 argv[0]);
 
@@ -3122,6 +3128,9 @@ int main(int argc, char **argv) {
 
 	// Requesting real-time priority when needed
     switch (mode) {
+	case MODE_VALIDATE_XML:
+	 	validation();
+	break;
      case MODE_READ:
      case MODE_WRITE:
         if (amode != ACCESS_DMA)

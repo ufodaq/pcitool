@@ -1,0 +1,13 @@
+///configuration///
+
+pwd to xml model file:
+camera.xml
+
+///pwd to units xml file:
+///units.xml
+///
+///pwd to python eval file:
+///pythonscripts.py
+///
+pwd to xsd schema file:
+registers_and_banks.xsd

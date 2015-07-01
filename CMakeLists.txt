@@ -11,13 +11,16 @@ set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library")
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
+find_package(PythonLibs REQUIRED)
 
 #Check in sibling directory
 if (NOT DISABLE_PCITOOL)
     pkg_check_modules(FASTWRITER fastwriter REQUIRED)
 endif (NOT DISABLE_PCITOOL)
 
-add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3")
+pkg_check_modules(XMLLIB libxml-2.0 REQUIRED)
+
+add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -g")
 #add_definitions("-fPIC --std=c99 -Wall -O2")
 
 include(cmake/version.cmake)
