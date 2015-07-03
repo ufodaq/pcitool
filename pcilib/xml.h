@@ -74,15 +74,17 @@
 #define BANK_NAME_PATH ((xmlChar*)"/model/banks/bank/bank_description/name") /**< path to name of banks.*/
 #define BANK_DESCRIPTION_PATH ((xmlChar*)"/model/banks/bank/bank_description/description") /**<path to description of banks.*/
  
-#define UNIT_PATH ((char*)"/units/unit[@name=\"%s\"]/convert_unit[@value=\"%s\"]") /**< path to get possible units for a view in units xml file.*/
 
 /**
- * this type is used to save enough information in the pcilib_watch_to_read_with_enum function to get a good output in human readable form.
+ * this path get the units in the units xml file
  */
-typedef struct{
-	int val; /**< value of a register corresponding to an enum value.*/
-	char* name; /**< name of the corresponding command to val.*/
-}info_enum;
+#define BASE_UNIT_PATH ((char*)"/units/unit")
+
+/**
+ * this path permits to get the possible units one given unit can be converted into in the xml.
+ */
+#define TRANSFORM_UNIT_PATH ((char*)"/units/unit[@name=\"%s\"]/convert_unit")
+
 
 /**
 * this function takes a string and will create an abtract syntax tree from the xml file represented by the string.

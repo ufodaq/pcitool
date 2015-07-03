@@ -3128,9 +3128,6 @@ int main(int argc, char **argv) {
 
 	// Requesting real-time priority when needed
     switch (mode) {
-	case MODE_VALIDATE_XML:
-	 	validation();
-	break;
      case MODE_READ:
      case MODE_WRITE:
         if (amode != ACCESS_DMA)
@@ -3146,6 +3143,9 @@ int main(int argc, char **argv) {
     }
 
     switch (mode) {
+     case MODE_VALIDATE_XML:
+	 	validation();
+     break;
      case MODE_INFO:
         Info(handle, model_info);
      break;

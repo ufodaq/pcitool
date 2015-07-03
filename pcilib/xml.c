@@ -19,6 +19,8 @@
 #include <assert.h>
 #include <Python.h>
 
+//#define VIEW_OK
+//#define UNIT_OK
 
 /**
  * pcilib_xml_getdoc
@@ -670,3 +672,362 @@ void pcilib_xml_init_nodeset_bank_ctx(pcilib_register_bank_context_t *ctx){
 
 }
 */
+
+#ifdef VIEW_OK
+/* pcilib_xml_getnumberformulaviews
+ * 
+ * function to get the number of views of type formula, for further malloc
+ */
+int pcilib_xml_getnumberformulaviews(xmlXPathContextPtr doc){
+	int j;
+	xmlNodeSetPtr nodeviewsset=NULL;
+	nodeviewsset=pcilib_xml_getsetproperty(doc,VIEW_FORMULA_PATH)->nodesetval;
+	j=nodeviewsset->nodeNr;
+	return j;
+	
+}
+
+/* pcilib_xml_getnumberenumviews
+ *
+ * function to get the number of views of type enum, for further malloc
+ */
+int pcilib_xml_getnumberenumviews(xmlXPathContextPtr doc){
+	int j;
+	   xmlNodeSetPtr nodeviewsset=NULL;
+	nodeviewsset=pcilib_xml_getsetproperty(doc,VIEW_ENUM_PATH)->nodesetval;
+	j=nodeviewsset->nodeNr;
+	return j;
+	
+	
+}
+
+/* pcilib_xml_initialize_viewsformula
+ * 
+ * function to create the structures to store the views of type formula from the xml
+ *
+ * values that need to be changed when xml file change: name, formula,
+ */
+void pcilib_xml_initialize_viewsformula(xmlDocPtr doc, pcilib_view_formula_ptr_t* myviewsformula){
+	xmlNodeSetPtr viewsetformula, viewformula, viewreverseformula, viewunit, viewformulaname, nodesetviewregister,nodesetviewregisterbit,nodesetregister,nodesetsubregister;
+	xmlChar *formula, *name,*reverseformula,*registername,*bankname,*unit;
+	int i,j,registernumber,viewnumber,k,l,externregisternumber,enregistrement,u;
+
+    char *substr;
+	
+	xmlXPathContextPtr context;
+	context=pcilib_xml_getcontext(doc);
+
+	viewsetformula=pcilib_xml_getsetproperty(context,VIEW_FORMULA_PATH)->nodesetval;
+    viewformula=pcilib_xml_getsetproperty(context,VIEW_FORMULA_FORMULA_PATH)->nodesetval;
+    viewreverseformula=pcilib_xml_getsetproperty(context,VIEW_FORMULA_REVERSE_FORMULA_PATH)->nodesetval;
+    viewunit=pcilib_xml_getsetproperty(context,VIEW_FORMULA_UNIT_PATH)->nodesetval;
+    viewformulaname=pcilib_xml_getsetproperty(context,VIEW_FORMULA_NAME_PATH)->nodesetval;
+	
+
+
+viewnumber=0;
+	
+    
+	nodesetviewregisterbit=pcilib_xml_getsetproperty(context,VIEW_BITS_REGISTER)->nodesetval;
+    nodesetviewregister=pcilib_xml_getsetproperty(context,VIEW_STANDARD_REGISTER)->nodesetval;
+	nodesetregister=pcilib_xml_getsetproperty(context,NAME_PATH)->nodesetval;
+    nodesetsubregister=pcilib_xml_getsetproperty(context,SUB_NAME_PATH)->nodesetval;
+
+	myviewsformula->viewsformula=calloc(myviewsformula->size,sizeof(pcilib_view_formula_t));
+	for(i=0;i<viewsetformula->nodeNr;i++){
+		registernumber=0;
+			name=xmlNodeListGetString(doc,viewformulaname->nodeTab[i]->xmlChildrenNode,1);
+			formula=xmlNodeListGetString(doc,viewformula->nodeTab[i]->xmlChildrenNode,1);
+			reverseformula=xmlNodeListGetString(doc,viewreverseformula->nodeTab[i]->xmlChildrenNode,1);
+			unit=xmlNodeListGetString(doc,viewunit->nodeTab[i]->xmlChildrenNode,1);
+	
+			xmlXPathObjectPtr temp,temp2;
+
+           	char* path;
+			path=malloc((strlen((char*)name)+51)*sizeof(char));
+			sprintf(path, VIEW_STANDARD_REGISTER_PLUS,(char*)name);
+			temp=pcilib_xml_getsetproperty(context,(xmlChar*)path);
+			if(temp!=NULL) nodesetviewregister= temp->nodesetval;	
+
+			char* path2;
+			path2=malloc((strlen((char*)name)+strlen(VIEW_BITS_REGISTER_PLUS))*sizeof(char));
+			sprintf(path2, VIEW_BITS_REGISTER_PLUS,(char*)name);
+			temp2= pcilib_xml_getsetproperty(context,(xmlChar*)path2);
+			if(temp2!=NULL)	nodesetviewregisterbit= temp2->nodesetval;
+			
+		    j=0;
+			if(temp!=NULL) j+=nodesetviewregister->nodeNr;
+			if(temp2!=NULL) j+=nodesetviewregisterbit->nodeNr;
+		   
+			myviewsformula->viewsformula[viewnumber].depending_registers=calloc((j),sizeof(pcilib_register_for_read_t));
+			myviewsformula->viewsformula[viewnumber].number_depending_registers=j;
+            registernumber=0;
+			if (temp!=NULL){
+				for(j=0; j<nodesetviewregister->nodeNr;j++){
+					myviewsformula->viewsformula[viewnumber].depending_registers[registernumber].name=(char*)xmlNodeListGetString(doc,nodesetviewregister->nodeTab[j]->parent->parent->last->prev->prev->prev->xmlChildrenNode,1);
+					bankname=xmlNodeListGetString(doc,xmlFirstElementChild(nodesetviewregister->nodeTab[j]->parent->parent->parent->parent)->last->prev->prev->prev->xmlChildrenNode,1);
+					myviewsformula->viewsformula[viewnumber].depending_registers[registernumber].bank_name=(char*)bankname;
+					registernumber++;
+				}
+			}
+			
+			if(temp2!=NULL){
+				for(j=0; j<nodesetviewregisterbit->nodeNr;j++){
+					myviewsformula->viewsformula[viewnumber].depending_registers[registernumber].name=(char*)xmlNodeListGetString(doc,nodesetviewregisterbit->nodeTab[j]->parent->parent->last->prev->prev->prev->xmlChildrenNode,1);
+					bankname=xmlNodeListGetString(doc,(xmlFirstElementChild(nodesetviewregisterbit->nodeTab[j]->parent->parent->parent->parent->parent->parent))->last->prev->prev->prev->xmlChildrenNode,1);
+					myviewsformula->viewsformula[viewnumber].depending_registers[registernumber].bank_name=(char*)bankname;	   
+				   registernumber++;
+				}
+			}
+	
+			myviewsformula->viewsformula[viewnumber].name=(char*) name;
+			myviewsformula->viewsformula[viewnumber].formula=(char*) formula;
+			myviewsformula->viewsformula[viewnumber].reverseformula=(char*) reverseformula;
+			myviewsformula->viewsformula[viewnumber].unit=(char*) unit;
+
+            /* we then get the extern registers for the formula, which names are directly put in the formula*/
+			externregisternumber=0;
+			k=0;	
+			u=0;
+            myviewsformula->viewsformula[viewnumber].extern_registers=calloc(1,sizeof(pcilib_register_for_read_t));
+			myviewsformula->viewsformula[viewnumber].number_extern_registers=0;
+
+            /* we first get the name of a register put in the formula, by getting indexes of start and end for this name*/
+			for(j=0;j<strlen((char*)formula);j++){
+				if(formula[j]=='@'){
+					k=j+1;
+					while((formula[k]!=' ' && formula[k]!=')' && formula[k]!='/' && formula[k]!='+' && formula[k]!='-' && formula[k]!='*' && formula[k]!='=') && (k<strlen((char*)formula))){
+						k++;
+					}
+					enregistrement=1;
+                    substr=str_sub((char*)formula,j+1,k-1);
+                    /* we verify the register is not the depending register*/
+					if(strcmp("reg",substr)!=0){
+                        
+                        /* we then get recursively each standard register and test if it's the extern register or not*/
+						for(l=0;l<nodesetregister->nodeNr;l++){
+							registername=xmlNodeListGetString(doc,nodesetregister->nodeTab[l]->xmlChildrenNode,1);
+							if(strcmp((char*)registername,substr)==0){
+								bankname=xmlNodeListGetString(doc,(xmlFirstElementChild(nodesetregister->nodeTab[l]->parent->parent->parent))->last->prev->prev->prev->xmlChildrenNode,1);              
+                                /*before registering the extern register, as it matches, we tast if the said register was already registered or not*/
+								for(u=0;u<externregisternumber;u++){
+									if(strcmp(myviewsformula->viewsformula[viewnumber].extern_registers[u].name,(char*)registername)==0){
+										enregistrement=0;                     
+									}
+								}
+								if(enregistrement==1){
+									myviewsformula->viewsformula[viewnumber].number_extern_registers++;
+									myviewsformula->viewsformula[viewnumber].extern_registers=realloc(myviewsformula->viewsformula[viewnumber].extern_registers,myviewsformula->viewsformula[viewnumber].number_extern_registers*sizeof(pcilib_register_for_read_t));
+									myviewsformula->viewsformula[viewnumber].extern_registers[externregisternumber].name=(char*)registername;
+									myviewsformula->viewsformula[viewnumber].extern_registers[externregisternumber].bank_name=(char*)bankname;                          
+                                    enregistrement=0;    
+									externregisternumber++;
+								}                         
+								break;
+							}
+						}
+						if(enregistrement==1){
+	                        /* we get recursively each bits register and test if it's the extern register of the formula or not*/
+                            for(l=0;l<nodesetsubregister->nodeNr;l++){
+	    						registername=xmlNodeListGetString(doc,nodesetsubregister->nodeTab[l]->xmlChildrenNode, 1);
+	    						if(strcmp((char*)registername,substr)==0){
+	    							bankname=xmlNodeListGetString(doc,(xmlFirstElementChild(nodesetsubregister->nodeTab[l]->parent->parent->parent->parent->parent))->last->prev->prev->prev->xmlChildrenNode,1);
+                                       /* check to test if the register has already been registered or not*/
+	    							for(u=0;u<externregisternumber;u++){
+	    								if(strcmp(myviewsformula->viewsformula[viewnumber].extern_registers[u].name,(char*)registername)==0){
+	    									enregistrement=0;
+	    									break;
+	    								}
+	    							}
+	    							if(enregistrement==1){
+                                        myviewsformula->viewsformula[viewnumber].number_extern_registers++;
+										myviewsformula->viewsformula[viewnumber].extern_registers=realloc(myviewsformula->viewsformula[viewnumber].extern_registers,myviewsformula->viewsformula[viewnumber].number_extern_registers*sizeof(pcilib_register_for_read_t));
+	    								myviewsformula->viewsformula[viewnumber].extern_registers[externregisternumber].name=(char*)registername;
+	    								myviewsformula->viewsformula[viewnumber].extern_registers[externregisternumber].bank_name=(char*)bankname;
+    									externregisternumber++;
+                                        enregistrement=0;
+							    	}
+							    	break;
+							    }
+						    }
+                        }
+					}
+				}
+			}
+			viewnumber++;
+	}
+}
+
+/* pcilib_xml_initialize_viewsenum
+ * 
+ * function to create the structures to store the views of type enum from the xml
+ *
+ * values that need to be changed when xml file change: current,
+*
+ */
+void pcilib_xml_initialize_viewsenum(xmlDocPtr doc, pcilib_view_enum_ptr_t* myviewsenum){
+	xmlNodeSetPtr viewsetenum,viewsetregister3, viewsetregister4;
+	xmlChar *name;
+	int i,k,viewnumber,j,registernumber;
+
+	xmlXPathContextPtr context;
+	context=pcilib_xml_getcontext(doc);
+	
+	xmlXPathObjectPtr temp,temp2;
+
+	xmlNodePtr current;
+	viewsetenum=pcilib_xml_getsetproperty(context,VIEW_ENUM_PATH)->nodesetval;
+	xmlAttr *attr2,*attr3;
+	viewnumber=0;
+	int enumnumber=0;
+
+	myviewsenum->viewsenum=calloc(myviewsenum->size,sizeof(pcilib_view_enum_t));	
+        for(i=0;i<viewsetenum->nodeNr;i++){
+			enumnumber=0;
+			k=0;
+			registernumber=0;
+			name=xmlNodeListGetString(doc,xmlFirstElementChild(viewsetenum->nodeTab[i])->xmlChildrenNode,1);
+			myviewsenum->viewsenum[viewnumber].name=(char*)name;
+			myviewsenum->viewsenum[viewnumber].registerenum=calloc(1,sizeof(char*));
+			myviewsenum->viewsenum[viewnumber].number_registerenum=0;
+			registernumber=0;
+			
+			char* path;
+			path=malloc((strlen((char*)name)+51)*sizeof(char));
+			sprintf(path, VIEW_STANDARD_REGISTER_PLUS,(char*)name);
+			temp=pcilib_xml_getsetproperty(context,(xmlChar*)path);
+			if(temp!=NULL) viewsetregister3= temp->nodesetval;	
+
+			char* path2;
+			path2=malloc((strlen((char*)name)+strlen(VIEW_BITS_REGISTER_PLUS))*sizeof(char));
+			sprintf(path2, VIEW_BITS_REGISTER_PLUS,(char*)name);
+			temp2= pcilib_xml_getsetproperty(context,(xmlChar*)path2);
+			if(temp2!=NULL)	viewsetregister4= temp2->nodesetval;
+			
+			j=0;
+			if(temp!=NULL) j+=viewsetregister3->nodeNr;
+			if(temp2!=NULL) j+=viewsetregister4->nodeNr;
+			myviewsenum->viewsenum[viewnumber].registerenum=malloc(j*sizeof(char*));
+			myviewsenum->viewsenum[viewnumber].number_registerenum=j;
+			if(temp!=NULL){
+				for(j=0; j<viewsetregister3->nodeNr;j++){
+						myviewsenum->viewsenum[viewnumber].registerenum[registernumber]=(char*)xmlNodeListGetString(doc,viewsetregister3->nodeTab[j]->parent->parent->last->prev->prev->prev->xmlChildrenNode,1);
+						registernumber++;
+				}
+			}
+			if(temp2!=NULL){
+				for(j=0; j<viewsetregister4->nodeNr;j++){
+						myviewsenum->viewsenum[viewnumber].registerenum[registernumber]=(char*)xmlNodeListGetString(doc,viewsetregister4->nodeTab[j]->parent->parent->last->prev->prev->prev->xmlChildrenNode,1);
+						registernumber++;
+					}
+				}
+			
+			
+			current=xmlFirstElementChild(viewsetenum->nodeTab[i])->next->next->next->next;
+			while(current!=viewsetenum->nodeTab[i]->last->prev){
+				k++;
+				current=current->next->next;
+			}
+             
+			myviewsenum->viewsenum[viewnumber].myenums=calloc((k+1),sizeof(pcilib_enum_t));
+			myviewsenum->viewsenum[viewnumber].number_enums=k+1;
+            
+            /* we get here each enum for a said view except the last one*/
+			current=xmlFirstElementChild(viewsetenum->nodeTab[i])->next->next;
+			while(current!=viewsetenum->nodeTab[i]->last->prev->prev->prev){
+				attr2 = current->properties;
+				myviewsenum->viewsenum[viewnumber].myenums[enumnumber].command=(char*)xmlNodeListGetString(doc,current->xmlChildrenNode,1);
+				myviewsenum->viewsenum[viewnumber].myenums[enumnumber].value=(char*)attr2->children->content;
+				attr2=attr2->next;
+                /* and we take the properties that are given about range*/
+				if(attr2!=NULL){
+					if(strcmp((char*)attr2->name,"min")==0){
+						myviewsenum->viewsenum[viewnumber].myenums[enumnumber].min=(char*)attr2->children->content;
+						attr3=attr2->next;
+						if(attr3 !=NULL){
+							if(strcmp((char*)attr3->name,"max")==0){
+								myviewsenum->viewsenum[viewnumber].myenums[enumnumber].max=(char*)attr3->children->content;
+							}else pcilib_error("problem in xml file at enum");
+										
+						}else{
+							myviewsenum->viewsenum[viewnumber].myenums[enumnumber].max=myviewsenum->viewsenum[viewnumber].myenums[enumnumber].value;
+						}
+									
+					}else if(strcmp((char*)attr2->name,"max")==0){
+						myviewsenum->viewsenum[viewnumber].myenums[enumnumber].min=myviewsenum->viewsenum[viewnumber].myenums[enumnumber].value;
+						myviewsenum->viewsenum[viewnumber].myenums[enumnumber].max=(char*)attr2->children->content;
+					}else pcilib_error("problem in xml file at enum");
+				}else{
+					myviewsenum->viewsenum[viewnumber].myenums[enumnumber].min=myviewsenum->viewsenum[viewnumber].myenums[enumnumber].value;
+					myviewsenum->viewsenum[viewnumber].myenums[enumnumber].max=myviewsenum->viewsenum[viewnumber].myenums[enumnumber].value;
+				}
+				enumnumber++;
+				current=current->next->next;
+			}
+            /* get the last enum and the given properties */
+			myviewsenum->viewsenum[viewnumber].myenums[enumnumber].command=(char*)xmlNodeListGetString(doc,current->xmlChildrenNode,1);
+			attr2 = current->properties;
+			myviewsenum->viewsenum[viewnumber].myenums[enumnumber].value=(char*)attr2->children->content;
+			attr2=attr2->next;
+			if(attr2!=NULL){
+				if(strcmp((char*)attr2->name,"min")==0){
+					myviewsenum->viewsenum[viewnumber].myenums[enumnumber].min=(char*)attr2->children->content;
+						attr3=attr2->next;
+						if(attr3 !=NULL){
+							if(strcmp((char*)attr3->name,"max")==0){
+								myviewsenum->viewsenum[viewnumber].myenums[enumnumber].max=(char*)attr3->children->content;
+							}else pcilib_error("problem in xml file at enum");
+						}else{
+							myviewsenum->viewsenum[viewnumber].myenums[enumnumber].max=myviewsenum->viewsenum[viewnumber].myenums[enumnumber].value;
+						}
+								
+				}else if(strcmp((char*)attr2->name,"max")==0){
+					myviewsenum->viewsenum[viewnumber].myenums[enumnumber].min=myviewsenum->viewsenum[viewnumber].myenums[enumnumber].value;
+					myviewsenum->viewsenum[viewnumber].myenums[enumnumber].max=(char*)attr2->children->content;
+				}else pcilib_error("problem in xml file at enum");
+			}else{
+				myviewsenum->viewsenum[viewnumber].myenums[enumnumber].min=myviewsenum->viewsenum[viewnumber].myenums[enumnumber].value;
+				myviewsenum->viewsenum[viewnumber].myenums[enumnumber].max=myviewsenum->viewsenum[viewnumber].myenums[enumnumber].value;
+			}
+
+			viewnumber++;
+
+	}
+}
+#endif
+
+#ifdef UNIT_OK
+
+void pclib_xml_initialize_units(xmlDocPtr doc, pcilib_units_ptr_t* unitsptr){
+
+  xmlNodeSetPtr nodesetbaseunit=NULL, nodesettransformunit=NULL;
+  xmlXPathContextptr context;
+  context=pcilib_xml_getcontext(doc);
+  xmlXPathObjectPtr temp;
+  int i,j;
+  char *path;
+
+  temp=pcilib_xml_getsetproperty(context, BASE_UNIT_PATH);
+  if(temp!=NULL) nodesetbaseunit=temp->nodesetval;
+  else pcilib_error("the unit xml file is wrong");
+  
+  unitsptr->list_unit=malloc(nodesetbaseunit->nodeNr*sizeof(pcilib_unit_t));
+  unitsptr->size=nodesetbaseunit->nodeNr; 
+  
+ for(i=0; i< nodesetbaseunit->NodeNr; i++){
+   unitsptr->list_unit[i].name=nodesetbaseunit->nodeTab[i]->properties->children->content;
+   path=malloc((strlen(unitsptr->list_unit[i].name)+35)*sizeof(char));
+   sprintf(path, TRANSFORM_UNIT_PATH, unitsptr->list_unit[i].name);
+   temp=pcilib_xml_getsetproperty(context, path);
+   if(temp!=NULL){
+     unitsptr->list_unit[i].size_trans_units=temp->nodeNr;
+     unitsptr->list_unit[i].other_units=malloc(temp->nodeNr*sizeof(pcilib_transform_unit_t));
+     for(j=0;j<temp->nodeNr;j++){
+       unitsptr->list_unit[i].other_units[j].name=temp->nodeTab[j]->properties->children->content;
+       unitsptr->list_unit[i].other_units[j].transform_formula=(char*)xmlNodeListGetString(doc,temp->nodeTab[j]->xmlChildrenNode,1);
+     }
+   }
+ }
+ 
+}
+#endif
