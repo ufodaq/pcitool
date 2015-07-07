@@ -69,7 +69,7 @@ struct pcilib_s {
     pcilib_register_bank_context_t *bank_ctx[PCILIB_MAX_REGISTER_BANKS];		/**< Contexts for registers banks if required by register protocol */
     pcilib_dma_context_t *dma_ctx;							/**< DMA context */
     pcilib_context_t *event_ctx;							/**< Implmentation context */
-
+	void* locks_handle;			/**< adress of the kernel memory use for locks from user space*/
 #ifdef PCILIB_FILE_IO
     int file_io_handle;
 #endif /* PCILIB_FILE_IO */

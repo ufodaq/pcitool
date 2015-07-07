@@ -1,38 +1,44 @@
+#define _XOPEN_SOURCE 700
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/file.h>
-
 #include "model.h"
 #include "error.h"
 #include "kmem.h"
 #include "pcilib.h"
 #include "pci.h"
+#include "lock.h"
 
 typedef struct pcilib_software_register_bank_context_s pcilib_software_register_bank_context_t;
 
+/**
+ * new context to save all needed informations for software registers
+ */
 struct pcilib_software_register_bank_context_s {
-    pcilib_register_bank_context_t bank_ctx;
+    pcilib_register_bank_context_t bank_ctx; /**< the bank context associated with the software registers*/
 
-    pcilib_kmem_handle_t *kmem;
-    void *addr;
+    pcilib_kmem_handle_t *kmem; /**< the kernel memory for software registers */
+    void *addr; /**< the base adress of the allocated kernel memory*/
 };
 
 /**
  * pcilib_software_registers_close
  * this function clear the kernel memory space that could have been allocated for software registers
+ *@param[in] ctx the pcilib_t running
  * @param[in] bank_ctx the bank context running that we get from the initialisation function
  */	
 void pcilib_software_registers_close(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx) {
 	if (((pcilib_software_register_bank_context_t*)bank_ctx)->kmem)
-	    pcilib_free_kernel_memory(ctx, ((pcilib_software_register_bank_context_t*)bank_ctx)->kmem, PCILIB_KMEM_FLAG_REUSE);
+	pcilib_free_kernel_memory(ctx, ((pcilib_software_register_bank_context_t*)bank_ctx)->kmem, PCILIB_KMEM_FLAG_REUSE);
 	free(bank_ctx);
 }
 
 /**
  * pcilib_software_registers_open
- * this function initializes the kernel space memory and stores in it the default values of the registers of the given bank index, if it was not initialized by a concurrent process, and return a bank context containing the adress of this kernel space. It the kernel space memory was already initialized by a concurrent process, then this function just return the bank context with the adress of this kernel space already used
+ * this function initializes the kernel space memory and stores in it the default values of the registers of the given bank index, if it was not initialized by a concurrent process, and return a bank context containing the adress of this kernel space. If the kernel space memory was already initialized by a concurrent process, then this function just return the bank context with the adress of this kernel space already used. The initialization is protected by the locking mechanisms of lock files.
  * @param[in] ctx the pcilib_t structure running
  * @param[in] bank the bank index that will permits to get the bank we want registers from
  * @param[in] model not used
@@ -43,6 +49,7 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 	pcilib_software_register_bank_context_t *bank_ctx;
 	pcilib_kmem_handle_t *handle;
 	pcilib_kmem_reuse_state_t reused;
+	pcilib_lock_t* semId=NULL;
 
 	const pcilib_register_bank_description_t *bank_desc = ctx->banks + bank;
 	
@@ -52,8 +59,12 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 	}
 
 	bank_ctx = calloc(1, sizeof(pcilib_software_register_bank_context_t));
+	
+	/* prtoection against several kernel memory allocation*/
+	semId=pcilib_init_lock(ctx,"thisatest2");
+	pcilib_lock(semId,MUTEX_LOCK);
 
-	handle = pcilib_alloc_kernel_memory(ctx, PCILIB_KMEM_TYPE_PAGE, 1, PCILIB_KMEM_PAGE_SIZE, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_SOFTWARE_REGISTERS, bank), PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_PERSISTENT);
+	handle = pcilib_alloc_kernel_memory(ctx, PCILIB_KMEM_TYPE_PAGE, 1, PCILIB_KMEM_PAGE_SIZE, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_SOFTWARE_REGISTERS, bank), PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_PERSISTENT); /**< get the kernel memory*/
 	if (!handle) {
 	    pcilib_error("Allocation of kernel memory for software registers has failed");
 	    pcilib_software_registers_close(ctx, (pcilib_register_bank_context_t*)bank_ctx);
@@ -75,11 +86,18 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 		
 	    for (i = 0; ctx->model_info.registers[i].name != NULL; i++) {
 		if ((ctx->model_info.registers[i].bank == ctx->banks[bank].addr)&&(ctx->model_info.registers[i].type == PCILIB_REGISTER_STANDARD)) {
-		    *(pcilib_register_value_t*)(bank_ctx->addr + ctx->model_info.registers[i].addr) = ctx->model_info.registers[i].defvalue;
+
+			/*initialization here*/
+			
+			*(pcilib_register_value_t*)(bank_ctx->addr + ctx->model_info.registers[i].addr) = ctx->model_info.registers[i].defvalue;
+
+
+	
 		}
 	    }
 	}
-
+	pcilib_unlock(semId);
+	
 	return (pcilib_register_bank_context_t*)bank_ctx;
 }
 
@@ -93,11 +111,12 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
  * @return 0 in case of success
  */
 int pcilib_software_registers_read(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx, pcilib_register_addr_t addr, pcilib_register_value_t *value){
+
 	if ((addr + sizeof(pcilib_register_value_t)) > bank_ctx->bank->size) {
 	    pcilib_error("Trying to access space outside of the define register bank (bank: %s, addr: 0x%lx)", bank_ctx->bank->name, addr);
 	    return PCILIB_ERROR_INVALID_ADDRESS;
 	}
-	
+	/* the following reading is considered atomic operation, so not protected, may change*/
 	*value = *(pcilib_register_value_t*)(((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr);
 	return 0;
 }
@@ -116,7 +135,7 @@ int pcilib_software_registers_write(pcilib_t *ctx, pcilib_register_bank_context_
 	    pcilib_error("Trying to access space outside of the define register bank (bank: %s, addr: 0x%lx)", bank_ctx->bank->name, addr);
 	    return PCILIB_ERROR_INVALID_ADDRESS;
 	}
-	
+	/* the following writing is considered atomic operation, so not protected, may change*/
 	*(pcilib_register_value_t*)(((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr) = value;
 	return 0;
 }

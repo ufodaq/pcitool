@@ -79,6 +79,7 @@ static const pcilib_register_description_t ipe_dma_registers[] = {
     {0x005C, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "desc_mem_addr", 		"Number of descriptors configured"},
     {0x0060, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "update_thresh",  		"Update threshold of progress register"},
     {0x0000, 	0, 	32, 	PCILIB_VERSION, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_version",  		"Version of DMA engine"},
+	{0x005, 	0, 	32, 	PCILIB_VERSION, 	0x00000040,	PCILIB_REGISTER_RW   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "test",  		"testdesc"},
     {0,		0,	0,	0,	0x00000000,	0,                                           0,                        0, NULL, 			NULL}
 };
 #endif /* _PCILIB_EXPORT_C */

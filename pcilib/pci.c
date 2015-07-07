@@ -1,4 +1,5 @@
 //#define PCILIB_FILE_IO
+#define _XOPEN_SOURCE 700
 #define _BSD_SOURCE
 #define _POSIX_C_SOURCE 200809L
 
@@ -24,6 +25,7 @@
 #include "model.h"
 #include "plugin.h"
 #include "bar.h"
+#include "locking.h"
 
 static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
     int i, j;
@@ -159,6 +161,12 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	ctx->model_info.protocols = ctx->protocols;
 	ctx->model_info.ranges = ctx->ranges;
 
+	err=pcilib_init_locking(ctx);
+	if (err) {
+	    pcilib_error("Error (%i) initializing locking\n", err);
+	    pcilib_close(ctx);
+	    return NULL;
+	}
 
 	err = pcilib_init_register_banks(ctx);
 	if (err) {

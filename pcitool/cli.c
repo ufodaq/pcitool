@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200112L
 #define _BSD_SOURCE
 
@@ -37,6 +38,7 @@
 #include "error.h"
 #include "debug.h"
 #include "model.h"
+#include "locking.h"
 
 /* defines */
 #define MAX_KBUF 14
@@ -89,7 +91,8 @@ typedef enum {
     MODE_ALLOC_KMEM,
     MODE_LIST_KMEM,
     MODE_READ_KMEM,
-    MODE_FREE_KMEM
+    MODE_FREE_KMEM,
+	MODE_FREE_LOCKS
 } MODE;
 
 typedef enum {
@@ -167,7 +170,8 @@ typedef enum {
     OPT_VERIFY,
     OPT_WAIT,
     OPT_MULTIPACKET,
-    OPT_VERBOSE
+    OPT_VERBOSE,
+	OPT_FREE_LOCKS
 } OPTIONS;
 
 static struct option long_options[] = {
@@ -219,6 +223,7 @@ static struct option long_options[] = {
     {"multipacket",		no_argument, 0, OPT_MULTIPACKET },
     {"wait",			no_argument, 0, OPT_WAIT },
     {"help",			no_argument, 0, OPT_HELP },
+	{"free-locks",		no_argument, 0, OPT_FREE_LOCKS},
     { 0, 0, 0, 0 }
 };
 
@@ -272,6 +277,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "				  block is specified as: use:block_number\n"
 "   --alloc-kernel-memory <use>	- Allocate kernel buffers (DANGEROUS)\n"
 "   --free-kernel-memory <use>	- Cleans lost kernel space buffers (DANGEROUS)\n"
+"	--free-locks				- Cleans locks allocated during pcitool program use(dangerous in a concurrential model)\n"
 "	dma			- Remove all buffers allocated by DMA subsystem\n"
 "	#number			- Remove all buffers with the specified use id\n"
 "\n"
@@ -2570,6 +2576,9 @@ int main(int argc, char **argv) {
 		    event = stmp;
 		}
 	    break;
+		case OPT_FREE_LOCKS:
+		mode=MODE_FREE_LOCKS;
+		break;
 	    case OPT_TRIGGER:
 		if ((mode != MODE_INVALID)&&((mode != MODE_GRAB)||(grab_mode&GRAB_MODE_TRIGGER))) Usage(argc, argv, "Multiple operations are not supported");
 
@@ -2949,7 +2958,6 @@ int main(int argc, char **argv) {
 
     model_info = pcilib_get_model_description(handle);
     dma_info = pcilib_get_dma_description(handle);
-
     switch (mode) {
      case MODE_WRITE:
         if (((argc - optind) == 1)&&(*argv[optind] == '*')) {
@@ -3137,6 +3145,9 @@ int main(int argc, char **argv) {
     }
 
     switch (mode) {
+	case MODE_FREE_LOCKS:
+	  pcilib_clean_all_locks(handle);
+	break;
      case MODE_INFO:
         Info(handle, model_info);
      break;
