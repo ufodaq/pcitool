@@ -989,8 +989,8 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
         format = model_info->banks[bank_id].format;
         if (!format) format = "%lu";
 
-        err = pcilib_read_register_by_id(handle, regid, &value);
-    //    err = pcilib_read_register(handle, bank, reg, &value);
+	     err = pcilib_read_register_by_id(handle, regid, &value);
+	     // err = pcilib_read_register(handle, bank, reg, &value);
         if (err) printf("Error reading register %s\n", reg);
         else {
 	    printf("%s = ", reg);

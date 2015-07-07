@@ -120,6 +120,7 @@ void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data) {
 }
 
 int pcilib_map_register_space(pcilib_t *ctx) {
+  printf("mapping\n");
     int err;
     pcilib_register_bank_t i;
     

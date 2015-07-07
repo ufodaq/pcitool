@@ -306,8 +306,12 @@ void pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank,xmlChar* 
 		
 		if(strcmp((char*)bar,"0")==0){
 			mybank->bar=PCILIB_BAR0;
-		}else if(strcmp((char*)bar,"ipecamera_register")==0){
+		}else if(strcmp((char*)bar,"1")==0){
 			mybank->bar=PCILIB_BAR1;
+		}else if(strcmp((char*)bar,"no_bar")==0){
+			mybank->bar=PCILIB_BAR_NOBAR;
+		}else{
+		  mybank->bar=PCILIB_BAR_INVALID;
 		}
 		
 		mybank->bar=(pcilib_bar_t)strtol((char*)bar,&ptr,0);
@@ -336,7 +340,7 @@ void pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank,xmlChar* 
 		}else if(strcmp((char*)endianess,"host")==0){
 			mybank->endianess=PCILIB_HOST_ENDIAN;
 		}		
-		
+		mybank->format=(char*)format;
 		mybank->raw_endianess=mybank->endianess;
 
 		mybank->name=(char*)name;

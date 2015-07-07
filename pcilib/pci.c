@@ -294,6 +294,7 @@ int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
 	
 char *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr) {
     if (bar == PCILIB_BAR_DETECT) {
+      printf("bar = PCILIB_BAR_DETECT\n");
 	    // First checking the default register bar
 	size_t offset = addr - ctx->board_info.bar_start[ctx->reg_bar];
 	if ((addr > ctx->board_info.bar_start[ctx->reg_bar])&&(offset < ctx->board_info.bar_length[ctx->reg_bar])) {
@@ -308,6 +309,7 @@ char *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t
 	    // Otherwise trying to detect
 	bar = pcilib_detect_bar(ctx, addr, 1);
 	if (bar != PCILIB_BAR_INVALID) {
+	  printf("bar pas ainvalid\n");
 	    size_t offset = addr - ctx->board_info.bar_start[bar];
 	    if ((offset < ctx->board_info.bar_length[bar])&&(ctx->bar_space[bar])) {
 		if (!ctx->bar_space[bar]) {
@@ -318,16 +320,21 @@ char *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t
 	    }
 	}
     } else {
+	printf("bar internal :%i\n",bar);
+	//      printf("bar invalid\n");
 	if (!ctx->bar_space[bar]) {
 	    pcilib_error("The requested bar (%i) is not mapped", bar);
 	    return NULL;
 	}
 	
 	if (addr < ctx->board_info.bar_length[bar]) {
+	  printf("path1\n");
+	  // printf("apres: %s\n",ctx->bar_space[bar] + addr);
 	    return ctx->bar_space[bar] + addr + (ctx->board_info.bar_start[bar] & ctx->page_mask);
 	}
 	
 	if ((addr >= ctx->board_info.bar_start[bar])&&(addr < (ctx->board_info.bar_start[bar] + ctx->board_info.bar_length[ctx->reg_bar]))) {
+	  printf("path2\n");
 	    return ctx->bar_space[bar] + (addr - ctx->board_info.bar_start[bar]) + (ctx->board_info.bar_start[bar] & ctx->page_mask);
 	}
     }

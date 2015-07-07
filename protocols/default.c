@@ -13,15 +13,18 @@ int pcilib_default_read(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx,
     pcilib_register_value_t val = 0;
     
     const pcilib_register_bank_description_t *b = bank_ctx->bank;
-
+    printf("bank name %s\n",b->name);
+    printf("bank bar %i\n",b->bar);
+    printf("addr %i\n",addr);
     int access = b->access / 8;
-
+    printf("access : %i\n",access);
     ptr =  pcilib_resolve_register_address(ctx, b->bar, b->read_addr + addr);
+    // printf("ptr %s\n",ptr);
     default_datacpy(&val, ptr, access, b);
-
+    printf("val : %i\n",val);
 //    *value = val&BIT_MASK(bits);
     *value = val;
-
+    printf("value : %i\n",*value);
     return 0;
 }
 
