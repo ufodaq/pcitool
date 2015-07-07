@@ -49,7 +49,7 @@ int pcilib_init_locking(pcilib_t* ctx, ...){
 
 	ctx->locks_handle=handle;
         reused = pcilib_kmem_is_reused(ctx, handle);
-//#define DEBUG_REUSE
+	#define DEBUG_REUSE
 #ifdef DEBUG_REUSE
 reused=0;
 #endif
@@ -57,7 +57,7 @@ reused=0;
 	    pcilib_register_t i;
 
 	    if (reused & PCILIB_KMEM_REUSE_PARTIAL) {
-		pcilib_error("Inconsistent software registers are found (only part of required buffers is available)");
+		pcilib_error("Inconsistent memory for locks was found (only part of required buffers is available)");
 	        pcilib_clean_all_locks(ctx);
 		return 1;
 	    }
