@@ -61,7 +61,7 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 	bank_ctx = calloc(1, sizeof(pcilib_software_register_bank_context_t));
 	
 	/* prtoection against several kernel memory allocation*/
-	semId=pcilib_init_lock(ctx,"thisatest2");
+	semId=pcilib_init_lock(ctx,PCILIB_LOCK,"%s_%s",bank_desc->name,"software_register");
 	pcilib_lock(semId,MUTEX_LOCK);
 
 	handle = pcilib_alloc_kernel_memory(ctx, PCILIB_KMEM_TYPE_PAGE, 1, PCILIB_KMEM_PAGE_SIZE, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_SOFTWARE_REGISTERS, bank), PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_PERSISTENT); /**< get the kernel memory*/
