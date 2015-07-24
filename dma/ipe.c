@@ -22,8 +22,8 @@
 
 
 pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const void *arg) {
-//    int err = 0;
-    
+    pcilib_register_value_t value;
+
     const pcilib_model_description_t *model_info = pcilib_get_model_description(pcilib);
 
     ipe_dma_t *ctx = malloc(sizeof(ipe_dma_t));
@@ -31,11 +31,6 @@ pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const vo
     if (ctx) {
 	memset(ctx, 0, sizeof(ipe_dma_t));
 	ctx->dmactx.pcilib = pcilib;
-
-#ifdef IPEDMA_64BIT_MODE
-	    // Always supported and we need to use it
-	ctx->mode64 = 1;
-#endif /* IPEDMA_64BIT_MODE */
 
 	pcilib_register_bank_t dma_bank = pcilib_find_register_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
 
@@ -47,6 +42,15 @@ pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const vo
 
 	ctx->dma_bank = model_info->banks + dma_bank;
 	ctx->base_addr = pcilib_resolve_register_address(pcilib, ctx->dma_bank->bar, ctx->dma_bank->read_addr);
+
+#ifdef IPEDMA_ENFORCE_64BIT_MODE
+	ctx->mode64 = 1;
+#else /* IPEDMA_ENFORCE_64BIT_MODE */
+	    // According to Lorenzo, some gen2 boards have problems with 64-bit addressing. Therefore, we only enable it for gen3 boards unless enforced
+	RD(IPEDMA_REG_PCIE_GEN, value);
+	if (value > 2) ctx->mode64 = 1;
+	else ctx->mode64 = 0;
+#endif /* IPEDMA_ENFORCE_64BIT_MODE */
     }
 
     return (pcilib_dma_context_t*)ctx;

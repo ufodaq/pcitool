@@ -65,6 +65,7 @@ static const pcilib_register_description_t ipe_dma_registers[] = {
     {0x000C, 	24, 	8, 	0, 	0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "mwr_up_addr",  			"Upper address for 64 bit memory addressing"},
     {0x0010, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "mwr_count",  		"Write DMA TLP Count"},
     {0x0014, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "mwr_pattern",  		"DMA generator data pattern"},
+    {0x0018, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "pcie_gen",  			"PCIe version 2/3 depending on the used XILINX core"},
     {0x0028, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "mwr_perf",			"MWR Performance"},
     {0x003C, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "cfg_lnk_width",		"Negotiated and max width of PCIe Link"},
     {0x003C, 	0, 	6, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "cfg_cap_max_lnk_width", 		"Max link width"},

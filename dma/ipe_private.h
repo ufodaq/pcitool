@@ -3,12 +3,12 @@
 
 #include "dma.h"
 
-#define IPEDMA_64BIT_MODE		1		/**< 64-bit mode addressing is required to support PCIe gen3 */
+//#define IPEDMA_ENFORCE_64BIT_MODE	1		/**< enforce 64-bit mode addressing (otherwise it is used only if register 0x18 specifies PCIe gen3 as required by DMA engine) */
 #define IPEDMA_CORES			1
 #define IPEDMA_MAX_TLP_SIZE		256		/**< Defines maximum TLP in bytes supported by device */
-//#define IPEDMA_TLP_SIZE		128		/**< If set, enforces the specified TLP size */
+//#define IPEDMA_TLP_SIZE			128		/**< If set, enforces the specified TLP size */
 
-#define IPEDMA_STREAMING_MODE				/**< Enables streaming DMA operation mode instead of ring-buffer, the page is written once and forgotten and need to be pushed in queue again */
+//#define IPEDMA_STREAMING_MODE				/**< Enables streaming DMA operation mode instead of ring-buffer, the page is written once and forgotten and need to be pushed in queue again */
 #define IPEDMA_STREAMING_CHECKS				/**< Enables status checks in streaming mode (it will cause performance penalty) */
 #define IPEDMA_PAGE_SIZE		4096
 #define IPEDMA_DMA_PAGES		1024		/**< number of DMA pages in the ring buffer to allocate */
@@ -31,6 +31,7 @@
 #define IPEDMA_REG_CONTROL		0x04
 #define IPEDMA_REG_TLP_SIZE		0x0C
 #define IPEDMA_REG_TLP_COUNT		0x10
+#define IPEDMA_REG_PCIE_GEN		0x18
 #define IPEDMA_REG_PAGE_ADDR		0x50
 #define IPEDMA_REG_UPDATE_ADDR		0x54
 #define IPEDMA_REG_LAST_READ		0x58		/**< In streaming mode, we can use it freely to track current status */
