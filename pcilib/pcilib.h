@@ -63,6 +63,17 @@ typedef enum {
 } pcilib_dma_flags_t;
 
 typedef enum {
+    PCILIB_STREAMING_STOP = 0, 		/**< stop streaming */
+    PCILIB_STREAMING_CONTINUE = 1, 	/**< wait the default DMA timeout for a new data */
+    PCILIB_STREAMING_WAIT = 2,		/**< wait the specified timeout for a new data */
+    PCILIB_STREAMING_CHECK = 3,		/**< do not wait for the data, bail out imideatly if no data ready */
+    PCILIB_STREAMING_FAIL = 4,		/**< fail if data is not available on timeout */
+    PCILIB_STREAMING_REQ_FRAGMENT = 5,	/**< only fragment of a packet is read, wait for next fragment and fail if no data during DMA timeout */
+    PCILIB_STREAMING_REQ_PACKET = 6,	/**< wait for next packet and fail if no data during the specified timeout */
+    PCILIB_STREAMING_TIMEOUT_MASK = 3	/**< mask specifying all timeout modes */
+} pcilib_streaming_action_t;
+
+typedef enum {
     PCILIB_EVENT_FLAGS_DEFAULT = 0,
     PCILIB_EVENT_FLAG_RAW_DATA_ONLY = 1,	/**< Do not parse data, just read raw and pass it to rawdata callback. If passed to rawdata callback, idicates the data is not identified as event (most probably just padding) */
     PCILIB_EVENT_FLAG_STOP_ONLY = 1,		/**< Do not cleanup, just stop acquiring new frames, the cleanup should be requested afterwards */

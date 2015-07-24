@@ -8,6 +8,7 @@ Supported environmental variables
  IPECAMERA_DEBUG_RAW_PACKETS	- Store all raw packets read from DMA grouped in frames (variable may specify directory)
  IPECAMERA_DEBUG_RAW_FRAMES	- Store all raw frames (variable may specify directory)
  IPECAMERA_DEBUG_HARDWARE	- Produce various debugging information about ipecamera operation
+ IPECAMERA_DEBUG_FRAME_HEADERS  - Print headers of each frame
 
  PCILIB_BENCHMARK_HARDWARE	- Remove all unnecessary software processing (like copying memcpy) to check hardware performance
  PCILIB_BENCHMARK_STREAMING	- Emulate streaming mode while benchmarking DMA engines

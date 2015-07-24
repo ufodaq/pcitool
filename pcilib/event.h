@@ -45,17 +45,6 @@ typedef struct {
     const char *description;
 } pcilib_event_data_type_description_t;
 
-typedef enum {
-    PCILIB_STREAMING_STOP = 0, 		/**< stop streaming */
-    PCILIB_STREAMING_CONTINUE = 1, 	/**< wait the default DMA timeout for a new data */
-    PCILIB_STREAMING_WAIT = 2,		/**< wait the specified timeout for a new data */
-    PCILIB_STREAMING_CHECK = 3,		/**< do not wait for the data, bail out imideatly if no data ready */
-    PCILIB_STREAMING_FAIL = 4,		/**< fail if data is not available on timeout */
-    PCILIB_STREAMING_REQ_FRAGMENT = 5,	/**< only fragment of a packet is read, wait for next fragment and fail if no data during DMA timeout */
-    PCILIB_STREAMING_REQ_PACKET = 6,	/**< wait for next packet and fail if no data during the specified timeout */
-    PCILIB_STREAMING_TIMEOUT_MASK = 3	/**< mask specifying all timeout modes */
-} pcilib_streaming_action_t;
-
 /*
  * get_data: This call is used by get_data and copy_data functions of public  
  * interface. When copy_data is the caller, the data parameter will be passed.
