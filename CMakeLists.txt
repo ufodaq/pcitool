@@ -17,12 +17,13 @@ if (NOT DISABLE_PCITOOL)
     pkg_check_modules(FASTWRITER fastwriter REQUIRED)
 endif (NOT DISABLE_PCITOOL)
 
-add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3")
-#add_definitions("-fPIC --std=c99 -Wall -O2")
+check_include_files(stdatomic.h HAVE_STDATOMIC_H)
+
+add_definitions("-fPIC --std=c11 -Wall -O2 -gdwarf-2 -g3")
+#add_definitions("-fPIC --std=c11 -Wall -O2")
 
 include(cmake/version.cmake)
 VERSION_TO_VARS(${PCILIB_VERSION} PCILIB_VERSION_MAJOR PCILIB_VERSION_MINOR PCILIB_VERSION_MICRO)
-
 
 add_subdirectory(dma)
 add_subdirectory(protocols)

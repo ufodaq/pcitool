@@ -79,9 +79,16 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
     }
     
     memset(kbuf, 0, sizeof(pcilib_kmem_list_t) + nmemb * sizeof(pcilib_kmem_addr_t));
-    
+
+    err = pcilib_lock(ctx->locks.mmap);
+    if (!err) {
+	pcilib_error("Error acquiring mmap lock");
+	return NULL;
+    }
+
     ret = ioctl( ctx->handle, PCIDRIVER_IOC_MMAP_MODE, PCIDRIVER_MMAP_KMEM );
     if (ret) {
+	pcilib_unlock(ctx->locks.mmap);
 	pcilib_error("PCIDRIVER_IOC_MMAP_MODE ioctl have failed");
 	return NULL;
     }
@@ -168,6 +175,9 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	
 	kbuf->buf.blocks[i].mmap_offset = kh.pa & ctx->page_mask;
     }
+
+    pcilib_unlock(ctx->locks.mmap);
+
 
 	//This is possible in the case of error (nothing is allocated yet) or if buffers are not reused
     if (persistent < 0) persistent = 0;

@@ -24,6 +24,7 @@
 #include "event.h"
 #include "model.h"
 #include "export.h"
+#include "locking.h"
 
 typedef struct {
     uint8_t max_link_speed, link_speed;
@@ -69,6 +70,8 @@ struct pcilib_s {
     pcilib_register_bank_context_t *bank_ctx[PCILIB_MAX_REGISTER_BANKS];		/**< Contexts for registers banks if required by register protocol */
     pcilib_dma_context_t *dma_ctx;							/**< DMA context */
     pcilib_context_t *event_ctx;							/**< Implmentation context */
+
+    struct pcilib_locking_s locks;							/**< Context of locking subsystem */
 
 #ifdef PCILIB_FILE_IO
     int file_io_handle;

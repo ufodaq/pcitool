@@ -1,4 +1,5 @@
 //#define PCILIB_FILE_IO
+#define _XOPEN_SOURCE 700
 #define _BSD_SOURCE
 #define _POSIX_C_SOURCE 200809L
 
@@ -24,6 +25,7 @@
 #include "model.h"
 #include "plugin.h"
 #include "bar.h"
+#include "locking.h"
 
 static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
     int i, j;
@@ -118,6 +120,18 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	}
 	
 	ctx->page_mask = (uintptr_t)-1;
+	
+	if ((model)&&(!strcasecmp(model, "maintenance"))) {
+	    ctx->model = strdup("maintenance");
+	    return ctx;
+	}
+
+	err = pcilib_init_locking(ctx);
+	if (err) {
+	    pcilib_error("Error (%i) initializing locking subsystem", err);
+	    pcilib_close(ctx);
+	    return NULL;
+	}
 
 	ctx->alloc_reg = PCILIB_DEFAULT_REGISTER_SPACE;
 	ctx->registers = (pcilib_register_description_t *)malloc(PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_description_t));
@@ -158,7 +172,6 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	ctx->model_info.banks = ctx->banks;
 	ctx->model_info.protocols = ctx->protocols;
 	ctx->model_info.ranges = ctx->ranges;
-
 
 	err = pcilib_init_register_banks(ctx);
 	if (err) {
@@ -335,7 +348,10 @@ void pcilib_close(pcilib_t *ctx) {
 
 	if (ctx->event_plugin)
 	    pcilib_plugin_close(ctx->event_plugin);
-	
+
+	if (ctx->locks.kmem)
+	    pcilib_free_locking(ctx);
+
 	if (ctx->kmem_list) {
 	    pcilib_warning("Not all kernel buffers are properly cleaned");
 	
@@ -360,7 +376,7 @@ void pcilib_close(pcilib_t *ctx) {
 	
 	if (ctx->model)
 	    free(ctx->model);
-	
+
 	if (ctx->handle >= 0)
 	    close(ctx->handle);
 	
