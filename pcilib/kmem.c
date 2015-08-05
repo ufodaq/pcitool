@@ -81,8 +81,8 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
     memset(kbuf, 0, sizeof(pcilib_kmem_list_t) + nmemb * sizeof(pcilib_kmem_addr_t));
 
     err = pcilib_lock(ctx->locks.mmap);
-    if (!err) {
-	pcilib_error("Error acquiring mmap lock");
+    if (err) {
+	pcilib_error("Error (%i) acquiring mmap lock", err);
 	return NULL;
     }
 
