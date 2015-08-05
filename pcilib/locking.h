@@ -20,7 +20,7 @@ typedef struct pcilib_locking_s pcilib_locking_t;
 struct pcilib_locking_s {
     pcilib_kmem_handle_t *kmem;							/**< kmem used to store mutexes */
     pcilib_lock_t *locking;							/**< lock used while intializing other locks */
-    pcilib_lock_t *mmap;							/**< lock used to protect mmap operation */
+//    pcilib_lock_t *mmap;							/**< lock used to protect mmap operation */
 };
 
 #ifdef __cplusplus

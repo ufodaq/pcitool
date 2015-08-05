@@ -46,11 +46,10 @@ int pcilib_init_locking(pcilib_t* ctx) {
     }
 
     ctx->locks.locking = pcilib_get_lock(ctx, PCILIB_LOCK_FLAG_UNLOCKED, "locking");
-    ctx->locks.mmap = pcilib_get_lock(ctx,  PCILIB_LOCK_FLAG_UNLOCKED, "mmap");
 
     pcilib_unlock_global(ctx);
 
-    if ((!ctx->locks.locking)||(!ctx->locks.mmap)) {
+    if ((!ctx->locks.locking)) {
 	pcilib_error("Locking subsystem has failed to initialized mandatory global locks");
 	return PCILIB_ERROR_FAILED;
     }
@@ -62,9 +61,6 @@ int pcilib_init_locking(pcilib_t* ctx) {
  * this functions destroy all locks and then free the kernel memory allocated for them
  */
 void pcilib_free_locking(pcilib_t *ctx) {
-    if (ctx->locks.mmap)
-	pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, ctx->locks.mmap);
-
     if (ctx->locks.locking)
 	pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, ctx->locks.locking);
 

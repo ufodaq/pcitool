@@ -140,7 +140,10 @@ const char *pcilib_lock_get_name(pcilib_lock_t *lock) {
 int pcilib_lock_custom(pcilib_lock_t *lock, pcilib_lock_flags_t flags, pcilib_timeout_t timeout) {
     int err;
 
-    if (!lock) return 0;
+    if (!lock) {
+	pcilib_error("The null lock pointer is passed to lock function");
+	return PCILIB_ERROR_INVALID_ARGUMENT;
+    }
 
     struct timespec tm;
 
