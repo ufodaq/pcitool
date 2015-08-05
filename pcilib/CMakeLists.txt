@@ -16,6 +16,6 @@ install(FILES pcilib.h
     DESTINATION include
 )
 
-install(FILES bar.h kmem.h bank.h register.h dma.h event.h model.h error.h debug.h env.h tools.h export.h version.h
+install(FILES bar.h kmem.h locking.h lock.h bank.h register.h dma.h event.h model.h error.h debug.h env.h tools.h export.h version.h
     DESTINATION include/pcilib
 )
