@@ -61,6 +61,7 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 
 	lock = pcilib_get_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, "softreg/%s", bank_desc->name);
 	if (!lock) {
+	    pcilib_software_registers_close(ctx, (pcilib_register_bank_context_t*)bank_ctx);
 	    pcilib_error("Failed to initialize a lock to protect bank %s with software registers", bank_desc->name);
 	    return NULL;
 	}
@@ -68,6 +69,7 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 	err = pcilib_lock(lock);
 	if (err) {
 	    pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, lock);
+	    pcilib_software_registers_close(ctx, (pcilib_register_bank_context_t*)bank_ctx);
 	    pcilib_error("Error (%i) obtaining lock on bank %s with software registers", err, bank_desc->name);
 	    return NULL;
 	}
@@ -77,8 +79,8 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 	if (!handle) {
 	    pcilib_unlock(lock);
 	    pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, lock);
-	    pcilib_error("Allocation of kernel memory for software registers has failed");
 	    pcilib_software_registers_close(ctx, (pcilib_register_bank_context_t*)bank_ctx);
+	    pcilib_error("Allocation of kernel memory for software registers has failed");
 	    return NULL;
 	}
 	
@@ -92,8 +94,8 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 	    if (reused & PCILIB_KMEM_REUSE_PARTIAL) {
 		pcilib_unlock(lock);
 		pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, lock);
-		pcilib_error("Inconsistent software registers are found (only part of required buffers is available)");
 		pcilib_software_registers_close(ctx, (pcilib_register_bank_context_t*)bank_ctx);
+		pcilib_error("Inconsistent software registers are found (only part of required buffers is available)");
 		return NULL;
 	    }
 		
