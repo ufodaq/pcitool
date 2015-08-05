@@ -13,10 +13,10 @@
 typedef struct pcilib_software_register_bank_context_s pcilib_software_register_bank_context_t;
 
 struct pcilib_software_register_bank_context_s {
-    pcilib_register_bank_context_t bank_ctx;
+    pcilib_register_bank_context_t bank_ctx;	 /**< the bank context associated with the software registers */
 
-    pcilib_kmem_handle_t *kmem;
-    void *addr;
+    pcilib_kmem_handle_t *kmem;			/**< the kernel memory for software registers */
+    void *addr;					/**< the virtual adress of the allocated kernel memory*/
 };
 
 /**
@@ -40,8 +40,10 @@ void pcilib_software_registers_close(pcilib_t *ctx, pcilib_register_bank_context
  * @return a bank context with the adress of the kernel space memory related to it
  */
 pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pcilib_register_bank_t bank, const char* model, const void *args) {
+	int err;
 	pcilib_software_register_bank_context_t *bank_ctx;
 	pcilib_kmem_handle_t *handle;
+	pcilib_lock_t *lock;
 	pcilib_kmem_reuse_state_t reused;
 
 	const pcilib_register_bank_description_t *bank_desc = ctx->banks + bank;
@@ -52,9 +54,29 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 	}
 
 	bank_ctx = calloc(1, sizeof(pcilib_software_register_bank_context_t));
+	if (!bank_ctx) {
+	    pcilib_error("Memory allocation for bank context has failed");
+	    return NULL;
+	}
+
+	lock = pcilib_get_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, "softreg/%s", bank_desc->name);
+	if (!lock) {
+	    pcilib_error("Failed to initialize a lock to protect bank %s with software registers", bank_desc->name);
+	    return NULL;
+	}
+	
+	err = pcilib_lock(lock);
+	if (err) {
+	    pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, lock);
+	    pcilib_error("Error (%i) obtaining lock on bank %s with software registers", err, bank_desc->name);
+	    return NULL;
+	}
+
 
 	handle = pcilib_alloc_kernel_memory(ctx, PCILIB_KMEM_TYPE_PAGE, 1, PCILIB_KMEM_PAGE_SIZE, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_SOFTWARE_REGISTERS, bank_desc->addr), PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_PERSISTENT);
 	if (!handle) {
+	    pcilib_unlock(lock);
+	    pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, lock);
 	    pcilib_error("Allocation of kernel memory for software registers has failed");
 	    pcilib_software_registers_close(ctx, (pcilib_register_bank_context_t*)bank_ctx);
 	    return NULL;
@@ -68,6 +90,8 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 	    pcilib_register_t i;
 
 	    if (reused & PCILIB_KMEM_REUSE_PARTIAL) {
+		pcilib_unlock(lock);
+		pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, lock);
 		pcilib_error("Inconsistent software registers are found (only part of required buffers is available)");
 		pcilib_software_registers_close(ctx, (pcilib_register_bank_context_t*)bank_ctx);
 		return NULL;
@@ -79,6 +103,9 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 		}
 	    }
 	}
+
+	pcilib_unlock(lock);
+	pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, lock);
 
 	return (pcilib_register_bank_context_t*)bank_ctx;
 }
@@ -97,7 +124,8 @@ int pcilib_software_registers_read(pcilib_t *ctx, pcilib_register_bank_context_t
 	    pcilib_error("Trying to access space outside of the define register bank (bank: %s, addr: 0x%lx)", bank_ctx->bank->name, addr);
 	    return PCILIB_ERROR_INVALID_ADDRESS;
 	}
-	
+
+	    // we consider this atomic operation and, therefore, do no locking
 	*value = *(pcilib_register_value_t*)(((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr);
 	return 0;
 }
@@ -111,12 +139,13 @@ int pcilib_software_registers_read(pcilib_t *ctx, pcilib_register_bank_context_t
  * @param[out] value the value we want to write in the register
  * @return 0 in case of success
  */
-int pcilib_software_registers_write(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx, pcilib_register_addr_t addr, pcilib_register_value_t value){
+int pcilib_software_registers_write(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx, pcilib_register_addr_t addr, pcilib_register_value_t value) {
 	if ((addr + sizeof(pcilib_register_value_t)) > bank_ctx->bank->size) {
 	    pcilib_error("Trying to access space outside of the define register bank (bank: %s, addr: 0x%lx)", bank_ctx->bank->name, addr);
 	    return PCILIB_ERROR_INVALID_ADDRESS;
 	}
 	
+	    // we consider this atomic operation and, therefore, do no locking
 	*(pcilib_register_value_t*)(((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr) = value;
 	return 0;
 }
