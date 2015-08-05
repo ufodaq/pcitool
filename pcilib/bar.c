@@ -73,21 +73,29 @@ int pcilib_detect_address(pcilib_t *ctx, pcilib_bar_t *bar, uintptr_t *addr, siz
 
 void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar) {
     void *res;
-    int ret; 
+    int err, ret; 
 
     const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
     if (!board_info) return NULL;
-    
+
     if (ctx->bar_space[bar]) return ctx->bar_space[bar];
-    
+
+    err = pcilib_lock(ctx->locks.mmap);
+    if (err) {
+	pcilib_error("Error (%i) acquiring mmap lock", err);
+	return NULL;
+    }
+
     ret = ioctl( ctx->handle, PCIDRIVER_IOC_MMAP_MODE, PCIDRIVER_MMAP_PCI );
     if (ret) {
+	pcilib_unlock(ctx->locks.mmap);
 	pcilib_error("PCIDRIVER_IOC_MMAP_MODE ioctl have failed", bar);
 	return NULL;
     }
 
     ret = ioctl( ctx->handle, PCIDRIVER_IOC_MMAP_AREA, PCIDRIVER_BAR0 + bar );
     if (ret) {
+	pcilib_unlock(ctx->locks.mmap);
 	pcilib_error("PCIDRIVER_IOC_MMAP_AREA ioctl have failed for bank %i", bar);
 	return NULL;
     }
@@ -98,12 +106,13 @@ void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar) {
 #else
     res = mmap( 0, board_info->bar_length[bar], PROT_WRITE | PROT_READ, MAP_SHARED, ctx->handle, 0 );
 #endif
+    pcilib_unlock(ctx->locks.mmap);
+
     if ((!res)||(res == MAP_FAILED)) {
 	pcilib_error("Failed to mmap data bank %i", bar);
 	return NULL;
     }
 
-    
     return res;
 }
 
