@@ -1,6 +1,6 @@
 project(pcitool)
 
-set(PCILIB_VERSION "0.2.0")
+set(PCILIB_VERSION "0.2.1")
 set(PCILIB_ABI_VERSION "2")
 
 cmake_minimum_required(VERSION 2.6)

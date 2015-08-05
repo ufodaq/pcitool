@@ -108,6 +108,9 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
     size_t i;
     pcilib_t *ctx = malloc(sizeof(pcilib_t));
 
+    if (!model)
+	model = getenv("PCILIB_MODEL");
+
     if (ctx) {
 	memset(ctx, 0, sizeof(pcilib_t));
 	ctx->pci_cfg_space_fd = -1;
