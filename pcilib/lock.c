@@ -190,6 +190,10 @@ int pcilib_lock(pcilib_lock_t* lock) {
     return pcilib_lock_custom(lock, PCILIB_LOCK_FLAGS_DEFAULT, PCILIB_TIMEOUT_INFINITE);
 }
 
+int pcilib_try_lock(pcilib_lock_t* lock) {
+    return pcilib_lock_custom(lock, PCILIB_LOCK_FLAGS_DEFAULT, PCILIB_TIMEOUT_IMMEDIATE);
+}
+
 /**
  * this function will unlock the semaphore pointed by lock_ctx.
  */

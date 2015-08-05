@@ -87,6 +87,13 @@ int pcilib_lock_custom(pcilib_lock_t* lock, pcilib_lock_flags_t flags, pcilib_ti
 int pcilib_lock(pcilib_lock_t* lock);
 
 /**
+ * this function will try to take a lock for the mutex pointed by lock
+ * @param[in] lock the pointer to the mutex
+ */
+int pcilib_try_lock(pcilib_lock_t* lock);
+
+
+/**
   * this function will unlock the lock pointed by lock 
  * @param[in] lock the integer that points to the semaphore
  */
