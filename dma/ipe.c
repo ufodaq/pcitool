@@ -71,7 +71,7 @@ void  dma_ipe_free(pcilib_dma_context_t *vctx) {
 
 
 int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags) {
-    size_t i;
+    size_t i, num_pages;
 
     ipe_dma_t *ctx = (ipe_dma_t*)vctx;
 
@@ -203,7 +203,13 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	    // Instructing DMA engine that writting should start from the first DMA page
 	*last_written_addr_ptr = 0;
 	
-	for (i = 0; i < IPEDMA_DMA_PAGES; i++) {
+	    // In ring buffer mode, the hardware taking care to preserve an empty buffer to help distinguish between
+	    // completely empty and completely full cases. In streaming mode, it is our responsibility to track this
+	    // information. Therefore, we always keep the last buffer free
+	num_pages = IPEDMA_DMA_PAGES;
+	if (ctx->streaming) num_pages--;
+	
+	for (i = 0; i < num_pages; i++) {
 	    uintptr_t bus_addr_check, bus_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, pages, i);
 	    WR(IPEDMA_REG_PAGE_ADDR, bus_addr);
 	    if (bus_addr%4096) printf("Bad address %lu: %lx\n", i, bus_addr);
@@ -496,7 +502,12 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
 	    // Return buffer into the DMA pool when processed
 	if (ctx->streaming) {
-	    uintptr_t buf_ba = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, cur_read);
+	    size_t last_free;
+		// We always keep 1 buffer free to distinguish between completely full and empty cases
+	    if (cur_read) last_free = cur_read - 1;
+	    else last_free = IPEDMA_DMA_PAGES - 1;
+
+	    uintptr_t buf_ba = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, last_free);
 	    WR(IPEDMA_REG_PAGE_ADDR, buf_ba);    
 # ifdef IPEDMA_STREAMING_CHECKS
 	    pcilib_register_value_t streaming_status;
