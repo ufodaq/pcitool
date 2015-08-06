@@ -1,23 +1,19 @@
 High Priority (we would need it for IPE Camera)
 =============
- 1. Serialize access to the registers across applications
- 2. Protect kmem_entries in the driver using spinlock
- 3. Protect mmap operation (multiple kernel calls) with some locking mechanism 
- 4. Allow overriding of registers and banks (performance?).
+ 1. Allow overriding of registers and banks (performance?).
  
 Normal Priority (it would make just few things a bit easier)
 ===============
- 1. Implement software registers (stored in kernel-memory)
- 2. Implement pcilib_configure_autotrigger
- 3. Provide OR and AND operations on registers in cli
- 4. Support writting a data from a binary file in cli
+ 1. Implement pcilib_configure_autotrigger
+ 2. Provide OR and AND operations on registers in cli
+ 3. Support writting a data from a binary file in cli
  
 Low Priority (only as generalization for other projects)
 ============
  1. XML configurations describing registers (and DMA engines?)
- 2. Access register/bank lookups using hash tables
+ 2. Access register/bank/lock lookups using hash tables
  3. Support for Network Registers and Network DMA
  4. Define a syntax for register dependencies / delays (?)
  5. Use pthread_condition_t instead of polling
  6. Support FIFO reads/writes from/to registers
-
+ 7. We managed kmem performance using next kmem prediction, but it is still wise to provide additionally a binary tree for faster search

@@ -9,7 +9,7 @@
 //#define IPEDMA_TLP_SIZE			128		/**< If set, enforces the specified TLP size */
 
 #define IPEDMA_STREAMING_MODE				/**< Enables streaming DMA operation mode instead of ring-buffer, the page is written once and forgotten and need to be pushed in queue again */
-#define IPEDMA_STREAMING_CHECKS				/**< Enables status checks in streaming mode (it will cause performance penalty) */
+//#define IPEDMA_STREAMING_CHECKS				/**< Enables status checks in streaming mode (it will cause _significant_ performance penalty, max ~ 2 GB/s) */
 #define IPEDMA_PAGE_SIZE		4096
 #define IPEDMA_DMA_PAGES		1024		/**< number of DMA pages in the ring buffer to allocate */
 #define IPEDMA_DMA_PROGRESS_THRESHOLD	1		/**< how many pages the DMA engine should fill before reporting progress */
