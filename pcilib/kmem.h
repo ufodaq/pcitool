@@ -1,8 +1,6 @@
 #ifndef _PCILIB_KMEM_H
 #define _PCILIB_KMEM_H
 
-#include <stdint.h>
-
 typedef struct pcilib_s pcilib_t;
 typedef struct pcilib_kmem_list_s pcilib_kmem_list_t;
 
