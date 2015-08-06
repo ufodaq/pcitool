@@ -2444,9 +2444,9 @@ int ListLocks(pcilib_t *ctx, int verbose) {
     pcilib_lock_id_t i;
 
     if (verbose)
-	printf("ID      Refs    Flags   Locked   Name\n");
+	printf("ID      Refs    Flags   Locked    Name\n");
     else
-	printf("ID      Refs    Flags   Name\n");
+	printf("ID      Refs    Flags    Name\n");
     printf("--------------------------------------------------------------------------------\n");
 
     for (i = 0; i < PCILIB_MAX_LOCKS; i++) {
@@ -2468,13 +2468,13 @@ int ListLocks(pcilib_t *ctx, int verbose) {
 	    switch (err) {
 	     case 0:
 	        pcilib_unlock(lock);
-	        printf("No       ");
+	        printf("No        ");
 	        break;
 	     case PCILIB_ERROR_TIMEOUT:
-	        printf("Yes      ");
+	        printf("Yes       ");
 	        break;
 	     default:
-	        printf("Error    ");
+	        printf("Err: %3i  ", err);
 	    }
 	}
 	printf("%s\n", name);
