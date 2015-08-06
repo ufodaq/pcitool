@@ -174,8 +174,9 @@ int pcilib_lock_custom(pcilib_lock_t *lock, pcilib_lock_flags_t flags, pcilib_ti
         err = pthread_mutex_consistent(&lock->mutex);
         if (err) {
 	    pcilib_error("Failed to mark mutex as consistent, errno %i", err);
+	    break;
         }
-        break;
+        return 0;
      case ETIMEDOUT:
      case EBUSY:
         return PCILIB_ERROR_TIMEOUT;
@@ -203,6 +204,13 @@ void pcilib_unlock(pcilib_lock_t *lock) {
     if (!lock)
 	return;
 
-    if ((err = pthread_mutex_unlock(&lock->mutex)) != 0)
-	pcilib_error("Can't unlock mutex, errno %i", err);
+    if ((err = pthread_mutex_unlock(&lock->mutex)) != 0) {
+	switch (err) {
+	 case EPERM:
+	    pcilib_error("Trying to unlock not locked mutex (%s) or the mutex which was locked by a different thread", lock->name);
+	    break;
+	 default:
+	    pcilib_error("Can't unlock mutex, errno %i", err);
+	}
+    }
 }
