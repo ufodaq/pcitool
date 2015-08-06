@@ -337,12 +337,20 @@ void pcilib_close(pcilib_t *ctx) {
     pcilib_bar_t i;
 
     if (ctx) {
+	pcilib_dma_engine_t dma;
 	const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
 	const pcilib_event_api_description_t *eapi = model_info->api;
 	const pcilib_dma_api_description_t *dapi = ctx->dma.api;
 	
         if ((eapi)&&(eapi->free)) eapi->free(ctx->event_ctx);
         if ((dapi)&&(dapi->free)) dapi->free(ctx->dma_ctx);
+
+	for  (dma = 0; dma < PCILIB_MAX_DMA_ENGINES; dma++) {
+	    if (ctx->dma_rlock[dma])
+		pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, ctx->dma_rlock[dma]);
+	    if (ctx->dma_wlock[dma])
+		pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, ctx->dma_wlock[dma]);
+	}
 
 	pcilib_free_register_banks(ctx);
 	

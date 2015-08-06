@@ -71,6 +71,9 @@ struct pcilib_s {
     pcilib_dma_context_t *dma_ctx;							/**< DMA context */
     pcilib_context_t *event_ctx;							/**< Implmentation context */
 
+    pcilib_lock_t *dma_rlock[PCILIB_MAX_DMA_ENGINES];					/**< Per-engine locks to serialize streaming and read operations */
+    pcilib_lock_t *dma_wlock[PCILIB_MAX_DMA_ENGINES];					/**< Per-engine locks to serialize write operations */
+
     struct pcilib_locking_s locks;							/**< Context of locking subsystem */
 
 #ifdef PCILIB_FILE_IO
