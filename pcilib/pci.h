@@ -42,6 +42,7 @@ struct pcilib_s {
 
     int pci_cfg_space_fd;								/**< File descriptor linking to PCI configuration space in sysfs */
     uint32_t pci_cfg_space_cache[64];							/**< Cached PCI configuration space */
+    size_t pci_cfg_space_size;								/**< Size of the cached PCI configuration space, sometimes not fully is available for unpriveledged user */
     const uint32_t *pcie_capabilities;							/**< PCI Capbility structure (just a pointer at appropriate place in the pci_cfg_space) */
 
     int reg_bar_mapped;									/**< Indicates that all BARs used to access registers are mapped */

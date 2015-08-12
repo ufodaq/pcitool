@@ -425,10 +425,15 @@ static int pcilib_update_pci_configuration_space(pcilib_t *ctx) {
     }
 
     size = read(ctx->pci_cfg_space_fd, ctx->pci_cfg_space_cache, 256);
-    if (size != 256) {
-	pcilib_error("Failed to read PCI configuration from sysfs");
+    if (size < 64) {
+	if (size <= 0)
+	    pcilib_error("Failed to read PCI configuration from sysfs, errno: %i", errno);
+	else
+	    pcilib_error("Failed to read PCI configuration from sysfs, only %zu bytes read (expected at least 64)", size);
 	return PCILIB_ERROR_FAILED;
     }
+
+    ctx->pci_cfg_space_size = size;
 
     return 0;
 }
@@ -452,7 +457,7 @@ static uint32_t *pcilib_get_pci_capabilities(pcilib_t *ctx, int cap_id) {
     cap = ctx->pci_cfg_space_cache[(0x34>>2)];
     cap_offset = cap&0xFC;
 
-    while ((cap_offset)&&(cap_offset < 256)) {
+    while ((cap_offset)&&(cap_offset < ctx->pci_cfg_space_size)) {
 	cap = ctx->pci_cfg_space_cache[cap_offset>>2];
 	if ((cap&0xFF) == cap_id)
 	    return &ctx->pci_cfg_space_cache[cap_offset>>2];
