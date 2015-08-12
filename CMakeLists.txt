@@ -12,6 +12,8 @@ set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library")
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
+set(EXTRA_SYSTEM_LIBS -lrt)
+
 #Check in sibling directory
 if (NOT DISABLE_PCITOOL)
     pkg_check_modules(FASTWRITER fastwriter REQUIRED)
@@ -19,8 +21,8 @@ endif (NOT DISABLE_PCITOOL)
 
 check_include_files(stdatomic.h HAVE_STDATOMIC_H)
 
-add_definitions("-fPIC --std=c11 -Wall -O2 -gdwarf-2 -g3")
-#add_definitions("-fPIC --std=c11 -Wall -O2")
+add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3")
+#add_definitions("-fPIC --std=c99 -Wall -O2")
 
 include(cmake/version.cmake)
 VERSION_TO_VARS(${PCILIB_VERSION} PCILIB_VERSION_MAJOR PCILIB_VERSION_MINOR PCILIB_VERSION_MICRO)
