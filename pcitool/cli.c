@@ -1283,7 +1283,7 @@ typedef struct {
     int verbose;
     pcilib_timeout_t timeout;
     size_t run_time;
-    size_t trigger_time;    
+    size_t trigger_time;
     size_t max_triggers;
     pcilib_event_flags_t flags;
     FORMAT format;
@@ -1295,17 +1295,19 @@ typedef struct {
     volatile int run_flag;
     volatile int writing_flag;
 
-    struct timeval first_frame;    
+    struct timeval first_frame;
     struct timeval last_frame;
-    size_t last_num;
-    
+    size_t last_num, last_id;
+
     size_t trigger_failed;
     size_t trigger_count;
-    size_t event_count;
-    size_t incomplete_count;
-    size_t broken_count;
-    size_t missing_count;
-    size_t storage_count;
+    size_t event_count;				/**< Total number of events (including bad ones, but excluding events expected, but not reported by hardware) */
+    size_t incomplete_count;			/**< Broken events, we even can't extract appropriate block of raw data */
+    size_t broken_count;			/**< Broken events, error while decoding in the requested format */
+    size_t empty_count;				/**< Broken events, no associated data or unknown */
+    size_t missing_count;			/**< Missing events, not received from the hardware */
+    size_t dropped_count;			/**< Missing events, dropped due slow decoding/copying performance  */
+    size_t storage_count;			/**< Missing events, dropped due to slowness of the storage subsystem */
     
     struct timeval start_time;
     struct timeval stop_time;
@@ -1333,12 +1335,13 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 	ctx->missing_count += missing_count; 
 #ifdef PCILIB_DEBUG_MISSING_EVENTS
 	if (missing_count)
-	    pcilib_debug(MISSING_EVENTS, "%zu missing events between %zu and %zu", missing_count, ctx->last_num, info->seqnum);
+	    pcilib_debug(MISSING_EVENTS, "%zu missing events between %zu (hwid: %zu) and %zu (hwid: %zu)", missing_count, ctx->last_id, ctx->last_num, event_id, info->seqnum);
 #endif /* PCILIB_DEBUG_MISSING_EVENTS */
     }
 
     ctx->last_num = info->seqnum;
-    
+    ctx->last_id = event_id;
+
     if (info->flags&PCILIB_EVENT_INFO_FLAG_BROKEN) {
 	ctx->incomplete_count++;
 	return PCILIB_STREAMING_CONTINUE;
@@ -1351,9 +1354,19 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
      default:
 	data = pcilib_get_data(handle, event_id, PCILIB_EVENT_RAW_DATA, &size);
     }
-        
+
     if (!data) {
-	ctx->broken_count++;
+	int err = (int)size;
+	switch (err) {
+	 case PCILIB_ERROR_OVERWRITTEN:
+	    ctx->dropped_count++;
+	    break;
+	 case PCILIB_ERROR_INVALID_DATA:
+	    ctx->broken_count++;
+	    break;
+	 default:
+	    ctx->empty_count++;
+	}
 	return PCILIB_STREAMING_CONTINUE;
     }
 
@@ -1386,7 +1399,7 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 
     err = pcilib_return_data(handle, event_id, ctx->data, data);
     if (err) {
-	ctx->missing_count++;
+	ctx->dropped_count++;
 	fastwriter_cancel(ctx->writer);
 	return PCILIB_STREAMING_CONTINUE;
     }
@@ -1498,7 +1511,7 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
 	total = ctx->event_count + ctx->missing_count;
     }
     
-    good = ctx->event_count - ctx->broken_count - ctx->incomplete_count - ctx->storage_count;
+    good = ctx->event_count - ctx->broken_count - ctx->incomplete_count - ctx->storage_count - ctx->empty_count - ctx->dropped_count;
 
     if (ctx->event_count > 1) {
 	fps = (ctx->event_count - 1) / (1.*fps_duration/1000000);
@@ -1554,11 +1567,11 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
 	    printf("Good: ");
 	    PrintNumber(good);
 	    printf(", Dropped: ");
-    	    PrintNumber(ctx->storage_count);
+    	    PrintNumber(ctx->dropped_count + ctx->storage_count);
 	    printf(", Bad: ");
-	    PrintNumber(ctx->incomplete_count);
+	    PrintNumber(ctx->incomplete_count + ctx->broken_count);
 	    printf(", Empty: ");
-    	    PrintNumber(ctx->broken_count);
+    	    PrintNumber(ctx->empty_count);
 	}
 	printf(", Lost: ");
 	PrintNumber(ctx->missing_count);
@@ -1573,11 +1586,11 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
 	    printf("Good: ");
 	    PrintPercent(good, total);
 	    printf("%% Dropped: ");
-	    PrintPercent(ctx->storage_count, total);
+	    PrintPercent(ctx->dropped_count + ctx->storage_count, total);
 	    printf("%% Bad: ");
-	    PrintPercent(ctx->incomplete_count, total);
+	    PrintPercent(ctx->incomplete_count + ctx->broken_count, total);
 	    printf("%% Empty: ");
-	    PrintPercent(ctx->broken_count, total);
+	    PrintPercent(ctx->empty_count, total);
 	}
 
 	printf("%% Lost: ");
