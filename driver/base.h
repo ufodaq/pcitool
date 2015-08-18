@@ -68,14 +68,14 @@ static dev_t pcidriver_devt;
 static atomic_t pcidriver_deviceCount;
 
 /* Sysfs attributes */
-static DEVICE_ATTR(mmap_mode, (S_IRUGO | S_IWUGO), pcidriver_show_mmap_mode, pcidriver_store_mmap_mode);
-static DEVICE_ATTR(mmap_area, (S_IRUGO | S_IWUGO), pcidriver_show_mmap_area, pcidriver_store_mmap_area);
+static DEVICE_ATTR(mmap_mode, 0664, pcidriver_show_mmap_mode, pcidriver_store_mmap_mode);
+static DEVICE_ATTR(mmap_area, 0664, pcidriver_show_mmap_area, pcidriver_store_mmap_area);
 static DEVICE_ATTR(kmem_count, S_IRUGO, pcidriver_show_kmem_count, NULL);
 static DEVICE_ATTR(kbuffers, S_IRUGO, pcidriver_show_kbuffers, NULL);
-static DEVICE_ATTR(kmem_alloc, S_IWUGO, NULL, pcidriver_store_kmem_alloc);
-static DEVICE_ATTR(kmem_free, S_IWUGO, NULL, pcidriver_store_kmem_free);
+static DEVICE_ATTR(kmem_alloc, 0220, NULL, pcidriver_store_kmem_alloc);
+static DEVICE_ATTR(kmem_free, 0220, NULL, pcidriver_store_kmem_free);
 static DEVICE_ATTR(umappings, S_IRUGO, pcidriver_show_umappings, NULL);
-static DEVICE_ATTR(umem_unmap, S_IWUGO, NULL, pcidriver_store_umem_unmap);
+static DEVICE_ATTR(umem_unmap, 0220, NULL, pcidriver_store_umem_unmap);
 
 #ifdef ENABLE_IRQ
 static DEVICE_ATTR(irq_count, S_IRUGO, pcidriver_show_irq_count, NULL);

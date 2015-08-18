@@ -3,7 +3,7 @@ obj-m := pciDriver.o
 pciDriver-objs := base.o int.o umem.o kmem.o sysfs.o ioctl.o
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
-INSTALLDIR ?= /lib/modules/$(shell uname -r)/extra
+INSTALLDIR ?= /lib/modules/$(shell uname -r)/kernel/extra
 PWD := $(shell pwd)
 
 EXTRA_CFLAGS += -I$(M)/..
