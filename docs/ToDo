@@ -17,3 +17,8 @@ Low Priority (only as generalization for other projects)
  5. Use pthread_condition_t instead of polling
  6. Support FIFO reads/writes from/to registers
  7. We managed kmem performance using next kmem prediction, but it is still wise to provide additionally a binary tree for faster search
+
+Performance
+===========
+ 1. Even with fully algined data, glibc defaults to __memcpy_sse2_unaligned (called from ipecamera_data_callback and fastwriter_push). Can we do something?
+ 
