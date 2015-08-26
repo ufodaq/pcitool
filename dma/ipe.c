@@ -22,8 +22,8 @@
 
 
 pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const void *arg) {
-//    int err = 0;
-    
+    pcilib_register_value_t value;
+
     const pcilib_model_description_t *model_info = pcilib_get_model_description(pcilib);
 
     ipe_dma_t *ctx = malloc(sizeof(ipe_dma_t));
@@ -31,11 +31,6 @@ pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const vo
     if (ctx) {
 	memset(ctx, 0, sizeof(ipe_dma_t));
 	ctx->dmactx.pcilib = pcilib;
-
-#ifdef IPEDMA_64BIT_MODE
-	    // Always supported and we need to use it
-	ctx->mode64 = 1;
-#endif /* IPEDMA_64BIT_MODE */
 
 	pcilib_register_bank_t dma_bank = pcilib_find_register_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
 
@@ -47,6 +42,19 @@ pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const vo
 
 	ctx->dma_bank = model_info->banks + dma_bank;
 	ctx->base_addr = pcilib_resolve_register_address(pcilib, ctx->dma_bank->bar, ctx->dma_bank->read_addr);
+
+	RD(IPEDMA_REG_PCIE_GEN, value);
+
+#ifdef IPEDMA_ENFORCE_64BIT_MODE
+	ctx->mode64 = 1;
+#else /* IPEDMA_ENFORCE_64BIT_MODE */
+	    // According to Lorenzo, some gen2 boards have problems with 64-bit addressing. Therefore, we only enable it for gen3 boards unless enforced
+	if ((value&IPEDMA_MASK_PCIE_GEN) > 2) ctx->mode64 = 1;
+#endif /* IPEDMA_ENFORCE_64BIT_MODE */
+
+#ifdef IPEDMA_STREAMING_MODE
+	if (value&IPEDMA_MASK_STREAMING_MODE) ctx->streaming = 1;
+#endif /* IPEDMA_STREAMING_MODE */
     }
 
     return (pcilib_dma_context_t*)ctx;
@@ -63,7 +71,7 @@ void  dma_ipe_free(pcilib_dma_context_t *vctx) {
 
 
 int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags) {
-    size_t i;
+    size_t i, num_pages;
 
     ipe_dma_t *ctx = (ipe_dma_t*)vctx;
 
@@ -110,15 +118,16 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	    if ((reuse_desc & PCILIB_KMEM_REUSE_PERSISTENT) == 0) pcilib_warning("Lost DMA buffers are found (non-persistent mode), reinitializing...");
 	    else if ((reuse_desc & PCILIB_KMEM_REUSE_HARDWARE) == 0) pcilib_warning("Lost DMA buffers are found (missing HW reference), reinitializing...");
 	    else {
-#ifndef IPEDMA_BUG_DMARD
-# ifndef IPEDMA_STREAMING_MODE
-		RD(IPEDMA_REG_PAGE_COUNT, value);
-
-		if (value != IPEDMA_DMA_PAGES) pcilib_warning("Inconsistent DMA buffers are found (Number of allocated buffers (%lu) does not match current request (%lu)), reinitializing...", value + 1, IPEDMA_DMA_PAGES);
-		else
-# endif /* IPEDMA_STREAMING_MODE */
-#endif /* IPEDMA_BUG_DMARD */
+		if (ctx->streaming)
 		    preserve = 1;
+		else {
+		    RD(IPEDMA_REG_PAGE_COUNT, value);
+
+		    if (value != IPEDMA_DMA_PAGES) 
+			pcilib_warning("Inconsistent DMA buffers are found (Number of allocated buffers (%lu) does not match current request (%lu)), reinitializing...", value + 1, IPEDMA_DMA_PAGES);
+		    else 
+			preserve = 1;
+		} 
 	    }
 	}
     } else pcilib_warning("Inconsistent DMA buffers (modes of ring and page buffers does not match), reinitializing....");
@@ -132,12 +141,6 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	ctx->preserve = 1;
 	
 	    // Detect the current state of DMA engine
-#ifdef IPEDMA_BUG_DMARD
-	FILE *f = fopen("/tmp/pcitool_lastread", "r");
-	if (!f) pcilib_error("Can't read current status");
-	fread(&value, 1, sizeof(pcilib_register_value_t), f);
-	fclose(f);
-#else /* IPEDMA_BUG_DMARD */
 	RD(IPEDMA_REG_LAST_READ, value);
 	    // Numbered from 1 in FPGA
 # ifdef IPEDMA_BUG_LAST_READ
@@ -146,7 +149,6 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 # else /* IPEDMA_BUG_LAST_READ */
 	value--;
 # endif /* IPEDMA_BUG_LAST_READ */
-#endif /* IPEDMA_BUG_DMARD */
 
 	ctx->last_read = value;
     } else {
@@ -162,12 +164,10 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	WR(IPEDMA_REG_RESET, 0x0);
 	usleep(IPEDMA_RESET_DELAY);
 
-#ifndef IPEDMA_BUG_DMARD
 	    // Verify PCIe link status
 	RD(IPEDMA_REG_RESET, value);
 	if ((value != 0x14031700)&&(value != 0x14021700))
 	    pcilib_warning("PCIe is not ready, code is %lx", value);
-#endif /* IPEDMA_BUG_DMARD */
 
 	    // Enable 64 bit addressing and configure TLP and PACKET sizes (40 bit mode can be used with big pre-allocated buffers later)
 	if (ctx->mode64) address64 = 0x8000 | (0<<24);
@@ -203,7 +203,13 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	    // Instructing DMA engine that writting should start from the first DMA page
 	*last_written_addr_ptr = 0;
 	
-	for (i = 0; i < IPEDMA_DMA_PAGES; i++) {
+	    // In ring buffer mode, the hardware taking care to preserve an empty buffer to help distinguish between
+	    // completely empty and completely full cases. In streaming mode, it is our responsibility to track this
+	    // information. Therefore, we always keep the last buffer free
+	num_pages = IPEDMA_DMA_PAGES;
+	if (ctx->streaming) num_pages--;
+	
+	for (i = 0; i < num_pages; i++) {
 	    uintptr_t bus_addr_check, bus_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, pages, i);
 	    WR(IPEDMA_REG_PAGE_ADDR, bus_addr);
 	    if (bus_addr%4096) printf("Bad address %lu: %lx\n", i, bus_addr);
@@ -220,14 +226,6 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	WR(IPEDMA_REG_CONTROL, 0x1);
 	
 	ctx->last_read = IPEDMA_DMA_PAGES - 1;
-
-#ifdef IPEDMA_BUG_DMARD
-	FILE *f = fopen("/tmp/pcitool_lastread", "w");
-	if (!f) pcilib_error("Can't write current status");
-	value = ctx->last_read;
-	fwrite(&value, 1, sizeof(pcilib_register_value_t), f);
-	fclose(f);
-#endif /* IPEDMA_BUG_DMARD */
     }
 
     ctx->last_read_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, pages, ctx->last_read);
@@ -411,10 +409,6 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
     pcilib_dma_flags_t packet_flags = PCILIB_DMA_FLAG_EOP;
     size_t nodata_sleep;
 
-#ifdef IPEDMA_BUG_DMARD
-    pcilib_register_value_t value;
-#endif /* IPEDMA_BUG_DMARD */
-
     switch (sched_getscheduler(0)) {
      case SCHED_FIFO:
      case SCHED_RR:
@@ -507,16 +501,21 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 //	pcilib_kmem_sync_block(ctx->dmactx.pcilib, ctx->pages, PCILIB_KMEM_SYNC_TODEVICE, cur_read);
 
 	    // Return buffer into the DMA pool when processed
-#ifdef IPEDMA_STREAMING_MODE
-	uintptr_t buf_ba = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, cur_read);
-	WR(IPEDMA_REG_PAGE_ADDR, buf_ba);    
+	if (ctx->streaming) {
+	    size_t last_free;
+		// We always keep 1 buffer free to distinguish between completely full and empty cases
+	    if (cur_read) last_free = cur_read - 1;
+	    else last_free = IPEDMA_DMA_PAGES - 1;
+
+	    uintptr_t buf_ba = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, last_free);
+	    WR(IPEDMA_REG_PAGE_ADDR, buf_ba);    
 # ifdef IPEDMA_STREAMING_CHECKS
-	pcilib_register_value_t streaming_status;
-	RD(IPEDMA_REG_STREAMING_STATUS, streaming_status);
-	if (streaming_status)
-	    pcilib_error("Invalid status (0x%lx) adding a DMA buffer into the queue", streaming_status);
+	    pcilib_register_value_t streaming_status;
+	    RD(IPEDMA_REG_STREAMING_STATUS, streaming_status);
+	    if (streaming_status)
+		pcilib_error("Invalid status (0x%lx) adding a DMA buffer into the queue", streaming_status);
 # endif /* IPEDMA_STREAMING_MODE */
-#endif /* IPEDMA_STREAMING_MODE */
+	}
 
 	    // Numbered from 1
 #ifdef IPEDMA_BUG_LAST_READ
@@ -533,15 +532,6 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
 	ctx->last_read = cur_read;
 	ctx->last_read_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, cur_read);
-
-#ifdef IPEDMA_BUG_DMARD
-	FILE *f = fopen("/tmp/pcitool_lastread", "w");
-	if (!f) pcilib_error("Can't write current status");
-	value = cur_read;
-	fwrite(&value, 1, sizeof(pcilib_register_value_t), f);
-	fclose(f);
-#endif /* IPEDMA_BUG_DMARD */
-
     } while (ret);
 
     return 0;

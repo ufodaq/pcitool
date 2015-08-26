@@ -166,7 +166,7 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	    for (bytes = 0; bytes < size; bytes += rbytes) {
 		err = read_dma(ctx->dmactx.pcilib, 0, addr, size - bytes, PCILIB_DMA_FLAG_MULTIPACKET, PCILIB_DMA_TIMEOUT,  buf + bytes, &rbytes);
 	        if (err) {
-		    pcilib_error("Can't read data from DMA, error %i", err);
+		    pcilib_error("Can't read data from DMA (iteration: %zu, offset: %zu), error %i", iter, bytes, err);
 		    return -1;
 		}
 	    }

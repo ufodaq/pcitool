@@ -61,7 +61,10 @@ pcilib_dma_engine_t pcilib_add_dma_engine(pcilib_t *ctx, pcilib_dma_engine_descr
 int pcilib_init_dma(pcilib_t *ctx) {
     int err;
     pcilib_dma_context_t *dma_ctx = NULL;
+    const pcilib_dma_description_t *info = &ctx->dma;
     const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+
+    pcilib_dma_engine_t dma;
 
     if (ctx->dma_ctx)
 	return 0;
@@ -86,6 +89,24 @@ int pcilib_init_dma(pcilib_t *ctx) {
     }
 
     if (dma_ctx) {
+	for  (dma = 0; info->engines[dma].addr_bits; dma++) {
+	    if (info->engines[dma].direction&PCILIB_DMA_FROM_DEVICE) {
+		ctx->dma_rlock[dma] = pcilib_get_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, "dma%ir/%s", info->engines[dma].addr, info->name);
+		if (!ctx->dma_rlock[dma]) break;
+	    }
+	    if (info->engines[dma].direction&PCILIB_DMA_TO_DEVICE) {
+		ctx->dma_wlock[dma] = pcilib_get_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, "dma%iw/%s", info->engines[dma].addr, info->name);
+		if (!ctx->dma_wlock[dma]) break;
+	    }
+	}
+
+	if (info->engines[dma].addr_bits) {
+	    if (ctx->dma.api->free)
+		ctx->dma.api->free(dma_ctx);
+	    pcilib_error("Failed to intialize DMA locks");
+	    return PCILIB_ERROR_FAILED;
+	}
+
 	dma_ctx->pcilib = ctx;
 	    // DS: parameters?
 	ctx->dma_ctx = dma_ctx;
@@ -105,11 +126,11 @@ int pcilib_start_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t 
 	pcilib_error("DMA Engine is not configured in the current model");
 	return PCILIB_ERROR_NOTAVAILABLE;
     }
-    
+
     if (!info->api->start_dma) {
 	return 0;
     }
-    
+
     return info->api->start_dma(ctx->dma_ctx, dma, flags);
 }
 
@@ -201,6 +222,7 @@ static int pcilib_dma_skip_callback(void *arg, pcilib_dma_flags_t flags, size_t 
 }
 
 int pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, pcilib_dma_callback_t cb, void *cbattr) {
+    int err;
     const pcilib_dma_description_t *info =  pcilib_get_dma_description(ctx);
     if (!info) {
 	pcilib_error("DMA is not supported by the device");
@@ -228,7 +250,21 @@ int pcilib_stream_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, si
 	return PCILIB_ERROR_NOTSUPPORTED;
     }
 
-    return info->api->stream(ctx->dma_ctx, dma, addr, size, flags, timeout, cb, cbattr);
+    err = pcilib_try_lock(ctx->dma_rlock[dma]);
+    if (err) {
+	if ((err == PCILIB_ERROR_BUSY)||(err == PCILIB_ERROR_TIMEOUT))
+	    pcilib_error("DMA engine (%i) is busy", dma);
+	else
+	    pcilib_error("Error (%i) locking DMA engine (%i)", err, dma);
+
+	return err;
+    }
+
+    err = info->api->stream(ctx->dma_ctx, dma, addr, size, flags, timeout, cb, cbattr);
+
+    pcilib_unlock(ctx->dma_rlock[dma]);
+
+    return err;
 }
 
 int pcilib_read_dma_custom(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, void *buf, size_t *read_bytes) {
@@ -278,6 +314,8 @@ int pcilib_skip_dma(pcilib_t *ctx, pcilib_dma_engine_t dma) {
 
 
 int pcilib_push_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size_t size, pcilib_dma_flags_t flags, pcilib_timeout_t timeout, void *buf, size_t *written) {
+    int err;
+
     const pcilib_dma_description_t *info =  pcilib_get_dma_description(ctx);
     if (!info) {
 	pcilib_error("DMA is not supported by the device");
@@ -304,8 +342,22 @@ int pcilib_push_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, uintptr_t addr, size
 	pcilib_error("The selected engine (%i) is C2S-only and does not support writes", dma);
 	return PCILIB_ERROR_NOTSUPPORTED;
     }
-    
-    return info->api->push(ctx->dma_ctx, dma, addr, size, flags, timeout, buf, written);
+
+    err = pcilib_try_lock(ctx->dma_wlock[dma]);
+    if (err) {
+	if (err == PCILIB_ERROR_BUSY) 
+	    pcilib_error("DMA engine (%i) is busy", dma);
+	else
+	    pcilib_error("Error (%i) locking DMA engine (%i)", err, dma);
+
+	return err;
+    }
+
+    err = info->api->push(ctx->dma_ctx, dma, addr, size, flags, timeout, buf, written);
+
+    pcilib_unlock(ctx->dma_wlock[dma]);
+
+    return err;
 }
 
 

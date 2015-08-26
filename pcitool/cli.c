@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200112L
 #define _BSD_SOURCE
 
@@ -38,6 +39,7 @@
 #include "debug.h"
 #include "model.h"
 #include "xml.h"
+#include "locking.h"
 
 /* defines */
 #define MAX_KBUF 14
@@ -91,7 +93,11 @@ typedef enum {
     MODE_LIST_KMEM,
     MODE_READ_KMEM,
     MODE_FREE_KMEM,
-	MODE_VALIDATE_XML
+    MODE_VALIDATE_XML
+    MODE_LIST_LOCKS,
+    MODE_FREE_LOCKS,
+    MODE_LOCK,
+    MODE_UNLOCK
 } MODE;
 
 typedef enum {
@@ -163,6 +169,10 @@ typedef enum {
     OPT_LIST_KMEM,
     OPT_FREE_KMEM,
     OPT_READ_KMEM,
+    OPT_LIST_LOCKS,
+    OPT_FREE_LOCKS,
+    OPT_LOCK,
+    OPT_UNLOCK,
     OPT_BLOCK_SIZE,
     OPT_ALIGNMENT,
     OPT_TYPE,
@@ -213,6 +223,10 @@ static struct option long_options[] = {
     {"read-kernel-memory",	required_argument, 0, OPT_READ_KMEM },
     {"alloc-kernel-memory",	required_argument, 0, OPT_ALLOC_KMEM },
     {"free-kernel-memory",	required_argument, 0, OPT_FREE_KMEM },
+    {"list-locks",		no_argument, 0, OPT_LIST_LOCKS },
+    {"free-locks",		no_argument, 0, OPT_FREE_LOCKS },
+    {"lock",			required_argument, 0, OPT_LOCK },
+    {"unlock",			required_argument, 0, OPT_UNLOCK },
     {"type",			required_argument, 0, OPT_TYPE },
     {"block-size",		required_argument, 0, OPT_BLOCK_SIZE },
     {"alignment",		required_argument, 0, OPT_ALIGNMENT },
@@ -278,6 +292,11 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   --free-kernel-memory <use>	- Cleans lost kernel space buffers (DANGEROUS)\n"
 "	dma			- Remove all buffers allocated by DMA subsystem\n"
 "	#number			- Remove all buffers with the specified use id\n"
+"\n"
+"   --list-locks		- List all registered locks\n"
+"   --free-locks		- Destroy all locks (DANGEROUS)\n"
+"   --lock <lock name>		- Obtain persistent lock\n"
+"   --unlock <lock name>	- Release persistent lock\n"
 "\n"
 "  Addressing:\n"
 "   -d <device>			- FPGA device (/dev/fpga0)\n"
@@ -1270,7 +1289,7 @@ typedef struct {
     int verbose;
     pcilib_timeout_t timeout;
     size_t run_time;
-    size_t trigger_time;    
+    size_t trigger_time;
     size_t max_triggers;
     pcilib_event_flags_t flags;
     FORMAT format;
@@ -1282,17 +1301,19 @@ typedef struct {
     volatile int run_flag;
     volatile int writing_flag;
 
-    struct timeval first_frame;    
+    struct timeval first_frame;
     struct timeval last_frame;
-    size_t last_num;
-    
+    size_t last_num, last_id;
+
     size_t trigger_failed;
     size_t trigger_count;
-    size_t event_count;
-    size_t incomplete_count;
-    size_t broken_count;
-    size_t missing_count;
-    size_t storage_count;
+    size_t event_count;				/**< Total number of events (including bad ones, but excluding events expected, but not reported by hardware) */
+    size_t incomplete_count;			/**< Broken events, we even can't extract appropriate block of raw data */
+    size_t broken_count;			/**< Broken events, error while decoding in the requested format */
+    size_t empty_count;				/**< Broken events, no associated data or unknown */
+    size_t missing_count;			/**< Missing events, not received from the hardware */
+    size_t dropped_count;			/**< Missing events, dropped due slow decoding/copying performance  */
+    size_t storage_count;			/**< Missing events, dropped due to slowness of the storage subsystem */
     
     struct timeval start_time;
     struct timeval stop_time;
@@ -1320,12 +1341,13 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 	ctx->missing_count += missing_count; 
 #ifdef PCILIB_DEBUG_MISSING_EVENTS
 	if (missing_count)
-	    pcilib_debug(MISSING_EVENTS, "%zu missing events between %zu and %zu", missing_count, ctx->last_num, info->seqnum);
+	    pcilib_debug(MISSING_EVENTS, "%zu missing events between %zu (hwid: %zu) and %zu (hwid: %zu)", missing_count, ctx->last_id, ctx->last_num, event_id, info->seqnum);
 #endif /* PCILIB_DEBUG_MISSING_EVENTS */
     }
 
     ctx->last_num = info->seqnum;
-    
+    ctx->last_id = event_id;
+
     if (info->flags&PCILIB_EVENT_INFO_FLAG_BROKEN) {
 	ctx->incomplete_count++;
 	return PCILIB_STREAMING_CONTINUE;
@@ -1338,9 +1360,19 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
      default:
 	data = pcilib_get_data(handle, event_id, PCILIB_EVENT_RAW_DATA, &size);
     }
-        
+
     if (!data) {
-	ctx->broken_count++;
+	int err = (int)size;
+	switch (err) {
+	 case PCILIB_ERROR_OVERWRITTEN:
+	    ctx->dropped_count++;
+	    break;
+	 case PCILIB_ERROR_INVALID_DATA:
+	    ctx->broken_count++;
+	    break;
+	 default:
+	    ctx->empty_count++;
+	}
 	return PCILIB_STREAMING_CONTINUE;
     }
 
@@ -1373,7 +1405,7 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
 
     err = pcilib_return_data(handle, event_id, ctx->data, data);
     if (err) {
-	ctx->missing_count++;
+	ctx->dropped_count++;
 	fastwriter_cancel(ctx->writer);
 	return PCILIB_STREAMING_CONTINUE;
     }
@@ -1485,7 +1517,7 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
 	total = ctx->event_count + ctx->missing_count;
     }
     
-    good = ctx->event_count - ctx->broken_count - ctx->incomplete_count - ctx->storage_count;
+    good = ctx->event_count - ctx->broken_count - ctx->incomplete_count - ctx->storage_count - ctx->empty_count - ctx->dropped_count;
 
     if (ctx->event_count > 1) {
 	fps = (ctx->event_count - 1) / (1.*fps_duration/1000000);
@@ -1541,11 +1573,11 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
 	    printf("Good: ");
 	    PrintNumber(good);
 	    printf(", Dropped: ");
-    	    PrintNumber(ctx->storage_count);
+    	    PrintNumber(ctx->dropped_count + ctx->storage_count);
 	    printf(", Bad: ");
-	    PrintNumber(ctx->incomplete_count);
+	    PrintNumber(ctx->incomplete_count + ctx->broken_count);
 	    printf(", Empty: ");
-    	    PrintNumber(ctx->broken_count);
+    	    PrintNumber(ctx->empty_count);
 	}
 	printf(", Lost: ");
 	PrintNumber(ctx->missing_count);
@@ -1560,11 +1592,11 @@ void GrabStats(GRABContext *ctx, struct timeval *end_time) {
 	    printf("Good: ");
 	    PrintPercent(good, total);
 	    printf("%% Dropped: ");
-	    PrintPercent(ctx->storage_count, total);
+	    PrintPercent(ctx->dropped_count + ctx->storage_count, total);
 	    printf("%% Bad: ");
-	    PrintPercent(ctx->incomplete_count, total);
+	    PrintPercent(ctx->incomplete_count + ctx->broken_count, total);
 	    printf("%% Empty: ");
-	    PrintPercent(ctx->broken_count, total);
+	    PrintPercent(ctx->empty_count, total);
 	}
 
 	printf("%% Lost: ");
@@ -1945,7 +1977,7 @@ size_t FindUse(size_t *n_uses, kmem_use_info_t *uses, pcilib_kmem_use_t use) {
     
     if (n == MAX_USES) return 0;
 
-    memset(&uses[n], 0, sizeof(pcilib_kmem_use_t));
+    memset(&uses[n], 0, sizeof(kmem_use_info_t));
     uses[n].use = use;
     return (*n_uses)++;
 }
@@ -2035,6 +2067,8 @@ int ListKMEM(pcilib_t *handle, const char *device) {
     size_t i, useid, n_uses;	
     kmem_use_info_t uses[MAX_USES];
 
+    const pcilib_model_description_t *model_info = pcilib_get_model_description(handle);
+
     err = ParseKMEM(handle, device, &n_uses, uses);
     if (err) Error("Failed to parse kernel memory information provided through sysfs");
 
@@ -2042,7 +2076,7 @@ int ListKMEM(pcilib_t *handle, const char *device) {
 	printf("No kernel memory is allocated\n");
 	return 0;
     }
-    
+
     printf("Use      Type                  Count      Total Size       REF       Mode \n");
     printf("--------------------------------------------------------------------------------\n");
     for (useid = 0; useid < n_uses; useid++) {
@@ -2052,17 +2086,39 @@ int ListKMEM(pcilib_t *handle, const char *device) {
 	} else i = useid + 1;
 	
 	printf("%08x  ", uses[i].use);
-	if (!i) printf("All Others         ");
-	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_RING) printf("DMA%u %s Ring      ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
-	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_DMA_PAGES) printf("DMA%u %s Pages     ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
-	else if ((uses[i].use >> 16) == PCILIB_KMEM_USE_USER)	printf("User %04x         ", uses[i].use&0xFFFF);
-	else printf ("                   ");
+	if (i) {
+	    switch(PCILIB_KMEM_USE_TYPE(uses[i].use)) {
+	      case PCILIB_KMEM_USE_DMA_RING:
+	        printf("DMA%u %s Ring      ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
+	        break;
+	      case PCILIB_KMEM_USE_DMA_PAGES:
+	        printf("DMA%u %s Pages     ", uses[i].use&0x7F, ((uses[i].use&0x80)?"S2C":"C2S"));
+	        break;
+	      case PCILIB_KMEM_USE_SOFTWARE_REGISTERS: {
+		pcilib_register_bank_t bank = pcilib_find_register_bank_by_addr(handle, PCILIB_KMEM_USE_SUBTYPE(uses[i].use));
+		if (bank == PCILIB_REGISTER_BANK_INVALID)
+		    printf("SoftRegs (%8u)", PCILIB_KMEM_USE_SUBTYPE(uses[i].use));
+		else 
+		    printf("SoftRegs (%8s)", model_info->banks[bank].name);
+		break;
+	      }
+	      case PCILIB_KMEM_USE_LOCKS:
+		printf("Locks              ");
+		break;
+	      case PCILIB_KMEM_USE_USER:
+	        printf("User %04x         ", uses[i].use&0xFFFF);
+	        break;
+	      default:
+		printf ("                   ");
+	    }
+	} else printf("All Others         ");
+	
 	printf("  ");
 	printf("%6zu", uses[i].count);
 	printf("     ");
 	printf("%10s", GetPrintSize(stmp, uses[i].size));
 	printf("      ");
-	if (uses[i].referenced&&uses[i].hw_lock) printf("HW+SW");
+	if ((uses[i].referenced)&&(uses[i].hw_lock)) printf("HW+SW");
 	else if (uses[i].referenced) printf("   SW");
 	else if (uses[i].hw_lock) printf("HW   ");
 	else printf("  -  ");
@@ -2402,6 +2458,88 @@ int ReadBuffer(pcilib_t *handle, const char *device, const pcilib_model_descript
     return ReadKMEM(handle, device, ((dma&0x7F)|((dma_direction == PCILIB_DMA_TO_DEVICE)?0x80:0x00))|(PCILIB_KMEM_USE_DMA_PAGES<<16), block, size, o);
 }
 
+int ListLocks(pcilib_t *ctx, int verbose) {
+    int err;
+    pcilib_lock_id_t i;
+
+    if (verbose)
+	printf("ID      Refs    Flags   Locked    Name\n");
+    else
+	printf("ID      Refs    Flags    Name\n");
+    printf("--------------------------------------------------------------------------------\n");
+
+    for (i = 0; i < PCILIB_MAX_LOCKS; i++) {
+	pcilib_lock_t *lock = pcilib_get_lock_by_id(ctx, i);
+	const char *name = pcilib_lock_get_name(lock);
+	if (!name) break;
+	
+	pcilib_lock_flags_t flags = pcilib_lock_get_flags(lock);
+	size_t refs = pcilib_lock_get_refs(lock);
+	
+	printf("%4u    %4zu    ", i, refs);
+
+	if (flags&PCILIB_LOCK_FLAG_PERSISTENT) printf("P");
+	else printf(" ");
+	printf("       ");
+	
+	if (verbose) {
+	    err = pcilib_lock_custom(lock, PCILIB_LOCK_FLAGS_DEFAULT, PCILIB_TIMEOUT_IMMEDIATE);
+	    switch (err) {
+	     case 0:
+	        pcilib_unlock(lock);
+	        printf("No        ");
+	        break;
+	     case PCILIB_ERROR_TIMEOUT:
+	        printf("Yes       ");
+	        break;
+	     default:
+	        printf("Err: %3i  ", err);
+	    }
+	}
+	printf("%s\n", name);
+    }
+    printf("--------------------------------------------------------------------------------\n");
+    printf("P - Persistent\n");
+
+    return 0;
+}
+
+int FreeLocks(pcilib_t *handle, int force) {
+    return pcilib_destroy_all_locks(handle, force);
+}
+
+int LockUnlock(pcilib_t *handle, const char *name, int do_lock, pcilib_timeout_t timeout) {
+    int err =  0;
+
+    pcilib_lock_t *lock = pcilib_get_lock(handle, PCILIB_LOCK_FLAG_PERSISTENT, name);
+    if (!lock) Error("Error getting persistent lock %s", name);
+
+    if (do_lock)
+	err = pcilib_lock_custom(lock, PCILIB_LOCK_FLAGS_DEFAULT, timeout);
+    else 
+	pcilib_unlock(lock);
+	
+    if (err) {
+	pcilib_return_lock(handle, PCILIB_LOCK_FLAGS_DEFAULT, lock);
+	switch (err) {
+	 case PCILIB_ERROR_TIMEOUT:
+	    printf("Timeout locking %s\n", name);
+	    break;
+	 default:
+	    Error("Error (%i) locking %s", err, name);
+	}
+    } else if (do_lock) {
+	pcilib_lock_ref(lock);
+	pcilib_return_lock(handle, PCILIB_LOCK_FLAGS_DEFAULT, lock);
+	printf("%s is locked\n", name);
+    } else {
+	pcilib_lock_unref(lock);
+	pcilib_return_lock(handle, PCILIB_LOCK_FLAGS_DEFAULT, lock);
+    }
+
+    return err;
+}
+
 
 int EnableIRQ(pcilib_t *handle, const pcilib_model_description_t *model_info, pcilib_irq_type_t irq_type) {
     int err;
@@ -2489,6 +2627,7 @@ int main(int argc, char **argv) {
     const char *data_type = NULL;
     const char *dma_channel = NULL;
     const char *use = NULL;
+    const char *lock = NULL;
     size_t block = (size_t)-1;
     pcilib_irq_type_t irq_type = PCILIB_IRQ_TYPE_ALL;
     pcilib_irq_hw_source_t irq_source =  PCILIB_IRQ_SOURCE_DEFAULT;
@@ -2695,7 +2834,6 @@ int main(int argc, char **argv) {
 	    case OPT_LIST_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
 		mode = MODE_LIST_KMEM;
-		if (!model) model = "pci";
 		
 		if (optarg) use = optarg;
 		else if ((optind < argc)&&(argv[optind][0] != '-'))  use = argv[optind++];
@@ -2744,6 +2882,25 @@ int main(int argc, char **argv) {
 
 		if (optarg) use = optarg;
 		else if ((optind < argc)&&(argv[optind][0] != '-')) use = argv[optind++];
+	    break;
+	    case OPT_LIST_LOCKS:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		mode = MODE_LIST_LOCKS;
+	    break;
+	    case OPT_FREE_LOCKS:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		mode = MODE_FREE_LOCKS;
+		model = "maintenance";
+	    break;
+	    case OPT_LOCK:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		mode = MODE_LOCK;
+		lock = optarg;
+	    break;
+	    case OPT_UNLOCK:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		mode = MODE_UNLOCK;
+		lock = optarg;
 	    break;
 	    case OPT_DEVICE:
 		fpga_device = optarg;
@@ -2955,7 +3112,6 @@ int main(int argc, char **argv) {
 
     model_info = pcilib_get_model_description(handle);
     dma_info = pcilib_get_dma_description(handle);
-
     switch (mode) {
      case MODE_WRITE:
         if (((argc - optind) == 1)&&(*argv[optind] == '*')) {
@@ -3223,6 +3379,18 @@ int main(int argc, char **argv) {
      case MODE_FREE_KMEM:
         FreeKMEM(handle, fpga_device, use, force);
      break;
+     case MODE_LIST_LOCKS:
+        ListLocks(handle, verbose);
+     break;
+    case MODE_FREE_LOCKS:
+	FreeLocks(handle, force);
+    break;
+    case MODE_LOCK:
+	LockUnlock(handle, lock, 1, timeout_set?timeout:PCILIB_TIMEOUT_INFINITE);
+    break;
+    case MODE_UNLOCK:
+	LockUnlock(handle, lock, 0, timeout_set?timeout:PCILIB_TIMEOUT_INFINITE);
+    break;
      case MODE_INVALID:
         break;
     }

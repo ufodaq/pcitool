@@ -1,6 +1,6 @@
 project(pcitool)
 
-set(PCILIB_VERSION "0.2.0")
+set(PCILIB_VERSION "0.2.1")
 set(PCILIB_ABI_VERSION "2")
 
 cmake_minimum_required(VERSION 2.6)
@@ -13,19 +13,21 @@ find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 find_package(PythonLibs REQUIRED)
 
+set(EXTRA_SYSTEM_LIBS -lrt)
+
 #Check in sibling directory
 if (NOT DISABLE_PCITOOL)
     pkg_check_modules(FASTWRITER fastwriter REQUIRED)
 endif (NOT DISABLE_PCITOOL)
 
 pkg_check_modules(XMLLIB libxml-2.0 REQUIRED)
+check_include_files(stdatomic.h HAVE_STDATOMIC_H)
 
-add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -g")
+add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -fno-omit-frame-pointer")
 #add_definitions("-fPIC --std=c99 -Wall -O2")
 
 include(cmake/version.cmake)
 VERSION_TO_VARS(${PCILIB_VERSION} PCILIB_VERSION_MAJOR PCILIB_VERSION_MINOR PCILIB_VERSION_MICRO)
-
 
 add_subdirectory(dma)
 add_subdirectory(protocols)

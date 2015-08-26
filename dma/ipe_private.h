@@ -3,13 +3,13 @@
 
 #include "dma.h"
 
-#define IPEDMA_64BIT_MODE		1		/**< 64-bit mode addressing is required to support PCIe gen3 */
+//#define IPEDMA_ENFORCE_64BIT_MODE	1		/**< enforce 64-bit mode addressing (otherwise it is used only if register 0x18 specifies PCIe gen3 as required by DMA engine) */
 #define IPEDMA_CORES			1
 #define IPEDMA_MAX_TLP_SIZE		256		/**< Defines maximum TLP in bytes supported by device */
-//#define IPEDMA_TLP_SIZE		128		/**< If set, enforces the specified TLP size */
+//#define IPEDMA_TLP_SIZE			128		/**< If set, enforces the specified TLP size */
 
 #define IPEDMA_STREAMING_MODE				/**< Enables streaming DMA operation mode instead of ring-buffer, the page is written once and forgotten and need to be pushed in queue again */
-#define IPEDMA_STREAMING_CHECKS				/**< Enables status checks in streaming mode (it will cause performance penalty) */
+//#define IPEDMA_STREAMING_CHECKS				/**< Enables status checks in streaming mode (it will cause _significant_ performance penalty, max ~ 2 GB/s) */
 #define IPEDMA_PAGE_SIZE		4096
 #define IPEDMA_DMA_PAGES		1024		/**< number of DMA pages in the ring buffer to allocate */
 #define IPEDMA_DMA_PROGRESS_THRESHOLD	1		/**< how many pages the DMA engine should fill before reporting progress */
@@ -17,7 +17,6 @@
 #define IPEDMA_DESCRIPTOR_ALIGNMENT	64
 
 
-//#define IPEDMA_BUG_DMARD				/**< No register read during DMA transfer */
 //#define IPEDMA_BUG_LAST_READ				/**< We should forbid writting the second last available DMA buffer (the last is forbidden by design) */
 //#define IPEDMA_DETECT_PACKETS				/**< Using empty_deceted flag */
 #define  IPEDMA_SUPPORT_EMPTY_DETECTED			/**< Avoid waiting for data when empty_detected flag is set in hardware */
@@ -31,12 +30,16 @@
 #define IPEDMA_REG_CONTROL		0x04
 #define IPEDMA_REG_TLP_SIZE		0x0C
 #define IPEDMA_REG_TLP_COUNT		0x10
+#define IPEDMA_REG_PCIE_GEN		0x18
 #define IPEDMA_REG_PAGE_ADDR		0x50
 #define IPEDMA_REG_UPDATE_ADDR		0x54
 #define IPEDMA_REG_LAST_READ		0x58		/**< In streaming mode, we can use it freely to track current status */
 #define IPEDMA_REG_PAGE_COUNT		0x5C
 #define IPEDMA_REG_UPDATE_THRESHOLD	0x60
 #define IPEDMA_REG_STREAMING_STATUS	0x68
+
+#define IPEDMA_MASK_PCIE_GEN		0xF
+#define IPEDMA_MASK_STREAMING_MODE	0x10
 
 
 #define WR(addr, value) { *(uint32_t*)(ctx->base_addr + addr) = value; }
@@ -61,6 +64,7 @@ struct ipe_dma_s {
     int reused;				/**< indicates that DMA was found intialized, buffers were reused, and no additional initialization is needed */
     int preserve;			/**< indicates that DMA should not be stopped during clean-up */
     int mode64;				/**< indicates 64-bit operation mode */
+    int streaming;			/**< indicates if DMA is operating in streaming or ring-buffer mode */
 
     pcilib_kmem_handle_t *desc;		/**< in-memory status descriptor written by DMA engine upon operation progess */
     pcilib_kmem_handle_t *pages;	/**< collection of memory-locked pages for DMA operation */

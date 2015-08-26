@@ -14,7 +14,8 @@ typedef enum {
 
 #define PCILIB_KMEM_TYPE_MASK	0xFFFF0000
 #define PCILIB_KMEM_USE(type, subtype) ((pcilib_kmem_use_t)(((type) << 16)|(subtype)))
-
+#define PCILIB_KMEM_USE_TYPE(use) (use >> 16)
+#define PCILIB_KMEM_USE_SUBTYPE(use) (use & 0xFFFF)
 
 typedef enum {
     PCILIB_KMEM_TYPE_CONSISTENT = 0x00000,
@@ -31,6 +32,7 @@ typedef enum {
     PCILIB_KMEM_USE_DMA_RING = 1,
     PCILIB_KMEM_USE_DMA_PAGES = 2,
     PCILIB_KMEM_USE_SOFTWARE_REGISTERS = 3,
+    PCILIB_KMEM_USE_LOCKS = 4,
     PCILIB_KMEM_USE_USER = 0x10
 } pcilib_kmem_use_t;
 

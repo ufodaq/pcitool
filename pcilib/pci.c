@@ -1,4 +1,5 @@
 //#define PCILIB_FILE_IO
+#define _XOPEN_SOURCE 700
 #define _BSD_SOURCE
 #define _POSIX_C_SOURCE 200809L
 
@@ -25,6 +26,7 @@
 #include "plugin.h"
 #include "bar.h"
 #include "xml.h"
+#include "locking.h"
 
 static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
     int i, j;
@@ -127,6 +129,9 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	if(number_banks)banks=calloc((number_banks),sizeof(pcilib_register_bank_description_t));
 	else pcilib_error("no banks in the xml file");
 
+    if (!model)
+	model = getenv("PCILIB_MODEL");
+
     if (ctx) {
 	memset(ctx, 0, sizeof(pcilib_t));
 	ctx->pci_cfg_space_fd = -1;
@@ -139,6 +144,18 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	}
 	
 	ctx->page_mask = (uintptr_t)-1;
+	
+	if ((model)&&(!strcasecmp(model, "maintenance"))) {
+	    ctx->model = strdup("maintenance");
+	    return ctx;
+	}
+
+	err = pcilib_init_locking(ctx);
+	if (err) {
+	    pcilib_error("Error (%i) initializing locking subsystem", err);
+	    pcilib_close(ctx);
+	    return NULL;
+	}
 
 	ctx->alloc_reg = PCILIB_DEFAULT_REGISTER_SPACE;
 	ctx->registers = (pcilib_register_description_t *)malloc(PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_description_t));
@@ -190,7 +207,6 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	ctx->model_info.banks = ctx->banks;
 	ctx->model_info.protocols = ctx->protocols;
 	ctx->model_info.ranges = ctx->ranges;
-
 
 	err = pcilib_init_register_banks(ctx);
 	if (err) {
@@ -361,12 +377,20 @@ void pcilib_close(pcilib_t *ctx) {
     pcilib_bar_t i;
 
     if (ctx) {
+	pcilib_dma_engine_t dma;
 	const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
 	const pcilib_event_api_description_t *eapi = model_info->api;
 	const pcilib_dma_api_description_t *dapi = ctx->dma.api;
 	
         if ((eapi)&&(eapi->free)) eapi->free(ctx->event_ctx);
         if ((dapi)&&(dapi->free)) dapi->free(ctx->dma_ctx);
+
+	for  (dma = 0; dma < PCILIB_MAX_DMA_ENGINES; dma++) {
+	    if (ctx->dma_rlock[dma])
+		pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, ctx->dma_rlock[dma]);
+	    if (ctx->dma_wlock[dma])
+		pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, ctx->dma_wlock[dma]);
+	}
 
 	pcilib_free_register_banks(ctx);
 	
@@ -375,7 +399,10 @@ void pcilib_close(pcilib_t *ctx) {
 
 	if (ctx->event_plugin)
 	    pcilib_plugin_close(ctx->event_plugin);
-	
+
+	if (ctx->locks.kmem)
+	    pcilib_free_locking(ctx);
+
 	if (ctx->kmem_list) {
 	    pcilib_warning("Not all kernel buffers are properly cleaned");
 	
@@ -400,7 +427,7 @@ void pcilib_close(pcilib_t *ctx) {
 	
 	if (ctx->model)
 	    free(ctx->model);
-	
+
 	if (ctx->handle >= 0)
 	    close(ctx->handle);
 	
@@ -438,10 +465,15 @@ static int pcilib_update_pci_configuration_space(pcilib_t *ctx) {
     }
 
     size = read(ctx->pci_cfg_space_fd, ctx->pci_cfg_space_cache, 256);
-    if (size != 256) {
-	pcilib_error("Failed to read PCI configuration from sysfs");
+    if (size < 64) {
+	if (size <= 0)
+	    pcilib_error("Failed to read PCI configuration from sysfs, errno: %i", errno);
+	else
+	    pcilib_error("Failed to read PCI configuration from sysfs, only %zu bytes read (expected at least 64)", size);
 	return PCILIB_ERROR_FAILED;
     }
+
+    ctx->pci_cfg_space_size = size;
 
     return 0;
 }
@@ -465,7 +497,7 @@ static uint32_t *pcilib_get_pci_capabilities(pcilib_t *ctx, int cap_id) {
     cap = ctx->pci_cfg_space_cache[(0x34>>2)];
     cap_offset = cap&0xFC;
 
-    while ((cap_offset)&&(cap_offset < 256)) {
+    while ((cap_offset)&&(cap_offset < ctx->pci_cfg_space_size)) {
 	cap = ctx->pci_cfg_space_cache[cap_offset>>2];
 	if ((cap&0xFF) == cap_id)
 	    return &ctx->pci_cfg_space_cache[cap_offset>>2];

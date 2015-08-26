@@ -1,13 +1,16 @@
 Supported environmental variables
 =================================
- PCILIB_PLUGIN_DIR 		- override path to directory with plugins
+ PCILIB_MODEL			- defines the requested model (is overriden with -m option)
+ PCILIB_PLUGIN_DIR		- override path to directory with plugins
 
- PCILIB_DEBUG_DMA 		- Enable DMA debugging
+ PCILIB_DEBUG_DMA		- Enable DMA debugging
  PCILIB_DEBUG_MISSING_EVENTS	- Enable debugging of missing events (frames for instance)
  IPECAMERA_DEBUG_BROKEN_FRAMES	- Store broken frames in the specified directory (variable may specify directory)
  IPECAMERA_DEBUG_RAW_PACKETS	- Store all raw packets read from DMA grouped in frames (variable may specify directory)
  IPECAMERA_DEBUG_RAW_FRAMES	- Store all raw frames (variable may specify directory)
  IPECAMERA_DEBUG_HARDWARE	- Produce various debugging information about ipecamera operation
+ IPECAMERA_DEBUG_FRAME_HEADERS  - Print headers of each frame
+ IPECAMERA_DEBUG_API		- Print messages while entering and finishing standard API calls
 
  PCILIB_BENCHMARK_HARDWARE	- Remove all unnecessary software processing (like copying memcpy) to check hardware performance
  PCILIB_BENCHMARK_STREAMING	- Emulate streaming mode while benchmarking DMA engines

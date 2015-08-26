@@ -24,6 +24,7 @@
 #include "event.h"
 #include "model.h"
 #include "export.h"
+#include "locking.h"
 
 typedef struct {
     uint8_t max_link_speed, link_speed;
@@ -41,6 +42,7 @@ struct pcilib_s {
 
     int pci_cfg_space_fd;								/**< File descriptor linking to PCI configuration space in sysfs */
     uint32_t pci_cfg_space_cache[64];							/**< Cached PCI configuration space */
+    size_t pci_cfg_space_size;								/**< Size of the cached PCI configuration space, sometimes not fully is available for unpriveledged user */
     const uint32_t *pcie_capabilities;							/**< PCI Capbility structure (just a pointer at appropriate place in the pci_cfg_space) */
 
     int reg_bar_mapped;									/**< Indicates that all BARs used to access registers are mapped */
@@ -69,6 +71,11 @@ struct pcilib_s {
     pcilib_register_bank_context_t *bank_ctx[PCILIB_MAX_REGISTER_BANKS];		/**< Contexts for registers banks if required by register protocol */
     pcilib_dma_context_t *dma_ctx;							/**< DMA context */
     pcilib_context_t *event_ctx;							/**< Implmentation context */
+
+    pcilib_lock_t *dma_rlock[PCILIB_MAX_DMA_ENGINES];					/**< Per-engine locks to serialize streaming and read operations */
+    pcilib_lock_t *dma_wlock[PCILIB_MAX_DMA_ENGINES];					/**< Per-engine locks to serialize write operations */
+
+    struct pcilib_locking_s locks;							/**< Context of locking subsystem */
 
 #ifdef PCILIB_FILE_IO
     int file_io_handle;
