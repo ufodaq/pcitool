@@ -85,22 +85,6 @@
  */
 #define TRANSFORM_UNIT_PATH ((char*)"/units/unit[@name=\"%s\"]/convert_unit")
 
-
-/**
-* this function takes a string and will create an abtract syntax tree from the xml file represented by the string.
-* @param[in] filename the name of the xml file containing registers and banks.
-* @return an AST corresponding to the xml file.
-*/  
-xmlDocPtr pcilib_xml_getdoc(char* filename);
-
-/**
-* this function takes a context from an AST and an XPath expression, to produce a XPath object containing the nodes corresponding to the xpath expression.
-* @param[in] doc the xpath context of the xml file.
-* @param[in] xpath the value of the xpath expression that will be computed against the context.
-* @return the Xpath object with the nodes we wanted.
-*/
-xmlXPathObjectPtr pcilib_xml_getsetproperty(xmlXPathContextPtr doc, xmlChar *xpath);
-
 /**
  * this function create the list of registers structures, that are manipulated during execution, from the xml file.
  * @param[in] doc the xpath context of the xml file.
@@ -117,24 +101,9 @@ void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr* doc);
 void pcilib_xml_initialize_banks(pcilib_t* pci,xmlDocPtr* doc);
 
 /**
-* this function read the config file of the pcitool tool to give back the pwd of diverse files like the xml file to treat, the xsd file, the pythonscript file, the units xml file, the units xsd file.
-* @param[in,out] xmlfile the string representating a pwd to a file we want to access in:uninitilized out: the pwd.
-* @param[in] i the line at which the function should read the file to get the pwd.
-*/
-void pcilib_xml_read_config(char** xmlfile, int i);
-
-/**
-* this function validates the xml file against the xsd schema defined as the reference.
-* @todo change the name of the function if accepted.
-* @todo validation of unit file too?
-*/
-void validation();
-
-
-/**
-* this function create an XPath context (ie some sort of special AST only for XPath) from the AST of the xml file.
-* @param[in] doc the AST of the xml file.
-*/
-xmlXPathContextPtr pcilib_xml_getcontext(xmlDocPtr doc);
+ * this function gets the xml files and validates them, before returning pre-AST of them to initialize functions
+ *@param[out] docs the list of pre-AST of xml files parsed
+ */
+void pcilib_init_xml(xmlDocPtr* docs);
 
 #endif /*_XML_*/

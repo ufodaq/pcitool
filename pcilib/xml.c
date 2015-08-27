@@ -111,7 +111,6 @@ xmlSchemaFreeValidCtxt(ctxt);
 xmlFreeDoc(doc);
 }
 
-//! free the resource
 if(schema != NULL)
 xmlSchemaFree(schema);
 xmlSchemaCleanupTypes();
@@ -652,41 +651,6 @@ while(docs[count]!=NULL){
     pcilib_add_registers(pci,number_registers,registers);
     count++;
  }
-}
-
-
-
-
-/** pcilib_xml_read_config
- *
- * function to get the config we want at line j, in order to be able to have a configuration file with pwd to files we want
-* @param[in,out] xmlfile the string representating a pwd to a file we want to access in:uninitilized out: the pwd.
-* @param[in] i the line at which the function should read the file to get the pwd.
- */
-void pcilib_xml_read_config(char** xmlfile, int j){
-	FILE *fp;
-
-	fp=fopen("config.txt","r");
-	char line[60];
-	memset(line,'\0',60);
-	int i=0,k;
-	char *temp1;
-	if(fp==NULL) pcilib_error("can't find the configuration file: it must be near the executable");
-
-	while(fgets(line,60,fp)!=NULL){
-		if(i==j) {
-			k=0;
-			temp1=calloc((strlen(line)),sizeof(char));
-			while(line[k]!='\n'){
-				temp1[k]=line[k];
-				k++;
-			}
-			temp1[k]='\0';
-			*xmlfile=temp1;
-		}
-		i++;
-		memset(line,'\0',60);
-	}
 }
 
 #ifdef VIEW_OK
