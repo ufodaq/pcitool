@@ -154,6 +154,15 @@ while((fgets(line,sizeof(line),in))!=NULL) {
     
  docs=(xmlDocPtr*) realloc(docs,i*sizeof(xmlDocPtr));
  docs[i]=NULL;
+ free(path);
+ free(command);
+ free(command_xsd);
+ free(line);
+ free(line_xsd);
+ free(in);
+ free(in2);
+ fclose(in);
+ fclose(in2);
 }  
 
 /** pcilib_xml_create_register.
@@ -481,6 +490,7 @@ void pcilib_xml_arrange_registers(pcilib_register_description_t *registers,int s
 	pcilib_register_description_t* temp;
 	temp=malloc(size*sizeof(pcilib_register_description_t));
 	topdownsplitmerge(registers,0,size,temp);
+	free(temp);
 }
 
 /** pcilib_xml_getnumberregisters
@@ -724,13 +734,13 @@ viewnumber=0;
 			xmlXPathObjectPtr temp,temp2;
 
            	char* path;
-			path=malloc((strlen((char*)name)+51)*sizeof(char));
+			path=malloc(sizeof(char*));
 			sprintf(path, VIEW_STANDARD_REGISTER_PLUS,(char*)name);
 			temp=pcilib_xml_getsetproperty(context,(xmlChar*)path);
 			if(temp!=NULL) nodesetviewregister= temp->nodesetval;	
 
 			char* path2;
-			path2=malloc((strlen((char*)name)+strlen(VIEW_BITS_REGISTER_PLUS))*sizeof(char));
+			path2=malloc(sizeof(char*));
 			sprintf(path2, VIEW_BITS_REGISTER_PLUS,(char*)name);
 			temp2= pcilib_xml_getsetproperty(context,(xmlChar*)path2);
 			if(temp2!=NULL)	nodesetviewregisterbit= temp2->nodesetval;
@@ -836,6 +846,9 @@ viewnumber=0;
 			}
 			viewnumber++;
 	}
+
+	free(path);
+	free(path2);
 }
 
 /* pcilib_xml_initialize_viewsenum
@@ -873,13 +886,13 @@ void pcilib_xml_initialize_viewsenum(xmlDocPtr doc, pcilib_view_enum_ptr_t* myvi
 			registernumber=0;
 			
 			char* path;
-			path=malloc((strlen((char*)name)+51)*sizeof(char));
+			path=malloc(sizeof(char*));
 			sprintf(path, VIEW_STANDARD_REGISTER_PLUS,(char*)name);
 			temp=pcilib_xml_getsetproperty(context,(xmlChar*)path);
 			if(temp!=NULL) viewsetregister3= temp->nodesetval;	
 
 			char* path2;
-			path2=malloc((strlen((char*)name)+strlen(VIEW_BITS_REGISTER_PLUS))*sizeof(char));
+			path2=malloc(sizeof(char*));
 			sprintf(path2, VIEW_BITS_REGISTER_PLUS,(char*)name);
 			temp2= pcilib_xml_getsetproperty(context,(xmlChar*)path2);
 			if(temp2!=NULL)	viewsetregister4= temp2->nodesetval;
@@ -973,6 +986,9 @@ void pcilib_xml_initialize_viewsenum(xmlDocPtr doc, pcilib_view_enum_ptr_t* myvi
 			viewnumber++;
 
 	}
+	
+	free(path);
+	free(path2);
 }
 #endif
 
@@ -996,7 +1012,7 @@ void pclib_xml_initialize_units(xmlDocPtr doc, pcilib_units_ptr_t* unitsptr){
   
  for(i=0; i< nodesetbaseunit->NodeNr; i++){
    unitsptr->list_unit[i].name=nodesetbaseunit->nodeTab[i]->properties->children->content;
-   path=malloc((strlen(unitsptr->list_unit[i].name)+35)*sizeof(char));
+   path=malloc(sizeof(char*));
    sprintf(path, TRANSFORM_UNIT_PATH, unitsptr->list_unit[i].name);
    temp=pcilib_xml_getsetproperty(context, path);
    if(temp!=NULL){
@@ -1008,6 +1024,6 @@ void pclib_xml_initialize_units(xmlDocPtr doc, pcilib_units_ptr_t* unitsptr){
      }
    }
  }
- 
+ free(path);
 }
 #endif
