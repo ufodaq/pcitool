@@ -25,6 +25,7 @@
 #include "model.h"
 #include "export.h"
 #include "locking.h"
+#include <libxml/tree.h>
 
 typedef struct {
     uint8_t max_link_speed, link_speed;
@@ -71,6 +72,8 @@ struct pcilib_s {
     pcilib_register_bank_context_t *bank_ctx[PCILIB_MAX_REGISTER_BANKS];		/**< Contexts for registers banks if required by register protocol */
     pcilib_dma_context_t *dma_ctx;							/**< DMA context */
     pcilib_context_t *event_ctx;							/**< Implmentation context */
+    xmlNodePtr* banks_xml_nodes;				                                /**<pointer to xml nodes of banks in the xml file*/
+    xmlNodePtr* registers_xml_nodes;                                                     /**< pointer to xml nodes of registers in the xml file*/
 
     pcilib_lock_t *dma_rlock[PCILIB_MAX_DMA_ENGINES];					/**< Per-engine locks to serialize streaming and read operations */
     pcilib_lock_t *dma_wlock[PCILIB_MAX_DMA_ENGINES];					/**< Per-engine locks to serialize write operations */

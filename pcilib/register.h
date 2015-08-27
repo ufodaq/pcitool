@@ -40,7 +40,6 @@ typedef struct {
     
     const char *name;				/**< The access name of the register */
     const char *description;			/**< Brief description of the register */
-	/* use it or not? */ /*xmlNodePtr xmlNode;*/			/**<pointer to the corresponding node in the xml file*/
 } pcilib_register_description_t;
 
 

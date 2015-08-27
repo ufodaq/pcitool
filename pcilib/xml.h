@@ -26,7 +26,7 @@
 #include "register.h"
 #include "model.h"
 #include "bank.h"
-
+#include "pci.h"
 //#include <Python.h>
 
 #define REGISTERS_PATH ((xmlChar*)"/model/banks/bank/registers/register") /**<all standard registers nodes.*/
@@ -106,7 +106,7 @@ xmlXPathObjectPtr pcilib_xml_getsetproperty(xmlXPathContextPtr doc, xmlChar *xpa
  * @param[in] doc the xpath context of the xml file.
  * @param[out] registers out: the list of the created registers.
  */
-void pcilib_xml_initialize_registers(xmlDocPtr doc,pcilib_register_description_t *registers);
+void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc,pcilib_register_description_t *registers);
 
 /**
  * this function get the numbers of registers in the xml file for further malloc and xml checking.
@@ -129,7 +129,7 @@ void pcilib_xml_arrange_registers(pcilib_register_description_t *registers,int s
  * @param[in] doc the AST of the xml file.
  * @param[in,out] mybanks the structure containing the banks.
  */
-void pcilib_xml_initialize_banks(xmlDocPtr doc, pcilib_register_bank_description_t* mybanks);
+void pcilib_xml_initialize_banks(pcilib_t* pci,xmlDocPtr doc, pcilib_register_bank_description_t* mybanks);
 
 /**
  * this function create a bank from the informations gathered in the xml.
@@ -146,8 +146,9 @@ void pcilib_xml_initialize_banks(xmlDocPtr doc, pcilib_register_bank_description
  * @param[in] name the name of the bank that will be created.
  * @param[in] description the description of the bank that will be created.
  * @param[in] node the xmlNodeptr referring to the bank_description node of the bank that will be created.
- */
+ *
 void pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank,xmlChar* adress, xmlChar *bar, xmlChar *size, xmlChar *protocol,xmlChar *read_addr, xmlChar *write_addr, xmlChar *access, xmlChar *endianess, xmlChar *format, xmlChar *name,xmlChar *description, xmlNodePtr node);
+*/
 
 /**
  * this function get the numbers of banks in the xml file for further malloc and xml checking.
@@ -204,7 +205,7 @@ void pcilib_xml_init_nodeset_bank_ctx(pcilib_register_bank_context_t *ctx);
  * @param[in]  name the name of the future register
  * @param[in] description the description of the future register
  * @param[in] node the current xmlNode in the xml of the future register
- */
-void pcilib_xml_create_register(pcilib_register_description_t *myregister,xmlChar* adress, xmlChar *offset, xmlChar *size, xmlChar *defvalue, xmlChar *rwmask, xmlChar *mode, xmlChar *type, xmlChar *bank, xmlChar *name, xmlChar *description, xmlNodePtr node);
+ *
+ void pcilib_xml_create_register(pcilib_register_description_t *myregister,xmlChar* adress, xmlChar *offset, xmlChar *size, xmlChar *defvalue, xmlChar *rwmask, xmlChar *mode, xmlChar *type, xmlChar *bank, xmlChar *name, xmlChar *description, xmlNodePtr node);*/
 
 #endif /*_XML_*/

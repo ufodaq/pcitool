@@ -62,7 +62,6 @@ typedef struct {
     const char *format;								/**< printf format for the registers, either %lu for decimal output or 0x%lx for hexdecimal */
     const char *name;								/**< short bank name */
     const char *description;							/**< longer bank description */
-	/* use it or not?*/	/*xmlNodePtr xmlNode;*/				/**<pointer to xmlNode of the bank in the file*/
 } pcilib_register_bank_description_t;
 
 /**

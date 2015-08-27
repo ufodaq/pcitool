@@ -193,13 +193,13 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    ctx->model = strdup(model?model:"pci");
 
 	if(banks){
-		pcilib_xml_initialize_banks(doc,banks);
-		pcilib_add_register_banks(ctx,number_banks,banks);
+	    pcilib_xml_initialize_banks(ctx,doc,banks);
+	    pcilib_add_register_banks(ctx,number_banks,banks);
 	}else pcilib_error("no memory for banks");
 
 	if(registers){
-		pcilib_xml_initialize_registers(doc,registers);
-		pcilib_xml_arrange_registers(registers,number_registers);
+	    pcilib_xml_initialize_registers(ctx,doc,registers);
+	    pcilib_xml_arrange_registers(registers,number_registers);
 	    pcilib_add_registers(ctx,number_registers,registers);
 	}else pcilib_error("no memory for registers");
 	

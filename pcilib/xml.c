@@ -18,7 +18,7 @@
 #include <string.h>
 #include <assert.h>
 #include <Python.h>
-
+#include "pci.h"
 //#define VIEW_OK
 //#define UNIT_OK
 
@@ -90,9 +90,8 @@ xmlXPathContextPtr pcilib_xml_getcontext(xmlDocPtr doc){
  * @param[in] bank the bank of the future register
  * @param[in]  name the name of the future register
  * @param[in] description the description of the future register
- * @param[in] node the current xmlNode in the xml of the future register
  */
-void pcilib_xml_create_register(pcilib_register_description_t *myregister,xmlChar* adress, xmlChar *offset, xmlChar *size, xmlChar *defvalue, xmlChar *rwmask, xmlChar *mode, xmlChar *type, xmlChar *bank, xmlChar *name, xmlChar *description, xmlNodePtr node){
+void pcilib_xml_create_register(pcilib_register_description_t *myregister,xmlChar* adress, xmlChar *offset, xmlChar *size, xmlChar *defvalue, xmlChar *rwmask, xmlChar *mode, xmlChar *type, xmlChar *bank, xmlChar *name, xmlChar *description){
 		
 		char* ptr;
         
@@ -153,8 +152,6 @@ void pcilib_xml_create_register(pcilib_register_description_t *myregister,xmlCha
 		
 		myregister->name=(char*)name;
 		myregister->description=(char*)description;
-		/*should we include those xmlnodes?*/
-		//myregister->xmlNode=node;
 }	
 
 /** pcilib_xml_getnumberbanks
@@ -172,96 +169,6 @@ int pcilib_xml_getnumberbanks(xmlXPathContextPtr doc){
 	return nodesetadress->nodeNr; /**< we then return the number of said nodes */
 }
 
-/** pcilib_xml_initialize_banks
- * 
- * function to create the structures to store the banks from the AST 
- * @see pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank,xmlChar* adress, xmlChar *bar, xmlChar *size, xmlChar *protocol,xmlChar *read_addr, xmlChar *write_addr, xmlChar *access, xmlChar *endianess, xmlChar *format, xmlChar *name,xmlChar *description, xmlNodePtr node).
- * @param[in] doc the AST of the xml file.
- * @param[in,out] mybanks the structure containing the banks.
- */
-void pcilib_xml_initialize_banks(xmlDocPtr doc, pcilib_register_bank_description_t* mybanks){
-	pcilib_register_bank_description_t mybank;
-
-	xmlNodeSetPtr nodesetadress=NULL,nodesetbar=NULL,nodesetsize=NULL,nodesetprotocol=NULL,nodesetread_addr=NULL,nodesetwrite_addr=NULL,nodesetaccess=NULL,nodesetendianess=NULL,nodesetformat=NULL,nodesetname=NULL,nodesetdescription=NULL;
-	xmlChar *adress=NULL,*bar=NULL,*size=NULL,*protocol=NULL,*read_addr=NULL,*write_addr=NULL,*access=NULL,*endianess=NULL,*format=NULL,*name=NULL,*description=NULL;
-	xmlNodePtr mynode;	
-	
-	xmlXPathContextPtr context;
-	context=pcilib_xml_getcontext(doc);
-
-	int i;
-	
-	mynode=malloc(sizeof(xmlNode));
-
-	xmlXPathObjectPtr temp;
-	
-	/** we first get the nodes corresponding to the properties we want
-         * note: here a recursive algorithm may be more efficient but less evolutive*/
-	temp=pcilib_xml_getsetproperty(context,BANK_ADDR_PATH);
-	if(temp!=NULL) nodesetadress=temp->nodesetval;
-	else pcilib_error("there is no adress for banks in the xml");
-	
-	temp=pcilib_xml_getsetproperty(context,BANK_BAR_PATH);
-	if(temp!=NULL) nodesetbar=temp->nodesetval;
-	else pcilib_error("there is no bar for banks in the xml");
-
-	temp=pcilib_xml_getsetproperty(context,BANK_SIZE_PATH);
-	if(temp!=NULL) nodesetsize=temp->nodesetval;
-	else pcilib_error("there is no size for banks in the xml");
-
-	temp=pcilib_xml_getsetproperty(context,BANK_PROTOCOL_PATH);
-	if(temp!=NULL) nodesetprotocol= temp->nodesetval;
-	else pcilib_error("there is no protocol for banks in the xml");
-
-	temp=pcilib_xml_getsetproperty(context,BANK_READ_ADDR_PATH);
-	if(temp!=NULL) nodesetread_addr=temp->nodesetval;
-	else pcilib_error("there is no read_adress for banks in the xml");
-	
-	temp=pcilib_xml_getsetproperty(context,BANK_WRITE_ADDR_PATH);
-	if(temp!=NULL)nodesetwrite_addr=temp->nodesetval;
-	else pcilib_error("there is no write_adress for banks in the xml");
-
-	temp=pcilib_xml_getsetproperty(context,BANK_ACCESS_PATH);
-	if(temp!=NULL)nodesetaccess=temp->nodesetval;
-	else pcilib_error("there is no access for banks in the xml");
-
-	temp=pcilib_xml_getsetproperty(context,BANK_ENDIANESS_PATH);
-	if(temp!=NULL) nodesetendianess=temp->nodesetval;
-	else pcilib_error("there is no endianess for banks in the xml");
-
-	temp=pcilib_xml_getsetproperty(context,BANK_FORMAT_PATH);
-	if(temp!=NULL) nodesetformat=temp->nodesetval;
-	else pcilib_error("there is no format for banks in the xml");
-
-	temp=pcilib_xml_getsetproperty(context,BANK_NAME_PATH);
-	if(temp!=NULL)nodesetname=temp->nodesetval;
-	else pcilib_error("there is no name for banks in the xml");
-
-	temp=pcilib_xml_getsetproperty(context,BANK_DESCRIPTION_PATH);
-	if(temp!=NULL)nodesetdescription=temp->nodesetval;
-		
-	for(i=0;i<nodesetadress->nodeNr;i++){
-	  /** we then get each node from the structures above*/
-		adress=xmlNodeListGetString(doc,nodesetadress->nodeTab[i]->xmlChildrenNode, 1);
-		bar=xmlNodeListGetString(doc,nodesetbar->nodeTab[i]->xmlChildrenNode, 1);
-		size=xmlNodeListGetString(doc,nodesetsize->nodeTab[i]->xmlChildrenNode, 1);
-		protocol=xmlNodeListGetString(doc,nodesetprotocol->nodeTab[i]->xmlChildrenNode, 1);
-		read_addr=xmlNodeListGetString(doc,nodesetread_addr->nodeTab[i]->xmlChildrenNode, 1);
-		write_addr=xmlNodeListGetString(doc,nodesetwrite_addr->nodeTab[i]->xmlChildrenNode, 1);
-		access=xmlNodeListGetString(doc,nodesetaccess->nodeTab[i]->xmlChildrenNode, 1);
-		endianess=xmlNodeListGetString(doc,nodesetendianess->nodeTab[i]->xmlChildrenNode, 1);
-		format=xmlNodeListGetString(doc,nodesetformat->nodeTab[i]->xmlChildrenNode, 1);
-		name=xmlNodeListGetString(doc,nodesetname->nodeTab[i]->xmlChildrenNode, 1);
-		description=xmlNodeListGetString(doc,nodesetdescription->nodeTab[i]->xmlChildrenNode, 1);
-
-		mynode=nodesetadress->nodeTab[i]->parent;
-		/** the following function will create the given structure for banks*/
-		pcilib_xml_create_bank(&mybank,adress,bar,size,protocol,read_addr,write_addr,access,endianess,format, name, description,mynode);
-		mybanks[i]=mybank;
-	}
-
-}
-
 /** pcilib_xml_create_bank
  * 
  * this function create a bank structure from the results of xml parsing
@@ -277,9 +184,8 @@ void pcilib_xml_initialize_banks(xmlDocPtr doc, pcilib_register_bank_description
  * @param[in] format the format of the bank that will be created.
  * @param[in] name the name of the bank that will be created.
  * @param[in] description the description of the bank that will be created.
- * @param[in] node the xmlNodeptr referring to the bank_description node of the bank that will be created.
  */
-void pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank,xmlChar* adress, xmlChar *bar, xmlChar *size, xmlChar *protocol, xmlChar *read_addr, xmlChar *write_addr, xmlChar *access, xmlChar *endianess, xmlChar *format, xmlChar *name,xmlChar *description, xmlNodePtr node){
+void pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank,xmlChar* adress, xmlChar *bar, xmlChar *size, xmlChar *protocol, xmlChar *read_addr, xmlChar *write_addr, xmlChar *access, xmlChar *endianess, xmlChar *format, xmlChar *name,xmlChar *description){
 		
 		char* ptr;
 
@@ -345,9 +251,104 @@ void pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank,xmlChar* 
 
 		mybank->name=(char*)name;
 		mybank->description=(char*)description;
-		/* to include or not?*/
-		//mybank->xmlNode=node;
 }	
+
+/** pcilib_xml_initialize_banks
+ * 
+ * function to create the structures to store the banks from the AST 
+ * @see pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank,xmlChar* adress, xmlChar *bar, xmlChar *size, xmlChar *protocol,xmlChar *read_addr, xmlChar *write_addr, xmlChar *access, xmlChar *endianess, xmlChar *format, xmlChar *name,xmlChar *description, xmlNodePtr node).
+ * @param[in] doc the AST of the xml file.
+ * @param[in,out] mybanks the structure containing the banks.
+ */
+void pcilib_xml_initialize_banks(pcilib_t* pci, xmlDocPtr doc, pcilib_register_bank_description_t* mybanks){
+	pcilib_register_bank_description_t mybank;
+
+	xmlNodeSetPtr nodesetadress=NULL,nodesetbar=NULL,nodesetsize=NULL,nodesetprotocol=NULL,nodesetread_addr=NULL,nodesetwrite_addr=NULL,nodesetaccess=NULL,nodesetendianess=NULL,nodesetformat=NULL,nodesetname=NULL,nodesetdescription=NULL;
+	xmlChar *adress=NULL,*bar=NULL,*size=NULL,*protocol=NULL,*read_addr=NULL,*write_addr=NULL,*access=NULL,*endianess=NULL,*format=NULL,*name=NULL,*description=NULL;
+	xmlNodePtr mynode;	
+	
+	xmlXPathContextPtr context;
+	context=pcilib_xml_getcontext(doc);
+
+	int i;
+	
+	mynode=malloc(sizeof(xmlNode));
+
+	xmlXPathObjectPtr temp;
+	
+	/** we first get the nodes corresponding to the properties we want
+         * note: here a recursive algorithm may be more efficient but less evolutive*/
+	temp=pcilib_xml_getsetproperty(context,BANK_ADDR_PATH);
+	if(temp!=NULL) nodesetadress=temp->nodesetval;
+	else pcilib_error("there is no adress for banks in the xml");
+	
+	temp=pcilib_xml_getsetproperty(context,BANK_BAR_PATH);
+	if(temp!=NULL) nodesetbar=temp->nodesetval;
+	else pcilib_error("there is no bar for banks in the xml");
+
+	temp=pcilib_xml_getsetproperty(context,BANK_SIZE_PATH);
+	if(temp!=NULL) nodesetsize=temp->nodesetval;
+	else pcilib_error("there is no size for banks in the xml");
+
+	temp=pcilib_xml_getsetproperty(context,BANK_PROTOCOL_PATH);
+	if(temp!=NULL) nodesetprotocol= temp->nodesetval;
+	else pcilib_error("there is no protocol for banks in the xml");
+
+	temp=pcilib_xml_getsetproperty(context,BANK_READ_ADDR_PATH);
+	if(temp!=NULL) nodesetread_addr=temp->nodesetval;
+	else pcilib_error("there is no read_adress for banks in the xml");
+	
+	temp=pcilib_xml_getsetproperty(context,BANK_WRITE_ADDR_PATH);
+	if(temp!=NULL)nodesetwrite_addr=temp->nodesetval;
+	else pcilib_error("there is no write_adress for banks in the xml");
+
+	temp=pcilib_xml_getsetproperty(context,BANK_ACCESS_PATH);
+	if(temp!=NULL)nodesetaccess=temp->nodesetval;
+	else pcilib_error("there is no access for banks in the xml");
+
+	temp=pcilib_xml_getsetproperty(context,BANK_ENDIANESS_PATH);
+	if(temp!=NULL) nodesetendianess=temp->nodesetval;
+	else pcilib_error("there is no endianess for banks in the xml");
+
+	temp=pcilib_xml_getsetproperty(context,BANK_FORMAT_PATH);
+	if(temp!=NULL) nodesetformat=temp->nodesetval;
+	else pcilib_error("there is no format for banks in the xml");
+
+	temp=pcilib_xml_getsetproperty(context,BANK_NAME_PATH);
+	if(temp!=NULL)nodesetname=temp->nodesetval;
+	else pcilib_error("there is no name for banks in the xml");
+
+	temp=pcilib_xml_getsetproperty(context,BANK_DESCRIPTION_PATH);
+	if(temp!=NULL)nodesetdescription=temp->nodesetval;
+	
+	pci->banks_xml_nodes=calloc(nodesetadress->nodeNr,sizeof(xmlNodePtr));
+	if(!(pci->banks_xml_nodes)) pcilib_warning("can't create bank xml nodes for pcilib_t struct");
+	
+	for(i=0;i<nodesetadress->nodeNr;i++){
+	  /** we then get each node from the structures above*/
+		adress=xmlNodeListGetString(doc,nodesetadress->nodeTab[i]->xmlChildrenNode, 1);
+		bar=xmlNodeListGetString(doc,nodesetbar->nodeTab[i]->xmlChildrenNode, 1);
+		size=xmlNodeListGetString(doc,nodesetsize->nodeTab[i]->xmlChildrenNode, 1);
+		protocol=xmlNodeListGetString(doc,nodesetprotocol->nodeTab[i]->xmlChildrenNode, 1);
+		read_addr=xmlNodeListGetString(doc,nodesetread_addr->nodeTab[i]->xmlChildrenNode, 1);
+		write_addr=xmlNodeListGetString(doc,nodesetwrite_addr->nodeTab[i]->xmlChildrenNode, 1);
+		access=xmlNodeListGetString(doc,nodesetaccess->nodeTab[i]->xmlChildrenNode, 1);
+		endianess=xmlNodeListGetString(doc,nodesetendianess->nodeTab[i]->xmlChildrenNode, 1);
+		format=xmlNodeListGetString(doc,nodesetformat->nodeTab[i]->xmlChildrenNode, 1);
+		name=xmlNodeListGetString(doc,nodesetname->nodeTab[i]->xmlChildrenNode, 1);
+		description=xmlNodeListGetString(doc,nodesetdescription->nodeTab[i]->xmlChildrenNode, 1);
+
+		mynode=nodesetadress->nodeTab[i]->parent;
+
+		/** the following function will create the given structure for banks*/
+		pcilib_xml_create_bank(&mybank,adress,bar,size,protocol,read_addr,write_addr,access,endianess,format, name, description);
+		mybanks[i]=mybank;
+		pci->banks_xml_nodes[i]=mynode;
+
+	}
+
+}
+
 
 
 /** pcilib_xml_getnumberregisters
@@ -380,7 +381,7 @@ int pcilib_xml_getnumberregisters(xmlXPathContextPtr doc){
  * @param[in] doc the xpath context of the xml file.
  * @param[in,out] registers in: initialized list out: the list of the created registers.
  */
-void pcilib_xml_initialize_registers(xmlDocPtr doc,pcilib_register_description_t *registers){
+void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc,pcilib_register_description_t *registers){
 	
 	xmlNodeSetPtr nodesetadress=NULL,nodesetoffset=NULL,nodesetdefvalue=NULL,nodesetrwmask=NULL,nodesetsize=NULL,nodesetmode=NULL,nodesetname=NULL;
 	xmlChar *adress=NULL,*offset=NULL,*defvalue=NULL,*rwmask=NULL,*size=NULL,*mode=NULL,*name=NULL,*bank=NULL,*type=NULL,*description=NULL;
@@ -446,6 +447,9 @@ void pcilib_xml_initialize_registers(xmlDocPtr doc,pcilib_register_description_t
 	pcilib_register_description_t myregister;
 	
 	int i,j;
+	
+	pci->registers_xml_nodes=calloc(nodesetadress->nodeNr+nodesetsuboffset->nodeNr,sizeof(xmlNodePtr));
+	if(!(pci->registers_xml_nodes)) pcilib_warning("can't create registers xml nodes in pcilib_t struct");
 		
 	for(i=0;i<nodesetadress->nodeNr;i++){
 	  /** get each sub property of each standard registers*/
@@ -467,8 +471,9 @@ void pcilib_xml_initialize_registers(xmlDocPtr doc,pcilib_register_description_t
 		}
 		mynode=nodesetadress->nodeTab[i]->parent;
 		/**creation of a register with the given previous properties*/
-		pcilib_xml_create_register(&myregister,adress,offset,size,defvalue,rwmask,mode, type, bank, name, description,mynode);
+		pcilib_xml_create_register(&myregister,adress,offset,size,defvalue,rwmask,mode, type, bank, name, description);
 		registers[i]=myregister;
+		pci->registers_xml_nodes[i]=mynode;
 	}
 	
 	j=i;
@@ -497,8 +502,9 @@ void pcilib_xml_initialize_registers(xmlDocPtr doc,pcilib_register_description_t
 		}
 		mynode=nodesetsuboffset->nodeTab[i]->parent;
 		/** creation of a bits register given the previous properties*/
-		pcilib_xml_create_register(&myregister,subadress,suboffset,subsize,subdefvalue,subrwmask,submode, subtype, subbank, subname, subdescription,mynode);
+		pcilib_xml_create_register(&myregister,subadress,suboffset,subsize,subdefvalue,subrwmask,submode, subtype, subbank, subname, subdescription);
 		registers[i+j]=myregister;
+		pci->registers_xml_nodes[i+j]=mynode;
 	}
 }
 

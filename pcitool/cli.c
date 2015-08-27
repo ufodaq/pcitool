@@ -93,7 +93,7 @@ typedef enum {
     MODE_LIST_KMEM,
     MODE_READ_KMEM,
     MODE_FREE_KMEM,
-    MODE_VALIDATE_XML
+    MODE_VALIDATE_XML,
     MODE_LIST_LOCKS,
     MODE_FREE_LOCKS,
     MODE_LOCK,
@@ -143,7 +143,7 @@ typedef enum {
     OPT_GRAB = 'g',
     OPT_QUIETE = 'q',
     OPT_HELP = 'h',
-	OPT_VALIDATE_XML= 'v',
+    OPT_VALIDATE_XML= 'v',
     OPT_RESET = 128,
     OPT_BENCHMARK,
     OPT_TRIGGER,
