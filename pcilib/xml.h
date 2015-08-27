@@ -106,22 +106,7 @@ xmlXPathObjectPtr pcilib_xml_getsetproperty(xmlXPathContextPtr doc, xmlChar *xpa
  * @param[in] doc the xpath context of the xml file.
  * @param[out] registers out: the list of the created registers.
  */
-void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc,pcilib_register_description_t *registers);
-
-/**
- * this function get the numbers of registers in the xml file for further malloc and xml checking.
- * @param[in] doc the xpath context of the xml file.
- * @return the numbers of registers in xml file.
- * @todo see the usage of this function.
- */
-int pcilib_xml_getnumberregisters(xmlXPathContextPtr doc);
-
-/**
- * this function rearrange the list of registers to put them in pcilib_open furthermore, using a merge sort algorithm. The merge sort algorithm was chosen as it's fast and stable, however it uses some memory, but it's not limitating here. 
- * @param[in,out] registers the list of registers in : not ranged out: ranged.
- * @param[in] size the number of registers.
- */
-void pcilib_xml_arrange_registers(pcilib_register_description_t *registers,int size);
+void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc);
 
 /**
  * this functions initialize the structures containing banks, for use in the rest of execution, from the xml file.
@@ -129,34 +114,7 @@ void pcilib_xml_arrange_registers(pcilib_register_description_t *registers,int s
  * @param[in] doc the AST of the xml file.
  * @param[in,out] mybanks the structure containing the banks.
  */
-void pcilib_xml_initialize_banks(pcilib_t* pci,xmlDocPtr doc, pcilib_register_bank_description_t* mybanks);
-
-/**
- * this function create a bank from the informations gathered in the xml.
- * @param[out] mybank the created bank.
- * @param[in] adress the adress of the bank that will be created.
- * @param[in] bar the bar of the bank that will be created.
- * @param[in] size the size of the bank that will be created.
- * @param[in] protocol the protocol of the bank that will be created.
- * @param[in] read_addr the read adress for protocol of the bank that will be created.
- * @param[in] write_addr the write adress for the protocol of the bank that will be created.
- * @param[in] access the word size of the bank that will be created.
- * @param[in] endianess the endianess of the bank that will be created.
- * @param[in] format the format of the bank that will be created.
- * @param[in] name the name of the bank that will be created.
- * @param[in] description the description of the bank that will be created.
- * @param[in] node the xmlNodeptr referring to the bank_description node of the bank that will be created.
- *
-void pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank,xmlChar* adress, xmlChar *bar, xmlChar *size, xmlChar *protocol,xmlChar *read_addr, xmlChar *write_addr, xmlChar *access, xmlChar *endianess, xmlChar *format, xmlChar *name,xmlChar *description, xmlNodePtr node);
-*/
-
-/**
- * this function get the numbers of banks in the xml file for further malloc and xml checking.
- * @param[in] doc the Xpath context of the xml file.
- * @return the number of banks.
- *@todo see the usage of this function.
- */
-int pcilib_xml_getnumberbanks(xmlXPathContextPtr doc);
+void pcilib_xml_initialize_banks(pcilib_t* pci,xmlDocPtr doc);
 
 /**
 * this function read the config file of the pcitool tool to give back the pwd of diverse files like the xml file to treat, the xsd file, the pythonscript file, the units xml file, the units xsd file.
@@ -178,34 +136,5 @@ void validation();
 * @param[in] doc the AST of the xml file.
 */
 xmlXPathContextPtr pcilib_xml_getcontext(xmlDocPtr doc);
-
-/**
-* this function is used to register the xpath object containing all registers node in registers context.
-* @param[in] ctx the register context running.
-*/
-void pcilib_xml_init_nodeset_register_ctx(pcilib_register_context_t *ctx);
-
-/**
-* this function is used to register the xpath object containing all bankss node in banks context.
-* @param[in] ctx the bank context running.
-*/
-void pcilib_xml_init_nodeset_bank_ctx(pcilib_register_bank_context_t *ctx);
-
-/**
- * this function create a register structure from the results of xml parsing.
- * @param[out] myregister the register we want to create
- * @param[in] adress the adress of the future register
- * @param[in] offset the offset of the future register
- * @param[in] size the size of the future register
- * @param[in] defvalue the defaut value of the future register
- * @param[in] rwmask the rwmask of the future register
- * @param[in] mode the mode of the future register
- * @param[in] type the type of the future register
- * @param[in] bank the bank of the future register
- * @param[in]  name the name of the future register
- * @param[in] description the description of the future register
- * @param[in] node the current xmlNode in the xml of the future register
- *
- void pcilib_xml_create_register(pcilib_register_description_t *myregister,xmlChar* adress, xmlChar *offset, xmlChar *size, xmlChar *defvalue, xmlChar *rwmask, xmlChar *mode, xmlChar *type, xmlChar *bank, xmlChar *name, xmlChar *description, xmlNodePtr node);*/
 
 #endif /*_XML_*/

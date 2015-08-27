@@ -19,6 +19,8 @@
 #include <assert.h>
 #include <Python.h>
 #include "pci.h"
+#include "bank.h"
+#include "register.h"
 //#define VIEW_OK
 //#define UNIT_OK
 
@@ -260,12 +262,14 @@ void pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank,xmlChar* 
  * @param[in] doc the AST of the xml file.
  * @param[in,out] mybanks the structure containing the banks.
  */
-void pcilib_xml_initialize_banks(pcilib_t* pci, xmlDocPtr doc, pcilib_register_bank_description_t* mybanks){
+void pcilib_xml_initialize_banks(pcilib_t* pci, xmlDocPtr doc/*, pcilib_register_bank_description_t* mybanks*/){
 	pcilib_register_bank_description_t mybank;
 
 	xmlNodeSetPtr nodesetadress=NULL,nodesetbar=NULL,nodesetsize=NULL,nodesetprotocol=NULL,nodesetread_addr=NULL,nodesetwrite_addr=NULL,nodesetaccess=NULL,nodesetendianess=NULL,nodesetformat=NULL,nodesetname=NULL,nodesetdescription=NULL;
 	xmlChar *adress=NULL,*bar=NULL,*size=NULL,*protocol=NULL,*read_addr=NULL,*write_addr=NULL,*access=NULL,*endianess=NULL,*format=NULL,*name=NULL,*description=NULL;
 	xmlNodePtr mynode;	
+	int number_banks;
+	pcilib_register_bank_description_t* banks;
 	
 	xmlXPathContextPtr context;
 	context=pcilib_xml_getcontext(doc);
@@ -274,10 +278,14 @@ void pcilib_xml_initialize_banks(pcilib_t* pci, xmlDocPtr doc, pcilib_register_b
 	
 	mynode=malloc(sizeof(xmlNode));
 
+	number_banks=pcilib_xml_getnumberbanks(context);
+	if(number_banks) banks=calloc((number_banks),sizeof(pcilib_register_bank_description_t));
+	else return;
+
 	xmlXPathObjectPtr temp;
 	
-	/** we first get the nodes corresponding to the properties we want
-         * note: here a recursive algorithm may be more efficient but less evolutive*/
+	/** we first get the nodes corresponding to the properties we want*/
+/* -----> certainly not necessary if we validate xml each time*/
 	temp=pcilib_xml_getsetproperty(context,BANK_ADDR_PATH);
 	if(temp!=NULL) nodesetadress=temp->nodesetval;
 	else pcilib_error("there is no adress for banks in the xml");
@@ -342,14 +350,62 @@ void pcilib_xml_initialize_banks(pcilib_t* pci, xmlDocPtr doc, pcilib_register_b
 
 		/** the following function will create the given structure for banks*/
 		pcilib_xml_create_bank(&mybank,adress,bar,size,protocol,read_addr,write_addr,access,endianess,format, name, description);
-		mybanks[i]=mybank;
+		banks[i]=mybank;
 		pci->banks_xml_nodes[i]=mynode;
 
 	}
-
+	
+    pcilib_add_register_banks(pci,number_banks,banks);
 }
 
+/*
+ * next 3 functions are for the implementation of a merge sort algorithm
+ */
+void topdownmerge(pcilib_register_description_t *A, int start, int middle, int end, pcilib_register_description_t *B){
+ int i0,i1,j;
+ i0= start;
+ i1=middle;
 
+ for(j=start;j<end;j++){
+ 	if((i0 < middle) && (i1>=end || A[i0].addr<=A[i1].addr)){
+		B[j]=A[i0];
+		i0++;
+	}
+	else{
+		B[j]=A[i1];
+		i1++;
+	}
+	}
+}
+
+void copyarray(pcilib_register_description_t *B, int start,int  end, pcilib_register_description_t *A){
+	int k;
+	for (k=start; k<end;k++) A[k]=B[k];
+}
+
+void topdownsplitmerge(pcilib_register_description_t *A, int start, int end, pcilib_register_description_t *B){
+	int middle;
+	if(end-start <2)
+		return;
+	
+	middle =(end+start)/2;
+	topdownsplitmerge(A,start, middle,B);
+	topdownsplitmerge(A,middle,end,B);
+	topdownmerge(A,start,middle,end,B);
+	copyarray(B,start,end,A);
+}
+
+/** pcilib_xml_arrange_registers
+ *
+ * after the complete structure containing the registers has been created from the xml, this function rearrange them by address in order to add them in pcilib_open, which consider the adding of registers in order of adress	
+ * @param[in,out] registers the list of registers in : not ranged out: ranged.
+ * @param[in] size the number of registers. 
+ */
+void pcilib_xml_arrange_registers(pcilib_register_description_t *registers,int size){
+	pcilib_register_description_t* temp;
+	temp=malloc(size*sizeof(pcilib_register_description_t));
+	topdownsplitmerge(registers,0,size,temp);
+}
 
 /** pcilib_xml_getnumberregisters
  *
@@ -373,6 +429,7 @@ int pcilib_xml_getnumberregisters(xmlXPathContextPtr doc){
 	return nodesetadress->nodeNr + nodesetsuboffset->nodeNr; /**<we sum the number of nodes in the first structure to the number of nodes in the second one*/
 }
 
+
 /** pcilib_xml_initialize_registers
  *
  * this function create a list of registers from an abstract syntax tree
@@ -381,20 +438,28 @@ int pcilib_xml_getnumberregisters(xmlXPathContextPtr doc){
  * @param[in] doc the xpath context of the xml file.
  * @param[in,out] registers in: initialized list out: the list of the created registers.
  */
-void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc,pcilib_register_description_t *registers){
+void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc/*,pcilib_register_description_t *registers*/){
 	
 	xmlNodeSetPtr nodesetadress=NULL,nodesetoffset=NULL,nodesetdefvalue=NULL,nodesetrwmask=NULL,nodesetsize=NULL,nodesetmode=NULL,nodesetname=NULL;
 	xmlChar *adress=NULL,*offset=NULL,*defvalue=NULL,*rwmask=NULL,*size=NULL,*mode=NULL,*name=NULL,*bank=NULL,*type=NULL,*description=NULL;
 	xmlNodePtr mynode;	
 	xmlNodePtr tempnode;	
 	xmlXPathContextPtr context;
+	int number_registers;
+	pcilib_register_description_t *registers=NULL;
+	
 	context=pcilib_xml_getcontext(doc);
-
 	mynode=malloc(sizeof(xmlNode));
+
+	number_registers=pcilib_xml_getnumberregisters(context);
+	if(number_registers) registers=calloc(number_registers,sizeof(pcilib_register_description_t));
+        else return;
 	
 	xmlXPathObjectPtr temp;
 
 	/** get the sructures containing each property of standard regsiter */
+/* -----> certainly not necessary if we validate xml each time*/
+
 	temp=pcilib_xml_getsetproperty(context,ADRESS_PATH);
 	if(temp!=NULL)nodesetadress=temp->nodesetval;
 	else pcilib_error("no adress for registers found in xml");
@@ -506,57 +571,12 @@ void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc,pcilib_registe
 		registers[i+j]=myregister;
 		pci->registers_xml_nodes[i+j]=mynode;
 	}
+
+    pcilib_xml_arrange_registers(registers,number_registers);
+    pcilib_add_registers(pci,number_registers,registers);
 }
 
 
-/*
- * next 3 functions are for the implementation of a merge sort algorithm
- */
-void topdownmerge(pcilib_register_description_t *A, int start, int middle, int end, pcilib_register_description_t *B){
- int i0,i1,j;
- i0= start;
- i1=middle;
-
- for(j=start;j<end;j++){
- 	if((i0 < middle) && (i1>=end || A[i0].addr<=A[i1].addr)){
-		B[j]=A[i0];
-		i0++;
-	}
-	else{
-		B[j]=A[i1];
-		i1++;
-	}
-	}
-}
-
-void copyarray(pcilib_register_description_t *B, int start,int  end, pcilib_register_description_t *A){
-	int k;
-	for (k=start; k<end;k++) A[k]=B[k];
-}
-
-void topdownsplitmerge(pcilib_register_description_t *A, int start, int end, pcilib_register_description_t *B){
-	int middle;
-	if(end-start <2)
-		return;
-	
-	middle =(end+start)/2;
-	topdownsplitmerge(A,start, middle,B);
-	topdownsplitmerge(A,middle,end,B);
-	topdownmerge(A,start,middle,end,B);
-	copyarray(B,start,end,A);
-}
-
-/** pcilib_xml_arrange_registers
- *
- * after the complete structure containing the registers has been created from the xml, this function rearrange them by address in order to add them in pcilib_open, which consider the adding of registers in order of adress	
- * @param[in,out] registers the list of registers in : not ranged out: ranged.
- * @param[in] size the number of registers. 
- */
-void pcilib_xml_arrange_registers(pcilib_register_description_t *registers,int size){
-	pcilib_register_description_t* temp;
-	temp=malloc(size*sizeof(pcilib_register_description_t));
-	topdownsplitmerge(registers,0,size,temp);
-}
 
 #include <libxml/xmlschemastypes.h>
 /** validation
@@ -644,44 +664,6 @@ void pcilib_xml_read_config(char** xmlfile, int j){
 		memset(line,'\0',60);
 	}
 }
-/* to include or not?*/
-/** pcilib_xml_init_nodeset_register_ctx
- *
- * function to get all registers nodes in a structure and put it in registers context
-* @param[in] ctx the register context running.
- *
-void pcilib_xml_init_nodeset_register_ctx(pcilib_register_context_t *ctx){
-	char* xmlfile;	
-	pcilib_xml_read_config(&xmlfile,3);
-    xmlDocPtr doc;
-    doc=pcilib_xml_getdoc(xmlfile);
-    xmlXPathContextPtr context;
-    context=pcilib_xml_getcontext(doc);
-
-	xmlNodeSetPtr registers;
-	registers = pcilib_xml_getsetproperty(context, REGISTERS_PATH)->nodesetval;
-	ctx->registers_nodes=registers;
-}
-
-** pcilib_xml_init_nodeset_bank_ctx
- *
- *function to get all banks nodes in a structure and put it in banks context
-* @param[in] ctx the bank context running.
- *
-void pcilib_xml_init_nodeset_bank_ctx(pcilib_register_bank_context_t *ctx){
-	char* xmlfile;	
-	pcilib_xml_read_config(&xmlfile,3);
-    xmlDocPtr doc;
-    doc=pcilib_xml_getdoc(xmlfile);
-    xmlXPathContextPtr context;
-    context=pcilib_xml_getcontext(doc);
-
-	xmlNodeSetPtr banks;
-	banks = pcilib_xml_getsetproperty(context, BANKS_PATH)->nodesetval;
-	ctx->banks_nodes=banks;
-
-}
-*/
 
 #ifdef VIEW_OK
 /* pcilib_xml_getnumberformulaviews
