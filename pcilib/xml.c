@@ -10,17 +10,18 @@
 
  In case the performance is not good enough, please consider the following : no more configuration file indicating where the files required are, hard code of formulas, and go to complete non evolutive code : get 1 access to xml file and context, and then make recursive descent to get all you need(investigation of libxml2 source code would be so needed to prove it's better to go recursive than just xpath).
  */
-
+#define _XOPEN_SOURCE 700
 #include "xml.h"
 #include "error.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <Python.h>
+//#include <Python.h>
 #include "pci.h"
 #include "bank.h"
 #include "register.h"
+#include <libxml/xmlschemastypes.h>
 //#define VIEW_OK
 //#define UNIT_OK
 
@@ -78,6 +79,83 @@ xmlXPathContextPtr pcilib_xml_getcontext(xmlDocPtr doc){
 	return context;
 }
 
+
+/** validation
+ *
+ * function to validate the xml file against the xsd, so that it does not require extern software
+ */
+void validation(char* xml_filename, char* xsd_filename)
+{
+xmlDocPtr doc;
+xmlSchemaPtr schema = NULL;
+xmlSchemaParserCtxtPtr ctxt;
+int ret=1;
+
+ctxt = xmlSchemaNewParserCtxt(xsd_filename);
+schema = xmlSchemaParse(ctxt);
+xmlSchemaFreeParserCtxt(ctxt);
+
+doc = xmlReadFile(xml_filename, NULL, 0);
+
+if (doc == NULL)
+{
+	pcilib_error("Could not parse xml document ");
+}
+else
+{
+xmlSchemaValidCtxtPtr ctxt;
+/** validation here*/
+ctxt = xmlSchemaNewValidCtxt(schema);
+ret = xmlSchemaValidateDoc(ctxt, doc);
+xmlSchemaFreeValidCtxt(ctxt);
+xmlFreeDoc(doc);
+}
+
+//! free the resource
+if(schema != NULL)
+xmlSchemaFree(schema);
+xmlSchemaCleanupTypes();
+
+if(ret!=0) pcilib_error("xml file \"%s\" does not validate against the schema",xml_filename);
+
+}
+
+void pcilib_init_xml(xmlDocPtr* docs){
+  char *path,*command,*command_xsd, *line, *line_xsd;
+    FILE *in, *in2;
+    int i=1;
+
+    path=malloc(sizeof(char*));
+    command=malloc(sizeof(char*));
+    command_xsd=malloc(sizeof(char*));
+    line=malloc(sizeof(char*));
+    line_xsd=malloc(sizeof(char*));
+    docs=malloc(sizeof(xmlDocPtr));
+    
+    path=getenv("PCILIB_MODEL_DIR");
+    if((strcmp(path,"(null)"))==0) pcilib_error("can't find environment variable for xml files");
+
+    sprintf(command,"find %s -name *.xml -print",path);
+    sprintf(command_xsd,"find %s -name *.xsd -print",path);
+
+    if(!(in=popen(command,"r"))) pcilib_error("fail popen xml");
+    if(!((in2=popen(command_xsd,"r")))) pcilib_error("fail popen xsd");
+    
+    while(fgets(line_xsd,sizeof(line_xsd),in2)!=NULL) {
+      if((strstr(line_xsd,"units"))!=NULL) break;
+    }
+    if(line_xsd==NULL) pcilib_error("no xsd file found");
+    
+while((fgets(line,sizeof(line),in))!=NULL) {
+      validation(line,line_xsd);
+      docs=(xmlDocPtr*) realloc(docs,i*sizeof(xmlDocPtr));
+      docs[i-1]=pcilib_xml_getdoc(line);
+      i++;
+    }
+    
+ docs=(xmlDocPtr*) realloc(docs,i*sizeof(xmlDocPtr));
+ docs[i]=NULL;
+}  
 
 /** pcilib_xml_create_register.
  * this function create a register structure from the results of xml parsing.
@@ -262,7 +340,7 @@ void pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank,xmlChar* 
  * @param[in] doc the AST of the xml file.
  * @param[in,out] mybanks the structure containing the banks.
  */
-void pcilib_xml_initialize_banks(pcilib_t* pci, xmlDocPtr doc/*, pcilib_register_bank_description_t* mybanks*/){
+void pcilib_xml_initialize_banks(pcilib_t* pci,xmlDocPtr* docs){
 	pcilib_register_bank_description_t mybank;
 
 	xmlNodeSetPtr nodesetadress=NULL,nodesetbar=NULL,nodesetsize=NULL,nodesetprotocol=NULL,nodesetread_addr=NULL,nodesetwrite_addr=NULL,nodesetaccess=NULL,nodesetendianess=NULL,nodesetformat=NULL,nodesetname=NULL,nodesetdescription=NULL;
@@ -270,20 +348,17 @@ void pcilib_xml_initialize_banks(pcilib_t* pci, xmlDocPtr doc/*, pcilib_register
 	xmlNodePtr mynode;	
 	int number_banks;
 	pcilib_register_bank_description_t* banks;
-	
 	xmlXPathContextPtr context;
-	context=pcilib_xml_getcontext(doc);
-
-	int i;
-	
+        int i,p;
+	xmlXPathObjectPtr temp;	
 	mynode=malloc(sizeof(xmlNode));
-
-	number_banks=pcilib_xml_getnumberbanks(context);
+        p=0;
+    while(docs[p]!=NULL){
+      context=pcilib_xml_getcontext(docs[p]);
+      number_banks=pcilib_xml_getnumberbanks(context);
 	if(number_banks) banks=calloc((number_banks),sizeof(pcilib_register_bank_description_t));
 	else return;
 
-	xmlXPathObjectPtr temp;
-	
 	/** we first get the nodes corresponding to the properties we want*/
 /* -----> certainly not necessary if we validate xml each time*/
 	temp=pcilib_xml_getsetproperty(context,BANK_ADDR_PATH);
@@ -334,17 +409,17 @@ void pcilib_xml_initialize_banks(pcilib_t* pci, xmlDocPtr doc/*, pcilib_register
 	
 	for(i=0;i<nodesetadress->nodeNr;i++){
 	  /** we then get each node from the structures above*/
-		adress=xmlNodeListGetString(doc,nodesetadress->nodeTab[i]->xmlChildrenNode, 1);
-		bar=xmlNodeListGetString(doc,nodesetbar->nodeTab[i]->xmlChildrenNode, 1);
-		size=xmlNodeListGetString(doc,nodesetsize->nodeTab[i]->xmlChildrenNode, 1);
-		protocol=xmlNodeListGetString(doc,nodesetprotocol->nodeTab[i]->xmlChildrenNode, 1);
-		read_addr=xmlNodeListGetString(doc,nodesetread_addr->nodeTab[i]->xmlChildrenNode, 1);
-		write_addr=xmlNodeListGetString(doc,nodesetwrite_addr->nodeTab[i]->xmlChildrenNode, 1);
-		access=xmlNodeListGetString(doc,nodesetaccess->nodeTab[i]->xmlChildrenNode, 1);
-		endianess=xmlNodeListGetString(doc,nodesetendianess->nodeTab[i]->xmlChildrenNode, 1);
-		format=xmlNodeListGetString(doc,nodesetformat->nodeTab[i]->xmlChildrenNode, 1);
-		name=xmlNodeListGetString(doc,nodesetname->nodeTab[i]->xmlChildrenNode, 1);
-		description=xmlNodeListGetString(doc,nodesetdescription->nodeTab[i]->xmlChildrenNode, 1);
+	  adress=xmlNodeListGetString(docs[p],nodesetadress->nodeTab[i]->xmlChildrenNode, 1);
+	  bar=xmlNodeListGetString(docs[p],nodesetbar->nodeTab[i]->xmlChildrenNode, 1);
+	  size=xmlNodeListGetString(docs[p],nodesetsize->nodeTab[i]->xmlChildrenNode, 1);
+		protocol=xmlNodeListGetString(docs[p],nodesetprotocol->nodeTab[i]->xmlChildrenNode, 1);
+		read_addr=xmlNodeListGetString(docs[p],nodesetread_addr->nodeTab[i]->xmlChildrenNode, 1);
+		write_addr=xmlNodeListGetString(docs[p],nodesetwrite_addr->nodeTab[i]->xmlChildrenNode, 1);
+		access=xmlNodeListGetString(docs[p],nodesetaccess->nodeTab[i]->xmlChildrenNode, 1);
+		endianess=xmlNodeListGetString(docs[p],nodesetendianess->nodeTab[i]->xmlChildrenNode, 1);
+		format=xmlNodeListGetString(docs[p],nodesetformat->nodeTab[i]->xmlChildrenNode, 1);
+		name=xmlNodeListGetString(docs[p],nodesetname->nodeTab[i]->xmlChildrenNode, 1);
+		description=xmlNodeListGetString(docs[p],nodesetdescription->nodeTab[i]->xmlChildrenNode, 1);
 
 		mynode=nodesetadress->nodeTab[i]->parent;
 
@@ -356,6 +431,8 @@ void pcilib_xml_initialize_banks(pcilib_t* pci, xmlDocPtr doc/*, pcilib_register
 	}
 	
     pcilib_add_register_banks(pci,number_banks,banks);
+    p++;
+ }
 }
 
 /*
@@ -438,19 +515,18 @@ int pcilib_xml_getnumberregisters(xmlXPathContextPtr doc){
  * @param[in] doc the xpath context of the xml file.
  * @param[in,out] registers in: initialized list out: the list of the created registers.
  */
-void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc/*,pcilib_register_description_t *registers*/){
+void pcilib_xml_initialize_registers(pcilib_t* pci,xmlDocPtr* docs){
 	
 	xmlNodeSetPtr nodesetadress=NULL,nodesetoffset=NULL,nodesetdefvalue=NULL,nodesetrwmask=NULL,nodesetsize=NULL,nodesetmode=NULL,nodesetname=NULL;
 	xmlChar *adress=NULL,*offset=NULL,*defvalue=NULL,*rwmask=NULL,*size=NULL,*mode=NULL,*name=NULL,*bank=NULL,*type=NULL,*description=NULL;
 	xmlNodePtr mynode;	
 	xmlNodePtr tempnode;	
 	xmlXPathContextPtr context;
-	int number_registers;
+int number_registers, count=0;
 	pcilib_register_description_t *registers=NULL;
 	
-	context=pcilib_xml_getcontext(doc);
-	mynode=malloc(sizeof(xmlNode));
-
+while(docs[count]!=NULL){
+        context=pcilib_xml_getcontext(docs[count]);
 	number_registers=pcilib_xml_getnumberregisters(context);
 	if(number_registers) registers=calloc(number_registers,sizeof(pcilib_register_description_t));
         else return;
@@ -518,19 +594,19 @@ void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc/*,pcilib_regis
 		
 	for(i=0;i<nodesetadress->nodeNr;i++){
 	  /** get each sub property of each standard registers*/
-		adress=xmlNodeListGetString(doc,nodesetadress->nodeTab[i]->xmlChildrenNode, 1);
+		adress=xmlNodeListGetString(docs[count],nodesetadress->nodeTab[i]->xmlChildrenNode, 1);
 		tempnode=xmlFirstElementChild(xmlFirstElementChild(nodesetadress->nodeTab[i]->parent->parent->parent));
-		if(strcmp("adress",(char*)tempnode->name)==0) bank=xmlNodeListGetString(doc,tempnode->xmlChildrenNode,1);
+		if(strcmp("adress",(char*)tempnode->name)==0) bank=xmlNodeListGetString(docs[count],tempnode->xmlChildrenNode,1);
 		else pcilib_error("the xml file is malformed");
-		offset=xmlNodeListGetString(doc,nodesetoffset->nodeTab[i]->xmlChildrenNode, 1);
-		size=xmlNodeListGetString(doc,nodesetsize->nodeTab[i]->xmlChildrenNode, 1);
-		defvalue=xmlNodeListGetString(doc,nodesetdefvalue->nodeTab[i]->xmlChildrenNode, 1);
-		rwmask=xmlNodeListGetString(doc,nodesetrwmask->nodeTab[i]->xmlChildrenNode, 1);
-		mode=xmlNodeListGetString(doc,nodesetmode->nodeTab[i]->xmlChildrenNode, 1);
-		name=xmlNodeListGetString(doc,nodesetname->nodeTab[i]->xmlChildrenNode, 1);
+		offset=xmlNodeListGetString(docs[count],nodesetoffset->nodeTab[i]->xmlChildrenNode, 1);
+		size=xmlNodeListGetString(docs[count],nodesetsize->nodeTab[i]->xmlChildrenNode, 1);
+		defvalue=xmlNodeListGetString(docs[count],nodesetdefvalue->nodeTab[i]->xmlChildrenNode, 1);
+		rwmask=xmlNodeListGetString(docs[count],nodesetrwmask->nodeTab[i]->xmlChildrenNode, 1);
+		mode=xmlNodeListGetString(docs[count],nodesetmode->nodeTab[i]->xmlChildrenNode, 1);
+		name=xmlNodeListGetString(docs[count],nodesetname->nodeTab[i]->xmlChildrenNode, 1);
 		type=(xmlChar*)"standard";
 		if(nodesetname->nodeTab[i]->next->next!= NULL && strcmp((char*)nodesetname->nodeTab[i]->next->next->name,"description")==0){
-			description=xmlNodeListGetString(doc,nodesetname->nodeTab[i]->next->next->xmlChildrenNode,1);
+			description=xmlNodeListGetString(docs[count],nodesetname->nodeTab[i]->next->next->xmlChildrenNode,1);
 		}else{
 			description=(xmlChar*)"";
 		}
@@ -546,22 +622,22 @@ void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc/*,pcilib_regis
 	for(i=0;i<nodesetsuboffset->nodeNr;i++){
 	  /** we get there each subproperty of each bits register*/
 		tempnode=xmlFirstElementChild(nodesetsuboffset->nodeTab[i]->parent->parent->parent);
-		if(strcmp((char*)tempnode->name,"adress")==0)subadress=xmlNodeListGetString(doc,tempnode->xmlChildrenNode, 1);
+		if(strcmp((char*)tempnode->name,"adress")==0)subadress=xmlNodeListGetString(docs[count],tempnode->xmlChildrenNode, 1);
 		else pcilib_error("xml file is malformed");
 		tempnode= xmlFirstElementChild(xmlFirstElementChild(nodesetsuboffset->nodeTab[i]->parent->parent->parent->parent->parent));
-		if(strcmp((char*)tempnode->name,"adress")==0) subbank=xmlNodeListGetString(doc,tempnode->xmlChildrenNode,1);
+		if(strcmp((char*)tempnode->name,"adress")==0) subbank=xmlNodeListGetString(docs[count],tempnode->xmlChildrenNode,1);
 		else pcilib_error("xml file is malformed");
-		suboffset=xmlNodeListGetString(doc,nodesetsuboffset->nodeTab[i]->xmlChildrenNode, 1);
-		subsize=xmlNodeListGetString(doc,nodesetsubsize->nodeTab[i]->xmlChildrenNode, 1);
+		suboffset=xmlNodeListGetString(docs[count],nodesetsuboffset->nodeTab[i]->xmlChildrenNode, 1);
+		subsize=xmlNodeListGetString(docs[count],nodesetsubsize->nodeTab[i]->xmlChildrenNode, 1);
 		tempnode=xmlFirstElementChild(nodesetsuboffset->nodeTab[i]->parent->parent->parent)->next->next->next->next->next->next;
-		if(strcmp((char*)tempnode->name,"default")==0)subdefvalue=xmlNodeListGetString(doc,tempnode->xmlChildrenNode, 1);
+		if(strcmp((char*)tempnode->name,"default")==0)subdefvalue=xmlNodeListGetString(docs[count],tempnode->xmlChildrenNode, 1);
 		else pcilib_error("xml file is malformed");
-		subrwmask=xmlNodeListGetString(doc,nodesetsuboffset->nodeTab[i]->parent->parent->prev->prev->prev->prev->prev->prev->xmlChildrenNode, 1);
-		submode=xmlNodeListGetString(doc,nodesetsubmode->nodeTab[i]->xmlChildrenNode, 1);
-		subname=xmlNodeListGetString(doc,nodesetsubname->nodeTab[i]->xmlChildrenNode, 1);
+		subrwmask=xmlNodeListGetString(docs[count],nodesetsuboffset->nodeTab[i]->parent->parent->prev->prev->prev->prev->prev->prev->xmlChildrenNode, 1);
+		submode=xmlNodeListGetString(docs[count],nodesetsubmode->nodeTab[i]->xmlChildrenNode, 1);
+		subname=xmlNodeListGetString(docs[count],nodesetsubname->nodeTab[i]->xmlChildrenNode, 1);
 		subtype=(xmlChar*)"bits";
 		if(nodesetsubname->nodeTab[i]->next->next!= NULL && strcmp((char*)nodesetsubname->nodeTab[i]->next->next->name,"sub_description")==0){
-			subdescription=xmlNodeListGetString(doc,nodesetsubname->nodeTab[i]->next->next->xmlChildrenNode,1);
+			subdescription=xmlNodeListGetString(docs[count],nodesetsubname->nodeTab[i]->next->next->xmlChildrenNode,1);
 		}else{
 			subdescription=(xmlChar*)"";
 		}
@@ -574,64 +650,12 @@ void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc/*,pcilib_regis
 
     pcilib_xml_arrange_registers(registers,number_registers);
     pcilib_add_registers(pci,number_registers,registers);
+    count++;
+ }
 }
 
 
 
-#include <libxml/xmlschemastypes.h>
-/** validation
- *
- * function to validate the xml file against the xsd, so that it does not require extern software
- */
-void validation()
-{
-xmlDocPtr doc;
-xmlSchemaPtr schema = NULL;
-xmlSchemaParserCtxtPtr ctxt;
-  
-char *XMLFileName;
- pcilib_xml_read_config(&XMLFileName,3);
-char *XSDFileName;
-    pcilib_xml_read_config(&XSDFileName,12);
-int ret=1;
-
-ctxt = xmlSchemaNewParserCtxt(XSDFileName);
-
-schema = xmlSchemaParse(ctxt);
-xmlSchemaFreeParserCtxt(ctxt);
-
-doc = xmlReadFile(XMLFileName, NULL, 0);
-
-if (doc == NULL)
-{
-	pcilib_error("Could not parse xml document ");
-}
-else
-{
-xmlSchemaValidCtxtPtr ctxt;
-/** validation here*/
-ctxt = xmlSchemaNewValidCtxt(schema);
-ret = xmlSchemaValidateDoc(ctxt, doc);
-xmlSchemaFreeValidCtxt(ctxt);
-xmlFreeDoc(doc);
-}
-
-//! free the resource
-if(schema != NULL)
-xmlSchemaFree(schema);
-
-xmlSchemaCleanupTypes();
-/** print results */
-if (ret == 0)
-{
-	printf("xml file validates\n");
-}
-else
-{
-	printf("xml file does not validate against the schema\n");
-}
-
-}
 
 /** pcilib_xml_read_config
  *

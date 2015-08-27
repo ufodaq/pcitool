@@ -106,7 +106,7 @@ xmlXPathObjectPtr pcilib_xml_getsetproperty(xmlXPathContextPtr doc, xmlChar *xpa
  * @param[in] doc the xpath context of the xml file.
  * @param[out] registers out: the list of the created registers.
  */
-void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc);
+void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr* doc);
 
 /**
  * this functions initialize the structures containing banks, for use in the rest of execution, from the xml file.
@@ -114,7 +114,7 @@ void pcilib_xml_initialize_registers(pcilib_t* pci, xmlDocPtr doc);
  * @param[in] doc the AST of the xml file.
  * @param[in,out] mybanks the structure containing the banks.
  */
-void pcilib_xml_initialize_banks(pcilib_t* pci,xmlDocPtr doc);
+void pcilib_xml_initialize_banks(pcilib_t* pci,xmlDocPtr* doc);
 
 /**
 * this function read the config file of the pcitool tool to give back the pwd of diverse files like the xml file to treat, the xsd file, the pythonscript file, the units xml file, the units xsd file.
