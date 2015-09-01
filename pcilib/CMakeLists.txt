@@ -1,6 +1,8 @@
 include_directories(
     ${CMAKE_SOURCE_DIR}
+    ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/pcilib
+    ${CMAKE_BINARY_DIR}/pcilib
 )
 
 set(HEADERS pcilib.h pci.h export.h bar.h fifo.h model.h bank.h register.h kmem.h irq.h locking.h lock.h dma.h event.h plugin.h tools.h error.h debug.h env.h version.h config.h)

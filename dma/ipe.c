@@ -1,5 +1,6 @@
 #define _PCILIB_DMA_IPE_C
 #define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 
 #include <stdio.h>
 #include <stdlib.h>
