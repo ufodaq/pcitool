@@ -1,5 +1,6 @@
 #define _PCILIB_DMA_NWL_C
 #define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 #define _GNU_SOURCE
 
 #include <stdio.h>

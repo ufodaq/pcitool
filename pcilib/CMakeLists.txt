@@ -2,7 +2,9 @@ include_directories(
     ${CMAKE_SOURCE_DIR}
 	${PYTHON_INCLUDE_DIRS}
 	${XMLLIB_INCLUDE_DIRS}
+    ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/pcilib
+    ${CMAKE_BINARY_DIR}/pcilib
 )
 
 set(HEADERS pcilib.h pci.h export.h bar.h fifo.h model.h bank.h register.h

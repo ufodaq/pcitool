@@ -1,6 +1,8 @@
 include_directories(
     ${CMAKE_SOURCE_DIR}
+    ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/pcilib
+    ${CMAKE_BINARY_DIR}/pcilib
 )
 
 set(HEADERS ${HEADERS} default.h software.h)

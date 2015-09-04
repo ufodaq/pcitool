@@ -21,6 +21,10 @@
 #include "bank.h"
 #include "register.h"
 #include <libxml/xmlschemastypes.h>
+#include <libxml/tree.h>
+#include <libxml/parser.h>
+#include <libxml/xpath.h>
+#include <libxml/xpathInternals.h>
 
 #include <dirent.h>
 #include <errno.h>
@@ -450,7 +454,6 @@ void pcilib_xml_initialize_registers(pcilib_t* pci,xmlDocPtr doc){
 	xmlChar *type=NULL;
 	xmlNodePtr mynode;	
 	xmlXPathContextPtr context;
-	int number_registers;
 	pcilib_register_description_t *registers=NULL;
 	pcilib_register_description_t myregister;
 	int i,j;
@@ -488,7 +491,7 @@ void pcilib_xml_initialize_registers(pcilib_t* pci,xmlDocPtr doc){
 	/**we arrange the register for them to be well placed for pci-l*/
 	pcilib_xml_arrange_registers(registers,nodesetadress->nodeNr+nodesetsubadress->nodeNr);
 	/**we fille the pcilib_t struct*/
-        pcilib_add_registers(pci,number_registers,registers);
+        pcilib_add_registers(pci,nodesetadress->nodeNr+nodesetsubadress->nodeNr,registers);
 }
 
 

@@ -1,6 +1,8 @@
 include_directories(
     ${CMAKE_SOURCE_DIR}
+    ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/pcilib
+    ${CMAKE_BINARY_DIR}/pcilib
     ${FASTWRITER_INCLUDE_DIRS}
 )
 

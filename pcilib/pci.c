@@ -1,6 +1,7 @@
 //#define PCILIB_FILE_IO
 #define _XOPEN_SOURCE 700
 #define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 #define _POSIX_C_SOURCE 200809L
 
 #include <stdio.h>

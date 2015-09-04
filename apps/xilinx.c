@@ -1,4 +1,5 @@
 #define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 #define _POSIX_C_SOURCE 199309L
 #include <stdio.h>
 #include <stdlib.h>
