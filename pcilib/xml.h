@@ -12,10 +12,17 @@
 #ifndef _XML_
 #define _XML_
 
+/*#include <libxml/tree.h>
+#include <libxml/parser.h>
+#include <libxml/xpath.h>
+#include <libxml/xpathInternals.h>
+*/
 #include "pcilib.h"
 
 #define REGISTERS_PATH ((xmlChar*)"/model/banks/bank/registers/register") /**<all standard registers nodes.*/
+
 #define BITS_REGISTERS_PATH ((xmlChar*)"/model/banks/bank/registers/register/registers_bits/register_bits") /**<all bits registers nodes.*/
+
 #define BANKS_PATH ((xmlChar*)"/model/banks/bank/bank_description") /**< path to complete nodes of banks.*/
 
 /**

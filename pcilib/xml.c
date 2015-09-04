@@ -244,7 +244,6 @@ pcilib_xml_initialize_banks(pcilib_t* pci,xmlDocPtr doc){
 
 	xmlNodeSetPtr nodesetadress=NULL;
 	xmlNodePtr mynode;	
-	pcilib_register_bank_description_t* banks;
 	xmlXPathContextPtr context;
         int i;
 
@@ -253,21 +252,20 @@ pcilib_xml_initialize_banks(pcilib_t* pci,xmlDocPtr doc){
 	
 	/** we get the bank nodes using xpath expression*/
 	nodesetadress=pcilib_xml_getsetproperty(context,BANKS_PATH)->nodesetval;
-	if(nodesetadress->nodeNr>0) banks=calloc((nodesetadress->nodeNr),sizeof(pcilib_register_bank_description_t));
-	else return;
+	if(nodesetadress->nodeNr==0) return;
 
 	pci->banks_xml_nodes=calloc(nodesetadress->nodeNr,sizeof(xmlNodePtr));
-        if(!(pci->banks_xml_nodes)) pcilib_warning("can't create bank xml nodes for pcilib_t struct");
+        if(!(pci->banks_xml_nodes)) pcilib_error("can't create bank xml nodes for pcilib_t struct");
 
-	/** for each of the bank nodes, we create the associated structure*/
+	/** for each of the bank nodes, we create the associated structure, and  push it in the pcilib environnement*/
 	for(i=0;i<nodesetadress->nodeNr;i++){
 	  mynode=nodesetadress->nodeTab[i];
 	  pcilib_xml_create_bank(&mybank,mynode,doc);
-	  banks[i]=mybank;
+	  pcilib_add_register_banks(pci,1,&mybank);
 	  pci->banks_xml_nodes[i]=mynode;
 	}
-	/** we push our banks structures in the pcilib environnement*/
-    pcilib_add_register_banks(pci,nodesetadress->nodeNr,banks);
+
+
 }
 
 /*
@@ -567,6 +565,10 @@ int pcilib_init_xml(pcilib_t* ctx){
     free(line);
     free(line_xsd);
     free(docs);
+
+    xmlCleanupParser();
+    xmlMemoryDump();
+
     return 0;
 }  
 
