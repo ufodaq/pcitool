@@ -91,8 +91,6 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
     
     for (i = 0; i < n; i++) {
 	err = bapi->read(ctx, bctx, addr + i * access, buf + i);
-	printf("buf +i: %i \n",buf[i]);
-	if(err) printf("err internal 1: %i\n",err);
 	if (err) break;
     }
     
@@ -101,13 +99,9 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
 	err = bapi->read(ctx, bctx, addr + n * access, &val);
 	
 	val = (val >> offset)&BIT_MASK(bits);
-	printf("val : %i\n",val);
 	memcpy(buf + n, &val, sizeof(pcilib_register_value_t));
-		if(err) printf("err internal 2: %i\n",err);
+
     }
-    	printf("err internal 3: %i\n",err);
-    printf("buf internal: %i\n",buf[0]);
-    
     return err;
 }
 
@@ -149,19 +143,15 @@ int pcilib_read_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_regi
 	pcilib_error("Big-endian byte order support is not implemented");
 	return PCILIB_ERROR_NOTSUPPORTED;
     } else {
-      printf("bits: %i, n %lu\n",bits, n);
 	res = 0;
 	if (bits) ++n;
 	for (i = 0; i < n; i++) {
-	  printf("res: %i buf[i]: %i\n",res,buf[i]);
 	    res |= buf[i] << (i * b->access);
-	    printf("res: %i \n",res);
 	}
     }
     
     *value = res;
-    printf("value : %i\n",*value);
-    
+
     return err;
 }
 

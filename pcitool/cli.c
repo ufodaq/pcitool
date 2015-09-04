@@ -1,7 +1,6 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200112L
 #define _BSD_SOURCE
-#define _DEFAULT_SOURCE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -3395,6 +3394,8 @@ int main(int argc, char **argv) {
     pcilib_close(handle);
     
     if (data != argv + optind) free(data);
+    
+    pcilib_clean_xml(handle);
 
     return err;
 }

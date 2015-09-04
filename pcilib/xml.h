@@ -12,23 +12,24 @@
 #ifndef _XML_
 #define _XML_
 
-/*#include <libxml/tree.h>
-#include <libxml/parser.h>
-#include <libxml/xpath.h>
-#include <libxml/xpathInternals.h>
-*/
+#include <libxml/tree.h>
 #include "pcilib.h"
 
-#define REGISTERS_PATH ((xmlChar*)"/model/banks/bank/registers/register") /**<all standard registers nodes.*/
-
-#define BITS_REGISTERS_PATH ((xmlChar*)"/model/banks/bank/registers/register/registers_bits/register_bits") /**<all bits registers nodes.*/
-
-#define BANKS_PATH ((xmlChar*)"/model/banks/bank/bank_description") /**< path to complete nodes of banks.*/
+typedef struct{
+  xmlDocPtr* docs;
+}pcilib_xml_context_t;
 
 /**
  * this function gets the xml files and validates them, before filling the pcilib_t struct with the registers and banks of those files
  *@param[in,out] pci the pcilib_t struct running that gets filled with banks and registers
+ *@param[in] model the name of the model
  */
-int pcilib_init_xml(pcilib_t* pci);
+int pcilib_init_xml(pcilib_t* pci, char* model);
+
+/** pcilib_clean_xml
+ * this function free the xml parts of the pcilib_t running, and some libxml ashes
+ * @param[in] pci the pcilib_t running
+*/
+void pcilib_clean_xml(pcilib_t* pci);
 
 #endif /*_XML_*/
