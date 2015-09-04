@@ -23,7 +23,7 @@ endif (NOT DISABLE_PCITOOL)
 pkg_check_modules(XMLLIB libxml-2.0 REQUIRED)
 check_include_files(stdatomic.h HAVE_STDATOMIC_H)
 
-add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -fno-omit-frame-pointer")
+add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -fno-omit-frame-pointer -g")
 #add_definitions("-fPIC --std=c99 -Wall -O2")
 
 include(cmake/version.cmake)

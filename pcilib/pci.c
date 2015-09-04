@@ -109,8 +109,6 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
     size_t i;
     pcilib_t *ctx = malloc(sizeof(pcilib_t));
 	
-    xmlDocPtr* docs=NULL;
-    
     if (!model)
 	model = getenv("PCILIB_MODEL");
 
@@ -174,9 +172,7 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	if (!ctx->model)
 	    ctx->model = strdup(model?model:"pci");
 	
-	pcilib_init_xml(docs);
-	pcilib_xml_initialize_banks(ctx,docs);
-	pcilib_xml_initialize_registers(ctx,docs);
+	pcilib_init_xml(ctx);
 	
 	ctx->model_info.registers = ctx->registers;
 	ctx->model_info.banks = ctx->banks;
