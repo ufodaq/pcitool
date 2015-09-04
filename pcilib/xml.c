@@ -268,39 +268,19 @@ pcilib_xml_initialize_banks(pcilib_t* pci,xmlDocPtr doc){
 
 }
 
-/*
- * next 2 functions are for the implementation of a merge sort algorithm, because we need a stable algorithm
+/** pcilib_xml_registers_compare
+ * function to compare registers by adress for sorting registers
+ * @param a one hypothetic register
+ * @param b one other hypothetic register
  */
-static void
-pcilib_xml_topdownmerge(pcilib_register_description_t *A, int start, int middle, int end, pcilib_register_description_t *B){
- int i0,i1,j;
- i0= start;
- i1=middle;
+static int
+pcilib_xml_compare_registers(void const *a, void const *b){
+  const pcilib_register_description_t  *pa=a;
+  const pcilib_register_description_t  *pb=b;
 
- for(j=start;j<end;j++){
- 	if((i0 < middle) && (i1>=end || A[i0].addr<=A[i1].addr)){
-		B[j]=A[i0];
-		i0++;
-	}
-	else{
-		B[j]=A[i1];
-		i1++;
-	}
-	}
+    return pa->addr - pb->addr;
 }
 
-static void
-pcilib_xml_topdownsplitmerge(pcilib_register_description_t *A, int start, int end, pcilib_register_description_t *B){
-	int middle;
-	if(end-start <2)
-		return;
-	
-	middle =(end+start)/2;
-	pcilib_xml_topdownsplitmerge(A,start, middle,B);
-	pcilib_xml_topdownsplitmerge(A,middle,end,B);
-	pcilib_xml_topdownmerge(A,start,middle,end,B);
-	memcpy(&A[start],&B[start],(end-start)*sizeof(pcilib_register_description_t));
-}
 
 /** pcilib_xml_arrange_registers
  * after the complete structure containing the registers has been created from the xml, this function rearrange them by address in order to add them in pcilib_open, which don't consider the adding of registers in order of adress	
@@ -310,7 +290,7 @@ pcilib_xml_topdownsplitmerge(pcilib_register_description_t *A, int start, int en
 void pcilib_xml_arrange_registers(pcilib_register_description_t *registers,int size){
 	pcilib_register_description_t* temp;
 	temp=malloc(size*sizeof(pcilib_register_description_t));
-	pcilib_xml_topdownsplitmerge(registers,0,size,temp);
+	qsort(registers,size,sizeof(pcilib_register_description_t),pcilib_xml_compare_registers);
 	free(temp);
 }
 
@@ -327,6 +307,7 @@ void pcilib_xml_create_register(pcilib_register_description_t *myregister,xmlNod
     xmlNodePtr cur;
     xmlChar *value;
     xmlChar *bank;
+    int i=0;
 
     /**we get the children of the register xml nodes, that contains the properties for it*/
     cur=mynode->children;
@@ -382,11 +363,16 @@ void pcilib_xml_create_register(pcilib_register_description_t *myregister,xmlNod
 	  /* not implemented yet*/	  //	  myregister->value_max=(pcilib_register_value_t)strtol((char*)value,&ptr,0);	
 
 	}else if(strcmp((char*)cur->name,"description")==0){
+	  i++;
 	  myregister->description=(char*)value;
 	}
       
       cur=cur->next;
     }
+
+    /** make sure we don't get the description from previous registers*/
+    if(i==0) myregister->description=NULL;
+    
 
     /** we then get properties that can not be parsed as the previous ones*/
 	if(strcmp((char*)type,"standard")==0){
