@@ -172,7 +172,12 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	if (!ctx->model)
 	    ctx->model = strdup(model?model:"pci");
 	
-	pcilib_init_xml(ctx, ctx->model);
+	err = pcilib_init_xml(ctx, ctx->model);
+	if (err) {
+	    pcilib_error("Error (%i) initializing xml part\n", err);
+	    pcilib_close(ctx);
+	    return NULL;
+	}
 	
 	ctx->model_info.registers = ctx->registers;
 	ctx->model_info.banks = ctx->banks;
@@ -357,6 +362,9 @@ void pcilib_close(pcilib_t *ctx) {
 	}
 
 	pcilib_free_register_banks(ctx);
+
+	if(ctx->xml_ctx)
+	  pcilib_free_xml(ctx);
 	
 	if (ctx->register_ctx)
 	    free(ctx->register_ctx);

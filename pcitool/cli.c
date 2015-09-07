@@ -3395,7 +3395,5 @@ int main(int argc, char **argv) {
     
     if (data != argv + optind) free(data);
     
-    pcilib_clean_xml(handle);
-
     return err;
 }

@@ -17,6 +17,10 @@
 
 typedef struct{
   xmlDocPtr* docs;
+  xmlNodePtr* xml_banks;				                                /**<pointer to xml nodes of banks in the xml file*/
+  xmlNodePtr* xml_registers;                                                     /**< pointer to xml nodes of registers in the xml file*/
+  unsigned int nb_registers;
+  unsigned int nb_new_banks;
 }pcilib_xml_context_t;
 
 /**
@@ -30,6 +34,6 @@ int pcilib_init_xml(pcilib_t* pci, char* model);
  * this function free the xml parts of the pcilib_t running, and some libxml ashes
  * @param[in] pci the pcilib_t running
 */
-void pcilib_clean_xml(pcilib_t* pci);
+void pcilib_free_xml(pcilib_t* pci);
 
 #endif /*_XML_*/

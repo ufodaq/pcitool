@@ -4,11 +4,11 @@
  * 
  * @brief this file is the main source file for the implementation of dynamic registers using xml and several funtionalities for the "pci-tool" line command tool from XML files. the xml part has been implemented using libxml2
  * 
- * @details this code was meant to be evolutive as the XML files evolute. In this meaning, most of the xml parsing is realized with XPath expressions(when it was possible), so that changing the xml xould result mainly in changing the XPAth pathes present in the header file. In a case of a change in xml file, variables that need to be changed other than xpathes, will be indicated in the description of the function.
- 
+ * @details registers and banks nodes are parsed using xpath expression, but their properties is get by recursively getting all properties nodes. In this sense, if a property changes, the algorithm has to be changed, but if it's registers or banks nodes, just the xpath expression modification should be enough.
+
  Libxml2 considers blank spaces within the XML as node natively and this code as been produced considering blank spaces in the XML files. In case XML files would not contain blank spaces anymore, please change the code.
 
- In case the performance is not good enough, please consider the following : no more configuration file indicating where the files required are, hard code of formulas, and go to complete non evolutive code : get 1 access to xml file and context, and then make recursive descent to get all you need(investigation of libxml2 source code would be so needed to prove it's better to go recursive than just xpath).
+ In case the performance is not good enough, please consider the following : hard code of formulas
  */
 #define _XOPEN_SOURCE 700
 
@@ -33,6 +33,14 @@
 #include <libxml/xpathInternals.h>
 #include <dirent.h>
 #include <errno.h>
+#include "config.h"
+
+typedef enum{
+  type_standard,
+  type_bits,
+  type_fifo
+}pcilib_type_register_t;
+
 
 /** pcilib_xml_get_nodeset_from_xpath
  * this function takes a context from an AST and an XPath expression, to produce an object containing the nodes corresponding to the xpath expression
@@ -57,18 +65,6 @@ pcilib_xml_get_nodeset_from_xpath(xmlXPathContextPtr doc, xmlChar *xpath){
 	
 	return result;
 }
-
-
-/**pcilib_xml_get_bank_node_from_register_node
- * this function get the bank xml node from a standards register xml node in the xml file
- *@param[in] mynode the register node we want to know the bank
- *@return the bank node
- */
-static xmlNodePtr
-pcilib_xml_get_bank_node_from_register_node(xmlNodePtr mynode){
-  return xmlFirstElementChild(xmlFirstElementChild(mynode->parent->parent));
-}
-
 
 
 /** pcilib_xml_validate
@@ -125,14 +121,13 @@ if(ret!=0) pcilib_warning("\nxml file \"%s\" does not validate against the schem
  * @param[in] doc the AST of the xml file, used for used lixbml functions
  */
 static void
-pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank, xmlNodePtr mynode, xmlDocPtr doc, pcilib_t* pci){
+pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank, xmlNodePtr mynode, xmlDocPtr doc, pcilib_t* pci, int err){
 		
     char* ptr;
     xmlNodePtr cur;
     xmlChar *value;
-    static int i=0;
     int bar_ok=0;
-    int k=0, name_found=0;
+    int k=0;
 
     cur=mynode->children; /** we place ourselves in the childrens of the bank node*/
 
@@ -149,12 +144,8 @@ pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank, xmlNodePtr my
 	    mybank->size=(size_t)strtol((char*)value,&ptr,0);
 	
 	}else if(strcasecmp((char*)cur->name,"protocol")==0){		
-	  while(pci->protocols[k].name!=NULL){
-	    if(strcasecmp(pci->protocols[k].name,(char*)value)==0){
-	      mybank->protocol=pci->protocols[k].addr;
-	      break;
-	      k++;
-	    }
+	  if((mybank->protocol=pcilib_find_register_protocol_by_name(pci,(char*)value))==PCILIB_REGISTER_PROTOCOL_INVALID){
+	    mybank->protocol=PCILIB_REGISTER_PROTOCOL_DEFAULT;
 	  }
 
 	}else if(strcasecmp((char*)cur->name,"read_address")==0){		
@@ -190,20 +181,23 @@ pcilib_xml_create_bank(pcilib_register_bank_description_t *mybank, xmlNodePtr my
     }
 
     if(bar_ok==0) mybank->bar=PCILIB_BAR_NOBAR;
-  
-    while(pci->banks[k].name!=NULL){
-	if(strcasecmp(pci->banks[k].name,mybank->name)==0){
-	  mybank->addr=pci->banks[k].addr;
-	  name_found++;
-	  break;
+
+	k=(int)pcilib_find_register_bank_by_name(pci,mybank->name);
+   	if(k==PCILIB_REGISTER_BANK_INVALID){
+	      mybank->addr=PCILIB_REGISTER_BANK_DYNAMIC + pci->xml_ctx->nb_new_banks;
+	      pci->xml_ctx->nb_new_banks++;
+		  k=pci->num_banks+1;
 	}
-	k++;
+	else mybank->addr=pci->banks[k].addr;
+   
+    if(err==0){
+	    pci->xml_ctx->xml_banks[k]=mynode;
     }
-    if(name_found==0) {
-      mybank->addr=PCILIB_REGISTER_BANK_DYNAMIC + i;
-      i++;
-    }
-    pci->xml_banks[k]=mynode;
+
+	char buffer[66];
+    sprintf(buffer,"%i",mybank->addr);
+    printf("buffer %s \n",buffer);
+    xmlNewChild(mynode,NULL, BAD_CAST "address", BAD_CAST buffer);
 }
 		  
 	
@@ -222,7 +216,7 @@ pcilib_xml_initialize_banks(pcilib_t* pci,xmlDocPtr doc){
 	xmlNodeSetPtr nodesetaddress=NULL;
 	xmlNodePtr mynode;	
 	xmlXPathContextPtr context;
-        int i;
+        int i,err=0;
 
 	mynode=malloc(sizeof(xmlNode));
 	if(!(context= xmlXPathNewContext(doc))){
@@ -234,13 +228,16 @@ pcilib_xml_initialize_banks(pcilib_t* pci,xmlDocPtr doc){
 	if(!(nodesetaddress)) return;
 	if(nodesetaddress->nodeNr==0) return;
 
-	pci->xml_banks=calloc(PCILIB_MAX_REGISTER_BANKS+1,sizeof(xmlNodePtr));
-        if(!(pci->xml_banks)) pcilib_error("can't create bank xml nodes for pcilib_t struct");
+	pci->xml_ctx->xml_banks=calloc(PCILIB_MAX_REGISTER_BANKS+1,sizeof(xmlNodePtr));
+        if(!(pci->xml_ctx->xml_banks)){
+	  pcilib_error("can't create bank xml nodes for pcilib_t struct");
+	  err++;
+	}
 
 	/** for each of the bank nodes, we create the associated structure, and  push it in the pcilib environnement*/
 	for(i=0;i<nodesetaddress->nodeNr;i++){
 	  mynode=nodesetaddress->nodeTab[i];
-	  pcilib_xml_create_bank(&mybank,mynode,doc, pci);
+	  pcilib_xml_create_bank(&mybank,mynode,doc, pci, err);
 	  pcilib_add_register_banks(pci,1,&mybank);
 	}
 
@@ -267,12 +264,23 @@ pcilib_xml_compare_registers(void const *a, void const *b){
  * @param[in,out] registers the list of registers in : not ranged out: ranged.
  * @param[in] size the number of registers. 
  */
-void pcilib_xml_arrange_registers(pcilib_register_description_t *registers,int size){
+static void
+pcilib_xml_arrange_registers(pcilib_register_description_t *registers,int size){
 	pcilib_register_description_t* temp;
 	temp=malloc(size*sizeof(pcilib_register_description_t));
 	qsort(registers,size,sizeof(pcilib_register_description_t),pcilib_xml_compare_registers);
 	free(temp);
 }
+
+/**pcilib_get_bank_address_from_register_node
+ *@param[in] node the current register node
+ */
+static xmlChar*
+pcilib_get_bank_address_from_register_node(xmlDocPtr doc, xmlNodePtr node){
+  xmlChar* temp= xmlNodeListGetString(doc,xmlGetLastChild(xmlFirstElementChild(node->parent->parent))->children,1);
+	return temp;
+}	    
+
 
 /** pcilib_xml_create_register.
  * this function create a register structure from a xml register node.
@@ -281,12 +289,11 @@ void pcilib_xml_arrange_registers(pcilib_register_description_t *registers,int s
  * @param[in] doc the AST of the xml file, required for some ibxml2 sub-fonctions
  * @param[in] mynode the xml node to create register from
  */
-void pcilib_xml_create_register(pcilib_register_description_t *myregister,xmlNodePtr mynode, xmlDocPtr doc, xmlChar* type, pcilib_t* pci){
+void pcilib_xml_create_register(pcilib_register_description_t *myregister,xmlNodePtr mynode, xmlDocPtr doc,pcilib_register_type_t type, pcilib_t* pci){
 		
     char* ptr;
     xmlNodePtr cur;
     xmlChar *value=NULL;
-    xmlNodePtr bank=NULL;
     int i=0;
 
     /**we get the children of the register xml nodes, that contains the properties for it*/
@@ -299,7 +306,7 @@ void pcilib_xml_create_register(pcilib_register_description_t *myregister,xmlNod
 		*/
 	if(strcasecmp((char*)cur->name,"address")==0){	
 		myregister->addr=(pcilib_register_addr_t)strtol((char*)value,&ptr,0);
-
+		
 	}else if(strcasecmp((char*)cur->name,"offset")==0){
 		myregister->offset=(pcilib_register_size_t)strtol((char*)value,&ptr,0);
 
@@ -352,39 +359,19 @@ void pcilib_xml_create_register(pcilib_register_description_t *myregister,xmlNod
 
     /** make sure we don't get the description from previous registers*/
     if(i==0) myregister->description=NULL;
-    
 
     /** we then get properties that can not be parsed as the previous ones*/
-	if(strcasecmp((char*)type,"standard")==0){
+	if((int)type==(int)type_standard){
 	  myregister->type=PCILIB_REGISTER_STANDARD;
-	  bank=pcilib_xml_get_bank_node_from_register_node(mynode);
-	  while(bank!=NULL){
-	    value=xmlNodeListGetString(doc,bank->children,1);
-	    if(strcasecmp((char*)bank->name,"name")==0){
-	      break;
-	    }
-	    bank=bank->next;
-	  }
-
-	  int k=0;
-
-	  while(pci->banks[k].name!=NULL){
-	    printf("name %s\n",pci->banks[k].name);
-	    if(strcasecmp(pci->banks[k].name,(char*)value)==0){
-	      myregister->bank=pci->banks[k].addr;
-	      printf("ok\n");
-	      break;
-	    }
-	    k++;
-	  }
-
-	}else if(strcasecmp((char*)type,"bits")==0){
+	  myregister->bank=(pcilib_register_bank_addr_t)strtol((char*)pcilib_get_bank_address_from_register_node(doc,mynode),&ptr,0);
+	  
+	}else if((int)type==(int)type_bits){
 	  myregister->type=PCILIB_REGISTER_BITS;
-
-	}else if(strcasecmp((char*)type,"fifo")==0){
+	
+	}else if((int)type==(int)type_fifo){
   /* not implemented yet*/	  myregister->type=PCILIB_REGISTER_FIFO;
 	}
-      
+     
 	
 }	
 
@@ -403,7 +390,7 @@ void pcilib_xml_initialize_registers(pcilib_t* pci,xmlDocPtr doc){
 	xmlXPathContextPtr context;
 	pcilib_register_description_t *registers=NULL;
 	pcilib_register_description_t myregister;
-	int i,j;
+	int i,j,err=0;
 
 	context= xmlXPathNewContext(doc);
 	if(!(context= xmlXPathNewContext(doc))){
@@ -418,15 +405,22 @@ void pcilib_xml_initialize_registers(pcilib_t* pci,xmlDocPtr doc){
 	if(nodesetaddress->nodeNr>0)registers=calloc(nodesetaddress->nodeNr+nodesetsubaddress->nodeNr,sizeof(pcilib_register_description_t));
         else return;
 	
-	pci->xml_registers=calloc(nodesetaddress->nodeNr+nodesetsubaddress->nodeNr,sizeof(xmlNodePtr));
-	if(!(pci->xml_registers)) pcilib_warning("can't create registers xml nodes in pcilib_t struct");
+	if(pci->xml_ctx->nb_registers==0)
+	  pci->xml_ctx->xml_registers=calloc(nodesetaddress->nodeNr+nodesetsubaddress->nodeNr,sizeof(xmlNodePtr));
+	else 
+	  pci->xml_ctx->xml_registers=realloc(pci->xml_ctx->xml_registers,(pci->xml_ctx->nb_registers+nodesetaddress->nodeNr+nodesetsubaddress->nodeNr)*sizeof(xmlNodePtr));
+	
+	if(!(pci->xml_ctx->xml_registers)){
+	  pcilib_warning("can't create registers xml nodes in pcilib_t struct: memory allocation failed");
+	  err++;
+	}
 		
 	/** we then iterate through standard registers nodes to create registers structures*/
 	for(i=0;i<nodesetaddress->nodeNr;i++){
 		mynode=nodesetaddress->nodeTab[i];
-		pcilib_xml_create_register(&myregister,mynode,doc,(xmlChar*)"standard",pci);
+		pcilib_xml_create_register(&myregister,mynode,doc,type_standard,pci);
 		registers[i]=myregister;
-		pci->xml_registers[i]=mynode;
+		if(err==0) pci->xml_ctx->xml_registers[pci->xml_ctx->nb_registers+i]=mynode;
 	}
 	
 	j=i;
@@ -434,16 +428,17 @@ void pcilib_xml_initialize_registers(pcilib_t* pci,xmlDocPtr doc){
 	/** we then iterate through bits  registers nodes to create registers structures*/
 	for(i=0;i<nodesetsubaddress->nodeNr;i++){
 		mynode=nodesetsubaddress->nodeTab[i];
-		pcilib_xml_create_register(&myregister,mynode->parent->parent,doc,(xmlChar*)"standard",pci);
-		pcilib_xml_create_register(&myregister,mynode,doc,(xmlChar*)"bits",pci);
+		pcilib_xml_create_register(&myregister,mynode->parent->parent,doc,type_standard,pci);
+		pcilib_xml_create_register(&myregister,mynode,doc,type_bits,pci);
 		registers[i+j]=myregister;
-		pci->xml_registers[i+j]=mynode;
+		if(err==0) pci->xml_ctx->xml_registers[pci->xml_ctx->nb_registers+i+j]=mynode;
 	}
 	
 	/**we arrange the register for them to be well placed for pci-l*/
 	pcilib_xml_arrange_registers(registers,nodesetaddress->nodeNr+nodesetsubaddress->nodeNr);
 	/**we fille the pcilib_t struct*/
         pcilib_add_registers(pci,nodesetaddress->nodeNr+nodesetsubaddress->nodeNr,registers);
+        pci->xml_ctx->nb_registers+=nodesetaddress->nodeNr+nodesetsubaddress->nodeNr;
 }
 
 
@@ -460,7 +455,7 @@ int pcilib_init_xml(pcilib_t* ctx, char* model){
     xmlDocPtr* docs;
     DIR* rep=NULL;
     struct dirent* file=NULL;
-    int err;
+    int err, err_count=0;
 
     path=malloc(sizeof(char*));
     line=malloc(sizeof(char*));
@@ -469,8 +464,7 @@ int pcilib_init_xml(pcilib_t* ctx, char* model){
     /** we first get the env variable corresponding to the place of the xml files*/
     path=getenv("PCILIB_MODEL_DIR");
     if(path==NULL){
-      pcilib_warning("can't find environment variable for xml files");
-      return 1;
+      path=PCILIB_MODEL_DIR;
     }
     
     /** we then open the directory corresponding to the ctx model*/
@@ -478,7 +472,7 @@ int pcilib_init_xml(pcilib_t* ctx, char* model){
     sprintf(pwd,"%s%s/",path,model);
     if((rep=opendir(pwd))==NULL){
       pcilib_warning("could not open the directory for xml files: error %i\n",errno);
-      return 1;
+      return PCILIB_ERROR_NOTINITIALIZED;
     }
 
     /** we iterate through the files of the directory, to get the xml files and the xsd file*/
@@ -497,33 +491,45 @@ int pcilib_init_xml(pcilib_t* ctx, char* model){
 
     if(line_xsd==NULL){
       pcilib_warning("no xsd file found");
-      return 1;
+      return PCILIB_ERROR_NOTINITIALIZED;
     }
 
     if(line[0]==NULL){
       pcilib_warning("no xml file found");
-      return 1;
+      return PCILIB_ERROR_NOTINITIALIZED;
     }
     
     /** for each xml file, we validate it, and get the registers and the banks*/
     docs=malloc((i-1)*sizeof(xmlDocPtr));
+    ctx->xml_ctx=malloc(sizeof(pcilib_xml_context_t));
+    ctx->xml_ctx->docs=malloc(sizeof(xmlDocPtr)*(i-1));
+    ctx->xml_ctx->nb_registers=0;
+    ctx->xml_ctx->nb_new_banks=0;
+
+    if(!(ctx->xml_ctx) || !(ctx->xml_ctx->docs))
+      return  PCILIB_ERROR_MEMORY;
+
+    
     for(k=0;k<i-1;k++){
       if((err=pcilib_xml_validate(line[k],line_xsd))==0){
 	if((docs[k]=xmlParseFile(line[k]))){
 	  pcilib_xml_initialize_banks(ctx,docs[k]);
-	    pcilib_xml_initialize_registers(ctx,docs[k]);
+	  pcilib_xml_initialize_registers(ctx,docs[k]);
 	}
-	else pcilib_error("xml document %s not parsed successdfullly\n",line[k]);
+	else{
+	  pcilib_error("xml document %s not parsed successdfullly\n",line[k]);
+	  err_count++;
+	}
       }
     }  
-    ctx->xml_context=malloc(sizeof(pcilib_xml_context_t));
-    ctx->xml_context->docs=malloc(sizeof(xmlDocPtr)*(i-1));
-    ctx->xml_context->docs=docs;
+    
+    ctx->xml_ctx->docs=docs;
 
     free(pwd);
     free(line);
     free(line_xsd);
 
+    if(err_count>0) return PCILIB_ERROR_NOTINITIALIZED;
     return 0;
 }  
 
@@ -531,11 +537,15 @@ int pcilib_init_xml(pcilib_t* ctx, char* model){
  * this function free the xml parts of the pcilib_t running, and some libxml ashes
  * @param[in] pci the pcilib_t running
 */
-void pcilib_clean_xml(pcilib_t* pci){
+void pcilib_free_xml(pcilib_t* pci){
 
-  free(pci->xml_banks);
-  free(pci->xml_registers);
-  free(pci->xml_context);
+  free(pci->xml_ctx->xml_banks);
+  free(pci->xml_ctx->xml_registers);
+  pci->xml_ctx->xml_banks=NULL;
+  pci->xml_ctx->xml_registers=NULL;
+  free(pci->xml_ctx);
+  pci->xml_ctx=NULL;
+  
   xmlCleanupParser();
   xmlMemoryDump();
 

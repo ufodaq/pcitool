@@ -49,12 +49,11 @@
     
     <xsd:complexType name="bank_description_t">
         <xsd:sequence>
-            <xsd:element name="adress" type="bank_adress_type"/>
             <xsd:element name="bar" type="bar_type"/>
             <xsd:element name="size" type="hexa_and_integer64_t"/>
             <xsd:element name="protocol" type="xsd:string"/>
-            <xsd:element name="read_adress" type="hex64_t"/>
-            <xsd:element name="write_adress" type="hex64_t"/>
+            <xsd:element name="read_address" type="hex64_t"/>
+            <xsd:element name="write_address" type="hex64_t"/>
             <xsd:element name="word_size" type="uint8_t"/>
             <xsd:element name="endianess" type="endianess_type"/>
             <xsd:element name="format" type="xsd:string"/>
@@ -72,7 +71,7 @@
     
     <xsd:complexType name="register_type">
         <xsd:sequence>
-            <xsd:element name="adress" type="hexa_and_integer32_t"/>
+            <xsd:element name="address" type="hexa_and_integer32_t"/>
             <xsd:element name="offset" type="uint8_t"/>
             <xsd:element name="size" type="uint8_t"/>
             <xsd:element name="default" type="hexa_and_integer32_t"/>

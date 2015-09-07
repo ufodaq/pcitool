@@ -3,12 +3,11 @@
   <banks>
     <bank>
      <bank_description>
-        <adress>bank 0</adress>
         <bar>0</bar>
         <size>128</size>
         <protocol>default</protocol>
-        <read_adress>0x9010</read_adress>
-        <write_adress>0x9000</write_adress>
+        <read_address>0x9010</read_address>
+        <write_address>0x9000</write_address>
         <word_size>8</word_size>
         <endianess>little</endianess>
         <format>%lu</format>
@@ -17,7 +16,7 @@
       </bank_description>
       <registers>
         <register>
-        <adress>1</adress>
+        <address>1</address>
           <offset>0</offset>
           <size>16</size>
           <default>1088</default>
@@ -27,7 +26,7 @@
 	  <description>test</description>
         </register>
         <register>
-          <adress>3</adress>
+          <address>3</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -36,7 +35,7 @@
           <name>cmosis_start1</name>
         </register>
         <register>
-          <adress>5</adress>
+          <address>5</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -45,7 +44,7 @@
           <name>cmosis_start2</name>
         </register>
         <register>
-          <adress>7</adress>
+          <address>7</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -54,7 +53,7 @@
           <name>cmosis_start3</name>
         </register>
         <register>
-          <adress>9</adress>
+          <address>9</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -63,7 +62,7 @@
           <name>cmosis_start4</name>
         </register>
         <register>
-          <adress>11</adress>
+          <address>11</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -72,7 +71,7 @@
           <name>cmosis_start5</name>
         </register>
         <register>
-          <adress>13</adress>
+          <address>13</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -81,7 +80,7 @@
           <name>cmosis_start6</name>
         </register>
         <register>
-          <adress>15</adress>
+          <address>15</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -90,7 +89,7 @@
           <name>cmosis_start7</name>
         </register>
         <register>
-          <adress>17</adress>
+          <address>17</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -99,7 +98,7 @@
           <name>cmosis_start8</name>
         </register>
         <register>
-          <adress>19</adress>
+          <address>19</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -108,7 +107,7 @@
           <name>cmosis_number_lines1</name>
         </register>
         <register>
-          <adress>21</adress>
+          <address>21</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -117,7 +116,7 @@
           <name>cmosis_number_lines2</name>
         </register>
         <register>
-          <adress>23</adress>
+          <address>23</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -126,7 +125,7 @@
           <name>cmosis_number_lines3</name>
         </register>
         <register>
-          <adress>25</adress>
+          <address>25</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -135,7 +134,7 @@
           <name>cmosis_number_lines4</name>
         </register>
         <register>
-          <adress>27</adress>
+          <address>27</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -144,7 +143,7 @@
           <name>cmosis_number_lines5</name>
         </register>
         <register>
-          <adress>29</adress>
+          <address>29</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -153,7 +152,7 @@
           <name>cmosis_number_lines6</name>
         </register>
         <register>
-          <adress>31</adress>
+          <address>31</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -162,7 +161,7 @@
           <name>cmosis_number_lines7</name>
         </register>
         <register>
-          <adress>33</adress>
+          <address>33</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -171,7 +170,7 @@
           <name>cmosis_number_lines8</name>
         </register>
         <register>
-          <adress>35</adress>
+          <address>35</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -180,7 +179,7 @@
           <name>cmosis_sub_s</name>
         </register>
         <register>
-          <adress>37</adress>
+          <address>37</address>
           <offset>0</offset>
           <size>16</size>
           <default>0</default>
@@ -189,7 +188,7 @@
           <name>cmosis_sub_a</name>
         </register>
         <register>
-          <adress>39</adress>
+          <address>39</address>
           <offset>0</offset>
           <size>1</size>
           <default>1</default>
@@ -198,7 +197,7 @@
           <name>cmosis_color</name>
         </register>
         <register>
-          <adress>40</adress>
+          <address>40</address>
           <offset>0</offset>
           <size>2</size>
           <default>0</default>
@@ -207,7 +206,7 @@
           <name>cmosis_image_flipping</name>
         </register>
         <register>
-          <adress>41</adress>
+          <address>41</address>
           <offset>0</offset>
           <size>2</size>
           <default>0</default>
@@ -216,7 +215,7 @@
           <name>cmosis_exp_flags</name>
         </register>
         <register>
-          <adress>42</adress>
+          <address>42</address>
           <offset>0</offset>
           <size>24</size>
           <default>1088</default>
@@ -229,7 +228,7 @@
           </views>
         </register>
         <register>
-          <adress>45</adress>
+          <address>45</address>
           <offset>0</offset>
           <size>24</size>
           <default>1088</default>
@@ -238,7 +237,7 @@
           <name>cmosis_exp_step</name>
         </register>
         <register>
-          <adress>48</adress>
+          <address>48</address>
           <offset>0</offset>
           <size>24</size>
           <default>1</default>
@@ -247,7 +246,7 @@
           <name>cmosis_exp_kp1</name>
         </register>
         <register>
-          <adress>51</adress>
+          <address>51</address>
           <offset>0</offset>
           <size>24</size>
           <default>1</default>
@@ -256,7 +255,7 @@
           <name>cmosis_exp_kp2</name>
         </register>
         <register>
-          <adress>54</adress>
+          <address>54</address>
           <offset>0</offset>
           <size>2</size>
           <default>1</default>
@@ -265,7 +264,7 @@
           <name>cmosis_nr_slopes</name>
         </register>
         <register>
-          <adress>55</adress>
+          <address>55</address>
           <offset>0</offset>
           <size>8</size>
           <default>1</default>
@@ -274,7 +273,7 @@
           <name>cmosis_exp_seq</name>
         </register>
         <register>
-          <adress>56</adress>
+          <address>56</address>
           <offset>0</offset>
           <size>24</size>
           <default>1088</default>
@@ -283,7 +282,7 @@
           <name>cmosis_exp_time2</name>
         </register>
         <register>
-          <adress>59</adress>
+          <address>59</address>
           <offset>0</offset>
           <size>24</size>
           <default>1088</default>
@@ -292,7 +291,7 @@
           <name>cmosis_exp_step2</name>
         </register>
         <register>
-          <adress>68</adress>
+          <address>68</address>
           <offset>0</offset>
           <size>2</size>
           <default>1</default>
@@ -301,7 +300,7 @@
           <name>cmosis_nr_slopes2</name>
         </register>
         <register>
-          <adress>69</adress>
+          <address>69</address>
           <offset>0</offset>
           <size>8</size>
           <default>1</default>
@@ -310,7 +309,7 @@
           <name>cmosis_exp_seq2</name>
         </register>
         <register>
-          <adress>70</adress>
+          <address>70</address>
           <offset>0</offset>
           <size>16</size>
           <default>1</default>
@@ -319,7 +318,7 @@
           <name>cmosis_number_frames</name>
         </register>
         <register>
-          <adress>72</adress>
+          <address>72</address>
           <offset>0</offset>
           <size>2</size>
           <default>0</default>
@@ -328,7 +327,7 @@
           <name>cmosis_output_mode</name>
         </register>
         <register>
-          <adress>78</adress>
+          <address>78</address>
           <offset>0</offset>
           <size>12</size>
           <default>85</default>
@@ -337,7 +336,7 @@
           <name>cmosis_training_pattern</name>
         </register>
         <register>
-          <adress>80</adress>
+          <address>80</address>
           <offset>0</offset>
           <size>18</size>
           <default>0x3FFFF</default>
@@ -346,7 +345,7 @@
           <name>cmosis_channel_en</name>
         </register>
         <register>
-          <adress>82</adress>
+          <address>82</address>
           <offset>0</offset>
           <size>3</size>
           <default>7</default>
@@ -355,7 +354,7 @@
           <name>cmosis_special_82</name>
         </register>
         <register>
-          <adress>89</adress>
+          <address>89</address>
           <offset>0</offset>
           <size>8</size>
           <default>96</default>
@@ -364,7 +363,7 @@
           <name>cmosis_vlow2</name>
         </register>
         <register>
-          <adress>90</adress>
+          <address>90</address>
           <offset>0</offset>
           <size>8</size>
           <default>96</default>
@@ -373,7 +372,7 @@
           <name>cmosis_vlow3</name>
         </register>
         <register>
-          <adress>100</adress>
+          <address>100</address>
           <offset>0</offset>
           <size>14</size>
           <default>16260</default>
@@ -382,7 +381,7 @@
           <name>cmosis_offset</name>
         </register>
         <register>
-          <adress>102</adress>
+          <address>102</address>
           <offset>0</offset>
           <size>2</size>
           <default>0</default>
@@ -391,7 +390,7 @@
           <name>cmosis_pga</name>
         </register>
         <register>
-          <adress>103</adress>
+          <address>103</address>
           <offset>0</offset>
           <size>8</size>
           <default>32</default>
@@ -400,7 +399,7 @@
           <name>cmosis_adc_gain</name>
         </register>
         <register>
-          <adress>111</adress>
+          <address>111</address>
           <offset>0</offset>
           <size>1</size>
           <default>1</default>
@@ -409,7 +408,7 @@
           <name>cmosis_bit_mode</name>
         </register>
         <register>
-          <adress>112</adress>
+          <address>112</address>
           <offset>0</offset>
           <size>2</size>
           <default>0</default>
@@ -418,7 +417,7 @@
           <name>cmosis_adc_resolution</name>
         </register>
         <register>
-          <adress>115</adress>
+          <address>115</address>
           <offset>0</offset>
           <size>1</size>
           <default>1</default>
@@ -430,12 +429,11 @@
     </bank>
     <bank>
       <bank_description>
-        <adress>bank 1</adress>
         <bar>0</bar>
         <size>0x0200</size>
         <protocol>default</protocol>
-        <read_adress>0x9000</read_adress>
-        <write_adress>0x9000</write_adress>
+        <read_address>0x9000</read_address>
+        <write_address>0x9000</write_address>
         <word_size>32</word_size>
         <endianess>little</endianess>
         <format>0x%lx</format>
@@ -444,7 +442,7 @@
       </bank_description>
       <registers>
         <register>
-          <adress>0x00</adress>
+          <address>0x00</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -453,7 +451,7 @@
           <name>spi_conf_input</name>
         </register>
         <register>
-          <adress>0x10</adress>
+          <address>0x10</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -462,7 +460,7 @@
           <name>spi_conf_output</name>
         </register>
         <register>
-          <adress>0x20</adress>
+          <address>0x20</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -471,7 +469,7 @@
           <name>spi_clk_speed</name>
         </register>
         <register>
-          <adress>0x30</adress>
+          <address>0x30</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -506,7 +504,7 @@
           </registers_bits>
         </register>
         <register>
-          <adress>0x40</adress>
+          <address>0x40</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -523,7 +521,7 @@
 		</registers_bits>	
         </register>
         <register>
-          <adress>0x50</adress>
+          <address>0x50</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -532,7 +530,7 @@
           <name>status</name>
         </register>
         <register>
-          <adress>0x54</adress>
+          <address>0x54</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -541,7 +539,7 @@
           <name>status2</name>
         </register>
         <register>
-          <adress>0x58</adress>
+          <address>0x58</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -550,7 +548,7 @@
           <name>status3</name>
         </register>
         <register>
-          <adress>0x5c</adress>
+          <address>0x5c</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -559,7 +557,7 @@
           <name>fr_status</name>
         </register>
         <register>
-          <adress>0x70</adress>
+          <address>0x70</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -568,7 +566,7 @@
           <name>start_address</name>
         </register>
         <register>
-          <adress>0x74</adress>
+          <address>0x74</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -577,7 +575,7 @@
           <name>end_address</name>
         </register>
         <register>
-          <adress>0x78</adress>
+          <address>0x78</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -586,7 +584,7 @@
           <name>rd_address</name>
         </register>
         <register>
-          <adress>0xa0</adress>
+          <address>0xa0</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -615,7 +613,7 @@
           </registers_bits>
         </register>
         <register>
-          <adress>0xb0</adress>
+          <address>0xb0</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -638,7 +636,7 @@
           </registers_bits>
         </register>
         <register>
-          <adress>0xc0</adress>
+          <address>0xc0</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -647,7 +645,7 @@
           <name>skiped_lines</name>
         </register>
         <register>
-          <adress>0xd0</adress>
+          <address>0xd0</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -656,7 +654,7 @@
           <name>fr_thresholds</name>
         </register>
         <register>
-          <adress>0xd0</adress>
+          <address>0xd0</address>
           <offset>0</offset>
           <size>10</size>
           <default>0</default>
@@ -665,7 +663,7 @@
           <name>fr_pixel_thr</name>
         </register>
         <register>
-          <adress>0xd0</adress>
+          <address>0xd0</address>
           <offset>10</offset>
           <size>11</size>
           <default>0</default>
@@ -674,7 +672,7 @@
           <name>fr_num_pixel_thr</name>
         </register>
         <register>
-          <adress>0xd0</adress>
+          <address>0xd0</address>
           <offset>21</offset>
           <size>11</size>
           <default>0</default>
@@ -683,7 +681,7 @@
           <name>fr_num_lines_thr</name>
         </register>
         <register>
-          <adress>0x100</adress>
+          <address>0x100</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -692,7 +690,7 @@
           <name>rawdata_pkt_addr</name>
         </register>
         <register>
-          <adress>0x110</adress>
+          <address>0x110</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -736,7 +734,7 @@
           </registers_bits>
         </register>
         <register>
-          <adress>0x120</adress>
+          <address>0x120</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -745,7 +743,7 @@
           <name>num_lines</name>
         </register>
         <register>
-          <adress>0x130</adress>
+          <address>0x130</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -754,7 +752,7 @@
           <name>start_line</name>
         </register>
         <register>
-          <adress>0x140</adress>
+          <address>0x140</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -763,7 +761,7 @@
           <name>exp_time</name>
         </register>
         <register>
-          <adress>0x150</adress>
+          <address>0x150</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -804,7 +802,7 @@
           </registers_bits>
         </register>
         <register>
-          <adress>0x160</adress>
+          <address>0x160</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -813,7 +811,7 @@
           <name>write_status</name>
         </register>
         <register>
-          <adress>0x170</adress>
+          <address>0x170</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -822,7 +820,7 @@
           <name>num_triggers</name>
         </register>
         <register>
-          <adress>0x180</adress>
+          <address>0x180</address>
           <offset>0</offset>
           <size>32</size>
           <default>0x280</default>
@@ -834,7 +832,7 @@
 	  </views>
         </register>
         <register>
-          <adress>0x190</adress>
+          <address>0x190</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -843,7 +841,7 @@
           <name>temperature_sample_period</name>
         </register>
         <register>
-          <adress>0x1a0</adress>
+          <address>0x1a0</address>
           <offset>0</offset>
           <size>32</size>
           <default>0x64</default>
@@ -852,7 +850,7 @@
           <name>ddr_max_frames</name>
         </register>
         <register>
-          <adress>0x1b0</adress>
+          <address>0x1b0</address>
           <offset>0</offset>
           <size>32</size>
           <default>0</default>
@@ -864,12 +862,11 @@
     </bank>
     <bank>
 	<bank_description>
-      <adress>DMA bank</adress>
         <bar>0</bar>
         <size>0x0200</size>
         <protocol>default</protocol>
-        <read_adress>0x0</read_adress>
-        <write_adress>0x0</write_adress>
+        <read_address>0x0</read_address>
+        <write_address>0x0</write_address>
         <word_size>32</word_size>
         <endianess>little</endianess>
         <format>0x%lx</format>
