@@ -4,6 +4,7 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/pcilib
     ${CMAKE_BINARY_DIR}/pcilib
     ${FASTWRITER_INCLUDE_DIRS}
+    ${LIBXML2_INCLUDE_DIRS}
 )
 
 link_directories(

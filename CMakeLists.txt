@@ -1,6 +1,6 @@
 project(pcitool)
 
-set(PCILIB_VERSION "0.2.1")
+set(PCILIB_VERSION "0.2.2")
 set(PCILIB_ABI_VERSION "2")
 
 cmake_minimum_required(VERSION 2.6)
@@ -36,12 +36,14 @@ find_package(Threads REQUIRED)
 
 set(EXTRA_SYSTEM_LIBS -lrt)
 
+check_include_files(stdatomic.h HAVE_STDATOMIC_H)
+
+pkg_check_modules(LIBXML2 libxml-2.0 REQUIRED)
+
 #Check in sibling directory
 if (NOT DISABLE_PCITOOL)
     pkg_check_modules(FASTWRITER fastwriter REQUIRED)
 endif (NOT DISABLE_PCITOOL)
-
-check_include_files(stdatomic.h HAVE_STDATOMIC_H)
 
 add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -fno-omit-frame-pointer")
 #add_definitions("-fPIC --std=c99 -Wall -O2")
@@ -54,6 +56,7 @@ add_subdirectory(protocols)
 add_subdirectory(pcilib)
 add_subdirectory(pcitool)
 add_subdirectory(apps)
+add_subdirectory(xml)
 
 set_target_properties(pcilib PROPERTIES
     VERSION ${PCILIB_VERSION}

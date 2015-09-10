@@ -26,6 +26,7 @@
 #include "model.h"
 #include "plugin.h"
 #include "bar.h"
+#include "xml.h"
 #include "locking.h"
 
 static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
@@ -59,10 +60,10 @@ static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
 
 	if (dma) {
 	    if (dma->banks)
-		pcilib_add_register_banks(ctx, 0, dma->banks);
+		pcilib_add_register_banks(ctx, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, dma->banks, NULL);
 
 	    if (dma->registers)
-		pcilib_add_registers(ctx, 0, dma->registers);
+		pcilib_add_registers(ctx, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, dma->registers, NULL);
 
 	    if (dma->engines) {
 		for (j = 0; dma->engines[j].addr_bits; j++);
@@ -73,16 +74,16 @@ static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
 	}
 
 	if (model_info->protocols)
-	    pcilib_add_register_protocols(ctx, 0, model_info->protocols);
+	    pcilib_add_register_protocols(ctx, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, model_info->protocols, NULL);
 		
 	if (model_info->banks)
-	    pcilib_add_register_banks(ctx, 0, model_info->banks);
+	    pcilib_add_register_banks(ctx, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, model_info->banks, NULL);
 
 	if (model_info->registers)
-	    pcilib_add_registers(ctx, 0, model_info->registers);
+	    pcilib_add_registers(ctx, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, model_info->registers, NULL);
 		
 	if (model_info->ranges)
-	    pcilib_add_register_ranges(ctx, 0, model_info->ranges);
+	    pcilib_add_register_ranges(ctx, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, model_info->ranges);
     }
 
     // Load XML registers
@@ -105,10 +106,10 @@ static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
 
 
 pcilib_t *pcilib_open(const char *device, const char *model) {
-    int err;
+    int err, xmlerr;
     size_t i;
     pcilib_t *ctx = malloc(sizeof(pcilib_t));
-
+	
     if (!model)
 	model = getenv("PCILIB_MODEL");
 
@@ -159,7 +160,7 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	ctx->num_protocols = i;
 
 	err = pcilib_detect_model(ctx, model);
-	if (err) {
+	if ((err)&&(err != PCILIB_ERROR_NOTFOUND)) {
 	    const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
 	    if (board_info)
 	        pcilib_error("Error (%i) configuring model %s (%x:%x)", err, (model?model:""), board_info->vendor_id, board_info->device_id);
@@ -171,7 +172,21 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 
 	if (!ctx->model)
 	    ctx->model = strdup(model?model:"pci");
+	
+	xmlerr = pcilib_init_xml(ctx, ctx->model);
+	if ((xmlerr)&&(xmlerr != PCILIB_ERROR_NOTFOUND)) {
+	    pcilib_error("Error (%i) initializing XML subsystem for model %s", xmlerr, ctx->model);
+	    pcilib_close(ctx);
+	    return NULL;
+	}
 
+	    // We have found neither standard model nor XML
+	if ((err)&&(xmlerr)) {
+	    pcilib_error("The specified model (%s) is not available", model);
+	    pcilib_close(ctx);
+	    return NULL;
+	}
+	
 	ctx->model_info.registers = ctx->registers;
 	ctx->model_info.banks = ctx->banks;
 	ctx->model_info.protocols = ctx->protocols;
@@ -354,6 +369,8 @@ void pcilib_close(pcilib_t *ctx) {
 	}
 
 	pcilib_free_register_banks(ctx);
+
+	pcilib_free_xml(ctx);
 	
 	if (ctx->register_ctx)
 	    free(ctx->register_ctx);

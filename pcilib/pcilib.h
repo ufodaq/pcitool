@@ -23,6 +23,7 @@ typedef uint32_t pcilib_event_t;
 typedef uint64_t pcilib_timeout_t;		/**< In microseconds */
 typedef unsigned int pcilib_irq_hw_source_t;
 typedef uint32_t pcilib_irq_source_t;
+typedef struct _xmlNode pcilib_xml_node_t;
 
 typedef enum {
     PCILIB_LOG_DEBUG = 0,			/**< Debug messages will be always printed as they should be filtered based on setting of corresponding environmental variable */

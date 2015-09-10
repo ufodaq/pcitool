@@ -19,7 +19,7 @@
 #include "error.h"
 
 
-int pcilib_add_registers(pcilib_t *ctx, size_t n, const pcilib_register_description_t *registers) {
+int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_description_t *registers, pcilib_register_t *ids) {
 	// DS: Overrride existing registers 
 	// Registers identified by addr + offset + size + type or name
 	
@@ -52,7 +52,16 @@ int pcilib_add_registers(pcilib_t *ctx, size_t n, const pcilib_register_descript
 
     memcpy(ctx->registers + ctx->num_reg, registers, n * sizeof(pcilib_register_description_t));
     memset(ctx->registers + ctx->num_reg + n, 0, sizeof(pcilib_register_description_t));
+
+    if (ids) {
+	size_t i;
+	
+	for (i = 0; i < n; i++)
+	    ids[i] = ctx->num_reg + i;
+    }
+
     ctx->num_reg += n;
+    
 
     return 0;
 }

@@ -25,6 +25,7 @@
 #include "model.h"
 #include "export.h"
 #include "locking.h"
+#include "xml.h"
 
 typedef struct {
     uint8_t max_link_speed, link_speed;
@@ -59,7 +60,9 @@ struct pcilib_s {
     size_t num_banks_init;								/**< Number of initialized banks */
     size_t num_reg, alloc_reg;								/**< Number of registered and allocated registers */
     size_t num_banks, num_protocols, num_ranges;					/**< Number of registered banks, protocols, and register ranges */
-    size_t num_engines;									/**> Number of configured DMA engines */
+    size_t num_engines;									/**< Number of configured DMA engines */
+    size_t dyn_banks;									/**< Number of configured dynamic banks */
+
     pcilib_register_description_t *registers;						/**< List of currently defined registers (from all sources) */
     pcilib_register_bank_description_t banks[PCILIB_MAX_REGISTER_BANKS + 1];		/**< List of currently defined register banks (from all sources) */
     pcilib_register_range_t ranges[PCILIB_MAX_REGISTER_RANGES + 1];			/**< List of currently defined register ranges (from all sources) */
@@ -76,6 +79,7 @@ struct pcilib_s {
     pcilib_lock_t *dma_wlock[PCILIB_MAX_DMA_ENGINES];					/**< Per-engine locks to serialize write operations */
 
     struct pcilib_locking_s locks;							/**< Context of locking subsystem */
+    struct pcilib_xml_s xml;                                                    	/**< XML context */
 
 #ifdef PCILIB_FILE_IO
     int file_io_handle;

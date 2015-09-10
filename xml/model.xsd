@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    
+    <xsd:element name="model">
+        <xsd:complexType>
+            <xsd:sequence>
+                <xsd:element name="banks" type="banks_type"/>
+                <xsd:element name="views" type="views_type" minOccurs="0" maxOccurs="1"/>
+            </xsd:sequence>
+        </xsd:complexType>
+        <xsd:key name="Registerkey">
+            <xsd:selector xpath="views/view/name"/>
+            <xsd:field xpath="."/>
+        </xsd:key>
+        <xsd:keyref refer="Registerkey" name="RegisterkeyRef">
+            <xsd:selector xpath="banks/bank/registers/register/views/view"/>
+            <xsd:field xpath="."/>
+        </xsd:keyref>
+        <xsd:key name="Registerbitskey">
+            <xsd:selector xpath="views/view/name"/>
+            <xsd:field xpath="."/>
+        </xsd:key>
+        <xsd:keyref refer="Registerbitskey" name="RegisterbitskeyRef">
+            <xsd:selector xpath="banks/bank/registers/register/registers_bits/register_bits/views/view"/>
+            <xsd:field xpath="."/>
+        </xsd:keyref>
+    </xsd:element>
+    
+    
+        <xsd:complexType name="views_type">
+            <xsd:sequence>
+                <xsd:element name="view" type="view_type" maxOccurs="unbounded"/>
+            </xsd:sequence>
+        </xsd:complexType>
+    
+    
+    <xsd:complexType name="banks_type">
+        <xsd:sequence>
+            <xsd:element name="bank" type="banktype" minOccurs="1" maxOccurs="12"/>
+        </xsd:sequence>
+    </xsd:complexType>
+    
+    <xsd:complexType name="banktype">
+        <xsd:sequence>
+            <xsd:element name="bank_description" type="bank_description_t"/>
+            <xsd:element name="registers" type="registerstype" minOccurs="0" maxOccurs="1"/>
+        </xsd:sequence>
+    </xsd:complexType>
+    
+    <xsd:complexType name="bank_description_t">
+        <xsd:sequence>
+            <xsd:element name="bar" type="bar_type"/>
+            <xsd:element name="size" type="hexa_and_integer64_t"/>
+            <xsd:element name="protocol" type="xsd:string"/>
+            <xsd:element name="read_address" type="hex64_t"/>
+            <xsd:element name="write_address" type="hex64_t"/>
+            <xsd:element name="word_size" type="uint8_t"/>
+            <xsd:element name="endianess" type="endianess_type"/>
+            <xsd:element name="format" type="xsd:string"/>
+            <xsd:element name="name" type="xsd:string"/>
+            <xsd:element name="description" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+        </xsd:sequence>
+    </xsd:complexType>
+    
+    
+    <xsd:complexType name="registerstype">
+        <xsd:sequence>
+            <xsd:element name="register" type="register_type" minOccurs="0" maxOccurs="256"/>
+        </xsd:sequence>
+    </xsd:complexType>
+    
+    <xsd:complexType name="register_type">
+        <xsd:sequence>
+            <xsd:element name="address" type="hexa_and_integer32_t"/>
+            <xsd:element name="offset" type="uint8_t"/>
+            <xsd:element name="size" type="uint8_t"/>
+            <xsd:element name="default" type="hexa_and_integer32_t"/>
+            <xsd:element name="rwmask" type="rwmask_type"/>
+            <xsd:element name="mode" type="pcilib_register_mode_t"/>
+            <xsd:element name="name" type="xsd:string"/>
+            <xsd:element name="description" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="views" type="reg_to_views_type" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="registers_bits" type="registers_bits_type" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="value_min" type="hexa_and_integer32_t" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="value_max" type="hexa_and_integer32_t" minOccurs="0" maxOccurs="1"/>
+          </xsd:sequence>
+    </xsd:complexType>
+    
+    <xsd:complexType name="registers_bits_type">
+        <xsd:sequence>
+            <xsd:element name="register_bits" type="register_bits_type" minOccurs="1" maxOccurs="32"/>
+        </xsd:sequence>
+    </xsd:complexType>
+    
+    <xsd:complexType name="reg_to_views_type">
+        <xsd:sequence>
+            <xsd:element name="view" type="xsd:string" minOccurs="1" maxOccurs="unbounded"/>
+        </xsd:sequence>
+    </xsd:complexType>
+    
+    <xsd:complexType name="register_bits_type">
+        <xsd:sequence>
+            <xsd:element name="offset" type="uint8_t"/>
+            <xsd:element name="size" type="uint8_t"/>
+            <xsd:element name="mode" type="pcilib_register_mode_t"/>
+            <xsd:element name="name" type="xsd:string"/>
+            <xsd:element name="description" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="views" type="reg_to_views_type" minOccurs="0" maxOccurs="1"/>
+        </xsd:sequence>
+
+    </xsd:complexType>
+    
+    <xsd:simpleType name="uint8_t">
+        <xsd:restriction base="xsd:integer">
+            <xsd:minInclusive value="0"/>
+            <xsd:maxInclusive value="255"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="size_t">
+        <xsd:restriction base="xsd:integer">
+            <xsd:minInclusive value="0"/>
+            <xsd:maxInclusive value="18446744073709551615"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="uintptr_t">
+        <xsd:restriction base="xsd:integer">
+            <xsd:minInclusive value="0"/>
+            <xsd:maxInclusive value="18446744073709551615"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="uint32_t">
+        <xsd:restriction base="xsd:integer">
+            <xsd:minInclusive value="0"/>
+            <xsd:maxInclusive value="4294967295"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="pcilib_register_mode_t">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="R"/>
+            <xsd:enumeration value="W"/>
+            <xsd:enumeration value="RW"/>
+            <xsd:enumeration value="W1C"/>
+            <xsd:enumeration value="RW1C"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="bank_adress_type">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="bank 0"/>
+            <xsd:enumeration value="bank 1"/>
+            <xsd:enumeration value="bank 2"/>
+            <xsd:enumeration value="bank 3"/>
+            <xsd:enumeration value="DMA bank"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="endianess_type">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="little"/>
+            <xsd:enumeration value="big"/>
+            <xsd:enumeration value="host"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="bar_type">
+        <xsd:restriction base="xsd:integer">
+            <xsd:enumeration value="0"/>
+            <xsd:enumeration value="1"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="space_adress_type">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="write adress"/>
+            <xsd:enumeration value="read adress"/>
+            <xsd:enumeration value="space adress"/>
+            <xsd:enumeration value="0"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="rwmask_type">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="all"/>
+            <xsd:enumeration value="0"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="hexa_and_integer32_t">
+        <xsd:union memberTypes="uint32_t hex32_t"/>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="hex32_t">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="0x([a-fA-F0-9]){0,8}"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="hexa_and_integer64_t">
+        <xsd:union memberTypes="size_t hex64_t"/>
+    </xsd:simpleType>
+    
+    <xsd:simpleType name="hex64_t">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="0x([a-fA-F0-9]){0,16}"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+    <xsd:complexType name="view_type">
+        <xsd:sequence>
+            <xsd:element name="name" type="xsd:ID"/>
+            <xsd:element name="unit" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="read_from_register" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="write_to_register" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="enum" type="enum_t" minOccurs="0" maxOccurs="unbounded"/>
+	    <xsd:element name="description" type="xsd:string"/>
+	</xsd:sequence>
+        <xsd:attribute name="type" type="viewtype_type" use="required"/>
+    </xsd:complexType>
+    
+	<xsd:complexType name="enum_t">
+		<xsd:simpleContent>
+			<xsd:extension base="xsd:string">
+				<xsd:attribute name="value" type="hexa_and_integer64_t" use="required"/>
+       			<xsd:attribute name="min" type="hexa_and_integer64_t"/>
+		        <xsd:attribute name="max" type="hexa_and_integer64_t"/>
+			</xsd:extension>
+		</xsd:simpleContent>
+	</xsd:complexType>
+
+    <xsd:simpleType name="viewtype_type">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="enum"/>
+            <xsd:enumeration value="formula"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+</xsd:schema>

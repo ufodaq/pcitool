@@ -105,7 +105,7 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib, const char *model, const vo
     } else {
 	ctx->type = NWL_MODIFICATION_DEFAULT;
 	    
-	err = pcilib_add_registers(pcilib, 0, nwl_xrawdata_registers);
+	err = pcilib_add_registers(pcilib, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, nwl_xrawdata_registers, NULL);
 	if (err) {
 	    free(ctx);
 	    pcilib_error("Error (%i) adding NWL XRAWDATA registers", err);
@@ -151,7 +151,7 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib, const char *model, const vo
 	    sprintf((char*)eregs[j].name, nwl_dma_engine_registers[j].name, dma_addr_len, edesc.addr, dma_direction);
 	}
 	
-        err = pcilib_add_registers(pcilib, j, eregs);
+        err = pcilib_add_registers(pcilib, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, j, eregs, NULL);
 	if (err) {
 	    free(ctx);
 	    pcilib_error("Error (%i) adding NWL DMA registers for engine %i", err, edesc.addr);

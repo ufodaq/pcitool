@@ -23,8 +23,13 @@ typedef uint8_t pcilib_register_bank_addr_t;					/**< Type holding the bank addr
 typedef uint8_t pcilib_register_protocol_t;					/**< Type holding the protocol position within the field listing register protocols in the model */
 typedef uint8_t pcilib_register_protocol_addr_t;				/**< Type holding the protocol address */
 
-
 typedef struct pcilib_register_bank_context_s pcilib_register_bank_context_t;
+
+typedef enum {
+    PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT = 0,
+    PCILIB_MODEL_MODIFICATION_FLAG_OVERRIDE = 1,				/**< Instructs to override the existing registers/banks/etc... */
+    PCILIB_MODEL_MODIFICATION_FLAG_SKIP_EXISTING = 2				/**< If flag is set, pcilib will just skip existing registers/banks/etc instead of reporting a error */
+} pcilib_model_modification_flags_t;
 
 typedef struct {
     pcilib_version_t version;
@@ -84,6 +89,7 @@ typedef struct {
 struct pcilib_register_bank_context_s {
     const pcilib_register_bank_description_t *bank;				/**< Corresponding bank description */
     const pcilib_register_protocol_api_description_t *api;			/**< API functions */
+    pcilib_xml_node_t *xml;							/**< Additional XML properties */
 };
 
 #ifdef __cplusplus
@@ -94,9 +100,9 @@ extern "C" {
 int pcilib_init_register_banks(pcilib_t *ctx);
 void pcilib_free_register_banks(pcilib_t *ctx);
 
-int pcilib_add_register_banks(pcilib_t *ctx, size_t n, const pcilib_register_bank_description_t *banks);
-int pcilib_add_register_protocols(pcilib_t *ctx, size_t n, const pcilib_register_protocol_description_t *protocols);
-int pcilib_add_register_ranges(pcilib_t *ctx, size_t n, const pcilib_register_range_t *ranges);
+int pcilib_add_register_banks(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_bank_description_t *banks, pcilib_register_bank_t *ids);
+int pcilib_add_register_protocols(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_protocol_description_t *protocols, pcilib_register_protocol_t *ids);
+int pcilib_add_register_ranges(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_range_t *ranges);
 
 pcilib_register_bank_t pcilib_find_register_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank);
 pcilib_register_bank_t pcilib_find_register_bank_by_name(pcilib_t *ctx, const char *bankname);

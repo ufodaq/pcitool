@@ -2,4 +2,4 @@
 
 APP_PATH=`dirname $0`
 
-LD_LIBRARY_PATH="$APP_PATH/pcilib" $APP_PATH/pcitool/pci $*
+PCILIB_MODEL_DIR="$APP_PATH/xml" LD_LIBRARY_PATH="$APP_PATH/pcilib" $APP_PATH/pcitool/pci $*

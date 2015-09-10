@@ -44,7 +44,9 @@ typedef struct {
 
 
 typedef struct {
-    pcilib_register_bank_t bank;
+    pcilib_register_bank_t bank;		/**< Reference to bank containing the register */
+    pcilib_register_value_t min, max;		/**< Minimum & maximum allowed values */
+    pcilib_xml_node_t *xml;			/**< Additional XML properties */
 } pcilib_register_context_t;
 
 
@@ -52,7 +54,7 @@ typedef struct {
 extern "C" {
 #endif
 
-int pcilib_add_registers(pcilib_t *ctx, size_t n, const pcilib_register_description_t *registers);
+int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_description_t *registers, pcilib_register_t *ids);
 
 #ifdef __cplusplus
 }

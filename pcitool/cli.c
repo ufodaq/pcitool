@@ -3132,7 +3132,7 @@ int main(int argc, char **argv) {
         else Usage(argc, argv, "The %i data values is specified, but %i required", argc - optind, size);
      case MODE_READ:
         if (!addr) {
-	    if (((!dma_info)||(!dma_info->api))&&(!model_info->api)) {
+	    if (((!dma_info)||(!dma_info->api))&&(!model_info->api)&&(!handle->num_reg)) {
 //	    if (model == PCILIB_MODEL_PCI) {
 		if ((amode != ACCESS_DMA)&&(amode != ACCESS_CONFIG)) 
 		    Usage(argc, argv, "The address is not specified");
