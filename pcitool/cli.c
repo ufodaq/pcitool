@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200112L
 #define _BSD_SOURCE
+#define _GNU_SOURCE
 #define _DEFAULT_SOURCE
 
 #include <stdio.h>
@@ -386,8 +387,27 @@ void ErrorInternal(void *arg, const char *file, int line, pcilib_log_priority_t 
 #define Error(...) ErrorInternal(NULL, __FILE__, __LINE__, PCILIB_LOG_ERROR, __VA_ARGS__)
 
 
+int RegisterCompare(const void *aptr, const void *bptr, void *registers) {
+    pcilib_register_description_t *a = &((pcilib_register_description_t*)registers)[*(const pcilib_register_t*)aptr];
+    pcilib_register_description_t *b = &((pcilib_register_description_t*)registers)[*(const pcilib_register_t*)bptr];
+
+    if (a->bank < b->bank) return -1;
+    if (a->bank > b->bank) return 1;
+
+    if (a->addr < b->addr) return -1;
+    if (a->addr > b->addr) return 1;
+
+    if ((a->type != PCILIB_REGISTER_BITS)&&(b->type == PCILIB_REGISTER_BITS)) return -1;
+    if ((a->type == PCILIB_REGISTER_BITS)&&(b->type != PCILIB_REGISTER_BITS)) return 1;
+
+    if (a->offset < b->offset) return -1;
+    if (a->offset > b->offset) return 0;
+
+    return 0;
+}
+
 void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, int details) {
-    int i,j;
+    int i, j, k;
     const pcilib_register_bank_description_t *banks;
     const pcilib_register_description_t *registers;
     const pcilib_event_description_t *events;
@@ -467,6 +487,8 @@ void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
     else registers = model_info->registers;
     
     if (registers) {
+	pcilib_register_t regsort[handle->num_reg];
+	
         pcilib_register_bank_addr_t bank_addr = 0;
 	if (bank) {
 	    pcilib_register_bank_t bank_id = pcilib_find_register_bank(handle, bank);
@@ -479,10 +501,21 @@ void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
 	} else {
 	    printf("Registers: \n");
 	}
-	for (i = 0; registers[i].bits; i++) {
-	    const char *mode;
-	    
+
+	    // sorting
+	for (i = 0, k = 0; registers[i].bits; i++) {
 	    if ((bank)&&(registers[i].bank != bank_addr)) continue;
+	    if ((registers[i].type == PCILIB_REGISTER_BITS)&&(!details)) continue;
+	    regsort[k++] = i;
+	}
+
+	qsort_r(regsort, k, sizeof(pcilib_register_t), &RegisterCompare, (void*)registers);
+	
+	
+	for (j = 0; j < k; j++) {
+	    const char *mode;
+	    i = regsort[j];
+
 	    if (registers[i].type == PCILIB_REGISTER_BITS) {
 		if (!details) continue;
 		
