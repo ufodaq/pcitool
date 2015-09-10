@@ -2,7 +2,7 @@
 #include "pci.h"
 #include "pcilib.h"
 #include <Python.h>
-#include "views.h"
+//#include "views.h"
 #include "error.h"
 #include <strings.h>
 #include <stdlib.h>
@@ -329,3 +329,68 @@ int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, cons
   pcilib_warning("the view asked and the register do not correspond");
   return PCILIB_ERROR_NOTAVAILABLE;
  }
+
+/**
+ * function to populate ctx enum views, as we could do for registers or banks
+ */
+int pcilib_add_views_enum(pcilib_t *ctx, size_t n, const pcilib_view_enum2_t* views) {
+	
+    pcilib_view_enum2_t *views_enum;
+    size_t size;
+
+    if (!n) {
+	for (n = 0; views[n].enums_list[0].value; n++);
+    }
+
+    if ((ctx->num_enum_views + n + 1) > ctx->alloc_enum_views) {
+	for (size = ctx->alloc_enum_views; size < 2 * (n + ctx->num_enum_views + 1); size<<=1);
+
+	views_enum = (pcilib_view_enum2_t*)realloc(ctx->enum_views, size * sizeof(pcilib_view_enum2_t));
+	if (!views_enum) return PCILIB_ERROR_MEMORY;
+
+	ctx->enum_views = views_enum;
+	/* context + model part ????*/
+	ctx->alloc_enum_views = size;
+    }
+
+    memcpy(ctx->enum_views + ctx->num_enum_views, views, n * sizeof(pcilib_view_enum2_t));
+    memset(ctx->enum_views + ctx->num_enum_views + n, 0, sizeof(pcilib_view_enum2_t));
+
+    ctx->num_enum_views += n;
+    
+
+    return 0;
+}
+
+
+/**
+ * function to populate ctx formula views, as we could do for registers or banks
+ */
+int pcilib_add_views_formula(pcilib_t *ctx, size_t n, const pcilib_view_formula_t* views) {
+	
+    pcilib_view_formula_t *views_formula;
+    size_t size;
+
+    if (!n) {
+	for (n = 0; views[n].name[0]; n++);
+    }
+
+    if ((ctx->num_formula_views + n + 1) > ctx->alloc_formula_views) {
+	for (size = ctx->alloc_formula_views; size < 2 * (n + ctx->num_formula_views + 1); size<<=1);
+
+	views_formula = (pcilib_view_formula_t*)realloc(ctx->formula_views, size * sizeof(pcilib_view_formula_t));
+	if (!views_formula) return PCILIB_ERROR_MEMORY;
+
+	ctx->formula_views = views_formula;
+	/* context + model part?????*/
+	ctx->alloc_formula_views = size;
+    }
+
+    memcpy(ctx->formula_views + ctx->num_formula_views, views, n * sizeof(pcilib_view_formula_t));
+    memset(ctx->formula_views + ctx->num_formula_views + n, 0, sizeof(pcilib_view_formula_t));
+
+    ctx->num_formula_views += n;
+    
+
+    return 0;
+}
