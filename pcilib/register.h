@@ -3,6 +3,7 @@
 
 #include <pcilib.h>
 #include <pcilib/bank.h>
+#include <pcilib/views.h>
 
 #define PCILIB_REGISTER_NO_BITS			0
 #define PCILIB_REGISTER_ALL_BITS		((pcilib_register_value_t)-1)

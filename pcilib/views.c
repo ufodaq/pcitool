@@ -1,26 +1,11 @@
 #include <string.h>
 #include "pci.h"
-
-
-/**
- * new type to define an enum view
- */
-pcilib_value_enum_s {
-  const char *name; /**<corresponding string to value*/
-  pcilib_register_value_t value, min, max; 
-};
-
-
-/**
- * new type to define a formula view
- */
-pcilib_view_formula_s {
-  const char *name; /**<name of the view*/
-  const char *read_formula; /**< formula to parse to read from a register*/
-  const char *write_formula; /**<formula to parse to write to a register*/
-	// **see it later**        const char *unit; (?)
-}
-
+#include "pcilib.h"
+#include <Python.h>
+#include "views.h"
+#include "error.h"
+#include <strings.h>
+#include <stdlib.h>
 
 /**
  *
@@ -126,7 +111,7 @@ pcilib_view_str_sub (const char *s, unsigned int start, unsigned int end)
 /**
  * get the bank name associated with a register name
  */
-static char*
+static const char*
 pcilib_view_get_bank_from_reg_name(pcilib_t* ctx,char* reg_name){
   int k;
   for(k=0;ctx->registers[k].bits;k++){
@@ -134,15 +119,16 @@ pcilib_view_get_bank_from_reg_name(pcilib_t* ctx,char* reg_name){
 	return ctx->banks[pcilib_find_register_bank_by_addr(ctx,ctx->registers[k].bank)].name;
       }
   }
+  return NULL;
 }
 
 /**
  * replace plain registers name in a formula by their value
  */
-static int
+static char*
 pcilib_view_compute_plain_registers(pcilib_t* ctx, char* formula){
   int j,k;
-  char* substr,substr2;
+  char *substr, *substr2;
   char temp[66];
   pcilib_register_value_t value;
   
@@ -156,16 +142,17 @@ pcilib_view_compute_plain_registers(pcilib_t* ctx, char* formula){
       substr2=pcilib_view_str_sub((char*)formula,j,k-1); /**< we get the name of the register+@*/
       substr=pcilib_view_str_sub(substr2,1,k-j/*length of substr2*/); /**< we get the name of the register*/
      
-      if((strcasecmp(substr,"reg")){
+      if((strcasecmp(substr,"reg"))){
 	  /* we get the bank name associated to the register, and read its value*/
 	  pcilib_read_register(ctx, pcilib_view_get_bank_from_reg_name(ctx, substr),substr,&value);
 	  /* we put the value in formula*/
 	  sprintf(temp,"%i",value);
-	  formula = str_replace(formula,substr2,temp);
+	  formula = pcilib_view_formula_replace(formula,substr2,temp);
       }
 
     }
   }
+  return formula;
 }
 
 /**
@@ -173,10 +160,9 @@ pcilib_view_compute_plain_registers(pcilib_t* ctx, char* formula){
  *@param[in] the formula to be evaluated
  *@return the integer value of the evaluated formula (maybe go to float instead)
  */
-static int
+static pcilib_register_value_t
 pcilib_view_eval_formula(char* formula){
-/* !!!! cf !!!!*/
-  // setenv("PYTHONPATH",".",1);
+   setenv("PYTHONPATH",".",1);
    PyObject *pName, *pModule, *pDict, *pFunc, *pValue, *presult=NULL;
    char* pythonfile;
 
@@ -215,11 +201,11 @@ pcilib_view_eval_formula(char* formula){
    /* close interpreter*/
    Py_Finalize();
    
-   return PyLong_AsLong(presult); /*this function is due to python 3.3, as PyLong_AsInt was there in python 2.7 and is no more there, resulting in using cast futhermore*/
+   return (pcilib_register_value_t)PyLong_AsUnsignedLong(presult); /*this function is due to python 3.3, as PyLong_AsInt was there in python 2.7 and is no more there, resulting in using cast futhermore*/
 }
 
 
-static int
+static void
 pcilib_view_apply_formula(pcilib_t* ctx, char* formula, pcilib_register_value_t reg_value, pcilib_register_value_t* out_value)
 {
   /* when applying a formula, we need to:
@@ -235,22 +221,23 @@ pcilib_view_apply_formula(pcilib_t* ctx, char* formula, pcilib_register_value_t 
   */
   
   char reg_value_string[66]; /* to register reg_value as a string, need to check the length*/
-  sprintf(reg_value_string,"%lu",reg_value);
+  sprintf(reg_value_string,"%u",reg_value);
   
   /*computation of plain registers in the formula*/
-  formula=pcilib_view_formula_compute_plain_registers(formula,ctx);
+  formula=pcilib_view_compute_plain_registers(ctx,formula);
   /* computation of @reg with register value*/
   formula=pcilib_view_formula_replace(formula,"@reg",reg_value_string);
   
   /* evaluation of the formula*/
-  *out_value=*(pcilib_register_value_t*) pcilib_view_eval_formula(formula);
+  *out_value= pcilib_view_eval_formula(formula);
 
 }
 
 int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view/*, const char *unit*/, size_t value_size, void *value)
 {
-  int i,j,err;
+  int i,j,err=0;
   pcilib_register_value_t temp_value;
+  char* formula;
   
   /* we get the index of the register to find the corresponding register context*/
   if((i=pcilib_find_register(ctx,bank,regname))==PCILIB_REGISTER_INVALID){
@@ -274,7 +261,7 @@ int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const
 	  return PCILIB_ERROR_MEMORY;
 	}
 	/* in the case the value of register is between min and max, then we return the correponding enum command*/
-	value=*(char*)ctx->register_ctx[i].enums[j].name;
+	strncpy((char*)value,ctx->register_ctx[i].enums[j].name, strlen(ctx->register_ctx[i].enums[j].name));
 	return 0;
       }
     }
@@ -285,9 +272,12 @@ int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const
   /** in the other case we ask for a view of type formula. Indeed, wa can't directly ask for a formula, so we have to provide a name for those views*/
   j=0;
   while((ctx->register_ctx[i].formulas[j].name)){
-    if(!(strcasecmp(ctx->register_ctx[i].formulas[j].name))){
+    if(!(strcasecmp(ctx->register_ctx[i].formulas[j].name,view))){
       /* when we have found the correct view of type formula, we apply the formula, that get the good value for return*/
-      pcilib_view_apply_formula(ctx, ctx->register_ctx[i].formulas[j].read_formula,temp_value,value);
+      formula=malloc(sizeof(char)*strlen(ctx->register_ctx[i].formulas[j].read_formula));
+      strncpy(formula,ctx->register_ctx[i].formulas[j].read_formula,strlen(ctx->register_ctx[i].formulas[j].read_formula));
+      //      pcilib_view_apply_formula(ctx, ctx->register_ctx[i].formulas[j].read_formula,temp_value,value);
+      pcilib_view_apply_formula(ctx, formula,temp_value,value);
       value_size=sizeof(int);
       return 0;
     }
@@ -297,6 +287,45 @@ int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const
   pcilib_warning("the view asked and the register do not correspond");
   return PCILIB_ERROR_NOTAVAILABLE;
 }
- 
- int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view/*, const char *unit*/, size_t value_size, void *value){
-   
+
+
+/**
+ * function to write to a register using a view
+ */ 
+int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view, size_t value_size,void* value/*, const char *unit*/){
+   int i,j;
+   pcilib_register_value_t temp_value;
+   char *formula;
+
+  /* we get the index of the register to find the corresponding register context*/
+  if((i=pcilib_find_register(ctx,bank,regname))==PCILIB_REGISTER_INVALID){
+    pcilib_error("can't get the index of the register %s", regname);
+    return PCILIB_ERROR_INVALID_REQUEST;
+  }
+  
+    /*here, in the case of views of type enum, view will correspond to the enum command.
+      we iterate so through the views of type enum to get the value corresponding to the enum command*/
+    for(j=0; ctx->register_ctx[i].enums[j].value;j++){
+      if(!(strcasecmp(ctx->register_ctx[i].enums[j].name,view))){
+	pcilib_write_register(ctx,bank,regname,ctx->register_ctx[i].enums[j].value);
+	return 0;
+      }
+    }
+  
+  /** in the other case we ask for a view of type formula. Indeed, wa can't directly ask for a formula, so we have to provide a name for those views in view, and the value we want to write in value*/
+  j=0;
+  while((ctx->register_ctx[i].formulas[j].name)){
+    if(!(strcasecmp(ctx->register_ctx[i].formulas[j].name,view))){
+      /* when we have found the correct view of type formula, we apply the formula, that get the good value for return*/
+      formula=malloc(sizeof(char)*strlen(ctx->register_ctx[i].formulas[j].write_formula));
+      strncpy(formula,ctx->register_ctx[i].formulas[j].write_formula,strlen(ctx->register_ctx[i].formulas[j].write_formula));
+      //    pcilib_view_apply_formula(ctx, ctx->register_ctx[i].formulas[j].write_formula,(pcilib_register_value_t*)value,temp_value);
+      pcilib_view_apply_formula(ctx,formula,*(pcilib_register_value_t*)value,&temp_value);
+      pcilib_write_register(ctx,bank,regname,temp_value);
+      return 0;
+    }
+    j++;
+  }
+  pcilib_warning("the view asked and the register do not correspond");
+  return PCILIB_ERROR_NOTAVAILABLE;
+ }
