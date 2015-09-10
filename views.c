@@ -1,3 +1,7 @@
+#include <string.h>
+#include "pci.h"
+
+
 /**
  * new type to define an enum view
  */
@@ -26,7 +30,8 @@ pcilib_view_formula_s {
  *@param[in] after - the new value of before substring
  *@return the modified txt string
  */
-char *formula_replace (const char *txt, const char *before, const char *after)
+static char*
+pcilib_view_formula_replace (const char *txt, const char *before, const char *after)
 {
 	const char *pos; 
 	char *return_txt; 
@@ -84,14 +89,15 @@ char *formula_replace (const char *txt, const char *before, const char *after)
 	return return_txt;
 }
 
-/*
+/**
  * function used to get the substring of a string s, from the starting and ending indexes
   * @param[in] s string containing the substring we want to extract.
  * @param[in] start the start index of the substring.
  * @param[in] end the ending index of the substring.
  * @return the extracted substring.
  */
-char *str_sub (const char *s, unsigned int start, unsigned int end)
+static char*
+pcilib_view_str_sub (const char *s, unsigned int start, unsigned int end)
 {
    char *new_s = NULL;
 
@@ -117,16 +123,52 @@ char *str_sub (const char *s, unsigned int start, unsigned int end)
    return new_s;
 }
 
-static int
-pcilib_view_compute_plain_registers{
-  /* hsould i used regexp.h??? or compile everythin myself? */
+/**
+ * get the bank name associated with a register name
+ */
+static char*
+pcilib_view_get_bank_from_reg_name(pcilib_t* ctx,char* reg_name){
+  int k;
+  for(k=0;ctx->registers[k].bits;k++){
+    if(!(strcasecmp(reg_name,ctx->registers[k].name))){
+	return ctx->banks[pcilib_find_register_bank_by_addr(ctx,ctx->registers[k].bank)].name;
+      }
+  }
 }
 
+/**
+ * replace plain registers name in a formula by their value
+ */
+static int
+pcilib_view_compute_plain_registers(pcilib_t* ctx, char* formula){
+  int j,k;
+  char* substr,substr2;
+  char temp[66];
+  pcilib_register_value_t value;
+  
+  /*we get recursively all registers of string , and if they are not equel to '@reg', then we get their value and put it in formula*/
+  for(j=0;j<strlen((char*)formula);j++){
+    if(formula[j]=='@'){
+      k=j+1;
+      while((formula[k]!=' ' && formula[k]!=')' && formula[k]!='/' && formula[k]!='+' && formula[k]!='-' && formula[k]!='*' && formula[k]!='=') && (k<strlen((char*)formula))){
+	k++;
+      }
+      substr2=pcilib_view_str_sub((char*)formula,j,k-1); /**< we get the name of the register+@*/
+      substr=pcilib_view_str_sub(substr2,1,k-j/*length of substr2*/); /**< we get the name of the register*/
+     
+      if((strcasecmp(substr,"reg")){
+	  /* we get the bank name associated to the register, and read its value*/
+	  pcilib_read_register(ctx, pcilib_view_get_bank_from_reg_name(ctx, substr),substr,&value);
+	  /* we put the value in formula*/
+	  sprintf(temp,"%i",value);
+	  formula = str_replace(formula,substr2,temp);
+      }
 
+    }
+  }
+}
 
-
-
-/*
+/**
  * this function calls the python script and the function "evaluate" in it to evaluate the given formula
  *@param[in] the formula to be evaluated
  *@return the integer value of the evaluated formula (maybe go to float instead)
@@ -178,7 +220,7 @@ pcilib_view_eval_formula(char* formula){
 
 
 static int
-pcilib_view_apply_read_formula(pcilib_t* ctx, char* formula, pcilib_register_value_t reg_value, pcilib_register_value_t* out_value)
+pcilib_view_apply_formula(pcilib_t* ctx, char* formula, pcilib_register_value_t reg_value, pcilib_register_value_t* out_value)
 {
   /* when applying a formula, we need to:
      1) compute the values of all registers present in plain name in the formulas and replace their name with their value : for example, if we have the formula" ((1./4)*(@reg - 1200)) if @freq==0 else ((3./10)*(@reg - 1000)) " we need to get the value of the register "freq"
@@ -196,18 +238,13 @@ pcilib_view_apply_read_formula(pcilib_t* ctx, char* formula, pcilib_register_val
   sprintf(reg_value_string,"%lu",reg_value);
   
   /*computation of plain registers in the formula*/
-  formula=pcilib_view_formula_compute_plain_registers(formula);
+  formula=pcilib_view_formula_compute_plain_registers(formula,ctx);
   /* computation of @reg with register value*/
   formula=pcilib_view_formula_replace(formula,"@reg",reg_value_string);
   
   /* evaluation of the formula*/
-  *out_value=(pcilib_register_value_t) pcilib_view_eval_formula(formula);
+  *out_value=*(pcilib_register_value_t*) pcilib_view_eval_formula(formula);
 
-}
-
-static int
-pcilib_view_apply_write_formula()
-{
 }
 
 int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view/*, const char *unit*/, size_t value_size, void *value)
@@ -250,7 +287,8 @@ int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const
   while((ctx->register_ctx[i].formulas[j].name)){
     if(!(strcasecmp(ctx->register_ctx[i].formulas[j].name))){
       /* when we have found the correct view of type formula, we apply the formula, that get the good value for return*/
-      pcilib_view_apply_read_formula(ctx->register_ctx[i].formulas[j].read_formula,temp_value, value,....);
+      pcilib_view_apply_formula(ctx, ctx->register_ctx[i].formulas[j].read_formula,temp_value,value);
+      value_size=sizeof(int);
       return 0;
     }
     j++;
@@ -260,4 +298,5 @@ int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const
   return PCILIB_ERROR_NOTAVAILABLE;
 }
  
-      
+ int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view/*, const char *unit*/, size_t value_size, void *value){
+   
