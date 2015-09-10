@@ -5,13 +5,13 @@
       <bank_description>
         <bar>0</bar>
         <size>0x0200</size>
-        <protocol>default</protocol>
+        <protocol>software_registers</protocol>
         <read_address>0x9000</read_address>
         <write_address>0x9000</write_address>
         <word_size>32</word_size>
         <endianess>little</endianess>
         <format>0x%lx</format>
-        <name>fpga</name>
+        <name>software</name>
         <description>IPECamera Registers</description>
       </bank_description>
       <registers>
