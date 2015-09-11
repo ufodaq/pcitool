@@ -21,10 +21,12 @@ int pcilib_init_locking(pcilib_t* ctx) {
     pcilib_kmem_reuse_state_t reused;
 
     assert(PCILIB_LOCK_PAGES * PCILIB_KMEM_PAGE_SIZE >= PCILIB_MAX_LOCKS * PCILIB_LOCK_SIZE);
-
+	
+	/*protection against multiple creations of kernel space*/
     err = pcilib_lock_global(ctx);
     if (err) return err;
 
+	/* by default, this kernel space is persistent and will be reused, in order to avoid the big initialization times for robust mutexes each time we run pcitool*/
     ctx->locks.kmem = pcilib_alloc_kernel_memory(ctx, PCILIB_KMEM_TYPE_PAGE, PCILIB_LOCK_PAGES, PCILIB_KMEM_PAGE_SIZE, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_LOCKS,0), PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_PERSISTENT);
     if (!ctx->locks.kmem) {
 	pcilib_unlock_global(ctx);
@@ -46,6 +48,7 @@ int pcilib_init_locking(pcilib_t* ctx) {
         }
     }
 
+	/* the lock that has been used for the creation of kernel space is declared unlocked, has we shouldnot use it anymore*/
     ctx->locks.locking = pcilib_get_lock(ctx, PCILIB_LOCK_FLAG_UNLOCKED, "locking");
 
     pcilib_unlock_global(ctx);
@@ -59,7 +62,7 @@ int pcilib_init_locking(pcilib_t* ctx) {
 }
 
 /*
- * this functions destroy all locks and then free the kernel memory allocated for them
+ * this function free the kernel memory allocated for them and destroys locks by setting memory to 0
  */
 void pcilib_free_locking(pcilib_t *ctx) {
     if (ctx->locks.locking)
@@ -75,7 +78,7 @@ void pcilib_free_locking(pcilib_t *ctx) {
 int pcilib_lock_global(pcilib_t *ctx) {
     int err;
     
-    /* we flock() to make sure to not have two initialization in the same time (possible long time to init) */
+    /* we flock() on the board's device file to make sure to not have two initialization in the same time (possible long time to init) */
     if ((err = flock(ctx->handle, LOCK_EX))==-1) {
 	pcilib_error("Can't get flock on device file");
 	return PCILIB_ERROR_FAILED;
@@ -105,7 +108,7 @@ pcilib_lock_t *pcilib_get_lock(pcilib_t *ctx, pcilib_lock_flags_t flags, const c
     pcilib_lock_t *lock;
     char buffer[PCILIB_LOCK_SIZE];
 
-
+	/* we construct the complete lock_id given the parameters of the function*/
     va_list pa;
     va_start(pa, lock_id);
     ret = vsnprintf(buffer, PCILIB_LOCK_SIZE, lock_id, pa);
@@ -115,7 +118,9 @@ pcilib_lock_t *pcilib_get_lock(pcilib_t *ctx, pcilib_lock_flags_t flags, const c
 	pcilib_error("Failed to construct the lock id, probably arguments does not match the format string (%s)...", lock_id);
 	return NULL;
     }
-
+	
+	
+	/* we iterate through locks to see if there is one already with the same name*/	
 	// Would be nice to have hash here
     for (i = 0; i < PCILIB_MAX_LOCKS; i++) {
 	lock = pcilib_get_lock_by_id(ctx, i);
@@ -141,6 +146,7 @@ pcilib_lock_t *pcilib_get_lock(pcilib_t *ctx, pcilib_lock_flags_t flags, const c
 		}
 	    }
 #endif /* ! HAVE_STDATOMIC_H */
+	/* if yes, we increment its ref variable*/
 	    pcilib_lock_ref(lock);
 #ifndef HAVE_STDATOMIC_H
 	    if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
@@ -192,6 +198,7 @@ pcilib_lock_t *pcilib_get_lock(pcilib_t *ctx, pcilib_lock_flags_t flags, const c
 	return NULL;
     }
 
+	/* if the lock did not exist before, then we create it*/
     err = pcilib_init_lock(lock, flags, buffer);
     
     if (err) {
@@ -229,11 +236,11 @@ void pcilib_return_lock(pcilib_t *ctx, pcilib_lock_flags_t flags, pcilib_lock_t 
 }
 
 
-/**
-  * Destroy all existing locks. This is unsafe call as this and other running applications
-  * will still have all initialized lock pointers. It is user responsibility to issue this
-  * command when no other application is running.
-  */
+/*
+ * Destroy all existing locks. This is unsafe call as this and other running applications
+ * will still have all initialized lock pointers. It is user responsibility to issue this
+ * command when no other application is running.
+ */
 int pcilib_destroy_all_locks(pcilib_t *ctx, int force) {
     int err;
     pcilib_lock_id_t i;
@@ -269,6 +276,7 @@ int pcilib_destroy_all_locks(pcilib_t *ctx, int force) {
 	return 0;
     }
 
+	/* if we run in non-forced case, then if it may be still processes that can have access to the locks, they are not destroyed*/
     if (!force) {
 	for (i = 0; i < PCILIB_MAX_LOCKS; i++) {
 	    pcilib_lock_t *lock = pcilib_get_lock_by_id(ctx, i);
