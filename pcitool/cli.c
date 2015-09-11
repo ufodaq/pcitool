@@ -2720,6 +2720,11 @@ int main(int argc, char **argv) {
 		mode = MODE_READ;
 		if (optarg) addr = optarg;
 		else if ((optind < argc)&&(argv[optind][0] != '-')) addr = argv[optind++];
+		
+		/*		char* s;
+		if(!(s=strchr(addr,'/'))){
+		mode=MODE_READ_VIEW;*/
+		  
 	    break;
 	    case OPT_WRITE:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");

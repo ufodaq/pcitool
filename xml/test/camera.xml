@@ -277,9 +277,9 @@
               <size>16</size>
               <mode>R</mode>
               <name>sensor_temperature</name>
-		<views>
-		<view>formuu1</view>
-		<view>formuu2</view>
+              <views>
+        		<view>formuu1</view>
+    		    <view>formuu2</view>
                 <view>enumm2</view>
               </views>
             </register_bits>

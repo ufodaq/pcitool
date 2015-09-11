@@ -75,32 +75,36 @@ static xmlNodePtr pcilib_xml_get_parent_register_node(xmlDocPtr doc, xmlNodePtr 
  * get the associated views of a register, to fill its register context
  */
 static int
-pcilib_get_associated_views(pcilib_t* ctx, const char* reg_name,xmlXPathContextPtr xpath,pcilib_register_t id){
-  char* VIEWS_NAME_PATH="/model/banks/bank/registers/register[@name=\"%s\"]/views/view";
+pcilib_get_associated_views(pcilib_t* ctx, const char* reg_name,xmlXPathContextPtr xpath,pcilib_register_t id,int mode){
+
+  /* i find this solution pretty elegant, but what about perf?*/
+  char* VIEWS_NAME_PATH_BITS="/model/banks/bank/registers/register[./name=\"%s\"]/registers_bits/register_bits/views/view";
+  char* VIEWS_NAME_PATH="/model/banks/bank/registers/register[./name=\"%s\"]/views/view";
   char* path;
   xmlXPathObjectPtr nodes;
   xmlNodeSetPtr nodeset;
   char* view_name;
 
   /*we get first the nodes corresponding to the given register*/
-  path=malloc(strlen(VIEWS_NAME_PATH)+strlen(reg_name));
+  if(mode==1) path=malloc(strlen(VIEWS_NAME_PATH)+strlen(reg_name));
+  else path=malloc(strlen(VIEWS_NAME_PATH_BITS)+strlen(reg_name));
   if(!(path)){
     pcilib_error("can't allocate memory for getting path to get associated views of %s",reg_name);
     return PCILIB_ERROR_MEMORY;
   }
 
-  sprintf(path,VIEWS_NAME_PATH,reg_name);
+  if(mode==1) sprintf(path,VIEWS_NAME_PATH,reg_name);
+  else sprintf(path,VIEWS_NAME_PATH_BITS,reg_name);
   nodes = xmlXPathEvalExpression((xmlChar*)path, xpath);
   nodeset = nodes->nodesetval;
-
     if (!xmlXPathNodeSetIsEmpty(nodeset)) {
       int i,k,l;
       /*if we correctly get a nodeset, then we iterate through the nodeset to get all views, using their names*/
 	for (i = 0; i < nodeset->nodeNr; i++) {
 	  view_name=(char*)nodeset->nodeTab[i]->children->content;
-	  
+
 	  /* if the view name obtained is for an enum view, we get all pcilib_view_enum_t corresponding to the register*/
-	  for(k=0; ctx->enum_views[k].enums_list[0].value;k++){
+	  for(k=0; ctx->enum_views[k].enums_list[0].value; k++){
 	    if(!(strcasecmp(view_name, ctx->enum_views[k].name))){
 	      ctx->register_ctx[id].enums=malloc(sizeof(pcilib_view_enum_t));
 	      
@@ -109,29 +113,34 @@ pcilib_get_associated_views(pcilib_t* ctx, const char* reg_name,xmlXPathContextP
 		return PCILIB_ERROR_MEMORY;
 	      }
 
+	      /*!!!!!!!!!!this loop here is buggy*/
 	      for(l=0; ctx->enum_views[k].enums_list[l].value;l++){
 		ctx->register_ctx[id].enums=realloc(ctx->register_ctx[id].enums,(l+1)*sizeof(pcilib_view_enum_t));
 		ctx->register_ctx[id].enums[l]=ctx->enum_views[k].enums_list[l];
+		//		printf("names %s %s\n",ctx->register_ctx[id].enums[l].name,ctx->enum_views[k].enums_list[l].name);
 	      }
+	      return 0;
 	    }
 	  }
 
 	  /*here it is for formula, i assume we have only one formula view per register*/
 	  for(k=0; ctx->formula_views[k].name[0];k++){
 	    if(!(strcasecmp(view_name,ctx->formula_views[k].name))){
+	      
 	      ctx->register_ctx[id].formulas=malloc(sizeof(pcilib_view_formula_t));
 	      if(!(ctx->register_ctx[id].formulas)){
 		pcilib_error("error allocating memory for formula views in register context %i",id);
 		return PCILIB_ERROR_MEMORY;
 	      }
 
-	      ctx->register_ctx[id].formulas=&(ctx->formula_views[k]);
+	      ctx->register_ctx[id].formulas[0]=ctx->formula_views[k];
+	      break;
 	    }
 	  }
 
 	}
     }
-
+ 
     xmlXPathFreeObject(nodes);
     return 0;
 }
@@ -247,7 +256,8 @@ static int pcilib_xml_parse_register(pcilib_t *ctx, pcilib_xml_register_descript
 static int pcilib_xml_create_register(pcilib_t *ctx, pcilib_register_bank_t bank, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
     int err;
     int views_ok=0;
-    
+    int h;
+
     xmlXPathObjectPtr nodes;
     xmlNodeSetPtr nodeset;
 
@@ -255,7 +265,7 @@ static int pcilib_xml_create_register(pcilib_t *ctx, pcilib_register_bank_t bank
     pcilib_xml_register_description_t fdesc;
     
     pcilib_register_t reg;
-    
+
     desc.base.bank = ctx->banks[bank].addr;
     desc.base.rwmask = PCILIB_REGISTER_ALL_BITS;
     desc.base.mode = PCILIB_REGISTER_R;
@@ -279,7 +289,7 @@ static int pcilib_xml_create_register(pcilib_t *ctx, pcilib_register_bank_t bank
     
     /* if the register had a node of type views, then we compute its associated registers. I do that here as i need the index for register context*/
     if(views_ok){
-      err=pcilib_get_associated_views(ctx,desc.base.name,xpath,reg);
+      err=pcilib_get_associated_views(ctx,desc.base.name,xpath,reg,1);
       if(err) pcilib_warning("can't get correctly the associated views of the register %s",desc.base.name);
     }
 
@@ -324,7 +334,7 @@ static int pcilib_xml_create_register(pcilib_t *ctx, pcilib_register_bank_t bank
 	    ctx->register_ctx[reg].min = fdesc.min;
 	    ctx->register_ctx[reg].max = fdesc.max;
 	    if(views_ok){
-	      err=pcilib_get_associated_views(ctx, desc.base.name,xpath,reg);
+	      err=pcilib_get_associated_views(ctx, desc.base.name,xpath,reg,0);
 	      if(err) pcilib_warning("can't get correctly the associated views of the register %s",fdesc.base.name);
 	    }
 	}
@@ -503,6 +513,7 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
     enum_desc.max=0;
 
     complete_enum_desc.name="default enum";
+    complete_enum_desc.description="default description";
     complete_enum_desc.enums_list=malloc(sizeof(pcilib_view_enum_t));
     if(!(complete_enum_desc.enums_list)){
       pcilib_error("can't allocate memory for the complete enum type");
@@ -513,6 +524,7 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
     formula_desc.name="formula_default";
     formula_desc.read_formula="@reg";
     formula_desc.write_formula="@reg";
+    formula_desc.description="default description";
 
     /* we get the attribute type of the view node*/
     attr=node->properties;
@@ -530,6 +542,10 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
         
 	if (!(strcasecmp((char*)name,"name"))) {
 	  complete_enum_desc.name = value;
+
+	}else if (!(strcasecmp((char*)name,"description"))) {
+	  complete_enum_desc.description = value;
+
         }else if (!(strcasecmp((char*)name,"enum"))) {
 
 	  complete_enum_desc.enums_list=realloc(complete_enum_desc.enums_list,(i+1)*sizeof(pcilib_view_enum_t));
@@ -567,7 +583,7 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 	      complete_enum_desc.enums_list[i].max=dat_max;
 	    }
 	  }
-	  i++;
+	  i++;	
 	}
       }
       err=pcilib_add_views_enum(ctx,1,&complete_enum_desc);
@@ -584,6 +600,7 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 	
 	name = (char*)cur->name;
 	value = (char*)cur->children->content;
+
         if (!value) continue;
         
 	if (!(strcasecmp((char*)name,"name"))) {
@@ -592,6 +609,8 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 	  formula_desc.read_formula=value;
         }else if (!(strcasecmp((char*)name,"write_to_register"))) {
 	  formula_desc.write_formula=value;
+	}else if (!(strcasecmp((char*)name,"description"))) {
+	  formula_desc.description=value;
 	}
       }
       err=pcilib_add_views_formula(ctx,1,&formula_desc);
@@ -619,6 +638,22 @@ static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathCon
     int i;
     xmlErrorPtr xmlerr;
 
+    views_nodes=xmlXPathEvalExpression(VIEWS_PATH,xpath);
+    if(!views_nodes){
+	xmlerr = xmlGetLastError();
+	if (xmlerr) pcilib_error("Failed to parse XPath expression %s, xmlXPathEvalExpression reported error %d - %s", BANKS_PATH, xmlerr->code, xmlerr->message);
+	else pcilib_error("Failed to parse XPath expression %s", BANKS_PATH);
+	return PCILIB_ERROR_FAILED;
+    }
+    
+        nodeset=views_nodes->nodesetval;
+    if(!xmlXPathNodeSetIsEmpty(nodeset)){
+      for(i=0;i < nodeset->nodeNr; i++){
+	pcilib_xml_create_view(ctx,xpath,doc,nodeset->nodeTab[i]);
+      }
+    }
+    xmlXPathFreeObject(views_nodes);    
+
     bank_nodes = xmlXPathEvalExpression(BANKS_PATH, xpath); 
     if (!bank_nodes) {
 	xmlerr = xmlGetLastError();
@@ -636,23 +671,6 @@ static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathCon
     }
     xmlXPathFreeObject(bank_nodes);
     
-
-    views_nodes=xmlXPathEvalExpression(VIEWS_PATH,xpath);
-    if(!views_nodes){
-	xmlerr = xmlGetLastError();
-	if (xmlerr) pcilib_error("Failed to parse XPath expression %s, xmlXPathEvalExpression reported error %d - %s", BANKS_PATH, xmlerr->code, xmlerr->message);
-	else pcilib_error("Failed to parse XPath expression %s", BANKS_PATH);
-	return PCILIB_ERROR_FAILED;
-    }
-    
-    nodeset=views_nodes->nodesetval;
-    if(!xmlXPathNodeSetIsEmpty(nodeset)){
-      for(i=0;i < nodeset->nodeNr; i++){
-	pcilib_xml_create_view(ctx,xpath,doc,nodeset->nodeTab[i]);
-      }
-    }
-    xmlXPathFreeObject(views_nodes);    
-
     return 0;
 }
 

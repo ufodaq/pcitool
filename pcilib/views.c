@@ -2,7 +2,7 @@
 #include "pci.h"
 #include "pcilib.h"
 #include <Python.h>
-//#include "views.h"
+#include "views.h"
 #include "error.h"
 #include <strings.h>
 #include <stdlib.h>
@@ -349,7 +349,6 @@ int pcilib_add_views_enum(pcilib_t *ctx, size_t n, const pcilib_view_enum2_t* vi
 	if (!views_enum) return PCILIB_ERROR_MEMORY;
 
 	ctx->enum_views = views_enum;
-	/* context + model part ????*/
 	ctx->alloc_enum_views = size;
     }
 
@@ -376,13 +375,12 @@ int pcilib_add_views_formula(pcilib_t *ctx, size_t n, const pcilib_view_formula_
     }
 
     if ((ctx->num_formula_views + n + 1) > ctx->alloc_formula_views) {
-	for (size = ctx->alloc_formula_views; size < 2 * (n + ctx->num_formula_views + 1); size<<=1);
+      for (size = ctx->alloc_formula_views; size < 2 * (n + ctx->num_formula_views + 1); size<<=1);
 
 	views_formula = (pcilib_view_formula_t*)realloc(ctx->formula_views, size * sizeof(pcilib_view_formula_t));
 	if (!views_formula) return PCILIB_ERROR_MEMORY;
 
 	ctx->formula_views = views_formula;
-	/* context + model part?????*/
 	ctx->alloc_formula_views = size;
     }
 

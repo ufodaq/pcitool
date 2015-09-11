@@ -24,6 +24,7 @@ struct pcilib_view_enum_s {
 struct pcilib_view_enum2_s {
   const char* name;
   pcilib_view_enum_t* enums_list;
+  const char* description;
 };
 
 
@@ -35,6 +36,7 @@ struct pcilib_view_formula_s {
   const char *read_formula; /**< formula to parse to read from a register*/
   const char *write_formula; /**<formula to parse to write to a register*/
 	// **see it later**        const char *unit; (?)
+  const char *description;
 };
 
 /**
@@ -47,9 +49,9 @@ int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const
  */
 int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view/*, const char *unit*/, size_t value_size, void *value);
 
-int pcilib_add_views_enum(pcilib_t* ctx,size_t n, pcilib_view_enum2_t* views);
+int pcilib_add_views_enum(pcilib_t* ctx,size_t n, const pcilib_view_enum2_t* views);
 
-int pcilib_add_views_formula(pcilib_t* ctx, size_t n, pcilib_view_formula_t* views);
+int pcilib_add_views_formula(pcilib_t* ctx, size_t n, const pcilib_view_formula_t* views);
 
 
 #endif

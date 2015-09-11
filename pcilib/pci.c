@@ -139,8 +139,12 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	}
 
 	ctx->alloc_reg = PCILIB_DEFAULT_REGISTER_SPACE;
+	ctx->alloc_formula_views=PCILIB_DEFAULT_VIEW_SPACE;
+	ctx->alloc_enum_views=PCILIB_DEFAULT_VIEW_SPACE;
 	ctx->registers = (pcilib_register_description_t *)malloc(PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_description_t));
 	ctx->register_ctx = (pcilib_register_context_t *)malloc(PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_context_t));
+	ctx->enum_views = (pcilib_view_enum2_t *)malloc(PCILIB_DEFAULT_VIEW_SPACE * sizeof(pcilib_view_enum2_t));
+	ctx->formula_views = (pcilib_view_formula_t*)malloc(PCILIB_DEFAULT_VIEW_SPACE * sizeof(pcilib_view_formula_t));
 	
 	if ((!ctx->registers)||(!ctx->register_ctx)) {
 	    pcilib_error("Error allocating memory for register model");
@@ -148,12 +152,20 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    return NULL;
 	}
 	
+	if((!ctx->enum_views)||(!ctx->formula_views)){
+	  pcilib_error("Error allocating memory for views");
+	  pcilib_close(ctx);
+	  return NULL;
+	}
+
 	memset(ctx->registers, 0, sizeof(pcilib_register_description_t));
 	memset(ctx->banks, 0, sizeof(pcilib_register_bank_description_t));
 	memset(ctx->ranges, 0, sizeof(pcilib_register_range_t));
 
 	memset(ctx->register_ctx, 0, PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_context_t));
 
+	memset(ctx->enum_views,0,sizeof(pcilib_view_enum2_t));
+	memset(ctx->formula_views,0,sizeof(pcilib_view_formula_t));
 	
 	for (i = 0; pcilib_protocols[i].api; i++);
 	memcpy(ctx->protocols, pcilib_protocols, i * sizeof(pcilib_register_protocol_description_t));

@@ -8,6 +8,7 @@
 #define PCILIB_DMA_SKIP_TIMEOUT 1000000		/**< us */
 #define PCILIB_MAX_BARS 6			/**< this is defined by PCI specification */
 #define PCILIB_DEFAULT_REGISTER_SPACE 1024	/**< number of registers to allocate on init */
+#define PCILIB_DEFAULT_VIEW_SPACE 128    	/**< number of views to allocate on init */
 #define PCILIB_MAX_REGISTER_BANKS 32		/**< maximum number of register banks to allocate space for */
 #define PCILIB_MAX_REGISTER_RANGES 32		/**< maximum number of register ranges to allocate space for */
 #define PCILIB_MAX_REGISTER_PROTOCOLS 32	/**< maximum number of register protocols to support */
