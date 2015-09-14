@@ -140,16 +140,16 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 
 	ctx->alloc_reg = PCILIB_DEFAULT_REGISTER_SPACE;
 	ctx->alloc_formula_views=PCILIB_DEFAULT_VIEW_SPACE;
+	ctx->alloc_views=PCILIB_DEFAULT_VIEW_SPACE;
 	ctx->alloc_enum_views=PCILIB_DEFAULT_VIEW_SPACE;
 	ctx->registers = (pcilib_register_description_t *)malloc(PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_description_t));
 	ctx->register_ctx = (pcilib_register_context_t *)malloc(PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_context_t));
 	ctx->enum_views = (pcilib_view_enum2_t *)malloc(PCILIB_DEFAULT_VIEW_SPACE * sizeof(pcilib_view_enum2_t));
 	ctx->formula_views = (pcilib_view_formula_t*)malloc(PCILIB_DEFAULT_VIEW_SPACE * sizeof(pcilib_view_formula_t));
+	ctx->views = (pcilib_view_t*)malloc(PCILIB_DEFAULT_VIEW_SPACE * sizeof(pcilib_view_t));
 	ctx->alloc_units=PCILIB_DEFAULT_UNIT_SPACE;
 	ctx->units=(pcilib_unit_t*)malloc(PCILIB_DEFAULT_UNIT_SPACE * sizeof(pcilib_unit_t));
 	
-
-
 	if ((!ctx->registers)||(!ctx->register_ctx)) {
 	    pcilib_error("Error allocating memory for register model");
 	    pcilib_close(ctx);
@@ -157,7 +157,7 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	}
 	
 	/* i think we need a better error handling here, because, it's not that a problem to not have views working, but how to block the use if the memory here was not good?, and we could have only one type of views that is working*/
-	if((!ctx->enum_views)||(!ctx->formula_views) || (!ctx->units)){
+	if((!ctx->enum_views)||(!ctx->formula_views) || (!ctx->units) || !(ctx->views)){
 	  pcilib_warning("Error allocating memory for views");
 	}
 
@@ -172,6 +172,7 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	memset(ctx->enum_views,0,sizeof(pcilib_view_enum2_t));
 	memset(ctx->formula_views,0,sizeof(pcilib_view_formula_t));
 	memset(ctx->units,0,sizeof(pcilib_unit_t));
+	memset(ctx->views,0,sizeof(pcilib_view_t));
 	
 	for (i = 0; pcilib_protocols[i].api; i++);
 	memcpy(ctx->protocols, pcilib_protocols, i * sizeof(pcilib_register_protocol_description_t));

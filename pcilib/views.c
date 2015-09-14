@@ -363,6 +363,84 @@ int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, cons
   return PCILIB_ERROR_NOTAVAILABLE;
  }
 
+int operation_enum(pcilib_t *ctx, void *params/*name*/, char* name, int read_or_write, pcilib_register_value_t *regval, size_t viewval_size, void* viewval){
+  int j,k;
+  if(read_or_write==1){
+    for(j=0; ((pcilib_view_enum_t*)(params))[j].name;j++){
+      if(!(strcasecmp(((pcilib_view_enum_t*)(params))[j].name,(char*)viewval))){
+	return j;
+      }
+    }
+  }else if (read_or_write==0){
+    for(j=0; ((pcilib_view_enum_t*)(params))[j].name;j++){
+      if (*regval<((pcilib_view_enum_t*)(params))[j].max && *regval>((pcilib_view_enum_t*)(params))[j].min){
+	viewval=(char*)realloc(viewval,strlen(((pcilib_view_enum_t*)(params))[j].name)*sizeof(char));
+	strncpy((char*)viewval,((pcilib_view_enum_t*)(params))[j].name, strlen(((pcilib_view_enum_t*)(params))[j].name));
+	k=strlen(((pcilib_view_enum_t*)(params))[j].name);
+	((char*)regval)[k]='\0';
+	return 0;
+      }
+    }
+  } 
+  return -1;
+}
+
+int operation_formula(pcilib_t *ctx, void *params/*name*/, char* unit, int read_or_write, pcilib_register_value_t *regval, size_t viewval_size, void* viewval){
+    int j=0;
+    char* formula;
+    pcilib_register_value_t value=0;
+
+    if(read_or_write==0){
+      if(!(strcasecmp(unit, ((pcilib_view_t*)viewval)->base_unit.name))){
+	formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->read_formula));
+	if(!(formula)){
+	  pcilib_error("can't allocate memory for the formula");
+	  return PCILIB_ERROR_MEMORY;
+	}
+	strncpy(formula,((pcilib_formula_t*)params)->read_formula,strlen(((pcilib_formula_t*)params)->read_formula));
+	pcilib_view_apply_formula(ctx,formula,*regval,&value,0);
+	return value;
+      }
+      
+      for(j=0; ((pcilib_view_t*)viewval)->base_unit.other_units[j].name;j++){
+	if(!(strcasecmp(((pcilib_view_t*)viewval)->base_unit.other_units[j].name,unit))){
+	  /* when we have found the correct view of type formula, we apply the formula, that get the good value for return*/
+	  formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->read_formula));
+	  if(!(formula)){
+	    pcilib_error("can't allocate memory for the formula");
+	    return PCILIB_ERROR_MEMORY;
+	  }
+	  strncpy(formula,((pcilib_formula_t*)params)->read_formula,strlen(((pcilib_formula_t*)params)->read_formula));
+	  pcilib_view_apply_formula(ctx,formula, *regval,&value,0);
+	  pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.other_units[j],unit,&value);
+	  return value;
+	}
+      }
+    }else if(read_or_write==1){
+      j=0;
+      if(!(strcasecmp(unit, ((pcilib_view_t*)viewval)->base_unit.name))){
+	formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->write_formula));
+	strncpy(formula,((pcilib_formula_t*)params)->write_formula,strlen(((pcilib_formula_t*)params)->write_formula));
+	pcilib_view_apply_formula(ctx,formula,*regval,&value,1);
+	return 0;
+    }
+      
+      for(j=0;((pcilib_view_t*)viewval)->base_unit.other_units[j].name;j++){
+	if(!(strcasecmp(((pcilib_view_t*)viewval)->base_unit.other_units[j].name,unit))){
+	  /* when we have found the correct view of type formula, we apply the formula, that get the good value for return*/
+	  formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->write_formula));
+	  strncpy(formula,((pcilib_formula_t*)params)->write_formula,strlen((( pcilib_formula_t*)params)->write_formula));
+	  pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.other_units[j],unit,&value);
+	  pcilib_view_apply_formula(ctx,formula,*regval,&value,1);
+	  /* we maybe need some error checking there , like temp_value >min and <max*/
+	  return 0;
+	}
+      }
+    }
+      return -1;
+}
+
+
 /**
  * function to populate ctx enum views, as we could do for registers or banks
  */
@@ -421,7 +499,34 @@ int pcilib_add_views_formula(pcilib_t *ctx, size_t n, const pcilib_view_formula_
     memset(ctx->formula_views + ctx->num_formula_views + n, 0, sizeof(pcilib_view_formula_t));
 
     ctx->num_formula_views += n;
-    
+    return 0;
+}
 
+/**
+ * function to populate ctx views, as we could do for registers or banks
+ */
+int pcilib_add_views(pcilib_t *ctx, size_t n, const pcilib_view_t* views) {
+	
+    pcilib_view_t *views2;
+    size_t size;
+
+    if (!n) {
+	for (n = 0; views[n].name; n++);
+    }
+
+    if ((ctx->num_views + n + 1) > ctx->alloc_views) {
+      for (size = ctx->alloc_views; size < 2 * (n + ctx->num_views + 1); size<<=1);
+
+	views2 = (pcilib_view_t*)realloc(ctx->views, size * sizeof(pcilib_view_t));
+	if (!views2) return PCILIB_ERROR_MEMORY;
+
+	ctx->views = views2;
+	ctx->alloc_views = size;
+    }
+
+    memcpy(ctx->views + ctx->num_views, views, n * sizeof(pcilib_view_t));
+    memset(ctx->views + ctx->num_views + n, 0, sizeof(pcilib_view_t));
+
+    ctx->num_views += n;
     return 0;
 }
