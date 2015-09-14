@@ -491,4 +491,38 @@
 	<description>enum towards cmosis_exp_register register</description>
     </view>
   </views>
+  <units>
+    <unit name="C">
+      <convert_unit value="K">@self+273.15</convert_unit>
+      <convert_unit value="F">@self*(9./5)+32</convert_unit>
+    </unit>
+    <unit name="K">
+      <convert_unit value="C">@self-273.15</convert_unit>
+      <convert_unit value="F">(@self-273.15)*(9./5)+32</convert_unit>
+    </unit>
+    <unit name="F">
+      <convert_unit value="C">(@self-32)*5./9</convert_unit>
+      <convert_unit value="K">(@self+273.15-32)*5./9</convert_unit>
+    </unit>
+    <unit name="s">
+      <convert_unit value="ms">@self*1000</convert_unit>
+      <convert_unit value="us">@self*1000000</convert_unit>
+      <convert_unit value="ns">@self*1000000000</convert_unit>
+    </unit>
+    <unit name="ms">
+      <convert_unit value="s">@self/1000</convert_unit>
+      <convert_unit value="us">@self*1000</convert_unit>
+      <convert_unit value="ns">@self*1000000</convert_unit>
+    </unit>
+    <unit name="us">
+      <convert_unit value="s">@self/1000000</convert_unit>
+      <convert_unit value="ms">@self/1000</convert_unit>
+      <convert_unit value="ns">@self*1000</convert_unit>
+    </unit>
+    <unit name="ns">
+      <convert_unit value="s">@self/1000000000</convert_unit>
+      <convert_unit value="ms">@self/1000000</convert_unit>
+      <convert_unit value="us">@self/1000</convert_unit>
+    </unit>
+  </units>
 </model>

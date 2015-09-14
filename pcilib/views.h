@@ -38,18 +38,18 @@ struct pcilib_view_formula_s {
   const char *write_formula; /**<formula to parse to write to a register*/
 	// **see it later**        const char *unit; (?)
   const char *description;
-  pcilib_unit_t* units;
+  pcilib_unit_t base_unit;
 };
 
 /**
  * function to read a register using a view
  */
-int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view/*, const char *unit*/, size_t value_size, void *value);
+int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, size_t value_size, void *value);
 
 /**
  * function to write to a register using a view
  */
-int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view/*, const char *unit*/, size_t value_size, void *value);
+int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, size_t value_size, void *value);
 
 int pcilib_add_views_enum(pcilib_t* ctx,size_t n, const pcilib_view_enum2_t* views);
 

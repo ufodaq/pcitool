@@ -1054,7 +1054,7 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 	s2=pcilib_view_str_sub(reg,0,s1-reg-1);
 	s3=pcilib_view_str_sub(reg,s1-reg+1,strlen(reg));
 	if(!(strcasecmp(s3,"name"))){
-	    err = pcilib_read_view(handle,bank,s2,NULL,sizeof(char*),enum_command);
+	  err = pcilib_read_view(handle,bank,s2,NULL,sizeof(char*),enum_command);
 	    if (err) printf("Error reading register %s\n", reg);
 	    else {
 	      printf("%s = %s\n", reg, (char*)enum_command);
@@ -1282,11 +1282,17 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
 
     unsigned long val;
     pcilib_register_value_t value;
+    pcilib_register_t regid;
 
     const char *format = NULL;
-    char *s1;
-
-    pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
+    char *s1,*s2=NULL;
+    
+    if((s1=strchr(reg,'/'))){
+	s2=pcilib_view_str_sub(reg,0,s1-reg-1);
+	regid=pcilib_find_register(handle,bank,s2);
+    }else{
+     regid = pcilib_find_register(handle, bank, reg);
+    }
     if (regid == PCILIB_REGISTER_INVALID) Error("Can't find register (%s) from bank (%s)", reg, bank?bank:"autodetected");
 
 /*
@@ -1316,15 +1322,15 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
       if(err) Error("can't write to the register using an enum view");
       else return 0;
     }
-      /*    } else {
+      /* should i put strchr not null here?
+    } else {
 	    Error("Can't parse data value (%s) is not valid decimal number", *data);
 	    }*/
 
     value = val;
 
     if((s1=strchr(reg,'/'))){
-	char *s3,*s2;
-	s2=pcilib_view_str_sub(reg,0,s1-reg-1);
+	char *s3;
 	s3=pcilib_view_str_sub(reg,s1-reg+1,strlen(reg));
 	err = pcilib_write_view(handle,bank,s2,s3,sizeof(pcilib_register_value_t),&value);
 	if (err) printf("Error writing register %s using view %s\n",s2,s3);

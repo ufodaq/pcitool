@@ -47,6 +47,7 @@
 #define REGISTERS_PATH ((xmlChar*)"../registers/register") 			/**< all standard registers nodes.*/
 #define BIT_REGISTERS_PATH ((xmlChar*)"./registers_bits/register_bits") 	/**< all bits registers nodes.*/
 #define VIEWS_PATH ((xmlChar*)"/model/views/view") 						/**< path to complete nodes of views.*/
+#define UNITS_PATH ((xmlChar*)"/model/units/unit") 						/**< path to complete nodes of units.*/
 
 
 static char *pcilib_xml_bank_default_format = "0x%lx";
@@ -71,22 +72,21 @@ static xmlNodePtr pcilib_xml_get_parent_register_node(xmlDocPtr doc, xmlNodePtr 
 */
 
 /**
- * get the associated units of a view
+ * get the associated unit of a view
  * this function is maybe completekly useless : we need to decide if we iterate directly in ctx or n view when we want to apply a unit. (in the second choice of course keep it).
-*
+ */
 static void
-pcilib_get_associated_units(pcilib_t* ctx, pcilib_view_formula_t* myview){
-  int i,j,k=2;
-  for(i=0;myview->units[0].other_units.name[0];i++){
-      for(j=0;ctx->units[j].name[0];i++){
-	if(!(strcasecmp(myview->units[0].other_units.name,ctx->units[i].name))){
-	  myview.units=realloc(myview.units,k*sizeof(pcilib_unit_t));
-	  myview.units[k-1]=ctx->units[i];
-	  k++;
-	}
-      }
+pcilib_get_unit_of_view(pcilib_t* ctx,pcilib_view_formula_t* myview, char* base_unit){
+  int j;
+
+  for(j=0;ctx->units[j].name;j++){
+    if(!(strcasecmp(base_unit,ctx->units[j].name))){
+      myview->base_unit=ctx->units[j];
+      break;
+    }
   }
-  }*/
+ 
+}
 			  
 /**
  * get the associated views of a register, to fill its register context
@@ -141,7 +141,7 @@ pcilib_get_associated_views(pcilib_t* ctx, const char* reg_name,xmlXPathContextP
 	  }
 
 	  /*here it is for formula, i assume we have only one formula view per register*/
-	  for(k=0; ctx->formula_views[k].name[0];k++){
+	  for(k=0; ctx->formula_views[k].name;k++){
 	    if(!(strcasecmp(view_name,ctx->formula_views[k].name))){
 	      
 	      ctx->register_ctx[id].formulas=malloc(sizeof(pcilib_view_formula_t));
@@ -149,7 +149,7 @@ pcilib_get_associated_views(pcilib_t* ctx, const char* reg_name,xmlXPathContextP
 		pcilib_error("error allocating memory for formula views in register context %i",id);
 		return PCILIB_ERROR_MEMORY;
 	      }
-
+	      pcilib_get_unit_of_view(ctx,&(ctx->formula_views[k]),ctx->formula_views[k].base_unit.name);
 	      ctx->register_ctx[id].formulas[0]=ctx->formula_views[k];
 	      break;
 	    }
@@ -273,8 +273,6 @@ static int pcilib_xml_parse_register(pcilib_t *ctx, pcilib_xml_register_descript
 static int pcilib_xml_create_register(pcilib_t *ctx, pcilib_register_bank_t bank, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
     int err;
     int views_ok=0;
-    int h;
-
     xmlXPathObjectPtr nodes;
     xmlNodeSetPtr nodeset;
 
@@ -507,28 +505,33 @@ static int pcilib_xml_create_bank(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
     return 0;
 }
 
-/*static int pcilib_xml_create_unit(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
+/**
+ * function to create a unit from a unit xml node, then populating ctx with it
+ *@param[in,out] ctx - the pcilib_t running
+ *@param[in] xpath - the xpath context of the unis xml file
+ *@param[in] doc - the AST of the unit xml file
+ *@param[in] node - the node representing the unit
+ *@return an error code: 0 if evrythinh is ok
+ */
+static int
+pcilib_xml_create_unit(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
     int err;
     
-    int override = 0;
     pcilib_unit_t desc = {0};
     xmlNodePtr cur;
     char *value, *name, *value2;
-    char *endptr;
 
-    xmlXPathObjectPtr nodes;
-    xmlNodeSetPtr nodeset;
     xmlAttr *attr;
     int i=0;
 
-      /* we get the attribute type of the view node*
+    /* we get the attribute type of the view node*/
     attr=node->properties;
     value=(char*)attr->children->content;
     desc.name=value;
     desc.other_units=malloc(sizeof(pcilib_transform_unit_t));
     
     for (cur = node->children; cur != NULL; cur = cur->next) {
-	if (!cur->children) continue;
+    if (!cur->children) continue;
 	if (!xmlNodeIsText(cur->children)) continue;
 	
 	name = (char*)cur->name;
@@ -536,11 +539,12 @@ static int pcilib_xml_create_bank(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 	attr= cur->properties;
 	value2=(char*)attr->children->content;
         if (!value || !attr) continue;
-        
+
         if (!strcasecmp(name, "convert_unit")) {
-	  desc.other_units=realloc(des.other_units,sizeof((i+1)*sizeof(pcilib_transform_unit_t)));
+	  desc.other_units=realloc(desc.other_units,(i+1)*sizeof(pcilib_transform_unit_t));
 	  desc.other_units[i].name=value2;
 	  desc.other_units[i].transform_formula=value;
+	  i++;
         }
     }
 
@@ -552,7 +556,7 @@ static int pcilib_xml_create_bank(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 
     return 0;
 }
-*/
+
 /**
  * function that create a view from a view node, and populate ctx views list
  */
@@ -678,8 +682,11 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 	  formula_desc.write_formula=value;
 	}else if (!(strcasecmp((char*)name,"description"))) {
 	  formula_desc.description=value;
+	}else if (!(strcasecmp((char*)name,"unit"))){
+	  formula_desc.base_unit.name=value;
 	}
       }
+
       err=pcilib_add_views_formula(ctx,1,&formula_desc);
       if (err) {
 	pcilib_error("Error (%i) adding a new formula view (%s) to the pcilib_t", err, formula_desc.name);
@@ -700,17 +707,28 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
  * @param[in] pci the pcilib_t running, which will be filled
  */
 static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathContextPtr xpath) {
-  xmlXPathObjectPtr bank_nodes,views_nodes;
+  xmlXPathObjectPtr bank_nodes,views_nodes, units_nodes;
     xmlNodeSetPtr nodeset;
     int i;
     xmlErrorPtr xmlerr;
+    
+    units_nodes=xmlXPathEvalExpression(UNITS_PATH,xpath);
+    if(!units_nodes){
+      goto views;
+    }
+    
+    nodeset=units_nodes->nodesetval;
+    if(!xmlXPathNodeSetIsEmpty(nodeset)){
+      for(i=0;i < nodeset->nodeNr; i++){
+	pcilib_xml_create_unit(ctx,xpath,doc,nodeset->nodeTab[i]);
+      }
+    }
+    xmlXPathFreeObject(units_nodes);    
 
+ views:
     views_nodes=xmlXPathEvalExpression(VIEWS_PATH,xpath);
     if(!views_nodes){
-	xmlerr = xmlGetLastError();
-	if (xmlerr) pcilib_error("Failed to parse XPath expression %s, xmlXPathEvalExpression reported error %d - %s", BANKS_PATH, xmlerr->code, xmlerr->message);
-	else pcilib_error("Failed to parse XPath expression %s", BANKS_PATH);
-	return PCILIB_ERROR_FAILED;
+      goto banks;
     }
     
         nodeset=views_nodes->nodesetval;
@@ -720,7 +738,7 @@ static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathCon
       }
     }
     xmlXPathFreeObject(views_nodes);    
-
+ banks:
     bank_nodes = xmlXPathEvalExpression(BANKS_PATH, xpath); 
     if (!bank_nodes) {
 	xmlerr = xmlGetLastError();
@@ -850,6 +868,8 @@ int pcilib_process_xml(pcilib_t *ctx, const char *location) {
     struct dirent *file = NULL;
     char *model_dir, *model_path;
 
+    int i;
+
     model_dir = getenv("PCILIB_MODEL_DIR");
     if (!model_dir) model_dir = PCILIB_MODEL_DIR;
 
@@ -869,6 +889,17 @@ int pcilib_process_xml(pcilib_t *ctx, const char *location) {
 	err = pcilib_xml_load_file(ctx, model_path, file->d_name);
 	if (err) pcilib_error("Error processing XML file %s", file->d_name);
     }
+
+    for(i=0;i<ctx->num_formula_views;i++){
+      pcilib_get_unit_of_view(ctx,&(ctx->formula_views[i]),ctx->formula_views[i].base_unit.name);
+    }
+    
+    for(i=0;i<ctx->num_reg;i++){
+      if(ctx->register_ctx[i].formulas){
+	pcilib_get_unit_of_view(ctx,&(ctx->register_ctx[i].formulas[0]),ctx->register_ctx[i].formulas[0].base_unit.name);
+      }
+    }
+      
 
     closedir(rep);
 
