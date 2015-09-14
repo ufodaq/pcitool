@@ -320,17 +320,40 @@ int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, cons
    int i,j;
    pcilib_register_value_t temp_value;
    char *formula;
+   int err;
    
   /* we get the index of the register to find the corresponding register context*/
   if((i=pcilib_find_register(ctx,bank,regname))==PCILIB_REGISTER_INVALID){
     pcilib_error("can't get the index of the register %s", regname);
     return PCILIB_ERROR_INVALID_REQUEST;
   }
-  
+ 
+  for(j=0;ctx>register_ctx[i].views[j].name;j++){
+    if(!(strcasecmp(ctx->register_ctx[i].views[j].base_unit,unit))){
+      err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters,unit,1,&temp_value,value);
+      temp_value=ctx->register_ctx[i].views[value].value;
+      if(err){
+	pcilib_error("can't write to the register with the enum view");
+	return PCILIB_ERROR_FAILED;
+      }
+      break;
+    }else if(!(strcasecmp(ctx->register_ctx[i].views[j].name,unit))){
+      err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters, unit, 1, &temp_value,0,&(ctx->register_ctx[i].views[j]));
+      if(err){
+	pcilib_error("can't write to the register with the formula view %s", unit);
+	return PCILIB_ERROR_FAILED;
+      }
+      break;
+    }
+    pcilib_write_register(ctx,bank,regname,temp_value);
+    return 0;
+  }
+
+
     /*here, in the case of views of type enum, view will correspond to the enum command.
-      we iterate so through the views of type enum to get the value corresponding to the enum command*/
+      we iterate so through the views of type enum to get the value corresponding to the enum command*
     for(j=0; ctx->register_ctx[i].enums[j].name;j++){
-      /* we should maybe have another to do it there*/
+      /* we should maybe have another to do it there*
       if(!(strcasecmp(ctx->register_ctx[i].enums[j].name,unit))){
 	pcilib_write_register(ctx,bank,regname,ctx->register_ctx[i].enums[j].value);
 	return 0;
@@ -338,7 +361,7 @@ int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, cons
     }
     
   /** in the other case we ask for a view of type formula. Indeed, wa can't directly ask for a formula, so we have to provide a name for those views in view, and the value we want to write in value*/
-  j=0;
+      /* j=0;
   if(!(strcasecmp(unit, ctx->register_ctx[i].formulas[0].base_unit.name))){
       formula=malloc(sizeof(char)*strlen(ctx->register_ctx[i].formulas[0].write_formula));
       strncpy(formula,ctx->register_ctx[i].formulas[0].write_formula,strlen(ctx->register_ctx[i].formulas[0].write_formula));
@@ -349,20 +372,21 @@ int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, cons
 
   for(j=0; ctx->register_ctx[i].formulas[0].base_unit.other_units[j].name;j++){
     if(!(strcasecmp(ctx->register_ctx[i].formulas[0].base_unit.other_units[j].name,unit))){
-      /* when we have found the correct view of type formula, we apply the formula, that get the good value for return*/
+      /* when we have found the correct view of type formula, we apply the formula, that get the good value for return*
       formula=malloc(sizeof(char)*strlen(ctx->register_ctx[i].formulas[0].write_formula));
       strncpy(formula,ctx->register_ctx[i].formulas[0].write_formula,strlen(ctx->register_ctx[i].formulas[0].write_formula));
       pcilib_view_apply_unit(ctx->register_ctx[i].formulas[0].base_unit.other_units[j],unit,value);
       pcilib_view_apply_formula(ctx,formula,*(pcilib_register_value_t*)value,&temp_value,1);
-      /* we maybe need some error checking there , like temp_value >min and <max*/
+      /* we maybe need some error checking there , like temp_value >min and <max*
       pcilib_write_register(ctx,bank,regname,temp_value);
       return 0;
     }
-  }
+  }*/
   pcilib_error("the view asked and the register do not correspond");
   return PCILIB_ERROR_NOTAVAILABLE;
- }
+}
 
+/** viewval=enum command, params=current parameters of view, regval=enum value*/
 int operation_enum(pcilib_t *ctx, void *params/*name*/, char* name, int read_or_write, pcilib_register_value_t *regval, size_t viewval_size, void* viewval){
   int j,k;
   if(read_or_write==1){
@@ -385,6 +409,7 @@ int operation_enum(pcilib_t *ctx, void *params/*name*/, char* name, int read_or_
   return -1;
 }
 
+/** viewsval=the current view, params=current view parameters*/
 int operation_formula(pcilib_t *ctx, void *params/*name*/, char* unit, int read_or_write, pcilib_register_value_t *regval, size_t viewval_size, void* viewval){
     int j=0;
     char* formula;
