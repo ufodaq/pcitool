@@ -466,14 +466,14 @@
     <view type="formula">
       <name>formuu2</name>
 	<unit>C</unit>
-      <read_from_register>((1./4)*(@reg - 1200)) if @freq==0 else ((3./10)*(@reg - 1000))</read_from_register>
+      <read_from_register>((1./4)*(@reg + 1200)) if @freq==0 else ((3./10)*(@reg + 1000))</read_from_register>
       <write_to_register>4*@value + 1200 if @freq==0 else (10./3)*@value + 1000</write_to_register>
       <description>formula to get real sensor temperature from the sensor_temperature register in decimal</description>
     </view>
     <view type="enum">
       <name>enumm2</name>
       <enum value="0x120">high</enum>
-      <enum value="0x010" min="0x00" max="0x020">low</enum>
+      <enum value="0x010" min="0x00" max="0x060">low</enum>
 	   <description>enum towards sensor_temperature register</description>
     </view>
     <view type="formula">

@@ -9,6 +9,7 @@
 #define PCILIB_MAX_BARS 6			/**< this is defined by PCI specification */
 #define PCILIB_DEFAULT_REGISTER_SPACE 1024	/**< number of registers to allocate on init */
 #define PCILIB_DEFAULT_VIEW_SPACE 128    	/**< number of views to allocate on init */
+#define PCILIB_DEFAULT_UNIT_SPACE 128           /** number of units to allocate on init*/
 #define PCILIB_MAX_REGISTER_BANKS 32		/**< maximum number of register banks to allocate space for */
 #define PCILIB_MAX_REGISTER_RANGES 32		/**< maximum number of register ranges to allocate space for */
 #define PCILIB_MAX_REGISTER_PROTOCOLS 32	/**< maximum number of register protocols to support */
@@ -27,6 +28,7 @@
 #include "export.h"
 #include "locking.h"
 #include "xml.h"
+#include "unit.h"
 
 typedef struct {
     uint8_t max_link_speed, link_speed;
@@ -65,7 +67,7 @@ struct pcilib_s {
     size_t dyn_banks;									/**< Number of configured dynamic banks */
   size_t num_enum_views,alloc_enum_views;                                               /**< Number of configured and allocated  views of type enum*/
   size_t num_formula_views,alloc_formula_views;                                         /**< Number of configured and allocated  views of type formula*/
-
+  size_t num_units,alloc_units;                                                         /**< Number of configured and allocated  units*/
     pcilib_register_description_t *registers;						/**< List of currently defined registers (from all sources) */
     pcilib_register_bank_description_t banks[PCILIB_MAX_REGISTER_BANKS + 1];		/**< List of currently defined register banks (from all sources) */
     pcilib_register_range_t ranges[PCILIB_MAX_REGISTER_RANGES + 1];			/**< List of currently defined register ranges (from all sources) */
@@ -87,6 +89,7 @@ struct pcilib_s {
   pcilib_view_enum2_t* enum_views;     /**< list of currently defined views of type enum*/
   pcilib_view_formula_t* formula_views;     /**< list of currently defined views of type formula*/
 
+  pcilib_unit_t* units; /** list of currently defined units*/
 #ifdef PCILIB_FILE_IO
     int file_io_handle;
 #endif /* PCILIB_FILE_IO */

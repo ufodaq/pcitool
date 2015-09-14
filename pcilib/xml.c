@@ -70,7 +70,24 @@ static xmlNodePtr pcilib_xml_get_parent_register_node(xmlDocPtr doc, xmlNodePtr 
 }
 */
 
-
+/**
+ * get the associated units of a view
+ * this function is maybe completekly useless : we need to decide if we iterate directly in ctx or n view when we want to apply a unit. (in the second choice of course keep it).
+*
+static void
+pcilib_get_associated_units(pcilib_t* ctx, pcilib_view_formula_t* myview){
+  int i,j,k=2;
+  for(i=0;myview->units[0].other_units.name[0];i++){
+      for(j=0;ctx->units[j].name[0];i++){
+	if(!(strcasecmp(myview->units[0].other_units.name,ctx->units[i].name))){
+	  myview.units=realloc(myview.units,k*sizeof(pcilib_unit_t));
+	  myview.units[k-1]=ctx->units[i];
+	  k++;
+	}
+      }
+  }
+  }*/
+			  
 /**
  * get the associated views of a register, to fill its register context
  */
@@ -490,7 +507,52 @@ static int pcilib_xml_create_bank(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
     return 0;
 }
 
+/*static int pcilib_xml_create_unit(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
+    int err;
+    
+    int override = 0;
+    pcilib_unit_t desc = {0};
+    xmlNodePtr cur;
+    char *value, *name, *value2;
+    char *endptr;
 
+    xmlXPathObjectPtr nodes;
+    xmlNodeSetPtr nodeset;
+    xmlAttr *attr;
+    int i=0;
+
+      /* we get the attribute type of the view node*
+    attr=node->properties;
+    value=(char*)attr->children->content;
+    desc.name=value;
+    desc.other_units=malloc(sizeof(pcilib_transform_unit_t));
+    
+    for (cur = node->children; cur != NULL; cur = cur->next) {
+	if (!cur->children) continue;
+	if (!xmlNodeIsText(cur->children)) continue;
+	
+	name = (char*)cur->name;
+        value = (char*)cur->children->content;
+	attr= cur->properties;
+	value2=(char*)attr->children->content;
+        if (!value || !attr) continue;
+        
+        if (!strcasecmp(name, "convert_unit")) {
+	  desc.other_units=realloc(des.other_units,sizeof((i+1)*sizeof(pcilib_transform_unit_t)));
+	  desc.other_units[i].name=value2;
+	  desc.other_units[i].transform_formula=value;
+        }
+    }
+
+    err = pcilib_add_units(ctx, 1, &desc);
+    if (err) {
+        pcilib_error("Error adding unit (%s) specified in the XML", desc.name);
+        return err;
+    }
+
+    return 0;
+}
+*/
 /**
  * function that create a view from a view node, and populate ctx views list
  */
@@ -505,6 +567,7 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
     char *endptr;
     xmlAttr *attr;
     int i=0;
+    int ok_min=0, ok_max=0;
 
     /*must i initialize? i think it's only needed if we want to include a description property*/ 
     enum_desc.name="default";
@@ -573,15 +636,19 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 		 return PCILIB_ERROR_INVALID_DATA;
 	       }
 	      complete_enum_desc.enums_list[i].min=dat_min;
+	      ok_min=1;
 	    }else if(!(strcasecmp(name,"max"))){
 	       pcilib_register_value_t dat_max = strtol(value, &endptr, 0);
 	       if ((strlen(endptr) > 0)) {
 		 pcilib_error("Invalid max (%s) is specified in the XML enum node", value);
 		 return PCILIB_ERROR_INVALID_DATA;
 	       }
-
 	      complete_enum_desc.enums_list[i].max=dat_max;
+	      ok_max=1;
 	    }
+	    if(ok_min==0) complete_enum_desc.enums_list[i].min=complete_enum_desc.enums_list[i].value;
+	    if(ok_max==0) complete_enum_desc.enums_list[i].max=complete_enum_desc.enums_list[i].value;
+	    
 	  }
 	  i++;	
 	}

@@ -1024,13 +1024,14 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
     int i;
     int err;
     const char *format;
+    char *s1,*s2,*s3;
+
 
     pcilib_register_bank_t bank_id;
     pcilib_register_bank_addr_t bank_addr = 0;
 
     pcilib_register_value_t value;
-    
-    if (reg) {
+      if (reg && !(strchr(reg,'/'))) {
 	pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
         bank_id = pcilib_find_register_bank_by_addr(handle, model_info->registers[regid].bank);
         format = model_info->banks[bank_id].format;
@@ -1044,7 +1045,36 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 	    printf(format, value);
 	    printf("\n");
 	}
+      }else if(reg && (s1=strchr(reg,'/'))){
+	char* enum_command=malloc(sizeof(char*));
+	if(!enum_command){
+	  printf("Error allocating memory for the result\n");
+	  return PCILIB_ERROR_MEMORY;
+	}
+	s2=pcilib_view_str_sub(reg,0,s1-reg-1);
+	s3=pcilib_view_str_sub(reg,s1-reg+1,strlen(reg));
+	if(!(strcasecmp(s3,"name"))){
+	    err = pcilib_read_view(handle,bank,s2,NULL,sizeof(char*),enum_command);
+	    if (err) printf("Error reading register %s\n", reg);
+	    else {
+	      printf("%s = %s\n", reg, (char*)enum_command);
+	    }   
+	}else{
+	    pcilib_register_t regid = pcilib_find_register(handle, bank, s2);
+	    bank_id = pcilib_find_register_bank_by_addr(handle, model_info->registers[regid].bank);
+	    format = model_info->banks[bank_id].format;
+	    if (!format) format = "%lu";
+
+	    err = pcilib_read_view(handle,bank,s2,s3,sizeof(pcilib_register_value_t),&value);
+	    if (err) printf("Error reading register %s\n", reg);
+	    else {
+	      printf("%s = ", reg);
+	      printf(format, value);
+	      printf("\n");
+	    }
+	}
     } else {
+	printf("da\n");
 	    // Adding DMA registers
 	pcilib_get_dma_description(handle);	
     
@@ -1254,6 +1284,7 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
     pcilib_register_value_t value;
 
     const char *format = NULL;
+    char *s1;
 
     pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
     if (regid == PCILIB_REGISTER_INVALID) Error("Can't find register (%s) from bank (%s)", reg, bank?bank:"autodetected");
@@ -1281,14 +1312,27 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
 	
 	format = "0x%lx";
     } else {
-	    Error("Can't parse data value (%s) is not valid decimal number", *data);
+      err = pcilib_write_view(handle,bank,reg,*data,0,NULL);
+      if(err) Error("can't write to the register using an enum view");
+      else return 0;
     }
+      /*    } else {
+	    Error("Can't parse data value (%s) is not valid decimal number", *data);
+	    }*/
 
     value = val;
-    
-    err = pcilib_write_register(handle, bank, reg, value);
-    if (err) Error("Error writting register %s\n", reg);
 
+    if((s1=strchr(reg,'/'))){
+	char *s3,*s2;
+	s2=pcilib_view_str_sub(reg,0,s1-reg-1);
+	s3=pcilib_view_str_sub(reg,s1-reg+1,strlen(reg));
+	err = pcilib_write_view(handle,bank,s2,s3,sizeof(pcilib_register_value_t),&value);
+	if (err) printf("Error writing register %s using view %s\n",s2,s3);
+    }else{
+	err = pcilib_write_register(handle, bank, reg, value);
+	if (err) Error("Error writting register %s\n", reg);
+    }
+      
     if ((model_info->registers[regid].mode&PCILIB_REGISTER_RW) == PCILIB_REGISTER_RW) {
 	err = pcilib_read_register(handle, bank, reg, &value);
 	if (err) Error("Error reading back register %s for verification\n", reg);
@@ -3249,7 +3293,10 @@ int main(int argc, char **argv) {
 		    ++mode;
 		}
 	    }
-	} else {
+	} else if(strchr(addr,'/')) {
+	  reg=addr;
+	  ++mode;
+	}else {
 	    if (pcilib_find_register(handle, bank, addr) == PCILIB_REGISTER_INVALID) {
 	        Usage(argc, argv, "Invalid address (%s) is specified", addr);
 	    } else {
@@ -3349,12 +3396,12 @@ int main(int argc, char **argv) {
 	} else if (addr) {
 	    err = ReadData(handle, amode, flags, dma, bar, start, size, access, endianess, (size_t)-1, ofile);
 	} else {
-	    Error("Address to read is not specified");
+	  Error("Address to read is not specified");
 	}
      break;
      case MODE_READ_REGISTER:
-        if ((reg)||(!addr)) ReadRegister(handle, model_info, bank, reg);
-	else ReadRegisterRange(handle, model_info, bank, start, addr_shift, size, ofile);
+       if ((reg)||(!addr)) ReadRegister(handle, model_info, bank, reg);
+       else ReadRegisterRange(handle, model_info, bank, start, addr_shift, size, ofile);
      break;
      case MODE_WRITE:
 	WriteData(handle, amode, dma, bar, start, size, access, endianess, data, verify);

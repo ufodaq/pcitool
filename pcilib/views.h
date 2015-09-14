@@ -2,6 +2,7 @@
 #define _PCILIB_VIEWS_H
 
 #include "pcilib.h"
+#include "unit.h"
 
 typedef struct pcilib_view_enum_s pcilib_view_enum_t;
 
@@ -37,6 +38,7 @@ struct pcilib_view_formula_s {
   const char *write_formula; /**<formula to parse to write to a register*/
 	// **see it later**        const char *unit; (?)
   const char *description;
+  pcilib_unit_t* units;
 };
 
 /**
@@ -53,5 +55,6 @@ int pcilib_add_views_enum(pcilib_t* ctx,size_t n, const pcilib_view_enum2_t* vie
 
 int pcilib_add_views_formula(pcilib_t* ctx, size_t n, const pcilib_view_formula_t* views);
 
+char* pcilib_view_str_sub(const char* s, unsigned int start, unsigned int end);
 
 #endif
