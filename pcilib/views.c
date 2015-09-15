@@ -9,73 +9,6 @@
 #include "unit.h" 
 
 /**
- *
- * replace a substring within a string by another
- * @param[in] txt - the string to be modified
- *@param[in] before - the substring in the string that will be replaced
- *@param[in] after - the new value of before substring
- *@return the modified txt string
- */
-static char*
-pcilib_view_formula_replace (const char *txt, const char *before, const char *after)
-{
-	const char *pos; 
-	char *return_txt; 
-	size_t pos_return_txt; 
-	size_t len; 
-	size_t allocated_size; 
-	
-	/*get the first occurence of before. then we need one time to be out of the loop to correctly set the diverses varaibles (malloc instead of realloc notably)*/
-	pos = strstr (txt, before);
-	 
-	if (pos == NULL)
-	{
-		pcilib_warning("problem with a formula");
-	}
- 
-	/* get the position of this occurence*/
-	len = (size_t)pos - (size_t)txt;
-	allocated_size = len + strlen (after) + 1;
-	return_txt = malloc (allocated_size);
-	pos_return_txt = 0;
-	
-	/* we copy there the in a newly allocated string the start of txt before the "before" occurence, and then we copy after instead*/
-	strncpy (return_txt + pos_return_txt, txt, len);
-	pos_return_txt += len;
-	txt = pos + strlen (before);
-	 
-	len = strlen (after);
-	strncpy (return_txt + pos_return_txt, after, len);
-	pos_return_txt += len;
-	
-	/* we then iterate with the same principle to all occurences of before*/
-	pos = strstr (txt, before);
-	while (pos != NULL)
-	{
-		len = (size_t)pos - (size_t)txt;
-		allocated_size += len + strlen (after);
-		return_txt = (char *)realloc (return_txt, allocated_size);
-		 
-		strncpy (return_txt + pos_return_txt, txt, len);
-		pos_return_txt += len;
-		 
-		txt = pos + strlen (before);
-		 
-		len = strlen (after);
-		strncpy (return_txt + pos_return_txt, after, len);
-		pos_return_txt += len;
-		pos = strstr (txt, before);
-	}
-	/* put the rest of txt string at the end*/
-	len = strlen (txt) + 1;
-	allocated_size += len;
-	return_txt = realloc (return_txt, allocated_size);
-	strncpy (return_txt + pos_return_txt, txt, len);
-	
-	return return_txt;
-}
-
-/**
  * function used to get the substring of a string s, from the starting and ending indexes
   * @param[in] s string containing the substring we want to extract.
  * @param[in] start the start index of the substring.
@@ -111,62 +44,6 @@ pcilib_view_str_sub (const char *s, unsigned int start, unsigned int end)
 
 
 /**
- * get the bank name associated with a register name
- */
-static const char*
-pcilib_view_get_bank_from_reg_name(pcilib_t* ctx,char* reg_name){
-  int k;
-  for(k=0;ctx->registers[k].bits;k++){
-    if(!(strcasecmp(reg_name,ctx->registers[k].name))){
-	return ctx->banks[pcilib_find_register_bank_by_addr(ctx,ctx->registers[k].bank)].name;
-      }
-  }
-  return NULL;
-}
-
-/**
- * replace plain registers name in a formula by their value
- */
-static char*
-pcilib_view_compute_plain_registers(pcilib_t* ctx, char* formula, int direction){
-  int j,k;
-  char *substr, *substr2;
-  char temp[66];
-  pcilib_register_value_t value;
-  
-  /*we get recursively all registers of string , and if they are not equel to '@reg', then we get their value and put it in formula*/
-  for(j=0;j<strlen((char*)formula);j++){
-    if(formula[j]=='@'){
-      k=j+1;
-      while((formula[k]!=' ' && formula[k]!=')' && formula[k]!='/' && formula[k]!='+' && formula[k]!='-' && formula[k]!='*' && formula[k]!='=') && (k<strlen((char*)formula))){
-	k++;
-      }
-      substr2=pcilib_view_str_sub((char*)formula,j,k-1); /**< we get the name of the register+@*/
-      substr=pcilib_view_str_sub(substr2,1,k-j/*length of substr2*/); /**< we get the name of the register*/
-      if(direction==0){
-	if((strcasecmp(substr,"reg"))){
-	  /* we get the bank name associated to the register, and read its value*/
-	  pcilib_read_register(ctx, pcilib_view_get_bank_from_reg_name(ctx, substr),substr,&value);
-	  /* we put the value in formula*/
-	  sprintf(temp,"%i",value);
-	  formula = pcilib_view_formula_replace(formula,substr2,temp);
-	}
-      }
-      else if(direction==1){
-	if((strcasecmp(substr,"value"))){
-	  /* we get the bank name associated to the register, and read its value*/
-	  pcilib_read_register(ctx, pcilib_view_get_bank_from_reg_name(ctx, substr),substr,&value);
-	  /* we put the value in formula*/
-	  sprintf(temp,"%i",value);
-	  formula = pcilib_view_formula_replace(formula,substr2,temp);
-	}
-      }	
-    }
-  }
-  return formula;
-}
-
-/**
  * this function calls the python script and the function "evaluate" in it to evaluate the given formula
  *@param[in] the formula to be evaluated
  *@return the integer value of the evaluated formula (maybe go to float instead)
@@ -192,27 +69,58 @@ pcilib_view_eval_formula(char* formula){
    return value;
 }
 
+
 /**
- * function to apply a unit for the views of type formula
- *@param[in] view - the view we want to get the units supported
-  *@param[in] unit - the requested unit in which we want to get the value
- *@param[in,out] value - the number that needs to get transformed
+ * 
  */
-static void
-pcilib_view_apply_unit(pcilib_transform_unit_t unit_desc, const char* unit,pcilib_register_value_t* value){
-  char* formula;
+static char*
+pcilib_view_compute_formula(pcilib_t* ctx, char* formula,char* reg_value_string){
+  char *src=(char*)formula; 
+  char *reg,*regend;
+  char *dst=malloc(6*strlen(src)*sizeof(char));
   char temp[66];
+  pcilib_register_value_t value;
+  int offset=0;
   
-	    formula=malloc(strlen(unit_desc.transform_formula)*sizeof(char));
-	    strcpy(formula,unit_desc.transform_formula);
-	    sprintf(temp,"%i",*value);
-	    formula=pcilib_view_formula_replace(formula,"@self",temp); 
-	    *value=(int)pcilib_view_eval_formula(formula);
+  /*we get recursively all registers of string , and if they are not equel to '@reg', then we get their value and put it in formula*/
+  while(1){
+    reg = strchr(src, '@');
+    if (!reg) {
+      strcpy(dst, src);
+      break;
+    }
+    regend = strchr(reg + 1, '@');
+    if (!regend){
+      pcilib_error("formula corresponding is malformed");
+      return NULL;
+    }
+    strncpy(dst+offset, src, reg - src);
+    offset+=reg-src;
+    *regend = 0;
+    /* Now (reg + 1) contains the proper register name, you can compare
+it to reg/value and either get the value of current register or the
+specified one. Add it to the register*/
+    if(!(strcasecmp(reg,"@value")) || !(strcasecmp(reg,"@reg")) || !(strcasecmp(reg,"@self"))){
+      strncpy(dst+offset,reg_value_string,strlen(reg_value_string));
+      offset+=strlen(reg_value_string);
+   
+    }else{
+      pcilib_read_register(ctx, NULL,reg+1,&value);
+      sprintf(temp,"%i",value);
+      strncpy(dst+offset,temp,strlen(temp));
+      offset+=strlen(temp);
+    }      
+  src = regend + 1;
+  }
+  
+  return dst;
 }
 
 
-static void
-pcilib_view_apply_formula(pcilib_t* ctx, char* formula, pcilib_register_value_t reg_value, pcilib_register_value_t* out_value, int direction)
+
+
+static int
+pcilib_view_apply_formula(pcilib_t* ctx, char* formula, pcilib_register_value_t* reg_value)
 {
   /* when applying a formula, we need to:
      1) compute the values of all registers present in plain name in the formulas and replace their name with their value : for example, if we have the formula" ((1./4)*(@reg - 1200)) if @freq==0 else ((3./10)*(@reg - 1000)) " we need to get the value of the register "freq"
@@ -227,16 +135,37 @@ pcilib_view_apply_formula(pcilib_t* ctx, char* formula, pcilib_register_value_t 
   */
   
   char reg_value_string[66]; /* to register reg_value as a string, need to check the length*/
-  sprintf(reg_value_string,"%u",reg_value);
+  sprintf(reg_value_string,"%u",*reg_value);
   
-  /*computation of plain registers in the formula*/
-  formula=pcilib_view_compute_plain_registers(ctx,formula,direction);
-  /* computation of @reg with register value*/
-  if(direction==0) formula=pcilib_view_formula_replace(formula,"@reg",reg_value_string);
-  else if (direction==1) formula=pcilib_view_formula_replace(formula,"@value",reg_value_string);
+  formula=pcilib_view_compute_formula(ctx,formula,reg_value_string);
+  if(!(formula)){
+    pcilib_error("computing of formula failed");
+    return PCILIB_ERROR_INVALID_DATA;
+  }
+
   /* evaluation of the formula*/
-  *out_value= pcilib_view_eval_formula(formula);
+  *reg_value= pcilib_view_eval_formula(formula);
+  return 0;
 }
+
+/**
+ * function to apply a unit for the views of type formula
+ *@param[in] view - the view we want to get the units supported
+  *@param[in] unit - the requested unit in which we want to get the value
+ *@param[in,out] value - the number that needs to get transformed
+ */
+static void
+pcilib_view_apply_unit(pcilib_transform_unit_t unit_desc, const char* unit,pcilib_register_value_t* value){
+  char* formula;
+ 
+	    formula=malloc(strlen(unit_desc.transform_formula)*sizeof(char));
+	    strcpy(formula,unit_desc.transform_formula);
+	    pcilib_view_apply_formula(NULL,formula, value);
+
+	    free(formula);
+}
+
+
 
 int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, size_t value_size, void *value)
 {
@@ -352,7 +281,7 @@ int operation_enum(pcilib_t *ctx, void *params, char* name, int view2reg, pcilib
 int operation_formula(pcilib_t *ctx, void *params, char* unit, int view2reg, pcilib_register_value_t *regval, size_t viewval_size, void* viewval){
     int j=0;
     pcilib_register_value_t value=0;
-    char* formula;
+    char* formula=NULL;
 
     if(view2reg==0){
       if(!(strcasecmp(unit, ((pcilib_view_t*)viewval)->base_unit.name))){
@@ -362,8 +291,8 @@ int operation_formula(pcilib_t *ctx, void *params, char* unit, int view2reg, pci
 	  return PCILIB_ERROR_MEMORY;
 	}
 	strncpy(formula,((pcilib_formula_t*)params)->read_formula,strlen(((pcilib_formula_t*)params)->read_formula));
-	pcilib_view_apply_formula(ctx,formula,*regval,&value,0);
-	return value;
+	pcilib_view_apply_formula(ctx,formula,regval);
+	return 0;
       }
       
       for(j=0; ((pcilib_view_t*)viewval)->base_unit.other_units[j].name;j++){
@@ -375,16 +304,16 @@ int operation_formula(pcilib_t *ctx, void *params, char* unit, int view2reg, pci
 	    return PCILIB_ERROR_MEMORY;
 	  }
 	  strncpy(formula,((pcilib_formula_t*)params)->read_formula,strlen(((pcilib_formula_t*)params)->read_formula));
-	  pcilib_view_apply_formula(ctx,formula, *regval,&value,0);
+	  pcilib_view_apply_formula(ctx,formula, regval);
 	  pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.other_units[j],unit,&value);
-	  return value;
+	  return 0;
 	}
       }
     }else if(view2reg==1){
       if(!(strcasecmp(unit, ((pcilib_view_t*)viewval)->base_unit.name))){
 	formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->write_formula));
 	strncpy(formula,((pcilib_formula_t*)params)->write_formula,strlen(((pcilib_formula_t*)params)->write_formula));
-	pcilib_view_apply_formula(ctx,formula,*regval,&value,1);
+	pcilib_view_apply_formula(ctx,formula,regval);
 	return 0;
     }
       
@@ -394,13 +323,13 @@ int operation_formula(pcilib_t *ctx, void *params, char* unit, int view2reg, pci
 	  formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->write_formula));
 	  strncpy(formula,((pcilib_formula_t*)params)->write_formula,strlen((( pcilib_formula_t*)params)->write_formula));
 	  pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.other_units[j],unit,&value);
-	  pcilib_view_apply_formula(ctx,formula,*regval,&value,1);
-	  *regval=value;
+	  pcilib_view_apply_formula(ctx,formula,regval);
 	  /* we maybe need some error checking there , like temp_value >min and <max*/
 	  return 0;
 	}
       }
     }
+    free(formula);
       return PCILIB_ERROR_INVALID_REQUEST;
 }
 

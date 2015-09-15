@@ -138,6 +138,7 @@ pcilib_get_associated_views(pcilib_t* ctx, const char* reg_name,xmlXPathContextP
     }
  
     xmlXPathFreeObject(nodes);
+    free(path);
     return 0;
 }
 
@@ -507,7 +508,6 @@ pcilib_xml_create_unit(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, x
     attr=node->properties;
     value=(char*)attr->children->content;
     desc.name=value;
-    desc.other_units=malloc(sizeof(pcilib_transform_unit_t));
     
     for (cur = node->children; cur != NULL; cur = cur->next) {
     if (!cur->children) continue;
@@ -520,7 +520,6 @@ pcilib_xml_create_unit(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, x
         if (!value || !attr) continue;
 
         if (!strcasecmp(name, "convert_unit")) {
-	  desc.other_units=realloc(desc.other_units,(i+1)*sizeof(pcilib_transform_unit_t));
 	  desc.other_units[i].name=value2;
 	  desc.other_units[i].transform_formula=value;
 	  i++;

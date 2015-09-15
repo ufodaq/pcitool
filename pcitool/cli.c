@@ -1024,14 +1024,15 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
     int i;
     int err;
     const char *format;
-    char *s1,*s2,*s3;
+    char *s1,*regname,*viewname;
 
+    char* fullreg=strdup(reg);
 
     pcilib_register_bank_t bank_id;
     pcilib_register_bank_addr_t bank_addr = 0;
 
     pcilib_register_value_t value;
-      if (reg && !(strchr(reg,'/'))) {
+      if (reg && !(strchr(fullreg,'/'))) {
 	pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
         bank_id = pcilib_find_register_bank_by_addr(handle, model_info->registers[regid].bank);
         format = model_info->banks[bank_id].format;
@@ -1045,28 +1046,30 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 	    printf(format, value);
 	    printf("\n");
 	}
-      }else if(reg && (s1=strchr(reg,'/'))){
+      }else if(reg && (s1=strchr(fullreg,'/'))){
 	char* enum_command=malloc(sizeof(char*));
 	if(!enum_command){
 	  printf("Error allocating memory for the result\n");
 	  return PCILIB_ERROR_MEMORY;
 	}
-	s2=pcilib_view_str_sub(reg,0,s1-reg-1);
-	s3=pcilib_view_str_sub(reg,s1-reg+1,strlen(reg));
-	if(!(strcasecmp(s3,"name"))){
-	  err = pcilib_read_view(handle,bank,s2,NULL,sizeof(char*),enum_command);
-	    if (err) printf("Error reading register %s\n", reg);
+	*s1=0;
+	regname=fullreg;
+	viewname=fullreg+1;
+	if(!strcasecmp(viewname,"name")){
+	  err = pcilib_read_view(handle,bank,regname,viewname,sizeof(char*),enum_command);
+	    if (err) printf("Error reading register %s with an enum view\n", reg);
 	    else {
 	      printf("%s = %s\n", reg, (char*)enum_command);
 	    }   
+	    free(enum_command);
 	}else{
-	    pcilib_register_t regid = pcilib_find_register(handle, bank, s2);
+	    pcilib_register_t regid = pcilib_find_register(handle, bank, regname);
 	    bank_id = pcilib_find_register_bank_by_addr(handle, model_info->registers[regid].bank);
 	    format = model_info->banks[bank_id].format;
 	    if (!format) format = "%lu";
 
-	    err = pcilib_read_view(handle,bank,s2,s3,sizeof(pcilib_register_value_t),&value);
-	    if (err) printf("Error reading register %s\n", reg);
+	    err = pcilib_read_view(handle,bank,regname,viewname,sizeof(pcilib_register_value_t),&value);
+	    if (err) printf("Error reading register %s with a formula view\n", reg);
 	    else {
 	      printf("%s = ", reg);
 	      printf(format, value);
@@ -1074,7 +1077,6 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 	    }
 	}
     } else {
-	printf("da\n");
 	    // Adding DMA registers
 	pcilib_get_dma_description(handle);	
     
@@ -1285,11 +1287,14 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
     pcilib_register_t regid;
 
     const char *format = NULL;
-    char *s1,*s2=NULL;
+    char *s1,*regname=NULL;
     
-    if((s1=strchr(reg,'/'))){
-	s2=pcilib_view_str_sub(reg,0,s1-reg-1);
-	regid=pcilib_find_register(handle,bank,s2);
+    char *fullregister=strdup(reg);
+
+    if((s1=strchr(fullregister,'/'))){
+      *s1=0;
+      regname=fullregister;
+      regid=pcilib_find_register(handle,bank,regname);
     }else{
      regid = pcilib_find_register(handle, bank, reg);
     }
@@ -1317,23 +1322,24 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
 	}
 	
 	format = "0x%lx";
-    } else {
+    } else if((data) && !(regname)){
       err = pcilib_write_view(handle,bank,reg,*data,0,NULL);
       if(err) Error("can't write to the register using an enum view");
       else return 0;
     }
-      /* should i put strchr not null here?
+    /* should i put strchr not null here?*
     } else {
 	    Error("Can't parse data value (%s) is not valid decimal number", *data);
 	    }*/
 
     value = val;
 
-    if((s1=strchr(reg,'/'))){
-	char *s3;
-	s3=pcilib_view_str_sub(reg,s1-reg+1,strlen(reg));
-	err = pcilib_write_view(handle,bank,s2,s3,sizeof(pcilib_register_value_t),&value);
-	if (err) printf("Error writing register %s using view %s\n",s2,s3);
+    if((regname)){
+	char *view_name;
+	view_name=fullregister+1;;
+	err = pcilib_write_view(handle,bank,regname,view_name,sizeof(pcilib_register_value_t),&value);
+	if (err) printf("Error writing register %s using view %s\n",regname,view_name);
+	free(fullregister);
     }else{
 	err = pcilib_write_register(handle, bank, reg, value);
 	if (err) Error("Error writting register %s\n", reg);

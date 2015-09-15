@@ -3,6 +3,8 @@
 
 #include "pcilib.h"
 
+#define PCILIB_MAX_TRANSFORMS_PER_UNIT 16
+
 typedef struct pcilib_unit_s pcilib_unit_t; 
 typedef struct pcilib_transform_unit_s pcilib_transform_unit_t;
 
@@ -19,7 +21,7 @@ struct pcilib_transform_unit_s{
  */
 struct pcilib_unit_s{
   char* name;
-  pcilib_transform_unit_t* other_units;
+  pcilib_transform_unit_t other_units[PCILIB_MAX_TRANSFORMS_PER_UNIT];
 };
 
 /**
