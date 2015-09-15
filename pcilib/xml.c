@@ -76,16 +76,16 @@ static xmlNodePtr pcilib_xml_get_parent_register_node(xmlDocPtr doc, xmlNodePtr 
  * this function is maybe completekly useless : we need to decide if we iterate directly in ctx or n view when we want to apply a unit. (in the second choice of course keep it).
  */
 static void
-pcilib_get_unit_of_view(pcilib_t* ctx,pcilib_view_formula_t* myview, char* base_unit){
+pcilib_get_unit_of_view(pcilib_t* ctx,pcilib_view_t* myview, char* base_unit){
   int j;
-
-  for(j=0;ctx->units[j].name;j++){
-    if(!(strcasecmp(base_unit,ctx->units[j].name))){
-      myview->base_unit=ctx->units[j];
-      break;
+  if((strcasecmp(base_unit,"name"))){
+      for(j=0;ctx->units[j].name;j++){
+	if(!(strcasecmp(base_unit,ctx->units[j].name))){
+	  myview->base_unit=ctx->units[j];
+	  break;
+	}
+      }
     }
-  }
- 
 }
 			  
 /**
@@ -114,44 +114,23 @@ pcilib_get_associated_views(pcilib_t* ctx, const char* reg_name,xmlXPathContextP
   else sprintf(path,VIEWS_NAME_PATH_BITS,reg_name);
   nodes = xmlXPathEvalExpression((xmlChar*)path, xpath);
   nodeset = nodes->nodesetval;
+  ctx->register_ctx[id].views=malloc(sizeof(pcilib_view_t));
+  if(!(ctx->register_ctx[id].views)){
+    pcilib_error("error allocating memory for enum views in register context %i",id);
+    return PCILIB_ERROR_MEMORY;
+  }
+
     if (!xmlXPathNodeSetIsEmpty(nodeset)) {
-      int i,k,l;
+      int i,k;
       /*if we correctly get a nodeset, then we iterate through the nodeset to get all views, using their names*/
 	for (i = 0; i < nodeset->nodeNr; i++) {
 	  view_name=(char*)nodeset->nodeTab[i]->children->content;
 
 	  /* if the view name obtained is for an enum view, we get all pcilib_view_enum_t corresponding to the register*/
-	  for(k=0; ctx->enum_views[k].enums_list[0].value; k++){
-	    if(!(strcasecmp(view_name, ctx->enum_views[k].name))){
-	      ctx->register_ctx[id].enums=malloc(sizeof(pcilib_view_enum_t));
-	      
-	      if(!(ctx->register_ctx[id].enums)){
-		pcilib_error("error allocating memory for enum views in register context %i",id);
-		return PCILIB_ERROR_MEMORY;
-	      }
-
-	      /*!!!!!!!!!!this loop here is buggy*/
-	      for(l=0; ctx->enum_views[k].enums_list[l].value;l++){
-		ctx->register_ctx[id].enums=realloc(ctx->register_ctx[id].enums,(l+1)*sizeof(pcilib_view_enum_t));
-		ctx->register_ctx[id].enums[l]=ctx->enum_views[k].enums_list[l];
-		//		printf("names %s %s\n",ctx->register_ctx[id].enums[l].name,ctx->enum_views[k].enums_list[l].name);
-	      }
-	      return 0;
-	    }
-	  }
-
-	  /*here it is for formula, i assume we have only one formula view per register*/
-	  for(k=0; ctx->formula_views[k].name;k++){
-	    if(!(strcasecmp(view_name,ctx->formula_views[k].name))){
-	      
-	      ctx->register_ctx[id].formulas=malloc(sizeof(pcilib_view_formula_t));
-	      if(!(ctx->register_ctx[id].formulas)){
-		pcilib_error("error allocating memory for formula views in register context %i",id);
-		return PCILIB_ERROR_MEMORY;
-	      }
-	      pcilib_get_unit_of_view(ctx,&(ctx->formula_views[k]),ctx->formula_views[k].base_unit.name);
-	      ctx->register_ctx[id].formulas[0]=ctx->formula_views[k];
-	      break;
+	  for(k=0; ctx->views[k].name; k++){
+	    if(!(strcasecmp(view_name, ctx->views[k].name))){
+	      ctx->register_ctx[id].views=realloc(ctx->register_ctx[id].views,(k+1)*sizeof(pcilib_view_enum_t));
+	      ctx->register_ctx[id].views[k]=ctx->views[k];
 	    }
 	  }
 
@@ -563,9 +542,7 @@ pcilib_xml_create_unit(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, x
 static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
     int err;
     
-    pcilib_view_enum2_t complete_enum_desc={0};
-    pcilib_view_enum_t enum_desc = {0};
-    pcilib_view_formula_t formula_desc= {0};
+    pcilib_view_t desc={0};
     xmlNodePtr cur;
     char *value, *name;
     char *endptr;
@@ -573,32 +550,17 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
     int i=0;
     int ok_min=0, ok_max=0;
 
-    /*must i initialize? i think it's only needed if we want to include a description property*/ 
-    enum_desc.name="default";
-    enum_desc.value=0;
-    enum_desc.min=0;
-    enum_desc.max=0;
-
-    complete_enum_desc.name="default enum";
-    complete_enum_desc.description="default description";
-    complete_enum_desc.enums_list=malloc(sizeof(pcilib_view_enum_t));
-    if(!(complete_enum_desc.enums_list)){
-      pcilib_error("can't allocate memory for the complete enum type");
-      return PCILIB_ERROR_MEMORY;
-    }
-    complete_enum_desc.enums_list[0]=enum_desc;
-
-    formula_desc.name="formula_default";
-    formula_desc.read_formula="@reg";
-    formula_desc.write_formula="@reg";
-    formula_desc.description="default description";
-
+    desc.description="default description";
+    
     /* we get the attribute type of the view node*/
     attr=node->properties;
     value=(char*)attr->children->content;
     /* regarding the architecture, i decided to follow what has been done for registers and banks. but without the context*/
     /*if the view is of type enum, we get recursively its properties and then populate ctx enum views*/
     if(!(strcasecmp(value,"enum"))){
+      desc.op=&operation_enum;
+      desc.parameters=malloc(sizeof(pcilib_view_enum_t));
+      desc.base_unit.name="name";
       for (cur = node->children; cur != NULL; cur = cur->next) {
 	if (!cur->children) continue;
 	if (!xmlNodeIsText(cur->children)) continue;
@@ -608,15 +570,15 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
         if (!value) continue;
         
 	if (!(strcasecmp((char*)name,"name"))) {
-	  complete_enum_desc.name = value;
+	  desc.name = value;
 
 	}else if (!(strcasecmp((char*)name,"description"))) {
-	  complete_enum_desc.description = value;
+	  desc.description = value;
 
         }else if (!(strcasecmp((char*)name,"enum"))) {
 
-	  complete_enum_desc.enums_list=realloc(complete_enum_desc.enums_list,(i+1)*sizeof(pcilib_view_enum_t));
-	  complete_enum_desc.enums_list[i].name=value; 
+	  desc.parameters=realloc(desc.parameters,(i+1)*sizeof(pcilib_view_enum_t));
+	  ((pcilib_view_enum_t*)(desc.parameters))[i].name=value; 
 	  
 	  /* we need to iterate through the different attributes of an enum node to get all properties*/
 	  for(attr=cur->properties; attr!=NULL;attr=attr->next){
@@ -632,14 +594,14 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 		 pcilib_error("Invalid value (%s) is specified in the XML enum node", value);
 		 return PCILIB_ERROR_INVALID_DATA;
 	       }
-	       complete_enum_desc.enums_list[i].value=dat_value;
+	       ((pcilib_view_enum_t*)(desc.parameters))[i].value=dat_value;
 	    }else if(!(strcasecmp(name,"min"))){
 	       pcilib_register_value_t dat_min = strtol(value, &endptr, 0);
 	       if ((strlen(endptr) > 0)) {
 		 pcilib_error("Invalid min (%s) is specified in the XML enum node", value);
 		 return PCILIB_ERROR_INVALID_DATA;
 	       }
-	      complete_enum_desc.enums_list[i].min=dat_min;
+	       ((pcilib_view_enum_t*)(desc.parameters))[i].min=dat_min;
 	      ok_min=1;
 	    }else if(!(strcasecmp(name,"max"))){
 	       pcilib_register_value_t dat_max = strtol(value, &endptr, 0);
@@ -647,24 +609,26 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 		 pcilib_error("Invalid max (%s) is specified in the XML enum node", value);
 		 return PCILIB_ERROR_INVALID_DATA;
 	       }
-	      complete_enum_desc.enums_list[i].max=dat_max;
+	       ((pcilib_view_enum_t*)(desc.parameters))[i].max=dat_max;
 	      ok_max=1;
 	    }
-	    if(ok_min==0) complete_enum_desc.enums_list[i].min=complete_enum_desc.enums_list[i].value;
-	    if(ok_max==0) complete_enum_desc.enums_list[i].max=complete_enum_desc.enums_list[i].value;
+	    if(ok_min==0) ((pcilib_view_enum_t*)(desc.parameters))[i].min=((pcilib_view_enum_t*)(desc.parameters))[i].value;
+	    if(ok_max==0) ((pcilib_view_enum_t*)(desc.parameters))[i].max=((pcilib_view_enum_t*)(desc.parameters))[i].value;
 	    
 	  }
 	  i++;	
 	}
       }
-      err=pcilib_add_views_enum(ctx,1,&complete_enum_desc);
+      err=pcilib_add_views(ctx,1,&desc);
       if (err) {
-	pcilib_error("Error (%i) adding a new enum view (%s) to the pcilib_t", err, complete_enum_desc.name);
+	pcilib_error("Error (%i) adding a new enum view (%s) to the pcilib_t", err, desc.name);
 	return err;
       }
    
       /* we do the same here but for a iew of type formula if the attribute gives formula*/
     }else if(!(strcasecmp(value,"formula"))){
+      desc.op=&operation_formula;
+      desc.parameters=malloc(sizeof(pcilib_formula_t));
       for (cur = node->children; cur != NULL; cur = cur->next) {
 	if (!cur->children) continue;
 	if (!xmlNodeIsText(cur->children)) continue;
@@ -675,21 +639,21 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
         if (!value) continue;
         
 	if (!(strcasecmp((char*)name,"name"))) {
-	  formula_desc.name = value;
+	  desc.name = value;
         }else if (!(strcasecmp((char*)name,"read_from_register"))) {
-	  formula_desc.read_formula=value;
+	  ((pcilib_formula_t*)(desc.parameters))->read_formula=value;
         }else if (!(strcasecmp((char*)name,"write_to_register"))) {
-	  formula_desc.write_formula=value;
+	    ((pcilib_formula_t*)(desc.parameters))->write_formula=value;
 	}else if (!(strcasecmp((char*)name,"description"))) {
-	  formula_desc.description=value;
+	  desc.description=value;
 	}else if (!(strcasecmp((char*)name,"unit"))){
-	  formula_desc.base_unit.name=value;
+	  desc.base_unit.name=value;
 	}
       }
 
-      err=pcilib_add_views_formula(ctx,1,&formula_desc);
+      err=pcilib_add_views(ctx,1,&desc);
       if (err) {
-	pcilib_error("Error (%i) adding a new formula view (%s) to the pcilib_t", err, formula_desc.name);
+	pcilib_error("Error (%i) adding a new formula view (%s) to the pcilib_t", err, desc.name);
 	return err;
       }
 
@@ -868,7 +832,7 @@ int pcilib_process_xml(pcilib_t *ctx, const char *location) {
     struct dirent *file = NULL;
     char *model_dir, *model_path;
 
-    int i;
+    int i,j;
 
     model_dir = getenv("PCILIB_MODEL_DIR");
     if (!model_dir) model_dir = PCILIB_MODEL_DIR;
@@ -890,16 +854,18 @@ int pcilib_process_xml(pcilib_t *ctx, const char *location) {
 	if (err) pcilib_error("Error processing XML file %s", file->d_name);
     }
 
-    for(i=0;i<ctx->num_formula_views;i++){
-      pcilib_get_unit_of_view(ctx,&(ctx->formula_views[i]),ctx->formula_views[i].base_unit.name);
+    for(i=0;i<ctx->num_views;i++){
+      pcilib_get_unit_of_view(ctx,&(ctx->views[i]),ctx->views[i].base_unit.name);
     }
     
     for(i=0;i<ctx->num_reg;i++){
-      if(ctx->register_ctx[i].formulas){
-	pcilib_get_unit_of_view(ctx,&(ctx->register_ctx[i].formulas[0]),ctx->register_ctx[i].formulas[0].base_unit.name);
+      for(j=0;j<ctx->num_views;j++){
+	if(!(ctx->register_ctx[i].views[j].name)) break;
+	if(ctx->register_ctx[i].views){
+	  pcilib_get_unit_of_view(ctx,&(ctx->register_ctx[i].views[j]),ctx->register_ctx[i].views[j].base_unit.name);
+	}
       }
     }
-      
 
     closedir(rep);
 

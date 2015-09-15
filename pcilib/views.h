@@ -45,7 +45,6 @@ struct pcilib_view_s{
   void* parameters;
   pcilib_unit_t base_unit;
 };
-		 
 /**
  * new type to define a formula view
  */
@@ -71,6 +70,12 @@ int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, cons
 int pcilib_add_views_enum(pcilib_t* ctx,size_t n, const pcilib_view_enum2_t* views);
 
 int pcilib_add_views_formula(pcilib_t* ctx, size_t n, const pcilib_view_formula_t* views);
+
+int operation_enum(pcilib_t *ctx, void *params, char* name, int view2reg, pcilib_register_value_t *regval, size_t viewval_size, void* viewval);
+
+int operation_formula(pcilib_t *ctx, void *params, char* unit, int view2reg, pcilib_register_value_t *regval, size_t viewval_size, void* viewval);
+
+int pcilib_add_views(pcilib_t *ctx, size_t n, const pcilib_view_t* views);
 
 char* pcilib_view_str_sub(const char* s, unsigned int start, unsigned int end);
 

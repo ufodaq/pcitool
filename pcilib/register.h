@@ -50,6 +50,7 @@ typedef struct {
     pcilib_xml_node_t *xml;			/**< Additional XML properties */
     pcilib_view_formula_t *formulas;            /**< list of views of type formula linked to this register*/
     pcilib_view_enum_t *enums;                  /**< list of views of type enum linked to this register*/
+  pcilib_view_t *views;      /** list of views linked to this register*/
 } pcilib_register_context_t;
 
 
