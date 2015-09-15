@@ -139,7 +139,7 @@ int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const
   
   for(j=0;ctx->register_ctx[i].views[j].name;j++){
       if(!(strcasecmp("name",ctx->register_ctx[i].views[j].base_unit.name))){/*if we asked for the unit "name"*/
-	err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters,value/*the command name*/,0,&temp_value,0,&(ctx->register_ctx[i].views[j]));
+	err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters,value/*the command name*/,0,&temp_value,value_size,NULL);
 	if(err){
 	  pcilib_error("can't read from the register with the enum view");
 	  return PCILIB_ERROR_FAILED;
@@ -198,7 +198,7 @@ int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, cons
       ok=1;
       break;
     }else if(!(strcasecmp(ctx->register_ctx[i].views[j].base_unit.name,(char*)unit))){/*in this case we asked for then name of the view in unit*/
-      temp_value=*(pcilib_register_value_t*)value /*the value to put in the register*/;
+      //temp_value=*(pcilib_register_value_t*)value /*the value to put in the register*/;
       err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters, (char*)unit, 1, &temp_value,0,&(ctx->register_ctx[i].views[j]));
       if(err){
 	pcilib_error("can't write to the register with the formula view %s", unit);
@@ -249,7 +249,10 @@ int operation_enum(pcilib_t *ctx, void *params, char* name, int view2reg, pcilib
   }else if (view2reg==0){
     for(j=0; ((pcilib_enum_t*)(params))[j].name;j++){
       if (*regval<=((pcilib_enum_t*)(params))[j].max && *regval>=((pcilib_enum_t*)(params))[j].min){
-	name=(char*)realloc(name,strlen(((pcilib_enum_t*)(params))[j].name)*sizeof(char));
+	if(viewval_size<strlen(((pcilib_enum_t*)(params))[j].name)){
+	    pcilib_error("the string to contain the enum command is too tight");
+	    return PCILIB_ERROR_MEMORY;
+	  }
 	strncpy(name,((pcilib_enum_t*)(params))[j].name, strlen(((pcilib_enum_t*)(params))[j].name));
 	k=strlen(((pcilib_enum_t*)(params))[j].name);
 	name[k]='\0';

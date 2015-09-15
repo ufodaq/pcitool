@@ -1047,7 +1047,7 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 	    printf("\n");
 	}
       }else if(reg && (s1=strchr(fullreg,'/'))){
-	char* enum_command=malloc(sizeof(char*));
+	char* enum_command=malloc(50*sizeof(char));
 	if(!enum_command){
 	  printf("Error allocating memory for the result\n");
 	  return PCILIB_ERROR_MEMORY;
@@ -1055,26 +1055,22 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 	*s1=0;
 	regname=fullreg;
 	viewname=s1+1;
-	printf("regname %s, viewname %s\n",regname,viewname);
 	if(!strcasecmp(viewname,"name")){
-	  err = pcilib_read_view(handle,bank,regname,viewname,sizeof(char*),enum_command);
+	  err = pcilib_read_view(handle,bank,regname,viewname,50*sizeof(char),enum_command);
 	    if (err) printf("Error reading register %s with an enum view\n", reg);
 	    else {
 	      printf("%s = %s\n", regname, (char*)enum_command);
 	    }   
 	    free(enum_command);
 	}else{
-	    pcilib_register_t regid = pcilib_find_register(handle, bank, regname);
-	    bank_id = pcilib_find_register_bank_by_addr(handle, model_info->registers[regid].bank);
-	    format = model_info->banks[bank_id].format;
-	    if (!format) format = "%lu";
+	    format = "%lf";
 
 	    err = pcilib_read_view(handle,bank,regname,viewname,sizeof(pcilib_register_value_t),&value);
 	    if (err) printf("Error reading register %s with a formula view\n", reg);
 	    else {
 	      printf("%s = ", reg);
 	      printf(format, value);
-	      printf("\n");
+	      printf("%s\n",viewname);
 	    }
 	}
     } else {
@@ -1338,7 +1334,7 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
     if((regname)){
 	char *view_name;
 	view_name=s1+1;;
-	err = pcilib_write_view(handle,bank,regname,view_name,sizeof(pcilib_register_value_t),&value);
+	err = pcilib_write_view(handle,bank,regname,view_name,0,&value);
 	if (err) printf("Error writing register %s using view %s\n",regname,view_name);
 	free(fullregister);
     }else{
