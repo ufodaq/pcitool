@@ -1033,6 +1033,7 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 
     pcilib_register_value_t value;
       if (reg && !(strchr(fullreg,'/'))) {
+	printf("pass1\n");
 	pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
         bank_id = pcilib_find_register_bank_by_addr(handle, model_info->registers[regid].bank);
         format = model_info->banks[bank_id].format;
@@ -1047,6 +1048,7 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 	    printf("\n");
 	}
       }else if(reg && (s1=strchr(fullreg,'/'))){
+	printf("pass2\n");
 	char* enum_command=malloc(sizeof(char*));
 	if(!enum_command){
 	  printf("Error allocating memory for the result\n");
@@ -1054,7 +1056,8 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 	}
 	*s1=0;
 	regname=fullreg;
-	viewname=fullreg+1;
+	viewname=s1+1;
+	printf("regname %s, viewname %s\n",regname,viewname);
 	if(!strcasecmp(viewname,"name")){
 	  err = pcilib_read_view(handle,bank,regname,viewname,sizeof(char*),enum_command);
 	    if (err) printf("Error reading register %s with an enum view\n", reg);

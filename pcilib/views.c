@@ -138,25 +138,38 @@ int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const
     return PCILIB_ERROR_INVALID_REQUEST;
   }
 
-    for(j=0;ctx->register_ctx[i].views[j].name;j++){
+  
+  for(j=0;ctx->num_views;j++){
+    if(!(ctx->register_ctx[i].views[j].name)) break;
+    if(ctx->register_ctx[i].views[j].name) printf("name %s\n",ctx->register_ctx[i].views[j].name);
+  }
+
+  for(j=0;ctx->num_views;j++){
+    if(!(ctx->register_ctx[i].views[j].name)) break;
+    if(ctx->register_ctx[i].views[j].name){
+      printf("unit %s, view %s\n",unit,ctx->register_ctx[i].views[j].name);
       if(!(strcasecmp(ctx->register_ctx[i].views[j].base_unit.name,unit))){/*if we asked for the unit "name"*/
+	printf("in unit\n");
 	err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters,value/*the command name*/,0,&temp_value,0,&(ctx->register_ctx[i].views[j]));
 	if(err){
 	  pcilib_error("can't write to the register with the enum view");
 	  return PCILIB_ERROR_FAILED;
 	}
+	
 	break;
       }else if(!(strcasecmp(ctx->register_ctx[i].views[j].name,(char*)unit))){/*in this case we asked for the name of the view in unit*/
+	printf("pass here2\n");
 	err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters,(char*)unit, 0, &temp_value,0,&(ctx->register_ctx[i].views[j]));
-      if(err){
-	pcilib_error("can't write to the register with the formula view %s", unit);
-	return PCILIB_ERROR_FAILED;
+	if(err){
+	  pcilib_error("can't write to the register with the formula view %s", unit);
+	  return PCILIB_ERROR_FAILED;
+	}
+	*(pcilib_register_value_t*)value=temp_value;
+	break;
       }
-      *(pcilib_register_value_t*)value=temp_value;
-      break;
-      }
-    return 0;
+      return 0;
     }
+  }
      pcilib_error("the view asked and the register do not correspond");
   return PCILIB_ERROR_NOTAVAILABLE;
 }

@@ -864,6 +864,7 @@ int pcilib_process_xml(pcilib_t *ctx, const char *location) {
       for(j=0;j<ctx->num_views;j++){
 	if(!(ctx->register_ctx[i].views[j].name)) break;
 	if(ctx->register_ctx[i].views[j].name){
+	  printf("register %s view %s\n",ctx->registers[i].name,ctx->register_ctx[i].views[j].name);
 	  pcilib_get_unit_of_view(ctx,&(ctx->register_ctx[i].views[j]),ctx->register_ctx[i].views[j].base_unit.name);
 	}
       }
