@@ -126,10 +126,10 @@ pcilib_get_associated_views(pcilib_t* ctx, const char* reg_name,xmlXPathContextP
 	for (i = 0; i < nodeset->nodeNr; i++) {
 	  view_name=(char*)nodeset->nodeTab[i]->children->content;
 
-	  /* if the view name obtained is for an enum view, we get all pcilib_view_enum_t corresponding to the register*/
+	  /* if the view name obtained is for an enum view, we get all pcilib_enum_t corresponding to the register*/
 	  for(k=0; ctx->views[k].name; k++){
 	    if(!(strcasecmp(view_name, ctx->views[k].name))){
-	      ctx->register_ctx[id].views=realloc(ctx->register_ctx[id].views,(k+1)*sizeof(pcilib_view_enum_t));
+	      ctx->register_ctx[id].views=realloc(ctx->register_ctx[id].views,(k+1)*sizeof(pcilib_enum_t));
 	      ctx->register_ctx[id].views[k]=ctx->views[k];
 	    }
 	  }
@@ -520,8 +520,8 @@ pcilib_xml_create_unit(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, x
         if (!value || !attr) continue;
 
         if (!strcasecmp(name, "convert_unit")) {
-	  desc.other_units[i].name=value2;
-	  desc.other_units[i].transform_formula=value;
+	  desc.transforms[i].name=value2;
+	  desc.transforms[i].transform_formula=value;
 	  i++;
         }
     }
@@ -558,7 +558,7 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
     /*if the view is of type enum, we get recursively its properties and then populate ctx enum views*/
     if(!(strcasecmp(value,"enum"))){
       desc.op=&operation_enum;
-      desc.parameters=malloc(sizeof(pcilib_view_enum_t));
+      desc.parameters=malloc(sizeof(pcilib_enum_t));
       desc.base_unit.name="name";
       for (cur = node->children; cur != NULL; cur = cur->next) {
 	if (!cur->children) continue;
@@ -576,8 +576,8 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 
         }else if (!(strcasecmp((char*)name,"enum"))) {
 
-	  desc.parameters=realloc(desc.parameters,(i+1)*sizeof(pcilib_view_enum_t));
-	  ((pcilib_view_enum_t*)(desc.parameters))[i].name=value; 
+	  desc.parameters=realloc(desc.parameters,(i+1)*sizeof(pcilib_enum_t));
+	  ((pcilib_enum_t*)(desc.parameters))[i].name=value; 
 	  
 	  /* we need to iterate through the different attributes of an enum node to get all properties*/
 	  for(attr=cur->properties; attr!=NULL;attr=attr->next){
@@ -593,14 +593,14 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 		 pcilib_error("Invalid value (%s) is specified in the XML enum node", value);
 		 return PCILIB_ERROR_INVALID_DATA;
 	       }
-	       ((pcilib_view_enum_t*)(desc.parameters))[i].value=dat_value;
+	       ((pcilib_enum_t*)(desc.parameters))[i].value=dat_value;
 	    }else if(!(strcasecmp(name,"min"))){
 	       pcilib_register_value_t dat_min = strtol(value, &endptr, 0);
 	       if ((strlen(endptr) > 0)) {
 		 pcilib_error("Invalid min (%s) is specified in the XML enum node", value);
 		 return PCILIB_ERROR_INVALID_DATA;
 	       }
-	       ((pcilib_view_enum_t*)(desc.parameters))[i].min=dat_min;
+	       ((pcilib_enum_t*)(desc.parameters))[i].min=dat_min;
 	      ok_min=1;
 	    }else if(!(strcasecmp(name,"max"))){
 	       pcilib_register_value_t dat_max = strtol(value, &endptr, 0);
@@ -608,11 +608,11 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 		 pcilib_error("Invalid max (%s) is specified in the XML enum node", value);
 		 return PCILIB_ERROR_INVALID_DATA;
 	       }
-	       ((pcilib_view_enum_t*)(desc.parameters))[i].max=dat_max;
+	       ((pcilib_enum_t*)(desc.parameters))[i].max=dat_max;
 	      ok_max=1;
 	    }
-	    if(ok_min==0) ((pcilib_view_enum_t*)(desc.parameters))[i].min=((pcilib_view_enum_t*)(desc.parameters))[i].value;
-	    if(ok_max==0) ((pcilib_view_enum_t*)(desc.parameters))[i].max=((pcilib_view_enum_t*)(desc.parameters))[i].value;
+	    if(ok_min==0) ((pcilib_enum_t*)(desc.parameters))[i].min=((pcilib_enum_t*)(desc.parameters))[i].value;
+	    if(ok_max==0) ((pcilib_enum_t*)(desc.parameters))[i].max=((pcilib_enum_t*)(desc.parameters))[i].value;
 	    
 	  }
 	  i++;	

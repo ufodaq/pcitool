@@ -28,7 +28,7 @@
 #include "export.h"
 #include "locking.h"
 #include "xml.h"
-#include "unit.h"
+#include "views.h"
 
 typedef struct {
     uint8_t max_link_speed, link_speed;

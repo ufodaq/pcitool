@@ -6,7 +6,6 @@
 #include "error.h"
 #include <strings.h>
 #include <stdlib.h>
-#include "unit.h" 
 
 /**
  * this function calls the python script and the function "evaluate" in it to evaluate the given formula
@@ -209,18 +208,18 @@ int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, cons
 int operation_enum(pcilib_t *ctx, void *params, char* name, int view2reg, pcilib_register_value_t *regval, size_t viewval_size, void* viewval){
   int j,k;
   if(view2reg==1){
-    for(j=0; ((pcilib_view_enum_t*)(params))[j].name;j++){
-      if(!(strcasecmp(((pcilib_view_enum_t*)(params))[j].name,name))){
-	*regval=((pcilib_view_enum_t*)(params))[j].value;
+    for(j=0; ((pcilib_enum_t*)(params))[j].name;j++){
+      if(!(strcasecmp(((pcilib_enum_t*)(params))[j].name,name))){
+	*regval=((pcilib_enum_t*)(params))[j].value;
 	return 0;
       }
     }
   }else if (view2reg==0){
-    for(j=0; ((pcilib_view_enum_t*)(params))[j].name;j++){
-      if (*regval<((pcilib_view_enum_t*)(params))[j].max && *regval>((pcilib_view_enum_t*)(params))[j].min){
-	name=(char*)realloc(name,strlen(((pcilib_view_enum_t*)(params))[j].name)*sizeof(char));
-	strncpy(name,((pcilib_view_enum_t*)(params))[j].name, strlen(((pcilib_view_enum_t*)(params))[j].name));
-	k=strlen(((pcilib_view_enum_t*)(params))[j].name);
+    for(j=0; ((pcilib_enum_t*)(params))[j].name;j++){
+      if (*regval<((pcilib_enum_t*)(params))[j].max && *regval>((pcilib_enum_t*)(params))[j].min){
+	name=(char*)realloc(name,strlen(((pcilib_enum_t*)(params))[j].name)*sizeof(char));
+	strncpy(name,((pcilib_enum_t*)(params))[j].name, strlen(((pcilib_enum_t*)(params))[j].name));
+	k=strlen(((pcilib_enum_t*)(params))[j].name);
 	name[k]='\0';
 	return 0;
       }
@@ -249,8 +248,8 @@ int operation_formula(pcilib_t *ctx, void *params, char* unit, int view2reg, pci
 	return 0;
       }
       
-      for(j=0; ((pcilib_view_t*)viewval)->base_unit.other_units[j].name;j++){
-	if(!(strcasecmp(((pcilib_view_t*)viewval)->base_unit.other_units[j].name,unit))){
+      for(j=0; ((pcilib_view_t*)viewval)->base_unit.transforms[j].name;j++){
+	if(!(strcasecmp(((pcilib_view_t*)viewval)->base_unit.transforms[j].name,unit))){
 	  /* when we have found the correct view of type formula, we apply the formula, that get the good value for return*/
 	  formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->read_formula));
 	  if(!(formula)){
@@ -259,7 +258,7 @@ int operation_formula(pcilib_t *ctx, void *params, char* unit, int view2reg, pci
 	  }
 	  strncpy(formula,((pcilib_formula_t*)params)->read_formula,strlen(((pcilib_formula_t*)params)->read_formula));
 	  pcilib_view_apply_formula(ctx,formula, regval);
-	  pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.other_units[j],unit,&value);
+	  pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.transforms[j],unit,&value);
 	  return 0;
 	}
       }
@@ -271,12 +270,12 @@ int operation_formula(pcilib_t *ctx, void *params, char* unit, int view2reg, pci
 	return 0;
     }
       
-      for(j=0;((pcilib_view_t*)viewval)->base_unit.other_units[j].name;j++){
-	if(!(strcasecmp(((pcilib_view_t*)viewval)->base_unit.other_units[j].name,unit))){
+      for(j=0;((pcilib_view_t*)viewval)->base_unit.transforms[j].name;j++){
+	if(!(strcasecmp(((pcilib_view_t*)viewval)->base_unit.transforms[j].name,unit))){
 	  /* when we have found the correct view of type formula, we apply the formula, that get the good value for return*/
 	  formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->write_formula));
 	  strncpy(formula,((pcilib_formula_t*)params)->write_formula,strlen((( pcilib_formula_t*)params)->write_formula));
-	  pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.other_units[j],unit,&value);
+	  pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.transforms[j],unit,&value);
 	  pcilib_view_apply_formula(ctx,formula,regval);
 	  /* we maybe need some error checking there , like temp_value >min and <max*/
 	  return 0;
@@ -314,5 +313,32 @@ int pcilib_add_views(pcilib_t *ctx, size_t n, const pcilib_view_t* views) {
     memset(ctx->views + ctx->num_views + n, 0, sizeof(pcilib_view_t));
 
     ctx->num_views += n;
+    return 0;
+}
+
+int pcilib_add_units(pcilib_t *ctx, size_t n, const pcilib_unit_t* units) {
+	
+    pcilib_unit_t *units2;
+    size_t size;
+
+    if (!n) {
+	for (n = 0; units[n].name[0]; n++);
+    }
+
+    if ((ctx->num_units + n + 1) > ctx->alloc_units) {
+      for (size = ctx->alloc_units; size < 2 * (n + ctx->num_units + 1); size<<=1);
+
+	units2 = (pcilib_unit_t*)realloc(ctx->units, size * sizeof(pcilib_unit_t));
+	if (!units2) return PCILIB_ERROR_MEMORY;
+
+	ctx->units = units2;
+	ctx->alloc_units = size;
+    }
+
+    memcpy(ctx->units + ctx->num_units, units, n * sizeof(pcilib_unit_t));
+    memset(ctx->units + ctx->num_units + n, 0, sizeof(pcilib_unit_t));
+
+    ctx->num_units += n;
+    
     return 0;
 }
