@@ -253,6 +253,10 @@
           <rwmask>all</rwmask>
           <mode>RW</mode>
           <name>fr_num_lines_thr</name>
+	  <views>
+            <view>formuu2</view>
+            <view>enumm2</view>
+          </views>
         </register>
         <register>
           <address>0x100</address>
@@ -278,8 +282,8 @@
               <mode>R</mode>
               <name>sensor_temperature</name>
               <views>
-        		<view>formuu1</view>
-    		    <view>formuu2</view>
+        	<view>formuu1</view>
+    		<view>formuu2</view>
                 <view>enumm2</view>
               </views>
             </register_bits>
@@ -294,10 +298,6 @@
               <size>10</size>
               <mode>RW</mode>
               <name>fpga_temperature</name>
-              <views>
-                <view>formuu1</view>
-                <view>enumm1</view>
-              </views>
             </register_bits>
             <register_bits>
               <offset>29</offset>
@@ -348,6 +348,11 @@
               <size>5</size>
               <mode>RW</mode>
               <name>motor_phi</name>
+	  <views>
+	    <view>formuu1</view>
+	    <view>enumm3</view>
+	  </views>
+
             </register_bits>
             <register_bits>
               <offset>5</offset>
@@ -392,6 +397,11 @@
           <rwmask>0</rwmask>
           <mode>RW</mode>
           <name>num_triggers</name>
+	  <views>
+	    <view>formuu1</view>
+	    <view>formuu3</view>
+	    <view>enumm3</view>
+	  </views>
         </register>
         <register>
           <address>0x180</address>

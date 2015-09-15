@@ -121,20 +121,22 @@ pcilib_get_associated_views(pcilib_t* ctx, const char* reg_name,xmlXPathContextP
   }
 
     if (!xmlXPathNodeSetIsEmpty(nodeset)) {
-      int i,k;
+      int i,k,l=0;
       /*if we correctly get a nodeset, then we iterate through the nodeset to get all views, using their names*/
 	for (i = 0; i < nodeset->nodeNr; i++) {
 	  view_name=(char*)nodeset->nodeTab[i]->children->content;
-
 	  /* if the view name obtained is for an enum view, we get all pcilib_enum_t corresponding to the register*/
 	  for(k=0; ctx->views[k].name; k++){
 	    if(!(strcasecmp(view_name, ctx->views[k].name))){
-	      ctx->register_ctx[id].views=realloc(ctx->register_ctx[id].views,(k+1)*sizeof(pcilib_enum_t));
-	      ctx->register_ctx[id].views[k]=ctx->views[k];
+	      ctx->register_ctx[id].views=realloc(ctx->register_ctx[id].views,(l+1)*sizeof(pcilib_view_t));
+	      ctx->register_ctx[id].views[l]=ctx->views[k];
+	      l++;
 	    }
 	  }
-
 	}
+	ctx->register_ctx[id].views=realloc(ctx->register_ctx[id].views,(l+1)*sizeof(pcilib_view_t));
+	ctx->register_ctx[id].views[l].name=NULL;
+
     }
  
     xmlXPathFreeObject(nodes);
@@ -305,6 +307,7 @@ static int pcilib_xml_create_register(pcilib_t *ctx, pcilib_register_bank_t bank
 	int i;
 	
 	for (i = 0; i < nodeset->nodeNr; i++) {
+	  views_ok=0;
 	    memset(&fdesc, 0, sizeof(pcilib_xml_register_description_t));
 
 	    fdesc.base.bank = desc.base.bank;
@@ -575,7 +578,6 @@ static int pcilib_xml_create_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 	  desc.description = value;
 
         }else if (!(strcasecmp((char*)name,"enum"))) {
-
 	  desc.parameters=realloc(desc.parameters,(i+1)*sizeof(pcilib_enum_t));
 	  ((pcilib_enum_t*)(desc.parameters))[i].name=value; 
 	  
@@ -700,6 +702,7 @@ static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathCon
 	pcilib_xml_create_view(ctx,xpath,doc,nodeset->nodeTab[i]);
       }
     }
+
     xmlXPathFreeObject(views_nodes);    
  banks:
     bank_nodes = xmlXPathEvalExpression(BANKS_PATH, xpath); 
@@ -718,7 +721,6 @@ static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathCon
 	}
     }
     xmlXPathFreeObject(bank_nodes);
-    
     return 0;
 }
 
@@ -852,20 +854,20 @@ int pcilib_process_xml(pcilib_t *ctx, const char *location) {
 	err = pcilib_xml_load_file(ctx, model_path, file->d_name);
 	if (err) pcilib_error("Error processing XML file %s", file->d_name);
     }
-
+    
     for(i=0;i<ctx->num_views;i++){
       pcilib_get_unit_of_view(ctx,&(ctx->views[i]),ctx->views[i].base_unit.name);
     }
     
     for(i=0;i<ctx->num_reg;i++){
+      if(!(ctx->register_ctx[i].views)) continue;
       for(j=0;j<ctx->num_views;j++){
 	if(!(ctx->register_ctx[i].views[j].name)) break;
-	if(ctx->register_ctx[i].views){
+	if(ctx->register_ctx[i].views[j].name){
 	  pcilib_get_unit_of_view(ctx,&(ctx->register_ctx[i].views[j]),ctx->register_ctx[i].views[j].base_unit.name);
 	}
       }
     }
-
     closedir(rep);
 
     return 0;
