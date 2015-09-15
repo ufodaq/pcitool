@@ -463,8 +463,8 @@
     <view type="formula">
       <name>formuu1</name>
 	<unit>C</unit>
-      <read_from_register>(503975./1024000)*@reg - 27315./100</read_from_register>
-      <write_to_register>(@value + 27315./100)*(102400./503975)</write_to_register>
+      <read_from_register>(503975./1024000)*@reg@ - 27315./100</read_from_register>
+      <write_to_register>(@value@ + 27315./100)*(102400./503975)</write_to_register>
 <description>formula to get real fpga temperature from the fpga_temperature register in decimal</description>
     </view>
     <view type="enum">
@@ -476,8 +476,8 @@
     <view type="formula">
       <name>formuu2</name>
 	<unit>C</unit>
-      <read_from_register>((1./4)*(@reg + 1200)) if @freq==0 else ((3./10)*(@reg + 1000))</read_from_register>
-      <write_to_register>4*@value + 1200 if @freq==0 else (10./3)*@value + 1000</write_to_register>
+      <read_from_register>((1./4)*(@reg@ + 1200)) if @freq@==0 else ((3./10)*(@reg@ + 1000))</read_from_register>
+      <write_to_register>4*@value@ + 1200 if @freq@==0 else (10./3)*@value@ + 1000</write_to_register>
       <description>formula to get real sensor temperature from the sensor_temperature register in decimal</description>
     </view>
     <view type="enum">
@@ -503,21 +503,21 @@
   </views>
   <units>
     <unit name="C">
-      <convert_unit value="K">@self+273.15</convert_unit>
-      <convert_unit value="F">@self*(9./5)+32</convert_unit>
+      <convert_unit value="K">@self@+273.15</convert_unit>
+      <convert_unit value="F">@self@*(9./5)+32</convert_unit>
     </unit>
     <unit name="K">
-      <convert_unit value="C">@self-273.15</convert_unit>
-      <convert_unit value="F">(@self-273.15)*(9./5)+32</convert_unit>
+      <convert_unit value="C">@self@-273.15</convert_unit>
+      <convert_unit value="F">(@self@-273.15)*(9./5)+32</convert_unit>
     </unit>
     <unit name="F">
-      <convert_unit value="C">(@self-32)*5./9</convert_unit>
-      <convert_unit value="K">(@self+273.15-32)*5./9</convert_unit>
+      <convert_unit value="C">(@self@-32)*5./9</convert_unit>
+      <convert_unit value="K">(@self@+273.15-32)*5./9</convert_unit>
     </unit>
     <unit name="s">
-      <convert_unit value="ms">@self*1000</convert_unit>
-      <convert_unit value="us">@self*1000000</convert_unit>
-      <convert_unit value="ns">@self*1000000000</convert_unit>
+      <convert_unit value="ms">@self@*1000</convert_unit>
+      <convert_unit value="us">@self@*1000000</convert_unit>
+      <convert_unit value="ns">@self@*1000000000</convert_unit>
     </unit>
     <unit name="ms">
       <convert_unit value="s">@self/1000</convert_unit>
