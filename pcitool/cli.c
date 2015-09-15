@@ -1320,7 +1320,7 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
 	
 	format = "0x%lx";
     } else if((data) && !(regname)){
-      err = pcilib_write_view(handle,bank,reg,*data,0,NULL);
+      err = pcilib_write_view(handle,bank,reg,"name",0,*data);
       if(err) Error("can't write to the register using an enum view");
       else return 0;
     }

@@ -138,8 +138,8 @@ int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const
 
   
   for(j=0;ctx->register_ctx[i].views[j].name;j++){
-      if(!(strcasecmp("name",ctx->register_ctx[i].views[j].base_unit.name))){/*if we asked for the unit "name"*/
-	err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters,value/*the command name*/,0,&temp_value,value_size,NULL);
+    if(!(strcasecmp("name",(char*)unit))){/*if we asked for the unit "name"*/
+	err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters,NULL/*the command name*/,0,&temp_value,value_size,value);
 	if(err){
 	  pcilib_error("can't read from the register with the enum view");
 	  return PCILIB_ERROR_FAILED;
@@ -156,7 +156,9 @@ int pcilib_read_view(pcilib_t *ctx, const char *bank, const char *regname, const
       }else{
 	for(k=0;ctx->register_ctx[i].views[j].base_unit.transforms[k].name;k++){
 	  if(!(strcasecmp(ctx->register_ctx[i].views[j].base_unit.transforms[k].name,(char*)unit))){
+	    ctx->register_ctx[i].views[j].base_unit.transforms[k].name
 	    err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters,(char*)unit, 0, &temp_value,0,&(ctx->register_ctx[i].views[j]));
+	    /***wrong***/  	  pcilib_view_apply_unit(ctx->register_ctx[i].views[j].base_unit.transforms[k].name,unit,(pcilib_register_value_t*)value);
 	    if(err){
 	      pcilib_error("can't write to the register with the formula view %s", unit);
 	      return PCILIB_ERROR_FAILED;
@@ -189,8 +191,8 @@ int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, cons
   }
 
   for(j=0;ctx->register_ctx[i].views[j].name;j++){
-    if(!(strcasecmp(ctx->register_ctx[i].views[j].base_unit.name,"name"))){/*if we asked for the unit "name"*/
-      err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters,(char*)unit/*the command name*/,1,&temp_value,0,&(ctx->register_ctx[i].views[j]));
+    if(!(strcasecmp((char*)unit,"name"))){/*if we asked for the unit "name"*/
+      err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters,NULL,1,&temp_value,0,value);
       if(err){
 	pcilib_error("can't write to the register with the enum view");
 	return PCILIB_ERROR_FAILED;
@@ -209,6 +211,7 @@ int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, cons
     }else{
       for(k=0;ctx->register_ctx[i].views[j].base_unit.transforms[k].name;k++){
 	if(!(strcasecmp(ctx->register_ctx[i].views[j].base_unit.transforms[k].name,(char*)unit))){
+	  pcilib_view_apply_unit(ctx->register_ctx[i].views[j].base_unit.transforms[k].name,unit,(pcilib_register_value_t*)value);
 	  err=ctx->register_ctx[i].views[j].op(ctx,ctx->register_ctx[i].views[j].parameters, (char*)unit, 1, &temp_value,0,&(ctx->register_ctx[i].views[j]));
 	  if(err){
 	    pcilib_error("can't write to the register with the formula view %s", unit);
@@ -237,11 +240,11 @@ int pcilib_write_view(pcilib_t *ctx, const char *bank, const char *regname, cons
  * always : viewval=view params=view params
  * write: name=enum command regval:the value corresponding to the command
  */
-int operation_enum(pcilib_t *ctx, void *params, char* name, int view2reg, pcilib_register_value_t *regval, size_t viewval_size, void* viewval){
+int operation_enum(pcilib_t *ctx, void *params, char* unit, int view2reg, pcilib_register_value_t *regval, size_t viewval_size, void* viewval){
   int j,k;
   if(view2reg==1){
     for(j=0; ((pcilib_enum_t*)(params))[j].name;j++){
-      if(!(strcasecmp(((pcilib_enum_t*)(params))[j].name,name))){
+      if(!(strcasecmp(((pcilib_enum_t*)(params))[j].name,(char*)viewval))){
 	*regval=((pcilib_enum_t*)(params))[j].value;
 	return 0;
       }
@@ -253,9 +256,9 @@ int operation_enum(pcilib_t *ctx, void *params, char* name, int view2reg, pcilib
 	    pcilib_error("the string to contain the enum command is too tight");
 	    return PCILIB_ERROR_MEMORY;
 	  }
-	strncpy(name,((pcilib_enum_t*)(params))[j].name, strlen(((pcilib_enum_t*)(params))[j].name));
+	strncpy((char*)viewval,((pcilib_enum_t*)(params))[j].name, strlen(((pcilib_enum_t*)(params))[j].name));
 	k=strlen(((pcilib_enum_t*)(params))[j].name);
-	name[k]='\0';
+	((char*)viewval)[k]='\0';
 	return 0;
       }
     }
@@ -293,7 +296,7 @@ int operation_formula(pcilib_t *ctx, void *params, char* unit, int view2reg, pci
 	  }
 	  strncpy(formula,((pcilib_formula_t*)params)->read_formula,strlen(((pcilib_formula_t*)params)->read_formula));
 	  pcilib_view_apply_formula(ctx,formula, regval);
-	  pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.transforms[j],unit,regval);
+	  //	  pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.transforms[j],unit,regval);
 	  return 0;
 	}
       }
@@ -310,7 +313,7 @@ int operation_formula(pcilib_t *ctx, void *params, char* unit, int view2reg, pci
 	  /* when we have found the correct view of type formula, we apply the formula, that get the good value for return*/
 	  formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->write_formula));
 	  strncpy(formula,((pcilib_formula_t*)params)->write_formula,strlen((( pcilib_formula_t*)params)->write_formula));
-	  pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.transforms[j],unit,&value);
+	  //pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.transforms[j],unit,regval);
 	  pcilib_view_apply_formula(ctx,formula,regval);
 	  /* we maybe need some error checking there , like temp_value >min and <max*/
 	  return 0;
