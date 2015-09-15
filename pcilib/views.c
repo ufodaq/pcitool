@@ -9,41 +9,6 @@
 #include "unit.h" 
 
 /**
- * function used to get the substring of a string s, from the starting and ending indexes
-  * @param[in] s string containing the substring we want to extract.
- * @param[in] start the start index of the substring.
- * @param[in] end the ending index of the substring.
- * @return the extracted substring.
- */
-char*
-pcilib_view_str_sub (const char *s, unsigned int start, unsigned int end)
-{
-   char *new_s = NULL;
-
-   if (s != NULL && start < end)
-   {
-      new_s = malloc (sizeof (*new_s) * (end - start + 2));
-      if (new_s != NULL)
-      {
-         int i;
-
-         for (i = start; i <= end; i++)
-         {
-            new_s[i-start] = s[i];
-         }
-         new_s[i-start] = '\0';
-      }
-      else
-      {
-         pcilib_error("insufficient memory for string manipulation\n");
-         return NULL;
-      }
-   }
-   return new_s;
-}
-
-
-/**
  * this function calls the python script and the function "evaluate" in it to evaluate the given formula
  *@param[in] the formula to be evaluated
  *@return the integer value of the evaluated formula (maybe go to float instead)
@@ -122,17 +87,6 @@ specified one. Add it to the register*/
 static int
 pcilib_view_apply_formula(pcilib_t* ctx, char* formula, pcilib_register_value_t* reg_value)
 {
-  /* when applying a formula, we need to:
-     1) compute the values of all registers present in plain name in the formulas and replace their name with their value : for example, if we have the formula" ((1./4)*(@reg - 1200)) if @freq==0 else ((3./10)*(@reg - 1000)) " we need to get the value of the register "freq"
-     2) compute the "@reg" component, corresponding to the raw value of the register
-     3) pass the formula to python interpreter for evaluation
-     4) return the final evaluation
-     
-     remark: it might be worth to use python regular expression interpreter (the following return all words following @ in formula : 
-         >>> import re
-	 >>> m = re.search('(?<=@)\w+', formula)
-	 >>> m.group(0)
-  */
   
   char reg_value_string[66]; /* to register reg_value as a string, need to check the length*/
   sprintf(reg_value_string,"%u",*reg_value);
@@ -333,67 +287,6 @@ int operation_formula(pcilib_t *ctx, void *params, char* unit, int view2reg, pci
       return PCILIB_ERROR_INVALID_REQUEST;
 }
 
-
-/**
- * function to populate ctx enum views, as we could do for registers or banks
- */
-int pcilib_add_views_enum(pcilib_t *ctx, size_t n, const pcilib_view_enum2_t* views) {
-	
-    pcilib_view_enum2_t *views_enum;
-    size_t size;
-
-    if (!n) {
-	for (n = 0; views[n].enums_list[0].value; n++);
-    }
-
-    if ((ctx->num_enum_views + n + 1) > ctx->alloc_enum_views) {
-	for (size = ctx->alloc_enum_views; size < 2 * (n + ctx->num_enum_views + 1); size<<=1);
-
-	views_enum = (pcilib_view_enum2_t*)realloc(ctx->enum_views, size * sizeof(pcilib_view_enum2_t));
-	if (!views_enum) return PCILIB_ERROR_MEMORY;
-
-	ctx->enum_views = views_enum;
-	ctx->alloc_enum_views = size;
-    }
-
-    memcpy(ctx->enum_views + ctx->num_enum_views, views, n * sizeof(pcilib_view_enum2_t));
-    memset(ctx->enum_views + ctx->num_enum_views + n, 0, sizeof(pcilib_view_enum2_t));
-
-    ctx->num_enum_views += n;
-    
-
-    return 0;
-}
-
-
-/**
- * function to populate ctx formula views, as we could do for registers or banks
- */
-int pcilib_add_views_formula(pcilib_t *ctx, size_t n, const pcilib_view_formula_t* views) {
-	
-    pcilib_view_formula_t *views_formula;
-    size_t size;
-
-    if (!n) {
-	for (n = 0; views[n].name; n++);
-    }
-
-    if ((ctx->num_formula_views + n + 1) > ctx->alloc_formula_views) {
-      for (size = ctx->alloc_formula_views; size < 2 * (n + ctx->num_formula_views + 1); size<<=1);
-
-	views_formula = (pcilib_view_formula_t*)realloc(ctx->formula_views, size * sizeof(pcilib_view_formula_t));
-	if (!views_formula) return PCILIB_ERROR_MEMORY;
-
-	ctx->formula_views = views_formula;
-	ctx->alloc_formula_views = size;
-    }
-
-    memcpy(ctx->formula_views + ctx->num_formula_views, views, n * sizeof(pcilib_view_formula_t));
-    memset(ctx->formula_views + ctx->num_formula_views + n, 0, sizeof(pcilib_view_formula_t));
-
-    ctx->num_formula_views += n;
-    return 0;
-}
 
 /**
  * function to populate ctx views, as we could do for registers or banks

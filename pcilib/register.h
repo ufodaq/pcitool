@@ -45,11 +45,9 @@ typedef struct {
 
 
 typedef struct {
-    pcilib_register_bank_t bank;		/**< Reference to bank containing the register */
-    pcilib_register_value_t min, max;		/**< Minimum & maximum allowed values */
-    pcilib_xml_node_t *xml;			/**< Additional XML properties */
-    pcilib_view_formula_t *formulas;            /**< list of views of type formula linked to this register*/
-    pcilib_view_enum_t *enums;                  /**< list of views of type enum linked to this register*/
+  pcilib_register_bank_t bank;		/**< Reference to bank containing the register */
+  pcilib_register_value_t min, max;		/**< Minimum & maximum allowed values */
+  pcilib_xml_node_t *xml;			/**< Additional XML properties */
   pcilib_view_t *views;      /** list of views linked to this register*/
 } pcilib_register_context_t;
 
