@@ -51,18 +51,6 @@ add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -fno-omit-frame-pointer
 include(cmake/version.cmake)
 VERSION_TO_VARS(${PCILIB_VERSION} PCILIB_VERSION_MAJOR PCILIB_VERSION_MINOR PCILIB_VERSION_MICRO)
 
-add_subdirectory(dma)
-add_subdirectory(protocols)
-add_subdirectory(pcilib)
-add_subdirectory(pcitool)
-add_subdirectory(apps)
-add_subdirectory(xml)
-
-set_target_properties(pcilib PROPERTIES
-    VERSION ${PCILIB_VERSION}
-    SOVERSION ${PCILIB_ABI_VERSION}
-)
-
 set(TARNAME "pcitool")
 set(PACKAGE_VERSION ${PCILIB_VERSION})
 set(PACKAGE_NAME "${TARNAME}")
@@ -75,6 +63,18 @@ set(PCILIB_DATA_DIR "${DATA_INSTALL_DIR}/pcilib" CACHE PATH "Directory to instal
 set(PCILIB_MODEL_DIR "${PCILIB_DATA_DIR}/models" CACHE PATH "Directory to install XML models")
 set(PCILIB_DOC_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs/" CACHE PATH "Directory to install documentation")
 set(PCILIB_DEBUG_DIR "." CACHE PATH "Directory to write debug information")
+
+add_subdirectory(dma)
+add_subdirectory(protocols)
+add_subdirectory(pcilib)
+add_subdirectory(pcitool)
+add_subdirectory(apps)
+add_subdirectory(xml)
+
+set_target_properties(pcilib PROPERTIES
+    VERSION ${PCILIB_VERSION}
+    SOVERSION ${PCILIB_ABI_VERSION}
+)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcitool.pc.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/config.h)
