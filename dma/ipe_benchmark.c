@@ -147,13 +147,13 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	    pcilib_info_once("Benchmarking the DMA hardware (without memcpy)");
 
 	WR(IPEDMA_REG_CONTROL, 0x0);
-/*
+
 	err = pcilib_skip_dma(ctx->dmactx.pcilib, 0);
 	if (err) {
 	    pcilib_error("Can't start benchmark, devices continuously writes unexpected data using DMA engine");
 	    return -1;
 	}
-*/
+
 	// Allocate memory and prepare data
 	buf = malloc(size);
 	if (!buf) return -1;
@@ -178,13 +178,13 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	
 	    gettimeofday(&cur, NULL);
 	    us += ((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec));
-/*	    
+	    
 	    err = pcilib_skip_dma(ctx->dmactx.pcilib, 0);
 	    if (err) {
 		pcilib_error("Can't start iteration, devices continuously writes unexpected data using DMA engine");
 		break;
 	    }
-*/
+
 	}
     }
 
