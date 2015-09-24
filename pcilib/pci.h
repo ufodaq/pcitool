@@ -8,10 +8,14 @@
 #define PCILIB_DMA_SKIP_TIMEOUT 1000000		/**< us */
 #define PCILIB_MAX_BARS 6			/**< this is defined by PCI specification */
 #define PCILIB_DEFAULT_REGISTER_SPACE 1024	/**< number of registers to allocate on init */
+#define PCILIB_DEFAULT_VIEW_SPACE 128    	/**< number of views to allocate on init */
+#define PCILIB_DEFAULT_UNIT_SPACE 128           /**< number of units to allocate on init */
 #define PCILIB_MAX_REGISTER_BANKS 32		/**< maximum number of register banks to allocate space for */
 #define PCILIB_MAX_REGISTER_RANGES 32		/**< maximum number of register ranges to allocate space for */
 #define PCILIB_MAX_REGISTER_PROTOCOLS 32	/**< maximum number of register protocols to support */
 #define PCILIB_MAX_DMA_ENGINES 32		/**< maximum number of supported DMA engines */
+
+#include <uthash.h>
 
 #include "linux-3.10.h"
 #include "driver/pciDriver.h"
@@ -26,12 +30,33 @@
 #include "export.h"
 #include "locking.h"
 #include "xml.h"
+#include "view.h"
 
 typedef struct {
     uint8_t max_link_speed, link_speed;
     uint8_t max_link_width, link_width;
     uint8_t max_payload, payload;
 } pcilib_pcie_link_info_t;
+
+struct pcilib_view_context_s {
+    UT_hash_handle hh;
+    pcilib_view_t view;
+    pcilib_view_api_description_t *api;
+    pcilib_view_description_t desc;							/**< We will allocate more memory and store actual description instance here, so it should be the last member */
+}; 
+
+struct pcilib_unit_context_s {
+    UT_hash_handle hh;
+    pcilib_unit_t unit;
+    pcilib_unit_description_t desc;
+};
+
+typedef struct {
+    pcilib_register_bank_t bank;							/**< Reference to bank containing the register */
+    pcilib_register_value_t min, max;							/**< Minimum & maximum allowed values */
+    pcilib_xml_node_t *xml;								/**< Additional XML properties */
+    pcilib_view_reference_t *views;							/**< For non-static list of views, this vairables holds a copy of a NULL-terminated list from model (if present, memory should be de-allocated) */
+} pcilib_register_context_t;
 
 struct pcilib_s {
     int handle;										/**< file handle of device */
@@ -62,7 +87,6 @@ struct pcilib_s {
     size_t num_banks, num_protocols, num_ranges;					/**< Number of registered banks, protocols, and register ranges */
     size_t num_engines;									/**< Number of configured DMA engines */
     size_t dyn_banks;									/**< Number of configured dynamic banks */
-
     pcilib_register_description_t *registers;						/**< List of currently defined registers (from all sources) */
     pcilib_register_bank_description_t banks[PCILIB_MAX_REGISTER_BANKS + 1];		/**< List of currently defined register banks (from all sources) */
     pcilib_register_range_t ranges[PCILIB_MAX_REGISTER_RANGES + 1];			/**< List of currently defined register ranges (from all sources) */
@@ -74,6 +98,11 @@ struct pcilib_s {
     pcilib_register_bank_context_t *bank_ctx[PCILIB_MAX_REGISTER_BANKS];		/**< Contexts for registers banks if required by register protocol */
     pcilib_dma_context_t *dma_ctx;							/**< DMA context */
     pcilib_context_t *event_ctx;							/**< Implmentation context */
+
+    size_t num_views, alloc_views;							/**< Number of configured and allocated  views*/
+    size_t num_units, alloc_units;							/**< Number of configured and allocated  units*/
+    pcilib_view_description_t **views;							/**< list of currently defined views */
+    pcilib_unit_description_t *units;							/**< list of currently defined units */
 
     pcilib_lock_t *dma_rlock[PCILIB_MAX_DMA_ENGINES];					/**< Per-engine locks to serialize streaming and read operations */
     pcilib_lock_t *dma_wlock[PCILIB_MAX_DMA_ENGINES];					/**< Per-engine locks to serialize write operations */

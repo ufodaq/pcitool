@@ -13,6 +13,8 @@ typedef uint32_t pcilib_version_t;
 
 typedef uint8_t pcilib_bar_t;			/**< Type holding the PCI Bar number */
 typedef uint16_t pcilib_register_t;		/**< Type holding the register position within the field listing registers in the model */
+typedef uint16_t pcilib_view_t;			/**< Type holding the register view position within view listing in the model */
+typedef uint16_t pcilib_unit_t;			/**< Type holding the value unit position within unit listing in the model */
 typedef uint32_t pcilib_register_addr_t;	/**< Type holding the register address within address-space of BARs */
 typedef uint8_t pcilib_register_size_t;		/**< Type holding the size in bits of the register */
 typedef uint32_t pcilib_register_value_t;	/**< Type holding the register value */
@@ -37,6 +39,12 @@ typedef enum {
     PCILIB_LITTLE_ENDIAN,
     PCILIB_BIG_ENDIAN
 } pcilib_endianess_t;
+
+typedef enum {
+    PCILIB_TYPE_STRING = 0,			/**< char* */
+    PCILIB_TYPE_DOUBLE = 1,			/**< double */
+    PCILIB_TYPE_LONG = 2
+} pcilib_data_type_t;
 
 typedef enum {
     PCILIB_DMA_IRQ = 1,
@@ -191,6 +199,9 @@ int pcilib_read_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_regi
 int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_register_value_t value);
 int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t *value);
 int pcilib_write_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t value);
+
+int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, pcilib_data_type_t value_type, size_t value_size, void *value);
+int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, pcilib_data_type_t value_type, size_t value_size, void *value);
 
 int pcilib_reset(pcilib_t *ctx);
 int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);

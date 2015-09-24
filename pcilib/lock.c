@@ -18,22 +18,21 @@
 #include "lock.h"
 #include "pci.h"
 
-
+/**
+ * structure to define a lock
+ */
 struct pcilib_lock_s {
-    pthread_mutex_t mutex;
-    pcilib_lock_flags_t flags;
+  pthread_mutex_t mutex; 		/**< the pthread robust mutex */
+  pcilib_lock_flags_t flags; 		/**< flags to define the type of the mutex */
 #ifdef HAVE_STDATOMIC_H
-    volatile atomic_uint refs;
+  volatile atomic_uint refs; 		/**< approximate number of processes that hold the lock initialized, may desynchronize on crashes */ 
 #else /* HAVE_STDATOMIC_H */
-    volatile uint32_t refs;
+    volatile uint32_t refs;		/**< approximate number of processes that hold the lock initialized, may desynchronize on crashes */
 #endif /* HAVE_STDATOMIC_H */
-    char name[];
+  char name[]; 				/**< lock identifier */
 };
 
 
-/**
- * this function initialize a new semaphore in the kernel if it's not already initialized given the key that permits to differentiate semaphores, and then return the integer that points to the semaphore that have been initialized or to a previously already initialized semaphore
- */
 int pcilib_init_lock(pcilib_lock_t *lock, pcilib_lock_flags_t flags, const char *lock_id) {
     int err;
     pthread_mutexattr_t attr;
@@ -53,11 +52,13 @@ int pcilib_init_lock(pcilib_lock_t *lock, pcilib_lock_flags_t flags, const char 
 	return PCILIB_ERROR_FAILED;
     }
 
+	/* we declare the mutex as possibly shared amongst different processes*/
     if ((err = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED))!=0) {
 	pcilib_error("Can't configure a shared mutex attribute, errno %i", errno);
 	return PCILIB_ERROR_FAILED;
     }
 
+	/* we set the mutex as robust, so it would be automatically unlocked if the application crash*/
     if ((flags&PCILIB_LOCK_FLAG_PERSISTENT)==0) {
 	if ((err = pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST))!=0) {
 	    pcilib_error("Can't configure a robust mutex attribute, errno: %i", errno);
@@ -78,9 +79,6 @@ int pcilib_init_lock(pcilib_lock_t *lock, pcilib_lock_flags_t flags, const char 
 }
 
 
-/*
- * we uninitialize a mutex and set its name to 0 pointed by lock_ctx with this function. setting name to is the real destroying operation, but we need to unitialize the lock to initialize it again after
- */
 void pcilib_free_lock(pcilib_lock_t *lock) {
     int err;
 
@@ -134,9 +132,6 @@ const char *pcilib_lock_get_name(pcilib_lock_t *lock) {
     return NULL;
 }
 
-/*
- * this function will take the lock for the semaphore pointed by semId
- */
 int pcilib_lock_custom(pcilib_lock_t *lock, pcilib_lock_flags_t flags, pcilib_timeout_t timeout) {
     int err;
 
@@ -149,12 +144,15 @@ int pcilib_lock_custom(pcilib_lock_t *lock, pcilib_lock_flags_t flags, pcilib_ti
 
     switch (timeout) {
      case PCILIB_TIMEOUT_INFINITE:
+	/* the process will be hold till it can gain acquire the lock*/
         err = pthread_mutex_lock(&lock->mutex);
 	break;
      case PCILIB_TIMEOUT_IMMEDIATE:
+	/* the function returns immediatly if it can't acquire the lock*/
         err = pthread_mutex_trylock(&lock->mutex);
 	break;
      default:
+	/* the process will be hold till it can acquire the lock and timeout is not reached*/
         clock_gettime(CLOCK_REALTIME, &tm);
         tm.tv_nsec += 1000 * (timeout%1000000);
         if (tm.tv_nsec < 1000000000)
@@ -171,6 +169,7 @@ int pcilib_lock_custom(pcilib_lock_t *lock, pcilib_lock_flags_t flags, pcilib_ti
 
     switch (err) {
      case EOWNERDEAD:
+	/*in the case an application with a lock acquired crashes, this lock becomes inconsistent. we have so to make it consistent again to use it again.*/
         err = pthread_mutex_consistent(&lock->mutex);
         if (err) {
 	    pcilib_error("Failed to mark mutex as consistent, errno %i", err);
@@ -195,9 +194,6 @@ int pcilib_try_lock(pcilib_lock_t* lock) {
     return pcilib_lock_custom(lock, PCILIB_LOCK_FLAGS_DEFAULT, PCILIB_TIMEOUT_IMMEDIATE);
 }
 
-/**
- * this function will unlock the semaphore pointed by lock_ctx.
- */
 void pcilib_unlock(pcilib_lock_t *lock) {
     int err;
 

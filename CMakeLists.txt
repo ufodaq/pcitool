@@ -33,10 +33,18 @@ SET(ENV{PKG_CONFIG_PATH} "${LIB_INSTALL_DIR}/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
+find_package(PythonLibs REQUIRED)
 
 set(EXTRA_SYSTEM_LIBS -lrt)
 
 check_include_files(stdatomic.h HAVE_STDATOMIC_H)
+
+find_path(UTHASH_INCLUDE_DIRS uthash.h PATH_SUFFIXES uthash)
+if (UTHASH_INCLUDE_DIRS)
+    message ("uthash is found at ${UTHASH_INCLUDE_DIRS}")
+else (UTHASH_INCLUDE_DIRS)
+    message (FATAL_ERROR "uthash is not found...")
+endif (UTHASH_INCLUDE_DIRS)
 
 pkg_check_modules(LIBXML2 libxml-2.0 REQUIRED)
 
@@ -66,6 +74,7 @@ set(PCILIB_DEBUG_DIR "." CACHE PATH "Directory to write debug information")
 
 add_subdirectory(dma)
 add_subdirectory(protocols)
+add_subdirectory(views)
 add_subdirectory(pcilib)
 add_subdirectory(pcitool)
 add_subdirectory(apps)

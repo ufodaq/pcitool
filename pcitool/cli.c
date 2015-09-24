@@ -192,7 +192,7 @@ static struct option long_options[] = {
     {"output",			required_argument, 0, OPT_OUTPUT },
     {"timeout",			required_argument, 0, OPT_TIMEOUT },
     {"iterations",		required_argument, 0, OPT_ITERATIONS },
-    {"info",			no_argument, 0, OPT_INFO },
+    {"info",			optional_argument, 0, OPT_INFO },
     {"list",			no_argument, 0, OPT_LIST },
     {"reset",			no_argument, 0, OPT_RESET },
     {"benchmark",		optional_argument, 0, OPT_BENCHMARK },
@@ -257,7 +257,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "Usage:\n"
 " %s <mode> [options] [hex data]\n"
 "  Modes:\n"
-"   -i				- Device Info\n"
+"   -i [target]			- Device or Register (target) Info\n"
 "   -l[l]			- List (detailed) Data Banks & Registers\n"
 "   -r <addr|reg|dmaX>		- Read Data/Register\n"
 "   -w <addr|reg|dmaX>		- Write Data/Register\n"
@@ -572,7 +572,90 @@ void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
     }
 }
 
-void Info(pcilib_t *handle, const pcilib_model_description_t *model_info) {
+void RegisterInfo(pcilib_t *handle, pcilib_register_t reg) {
+    int err;
+    pcilib_register_value_t val;
+
+    const pcilib_model_description_t *model_info = pcilib_get_model_description(handle);
+    const pcilib_register_description_t *r = &model_info->registers[reg];
+    pcilib_register_bank_t bank = pcilib_find_register_bank_by_addr(handle, r->bank);
+    const pcilib_register_bank_description_t *b = &model_info->banks[bank];
+
+    err = pcilib_read_register_by_id(handle, reg, &val);
+    
+
+    printf("%s/%s\n", b->name, r->name);
+    printf("  Current value: ");
+    if (err) printf("error %i", err);
+    else printf(b->format, val);
+
+    if (r->mode&PCILIB_REGISTER_W) {
+	printf(" (default: ");
+	printf(b->format, r->defvalue);
+	printf(")");
+    }
+    printf("\n");
+
+    printf("  Address      : 0x%x [%u:%u]\n", r->addr, r->offset, r->offset + r->bits);
+    printf("  Access       : ");
+    if ((r->mode&PCILIB_REGISTER_RW) == 0) printf("-");
+    if (r->mode&PCILIB_REGISTER_R) printf("R");
+    if (r->mode&PCILIB_REGISTER_W) printf("W");
+    if (r->mode&PCILIB_REGISTER_W1C) printf("/reset");
+    if (r->mode&PCILIB_REGISTER_W1I) printf("/invert");
+    printf("\n");
+
+
+    if (r->description)
+	printf("  Description  : %s\n", r->description);
+
+    if (r->views) {
+	int i;
+	printf("\nSupported Views:\n");
+	for (i = 0; r->views[i].name; i++) {
+	    pcilib_view_t view = pcilib_find_view_by_name(handle, r->views[i].view);
+	    if (view == PCILIB_VIEW_INVALID) continue;
+
+	    const pcilib_view_description_t *v = model_info->views[view];
+
+	    printf("  View %s (", r->views[i].name);
+	    switch (v->type) {
+		case PCILIB_TYPE_STRING:
+		    printf("char*");
+		    break;
+		case PCILIB_TYPE_DOUBLE:
+		    printf("double");
+		    break;
+		default:
+		    printf("unknown");
+	    }
+	    printf(")\n");
+
+	    if (v->unit) {
+	        pcilib_unit_t unit = pcilib_find_unit_by_name(handle, v->unit);
+
+	        printf("    Supported units: %s", v->unit);
+
+		if (unit != PCILIB_UNIT_INVALID) {
+		    int j;
+		    const pcilib_unit_description_t *u = &model_info->units[unit];
+
+		    for (j = 0; u->transforms[j].unit; j++)
+			printf(", %s", u->transforms[j].unit);
+		}
+		printf("\n");
+	    }
+
+	    if (v->description)
+	        printf("    Description    : %s\n", v->description);
+	}
+    }
+
+
+//    printf("Type: %s". r->rw
+}
+
+void Info(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *target) {
     int i, j;
     DIR *dir;
     void *plugin;
@@ -595,9 +678,20 @@ void Info(pcilib_t *handle, const pcilib_model_description_t *model_info) {
     if (board_info)
 	printf(" Interrupt - Pin: %i, Line: %i\n", board_info->interrupt_pin, board_info->interrupt_line);
 
+    printf("\n");
+
+    if (target) {
+	pcilib_register_t reg;
+	
+	reg = pcilib_find_register(handle, NULL, target);
+	if (reg != PCILIB_REGISTER_INVALID) 
+	    return RegisterInfo(handle, reg);
+	
+	Error(" No register %s is found", target);
+    }
+
     List(handle, model_info, (char*)-1, 0);
 
-    printf("\n");
     printf("Available models:\n");
 
     dir = opendir(path);
@@ -2656,6 +2750,7 @@ int main(int argc, char **argv) {
     const char *dma_channel = NULL;
     const char *use = NULL;
     const char *lock = NULL;
+    const char *info_target = NULL;
     size_t block = (size_t)-1;
     pcilib_irq_type_t irq_type = PCILIB_IRQ_TYPE_ALL;
     pcilib_irq_hw_source_t irq_source =  PCILIB_IRQ_SOURCE_DEFAULT;
@@ -2692,6 +2787,9 @@ int main(int argc, char **argv) {
 	    break;
 	    case OPT_INFO:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+
+		if (optarg) info_target = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-')) info_target = argv[optind++];
 
 		mode = MODE_INFO;
 	    break;
@@ -3328,7 +3426,7 @@ int main(int argc, char **argv) {
 
     switch (mode) {
      case MODE_INFO:
-        Info(handle, model_info);
+        Info(handle, model_info, info_target);
      break;
      case MODE_LIST:
         List(handle, model_info, bank, details);

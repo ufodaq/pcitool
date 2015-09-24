@@ -1,494 +1,157 @@
-<?xml version="1.0" encoding="ISO-8859-1"?>
+<?xml version="1.0"?>
 <model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <banks>
-    <bank>
-      <bank_description>
-        <bar>0</bar>
-        <size>0x0200</size>
-        <protocol>software_registers</protocol>
-        <read_address>0x9000</read_address>
-        <write_address>0x9000</write_address>
-        <word_size>32</word_size>
-        <endianess>little</endianess>
-        <format>0x%lx</format>
-        <name>software</name>
-        <description>IPECamera Registers</description>
-      </bank_description>
-      <registers>
-        <register>
-          <address>0x00</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>RW</mode>
-          <name>spi_conf_input</name>
-        </register>
-        <register>
-          <address>0x10</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>spi_conf_output</name>
-        </register>
-        <register>
-          <address>0x20</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>RW</mode>
-          <name>spi_clk_speed</name>
-        </register>
-        <register>
-          <address>0x30</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>firmware_info</name>
-          <registers_bits>
-            <register_bits>
-              <offset>0</offset>
-              <size>8</size>
-              <mode>R</mode>
-              <name>firmware_version</name>
-            </register_bits>
-            <register_bits>
-              <offset>8</offset>
-              <size>1</size>
-              <mode>R</mode>
-              <name>firmware_bitmode</name>
-            </register_bits>
-            <register_bits>
-              <offset>12</offset>
-              <size>2</size>
-              <mode>R</mode>
-              <name>adc_resolution</name>
-            </register_bits>
-            <register_bits>
-              <offset>16</offset>
-              <size>2</size>
-              <mode>R</mode>
-              <name>output_mode</name>
-            </register_bits>
-          </registers_bits>
-        </register>
-        <register>
-          <address>0x40</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>RW</mode>
-          <name>control</name>
-		<registers_bits>
-        	    <register_bits>
-              		<offset>31</offset>
-	                <size>1</size>
-	                <mode>R</mode>
-          	        <name>freq</name>
-            	    </register_bits>
-		</registers_bits>	
-        </register>
-        <register>
-          <address>0x50</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>status</name>
-        </register>
-        <register>
-          <address>0x54</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>status2</name>
-        </register>
-        <register>
-          <address>0x58</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>status3</name>
-        </register>
-        <register>
-          <address>0x5c</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>fr_status</name>
-        </register>
-        <register>
-          <address>0x70</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>start_address</name>
-        </register>
-        <register>
-          <address>0x74</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>end_address</name>
-        </register>
-        <register>
-          <address>0x78</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>rd_address</name>
-        </register>
-        <register>
-          <address>0xa0</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>fr_param1</name>
-          <registers_bits>
-            <register_bits>
-              <offset>0</offset>
-              <size>10</size>
-              <mode>RW</mode>
-              <name>fr_skip_lines</name>
-            </register_bits>
-            <register_bits>
-              <offset>10</offset>
-              <size>11</size>
-              <mode>RW</mode>
-              <name>fr_num_lines</name>
-            </register_bits>
-            <register_bits>
-              <offset>21</offset>
-              <size>11</size>
-              <mode>RW</mode>
-              <name>fr_start_address</name>
-            </register_bits>
-          </registers_bits>
-        </register>
-        <register>
-          <address>0xb0</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>all</rwmask>
-          <mode>RW</mode>
-          <name>fr_param2</name>
-          <registers_bits>
-            <register_bits>
-              <offset>0</offset>
-              <size>11</size>
-              <mode>RW</mode>
-              <name>fr_threshold_start_line</name>
-            </register_bits>
-            <register_bits>
-              <offset>16</offset>
-              <size>10</size>
-              <mode>RW</mode>
-              <name>fr_area_lines</name>
-            </register_bits>
-          </registers_bits>
-        </register>
-        <register>
-          <address>0xc0</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>skiped_lines</name>
-        </register>
-        <register>
-          <address>0xd0</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>all</rwmask>
-          <mode>RW</mode>
-          <name>fr_thresholds</name>
-        </register>
-        <register>
-          <address>0xd0</address>
-          <offset>0</offset>
-          <size>10</size>
-          <default>0</default>
-          <rwmask>all</rwmask>
-          <mode>RW</mode>
-          <name>fr_pixel_thr</name>
-        </register>
-        <register>
-          <address>0xd0</address>
-          <offset>10</offset>
-          <size>11</size>
-          <default>0</default>
-          <rwmask>all</rwmask>
-          <mode>RW</mode>
-          <name>fr_num_pixel_thr</name>
-        </register>
-        <register>
-          <address>0xd0</address>
-          <offset>21</offset>
-          <size>11</size>
-          <default>0</default>
-          <rwmask>all</rwmask>
-          <mode>RW</mode>
-          <name>fr_num_lines_thr</name>
-        </register>
-        <register>
-          <address>0x100</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>RW</mode>
-          <name>rawdata_pkt_addr</name>
-        </register>
-        <register>
-          <address>0x110</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>temperature_info</name>
-          <registers_bits>
-            <register_bits>
-              <offset>0</offset>
-              <size>16</size>
-              <mode>R</mode>
-              <name>sensor_temperature</name>
-		<views>
-		<view>formuu1</view>
-		<view>formuu2</view>
-                <view>enumm2</view>
-              </views>
-            </register_bits>
-            <register_bits>
-              <offset>16</offset>
-              <size>3</size>
-              <mode>R</mode>
-              <name>sensor_temperature_alarms</name>
-            </register_bits>
-            <register_bits>
-              <offset>19</offset>
-              <size>10</size>
-              <mode>RW</mode>
-              <name>fpga_temperature</name>
-              <views>
-                <view>formuu1</view>
-                <view>enumm1</view>
-              </views>
-            </register_bits>
-            <register_bits>
-              <offset>29</offset>
-              <size>3</size>
-              <mode>R</mode>
-              <name>fpga_temperature_alarms</name>
-            </register_bits>
-          </registers_bits>
-        </register>
-        <register>
-          <address>0x120</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>num_lines</name>
-        </register>
-        <register>
-          <address>0x130</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>start_line</name>
-        </register>
-        <register>
-          <address>0x140</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>exp_time</name>
-        </register>
-        <register>
-          <address>0x150</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>RW</mode>
-          <name>motor</name>
-          <registers_bits>
-            <register_bits>
-              <offset>0</offset>
-              <size>5</size>
-              <mode>RW</mode>
-              <name>motor_phi</name>
-            </register_bits>
-            <register_bits>
-              <offset>5</offset>
-              <size>5</size>
-              <mode>RW</mode>
-              <name>motor_z</name>
-            </register_bits>
-            <register_bits>
-              <offset>10</offset>
-              <size>5</size>
-              <mode>RW</mode>
-              <name>motor_y</name>
-            </register_bits>
-            <register_bits>
-              <offset>15</offset>
-              <size>5</size>
-              <mode>RW</mode>
-              <name>motor_x</name>
-            </register_bits>
-            <register_bits>
-              <offset>20</offset>
-              <size>8</size>
-              <mode>R</mode>
-              <name>adc_gain</name>
-            </register_bits>
-          </registers_bits>
-        </register>
-        <register>
-          <address>0x160</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>write_status</name>
-        </register>
-        <register>
-          <address>0x170</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>RW</mode>
-          <name>num_triggers</name>
-        </register>
-        <register>
-          <address>0x180</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0x280</default>
-          <rwmask>0</rwmask>
-          <mode>RW</mode>
-          <name>trigger_period</name>
-	  <views>
-		<view>enumm2</view>
-	  </views>
-        </register>
-        <register>
-          <address>0x190</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>temperature_sample_period</name>
-        </register>
-        <register>
-          <address>0x1a0</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0x64</default>
-          <rwmask>0</rwmask>
-          <mode>RW</mode>
-          <name>ddr_max_frames</name>
-        </register>
-        <register>
-          <address>0x1b0</address>
-          <offset>0</offset>
-          <size>32</size>
-          <default>0</default>
-          <rwmask>0</rwmask>
-          <mode>R</mode>
-          <name>ddr_num_frames</name>
-        </register>
-      </registers>
-    </bank>
-    <bank>
-	<bank_description>
-        <bar>0</bar>
-        <size>0x0200</size>
-        <protocol>default</protocol>
-        <read_address>0x0</read_address>
-        <write_address>0x0</write_address>
-        <word_size>32</word_size>
-        <endianess>little</endianess>
-        <format>0x%lx</format>
-        <name>dma</name>
-        <description>DMA Registers</description>
-	</bank_description>
-    </bank>
-  </banks>
-  <views>
-    <view type="formula">
-      <name>formuu1</name>
-	<unit>C</unit>
-      <read_from_register>(503975./1024000)*@reg - 27315./100</read_from_register>
-      <write_to_register>(@value + 27315./100)*(102400./503975)</write_to_register>
-<description>formula to get real fpga temperature from the fpga_temperature register in decimal</description>
-    </view>
-    <view type="enum">
-      <name>enumm1</name>
-      <enum value="0x100" min="0x2" max="0x300">high</enum>
-      <enum value="0x010">low</enum>
-	<description>enum towards temperatures register</description>
-    </view>
-    <view type="formula">
-      <name>formuu2</name>
-	<unit>C</unit>
-      <read_from_register>((1./4)*(@reg - 1200)) if @freq==0 else ((3./10)*(@reg - 1000))</read_from_register>
-      <write_to_register>4*@value + 1200 if @freq==0 else (10./3)*@value + 1000</write_to_register>
-      <description>formula to get real sensor temperature from the sensor_temperature register in decimal</description>
-    </view>
-    <view type="enum">
-      <name>enumm2</name>
-      <enum value="0x120">high</enum>
-      <enum value="0x010" min="0x00" max="0x020">low</enum>
-	   <description>enum towards sensor_temperature register</description>
-    </view>
-    <view type="formula">
-      <name>formuu3</name>
-	<unit>us</unit>  
-      <read_from_register>(@reg+(43./100))*129./(40*1000000)if @freq==0 else (@reg+(43./100))*129./(48*1000000)</read_from_register>
-      <write_to_register>@value/129.*(40*1000000) - 43./100 if @freq==0 else @value/129.*(48*1000000) - 43./100</write_to_register>
-	<description>formula to get real exposure time from the cmosis_exp_time register in decimal</description> 
-    </view>
-    <view type="enum">
-      <name>enumm3</name>
-      <enum  value="0x000">short</enum>
-      <enum  value="0x010">mid</enum>
-      <enum  value="0x100" min="0x0F0">long</enum>
-	<description>enum towards cmosis_exp_register register</description>
-    </view>
-  </views>
+  <bank bar="0" size="128" protocol="software_registers" read_address="0x9010" write_address="0x9000" word_size="8" endianess="little" format="%lu" name="cmosis" description="CMOSIS CMV2000 Registers">
+    <register address="1" offset="0" size="16" default="1088" rwmask="0" mode="RW" name="cmosis_number_lines" description="test"/>
+    <register address="3" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start1"/>
+    <register address="5" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start2"/>
+    <register address="7" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start3"/>
+    <register address="9" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start4"/>
+    <register address="11" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start5"/>
+    <register address="13" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start6"/>
+    <register address="15" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start7"/>
+    <register address="17" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start8"/>
+    <register address="19" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines1"/>
+    <register address="21" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines2"/>
+    <register address="23" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines3"/>
+    <register address="25" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines4"/>
+    <register address="27" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines5"/>
+    <register address="29" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines6"/>
+    <register address="31" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines7"/>
+    <register address="33" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines8"/>
+    <register address="35" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_sub_s"/>
+    <register address="37" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_sub_a"/>
+    <register address="39" offset="0" size="1" default="1" rwmask="0" mode="RW" name="cmosis_color"/>
+    <register address="40" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_image_flipping"/>
+    <register address="41" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_exp_flags"/>
+    <register address="42" offset="0" size="24" default="1088" rwmask="0" mode="RW" name="cmosis_exp_time"><view view="formuu3"/><view view="enumm3"/></register>
+    <register address="45" offset="0" size="24" default="1088" rwmask="0" mode="RW" name="cmosis_exp_step"/>
+    <register address="48" offset="0" size="24" default="1" rwmask="0" mode="RW" name="cmosis_exp_kp1"/>
+    <register address="51" offset="0" size="24" default="1" rwmask="0" mode="RW" name="cmosis_exp_kp2"/>
+    <register address="54" offset="0" size="2" default="1" rwmask="0" mode="RW" name="cmosis_nr_slopes"/>
+    <register address="55" offset="0" size="8" default="1" rwmask="0" mode="RW" name="cmosis_exp_seq"/>
+    <register address="56" offset="0" size="24" default="1088" rwmask="0" mode="RW" name="cmosis_exp_time2"/>
+    <register address="59" offset="0" size="24" default="1088" rwmask="0" mode="RW" name="cmosis_exp_step2"/>
+    <register address="68" offset="0" size="2" default="1" rwmask="0" mode="RW" name="cmosis_nr_slopes2"/>
+    <register address="69" offset="0" size="8" default="1" rwmask="0" mode="RW" name="cmosis_exp_seq2"/>
+    <register address="70" offset="0" size="16" default="1" rwmask="0" mode="RW" name="cmosis_number_frames"/>
+    <register address="72" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_output_mode"/>
+    <register address="78" offset="0" size="12" default="85" rwmask="0" mode="RW" name="cmosis_training_pattern"/>
+    <register address="80" offset="0" size="18" default="0x3FFFF" rwmask="0" mode="RW" name="cmosis_channel_en"/>
+    <register address="82" offset="0" size="3" default="7" rwmask="0" mode="RW" name="cmosis_special_82"/>
+    <register address="89" offset="0" size="8" default="96" rwmask="0" mode="RW" name="cmosis_vlow2"/>
+    <register address="90" offset="0" size="8" default="96" rwmask="0" mode="RW" name="cmosis_vlow3"/>
+    <register address="100" offset="0" size="14" default="16260" rwmask="0" mode="RW" name="cmosis_offset"/>
+    <register address="102" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_pga"/>
+    <register address="103" offset="0" size="8" default="32" rwmask="0" mode="RW" name="cmosis_adc_gain"/>
+    <register address="111" offset="0" size="1" default="1" rwmask="0" mode="RW" name="cmosis_bit_mode"/>
+    <register address="112" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_adc_resolution"/>
+    <register address="115" offset="0" size="1" default="1" rwmask="0" mode="RW" name="cmosis_special_115"/>
+  </bank>
+  <bank bar="0" size="0x0200" protocol="software_registers" read_address="0x9000" write_address="0x9000" word_size="32" endianess="little" format="0x%lx" name="fpga" description="IPECamera Registers">
+    <register address="0x00" offset="0" size="32" default="0" rwmask="0" mode="RW" name="spi_conf_input"/>
+    <register address="0x10" offset="0" size="32" default="0" rwmask="0" mode="R" name="spi_conf_output"/>
+    <register address="0x20" offset="0" size="32" default="0" rwmask="0" mode="RW" name="spi_clk_speed"/>
+    <register address="0x30" offset="0" size="32" default="0" rwmask="0" mode="R" name="firmware_info">
+      <field offset="0" size="8" mode="R" name="firmware_version"/>
+      <field offset="8" size="1" mode="R" name="firmware_bitmode"/>
+      <field offset="12" size="2" mode="R" name="adc_resolution"/>
+      <field offset="16" size="2" mode="R" name="output_mode"/>
+    </register>
+    <register address="0x40" offset="0" size="32" default="0" rwmask="0" mode="RW" name="control">
+      <field offset="31" size="1" mode="R" name="freq"/>
+    </register>
+    <register address="0x50" offset="0" size="32" default="0" rwmask="0" mode="R" name="status"/>
+    <register address="0x54" offset="0" size="32" default="0" rwmask="0" mode="R" name="status2"/>
+    <register address="0x58" offset="0" size="32" default="0" rwmask="0" mode="R" name="status3"/>
+    <register address="0x5c" offset="0" size="32" default="0" rwmask="0" mode="R" name="fr_status"/>
+    <register address="0x70" offset="0" size="32" default="0" rwmask="0" mode="R" name="start_address"/>
+    <register address="0x74" offset="0" size="32" default="0" rwmask="0" mode="R" name="end_address"/>
+    <register address="0x78" offset="0" size="32" default="0" rwmask="0" mode="R" name="rd_address"/>
+    <register address="0xa0" offset="0" size="32" default="0" rwmask="0" mode="R" name="fr_param1">
+      <field offset="0" size="10" mode="RW" name="fr_skip_lines"/>
+      <field offset="10" size="11" mode="RW" name="fr_num_lines"/>
+      <field offset="21" size="11" mode="RW" name="fr_start_address"/>
+    </register>
+    <register address="0xb0" offset="0" size="32" default="0" rwmask="all" mode="RW" name="fr_param2">
+      <field offset="0" size="11" mode="RW" name="fr_threshold_start_line"/>
+      <field offset="16" size="10" mode="RW" name="fr_area_lines"/>
+    </register>
+    <register address="0xc0" offset="0" size="32" default="0" rwmask="0" mode="R" name="skiped_lines"/>
+    <register address="0xd0" offset="0" size="32" default="0" rwmask="all" mode="RW" name="fr_thresholds"/>
+    <register address="0xd0" offset="0" size="10" default="0" rwmask="all" mode="RW" name="fr_pixel_thr"/>
+    <register address="0xd0" offset="10" size="11" default="0" rwmask="all" mode="RW" name="fr_num_pixel_thr"/>
+    <register address="0xd0" offset="21" size="11" default="0" rwmask="all" mode="RW" name="fr_num_lines_thr"/>
+    <register address="0x100" offset="0" size="32" default="0" rwmask="0" mode="RW" name="rawdata_pkt_addr"/>
+    <register address="0x110" offset="0" size="32" default="0" rwmask="0" mode="R" name="temperature_info">
+      <field offset="0" size="16" mode="R" name="sensor_temperature"><view view="formuu1"/><view view="formuu2"/><view view="enumm2"/></field>
+      <field offset="16" size="3" mode="R" name="sensor_temperature_alarms"/>
+      <field offset="19" size="10" mode="RW" name="fpga_temperature"><view view="formuu1"/><view view="enumm1"/></field>
+      <field offset="29" size="3" mode="R" name="fpga_temperature_alarms"/>
+    </register>
+    <register address="0x120" offset="0" size="32" default="0" rwmask="0" mode="R" name="num_lines"/>
+    <register address="0x130" offset="0" size="32" default="0" rwmask="0" mode="R" name="start_line"/>
+    <register address="0x140" offset="0" size="32" default="0" rwmask="0" mode="R" name="exp_time"/>
+    <register address="0x150" offset="0" size="32" default="0" rwmask="0" mode="RW" name="motor">
+      <field offset="0" size="5" mode="RW" name="motor_phi"/>
+      <field offset="5" size="5" mode="RW" name="motor_z"/>
+      <field offset="10" size="5" mode="RW" name="motor_y"/>
+      <field offset="15" size="5" mode="RW" name="motor_x"/>
+      <field offset="20" size="8" mode="R" name="adc_gain"/>
+    </register>
+    <register address="0x160" offset="0" size="32" default="0" rwmask="0" mode="R" name="write_status"/>
+    <register address="0x170" offset="0" size="32" default="0" rwmask="0" mode="RW" name="num_triggers"/>
+    <register address="0x180" offset="0" size="32" default="0x280" rwmask="0" mode="RW" name="trigger_period"><view view="enumm2"/></register>
+    <register address="0x190" offset="0" size="32" default="0" rwmask="0" mode="R" name="temperature_sample_period"/>
+    <register address="0x1a0" offset="0" size="32" default="0x64" rwmask="0" mode="RW" name="ddr_max_frames"/>
+    <register address="0x1b0" offset="0" size="32" default="0" rwmask="0" mode="R" name="ddr_num_frames"/>
+  </bank>
+  <bank bar="0" size="0x0200" protocol="software_registers" read_address="0x0" write_address="0x0" word_size="32" endianess="little" format="0x%lx" name="dma" description="DMA Registers"/>
+  <transform name="formuu1" unit="C" read_from_register="(503975./1024000)*$value - 27315./100" write_to_register="($value + 27315./100)*(102400./503975)" description="formula to get real fpga temperature from the fpga_temperature register in decimal"/>
+  <transform name="formuu2" unit="C" read_from_register="((1./4)*($value - 1200)) if $freq==0 else ((3./10)*($value - 1000))" write_to_register="4*$value + 1200 if $freq==0 else (10./3)*$value + 1000" description="formula to get real sensor temperature from the sensor_temperature register in decimal"/>
+  <transform name="formuu3" unit="us" read_from_register="($value+(43./100))*129./(40*1000000)if $freq==0 else ($value+(43./100))*129./(48*1000000)" write_to_register="$value/129.*(40*1000000) - 43./100 if $freq==0 else $value/129.*(48*1000000) - 43./100" description="formula to get real exposure time from the cmosis_exp_time register in decimal"/>
+  <enum name="enumm1" description="enum towards temperatures register">
+    <name name="high" value="0x100" min="0x2" max="0x300"/>
+    <name name="low" value="0x010"/>
+  </enum>
+  <enum name="enumm2" description="enum towards sensor_temperature register">
+    <name name="high" value="0x120"/>
+    <name name="low" value="0x010" min="0x00" max="0x020"/>
+  </enum>
+  <enum name="enumm3" description="enum towards cmosis_exp_register register">
+    <name name="short" value="0x000"/>
+    <name name="mid" value="0x010"/>
+    <name name="long" value="0x100" min="0x0F0"/>
+  </enum>
+  <unit name="C">
+    <transform unit="K" transform="$value+273.15"/>
+    <transform unit="F" transform="$value*(9./5)+32"/>
+  </unit>
+  <unit name="K">
+    <transform unit="C" transform="$value-273.15"/>
+    <transform unit="F" transform="($value-273.15)*(9./5)+32"/>
+  </unit>
+  <unit name="F">
+    <transform unit="C" transform="($value-32)*5./9"/>
+    <transform unit="K" transform="($value+273.15-32)*5./9"/>
+  </unit>
+  <unit name="s">
+    <transform unit="ms" transform="$value*1000"/>
+    <transform unit="us" transform="$value*1000000"/>
+    <transform unit="ns" transform="$value*1000000000"/>
+  </unit>
+  <unit name="ms">
+    <transform unit="s" transform="$value/1000"/>
+    <transform unit="us" transform="$value*1000"/>
+    <transform unit="ns" transform="$value*1000000"/>
+  </unit>
+  <unit name="us">
+    <transform unit="s" transform="$value/1000000"/>
+    <transform unit="ms" transform="$value/1000"/>
+    <transform unit="ns" transform="$value*1000"/>
+  </unit>
+  <unit name="ns">
+    <transform unit="s" transform="$value/1000000000"/>
+    <transform unit="ms" transform="$value/1000000"/>
+    <transform unit="us" transform="$value/1000"/>
+  </unit>
 </model>

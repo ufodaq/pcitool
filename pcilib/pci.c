@@ -139,16 +139,23 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	}
 
 	ctx->alloc_reg = PCILIB_DEFAULT_REGISTER_SPACE;
+	ctx->alloc_views = PCILIB_DEFAULT_VIEW_SPACE;
+	ctx->alloc_units = PCILIB_DEFAULT_UNIT_SPACE;
 	ctx->registers = (pcilib_register_description_t *)malloc(PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_description_t));
 	ctx->register_ctx = (pcilib_register_context_t *)malloc(PCILIB_DEFAULT_REGISTER_SPACE * sizeof(pcilib_register_context_t));
+	ctx->views = (pcilib_view_description_t**)malloc(PCILIB_DEFAULT_VIEW_SPACE * sizeof(pcilib_view_description_t*));
+	ctx->units = (pcilib_unit_description_t*)malloc(PCILIB_DEFAULT_UNIT_SPACE * sizeof(pcilib_unit_description_t));
 	
-	if ((!ctx->registers)||(!ctx->register_ctx)) {
+	if ((!ctx->registers)||(!ctx->register_ctx)||(!ctx->views)||(!ctx->units)) {
 	    pcilib_error("Error allocating memory for register model");
 	    pcilib_close(ctx);
 	    return NULL;
 	}
 	
+	
 	memset(ctx->registers, 0, sizeof(pcilib_register_description_t));
+	memset(ctx->units, 0, sizeof(pcilib_unit_t));
+	memset(ctx->views, 0, sizeof(pcilib_view_t));
 	memset(ctx->banks, 0, sizeof(pcilib_register_bank_description_t));
 	memset(ctx->ranges, 0, sizeof(pcilib_register_range_t));
 
@@ -191,6 +198,8 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	ctx->model_info.banks = ctx->banks;
 	ctx->model_info.protocols = ctx->protocols;
 	ctx->model_info.ranges = ctx->ranges;
+	ctx->model_info.views = (const pcilib_view_description_t**)ctx->views;
+	ctx->model_info.units = ctx->units;
 
 	err = pcilib_init_register_banks(ctx);
 	if (err) {
@@ -350,7 +359,8 @@ char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size) {
 
 
 void pcilib_close(pcilib_t *ctx) {
-    pcilib_bar_t i;
+    int i;
+    pcilib_bar_t bar;
 
     if (ctx) {
 	pcilib_dma_engine_t dma;
@@ -370,10 +380,14 @@ void pcilib_close(pcilib_t *ctx) {
 
 	pcilib_free_register_banks(ctx);
 
-	pcilib_free_xml(ctx);
-	
-	if (ctx->register_ctx)
+	if (ctx->register_ctx) {
+	    pcilib_register_t reg;
+	    for (reg = 0; reg < ctx->num_reg; reg++) {
+		if (ctx->register_ctx[reg].views)
+		    free(ctx->register_ctx[reg].views);
+	    }
 	    free(ctx->register_ctx);
+	}
 
 	if (ctx->event_plugin)
 	    pcilib_plugin_close(ctx->event_plugin);
@@ -389,22 +403,33 @@ void pcilib_close(pcilib_t *ctx) {
 	    }
 	}
 	
-	for (i = 0; i < PCILIB_MAX_BARS; i++) {
-	    if (ctx->bar_space[i]) {
-		char *ptr = ctx->bar_space[i];
-		ctx->bar_space[i] = NULL;
-		pcilib_unmap_bar(ctx, i, ptr);
+	for (bar = 0; bar < PCILIB_MAX_BARS; bar++) {
+	    if (ctx->bar_space[bar]) {
+		char *ptr = ctx->bar_space[bar];
+		ctx->bar_space[bar] = NULL;
+		pcilib_unmap_bar(ctx, bar, ptr);
 	    }
 	}
 	
 	if (ctx->pci_cfg_space_fd >= 0)
 	    close(ctx->pci_cfg_space_fd);
 
+	if (ctx->units);
+	    free(ctx->units);
+
+	if (ctx->views) {
+	    for (i = 0; ctx->views[i]; i++)
+	        free(ctx->views[i]);
+	    free(ctx->views);
+	}
+
 	if (ctx->registers)
 	    free(ctx->registers);
 	
 	if (ctx->model)
 	    free(ctx->model);
+
+	pcilib_free_xml(ctx);
 
 	if (ctx->handle >= 0)
 	    close(ctx->handle);

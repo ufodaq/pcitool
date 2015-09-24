@@ -1,6 +1,9 @@
 High Priority (we would need it for IPE Camera)
 =============
- 1. Allow overriding of registers and banks (performance?).
+ 1. Join multiple XML files and on error use simplified XSD scheme on all files to find the file causing error
+ 2. Universal tree-style api to access the independent views, frontend all registers as well (pci -l /register; pci -r /register/reg1; pci -r /sensor/width;) Unit is path of the view /view[:unit] or just /unit for register vies
+ 3. Information on bank and the view values in the pci -i <reg>
+ 4. Integrate hash tables for views, units, and registers
  
 Normal Priority (it would make just few things a bit easier)
 ===============
@@ -10,13 +13,12 @@ Normal Priority (it would make just few things a bit easier)
  
 Low Priority (only as generalization for other projects)
 ============
- 1. XML configurations describing registers (and DMA engines?)
- 2. Access register/bank/lock lookups using hash tables
- 3. Support for Network Registers and Network DMA
- 4. Define a syntax for register dependencies / delays (?)
- 5. Use pthread_condition_t instead of polling
- 6. Support FIFO reads/writes from/to registers
- 7. We managed kmem performance using next kmem prediction, but it is still wise to provide additionally a binary tree for faster search
+ 1. Shall we allow overriding of registers?
+ 2. Support for Network Registers and Network DMA
+ 3. Define a syntax for register dependencies / delays (?)
+ 4. Use pthread_condition_t instead of polling
+ 5. Support FIFO reads/writes from/to registers
+ 6. We managed kmem performance using next kmem prediction, but it is still wise to provide additionally a binary tree for faster search
 
 Performance
 ===========

@@ -6,6 +6,7 @@
 #include <pcilib/dma.h>
 #include <pcilib/event.h>
 #include <pcilib/export.h>
+#include <pcilib/view.h>
 
 
 typedef struct {
@@ -18,6 +19,8 @@ typedef struct {
     const pcilib_register_bank_description_t *banks;
     const pcilib_register_protocol_description_t *protocols;
     const pcilib_register_range_t *ranges;
+    const pcilib_view_description_t **views;
+    const pcilib_unit_description_t *units;
 
     const pcilib_event_description_t *events;
     const pcilib_event_data_type_description_t *data_types;

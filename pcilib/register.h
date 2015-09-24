@@ -24,6 +24,11 @@ typedef enum {
 } pcilib_register_type_t;
 
 typedef struct {
+    const char *name;
+    const char *view;
+} pcilib_view_reference_t;
+
+typedef struct {
     pcilib_register_addr_t addr;		/**< Register address in the bank */
     pcilib_register_size_t offset;		/**< Register offset in the byte (in bits) */
     pcilib_register_size_t bits;		/**< Register size in bits */
@@ -37,17 +42,12 @@ typedef struct {
 						are on in the value are cleared/inverted). For information only, no preprocessing on bits is performed. */
     pcilib_register_type_t type;		/**< Defines type of register is it standard register, subregister for bit fields or view, fifo */
     pcilib_register_bank_addr_t bank;		/**< Specified the address of the bank this register belongs to */
-    
+
     const char *name;				/**< The access name of the register */
     const char *description;			/**< Brief description of the register */
+
+    pcilib_view_reference_t *views;		/**< List of supported views for this register */
 } pcilib_register_description_t;
-
-
-typedef struct {
-    pcilib_register_bank_t bank;		/**< Reference to bank containing the register */
-    pcilib_register_value_t min, max;		/**< Minimum & maximum allowed values */
-    pcilib_xml_node_t *xml;			/**< Additional XML properties */
-} pcilib_register_context_t;
 
 
 #ifdef __cplusplus
