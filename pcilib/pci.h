@@ -30,6 +30,7 @@
 #include "export.h"
 #include "locking.h"
 #include "xml.h"
+#include "py.h"
 #include "view.h"
 
 typedef struct {
@@ -41,14 +42,13 @@ typedef struct {
 struct pcilib_view_context_s {
     UT_hash_handle hh;
     pcilib_view_t view;
-    pcilib_view_api_description_t *api;
-    pcilib_view_description_t desc;							/**< We will allocate more memory and store actual description instance here, so it should be the last member */
+//    pcilib_view_description_t desc;							/**< We will allocate more memory and store actual description instance here, so it should be the last member */
 }; 
 
 struct pcilib_unit_context_s {
     UT_hash_handle hh;
     pcilib_unit_t unit;
-    pcilib_unit_description_t desc;
+//    pcilib_unit_description_t desc;
 };
 
 typedef struct {
@@ -109,6 +109,7 @@ struct pcilib_s {
 
     struct pcilib_locking_s locks;							/**< Context of locking subsystem */
     struct pcilib_xml_s xml;                                                    	/**< XML context */
+    struct pcilib_py_s *py;                                                              /**< Python execution context */
 
 #ifdef PCILIB_FILE_IO
     int file_io_handle;

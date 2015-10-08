@@ -6,6 +6,8 @@
 #include <pcilib/bank.h>
 #include <pcilib/dma.h>
 
+extern const char *pcilib_data_types[];
+
 extern const pcilib_register_protocol_description_t pcilib_protocols[];
 extern const pcilib_dma_description_t pcilib_dma[];
 

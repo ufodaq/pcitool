@@ -12,7 +12,7 @@
 static void pcilib_enum_view_free(pcilib_t *ctx, pcilib_view_context_t *view) {
 }
 
-static int pcilib_enum_view_read(pcilib_t *ctx, pcilib_view_context_t *view, const pcilib_register_value_t *regval, pcilib_data_type_t viewval_type, size_t viewval_size, void *viewval) {
+static int pcilib_enum_view_read(pcilib_t *ctx, pcilib_view_context_t *view, const pcilib_register_value_t *regval, pcilib_value_t *val) {
 /*        for(j=0; ((pcilib_enum_t*)(params))[j].name; j++) {
             if (*regval<=((pcilib_enum_t*)(params))[j].max && *regval>=((pcilib_enum_t*)(params))[j].min) {
                 if(viewval_size<strlen(((pcilib_enum_t*)(params))[j].name)) {
@@ -29,7 +29,7 @@ static int pcilib_enum_view_read(pcilib_t *ctx, pcilib_view_context_t *view, con
     return PCILIB_ERROR_INVALID_REQUEST;*/
 }
 
-static int pcilib_enum_view_write(pcilib_t *ctx, pcilib_view_context_t *view, pcilib_register_value_t *regval, pcilib_data_type_t viewval_type, size_t viewval_size, const void *viewval) {
+static int pcilib_enum_view_write(pcilib_t *ctx, pcilib_view_context_t *view, pcilib_register_value_t *regval, pcilib_value_t *val) {
 /*    int j,k;
 
     if(view2reg==1) {

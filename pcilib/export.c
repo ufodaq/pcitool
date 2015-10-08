@@ -4,6 +4,10 @@
 
 #include "export.h"
 
+
+const char *pcilib_data_types[] = { "default", "string", "double", "long" };
+
+
 #include "protocols/default.h"
 #include "protocols/software.h"
 

@@ -41,10 +41,12 @@ typedef enum {
 } pcilib_endianess_t;
 
 typedef enum {
-    PCILIB_TYPE_STRING = 0,			/**< char* */
-    PCILIB_TYPE_DOUBLE = 1,			/**< double */
-    PCILIB_TYPE_LONG = 2
-} pcilib_data_type_t;
+    PCILIB_TYPE_INVALID = 0,                    /**< uninitialized */
+    PCILIB_TYPE_DEFAULT = 0,			/**< default type */
+    PCILIB_TYPE_STRING = 1,			/**< char* */
+    PCILIB_TYPE_DOUBLE = 2,			/**< double */
+    PCILIB_TYPE_LONG = 3
+} pcilib_value_type_t;
 
 typedef enum {
     PCILIB_DMA_IRQ = 1,
@@ -101,6 +103,23 @@ typedef struct {
     struct timeval timestamp;			/**< most accurate timestamp */
     pcilib_event_info_flags_t flags;		/**< flags */
 } pcilib_event_info_t;
+
+typedef struct {
+    pcilib_value_type_t type;
+    const char *unit;
+    const char *format;
+
+    union {
+	long ival;
+	double fval;
+	char *sval;
+    };
+
+        // This is a private part
+    size_t size;
+    void *data;
+    char str[16];
+} pcilib_value_t;
 
 
 #define PCILIB_BAR_DETECT 		((pcilib_bar_t)-1)
@@ -200,8 +219,15 @@ int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_reg
 int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t *value);
 int pcilib_write_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t value);
 
-int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, pcilib_data_type_t value_type, size_t value_size, void *value);
-int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, pcilib_data_type_t value_type, size_t value_size, void *value);
+void pcilib_clean_value(pcilib_t *ctx, pcilib_value_t *val);
+int pcilib_copy_value(pcilib_t *ctx, pcilib_value_t *dst, const pcilib_value_t *src);
+int pcilib_set_value_from_float(pcilib_t *ctx, pcilib_value_t *val, double fval);
+int pcilib_set_value_from_int(pcilib_t *ctx, pcilib_value_t *val, long ival);
+int pcilib_convert_value_unit(pcilib_t *ctx, pcilib_value_t *val, const char *unit_name);
+int pcilib_convert_value_type(pcilib_t *ctx, pcilib_value_t *val, pcilib_value_type_t type);
+
+int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, pcilib_value_t *value);
+int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, const pcilib_value_t *value);
 
 int pcilib_reset(pcilib_t *ctx);
 int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);

@@ -137,6 +137,13 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    pcilib_close(ctx);
 	    return NULL;
 	}
+	
+	err = pcilib_init_py(ctx);
+	if (err) {
+	    pcilib_error("Error (%i) initializing python subsystem", err);
+	    pcilib_close(ctx);
+	    return NULL;
+	}
 
 	ctx->alloc_reg = PCILIB_DEFAULT_REGISTER_SPACE;
 	ctx->alloc_views = PCILIB_DEFAULT_VIEW_SPACE;
@@ -152,10 +159,9 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    return NULL;
 	}
 	
-	
 	memset(ctx->registers, 0, sizeof(pcilib_register_description_t));
 	memset(ctx->units, 0, sizeof(pcilib_unit_t));
-	memset(ctx->views, 0, sizeof(pcilib_view_t));
+	memset(ctx->views, 0, sizeof(pcilib_view_t*));
 	memset(ctx->banks, 0, sizeof(pcilib_register_bank_description_t));
 	memset(ctx->ranges, 0, sizeof(pcilib_register_range_t));
 
@@ -391,6 +397,8 @@ void pcilib_close(pcilib_t *ctx) {
 
 	if (ctx->event_plugin)
 	    pcilib_plugin_close(ctx->event_plugin);
+	
+        pcilib_free_py(ctx);
 
 	if (ctx->locks.kmem)
 	    pcilib_free_locking(ctx);
