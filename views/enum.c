@@ -42,6 +42,6 @@ static int pcilib_enum_view_write(pcilib_t *ctx, pcilib_view_context_t *view, pc
 }
 
 const pcilib_view_api_description_t pcilib_enum_view_static_api =
-  { PCILIB_VERSION, sizeof(pcilib_enum_view_description_t), NULL, NULL,  pcilib_enum_view_read,  pcilib_enum_view_write };
+  { PCILIB_VERSION, sizeof(pcilib_enum_view_description_t), NULL, NULL, NULL, pcilib_enum_view_read,  pcilib_enum_view_write };
 const pcilib_view_api_description_t pcilib_enum_view_xml_api =
-  { PCILIB_VERSION, sizeof(pcilib_enum_view_description_t), NULL, pcilib_enum_view_free,  pcilib_enum_view_read,  pcilib_enum_view_write };
+  { PCILIB_VERSION, sizeof(pcilib_enum_view_description_t), NULL, NULL, pcilib_enum_view_free,  pcilib_enum_view_read,  pcilib_enum_view_write };

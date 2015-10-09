@@ -11,6 +11,7 @@
 #include "value.h"
 
 int pcilib_add_views(pcilib_t *ctx, size_t n, const pcilib_view_description_t *desc) {
+    int err = 0;
     size_t i;
     void *ptr;
 
@@ -43,88 +44,138 @@ int pcilib_add_views(pcilib_t *ctx, size_t n, const pcilib_view_description_t *d
     ptr = (void*)desc;
     for (i = 0; i < n; i++) {
         const pcilib_view_description_t *v = (const pcilib_view_description_t*)ptr;
+        pcilib_view_context_t *view_ctx;
+
         ctx->views[ctx->num_views + i] = (pcilib_view_description_t*)malloc(v->api->description_size);
         if (!ctx->views[ctx->num_views + i]) {
-            size_t j;
-            for (j = 0; j < i; j++)
-                free(ctx->views[ctx->num_views + j]);
-            ctx->views[ctx->num_views] = NULL;
-            pcilib_error("Error allocating %zu bytes of memory for the view description", v->api->description_size);
-            return PCILIB_ERROR_MEMORY;
+            err = PCILIB_ERROR_MEMORY;
+            break;
         }
+
+        if (v->api->init) 
+            view_ctx = v->api->init(ctx);
+        else {
+            view_ctx = (pcilib_view_context_t*)malloc(sizeof(pcilib_view_context_t));
+            memset(view_ctx, 0, sizeof(pcilib_view_context_t));
+        }
+
+        view_ctx->view = ctx->num_views + i;
+        view_ctx->name = v->name;
+
+        if (!view_ctx) {
+            free(ctx->views[ctx->num_views + i]);
+            err = PCILIB_ERROR_MEMORY;
+            break;
+        }
+
+        HASH_ADD_KEYPTR(hh, ctx->view_hash, view_ctx->name, strlen(view_ctx->name), view_ctx);
         memcpy(ctx->views[ctx->num_views + i], v, v->api->description_size);
         ptr += v->api->description_size;
     }
     ctx->views[ctx->num_views + i] = NULL;
-    ctx->num_views += n;
+    ctx->num_views += i;
 
-    return 0;
+    return err;
 }
 
-
-pcilib_view_t pcilib_find_view_by_name(pcilib_t *ctx, const char *name) {
+void pcilib_clean_views(pcilib_t *ctx) {
     pcilib_view_t i;
+    pcilib_view_context_t *view_ctx, *tmp;
 
-    for(i = 0; ctx->views[i]; i++) {
-        if (!strcasecmp(ctx->views[i]->name, name))
-	    return i;
+    if (ctx->unit_hash) {
+        HASH_ITER(hh, ctx->view_hash, view_ctx, tmp) {
+            const pcilib_view_description_t *v = ctx->views[view_ctx->view];
+
+            HASH_DEL(ctx->view_hash, view_ctx);
+            if (v->api->free) v->api->free(ctx, view_ctx);
+            else free(view_ctx);
+        }
     }
 
+    for (i = 0; ctx->views[i]; i++) {
+	if (ctx->views[i]->api->free_description) {
+	    ctx->views[i]->api->free_description(ctx, ctx->views[i]);
+	} else {
+	    free(ctx->views[i]);
+	}
+    }
+
+    ctx->views[0] = NULL;
+    ctx->num_views = 0;
+}
+
+pcilib_view_context_t *pcilib_find_view_context_by_name(pcilib_t *ctx, const char *name) {
+    pcilib_view_context_t *view_ctx = NULL;
+
+    HASH_FIND_STR(ctx->view_hash, name, view_ctx);
+    return view_ctx;
+}
+
+pcilib_view_t pcilib_find_view_by_name(pcilib_t *ctx, const char *name) {
+    pcilib_view_context_t *view_ctx = pcilib_find_view_context_by_name(ctx, name);
+    if (view_ctx) return view_ctx->view;
     return PCILIB_VIEW_INVALID;
 }
 
-pcilib_view_t pcilib_find_register_view_by_name(pcilib_t *ctx, pcilib_register_t reg, const char *name) {
+
+
+pcilib_view_context_t *pcilib_find_register_view_context_by_name(pcilib_t *ctx, pcilib_register_t reg, const char *name) {
     pcilib_view_t i;
     pcilib_register_context_t *regctx = &ctx->register_ctx[reg];
 
-    if (!regctx->views) return PCILIB_VIEW_INVALID;
+    if (!regctx->views) return NULL;
 
     for (i = 0; regctx->views[i].name; i++) {
 	if (strcasecmp(name, regctx->views[i].name)) {
-	    return pcilib_find_view_by_name(ctx, regctx->views[i].view);
+	    return pcilib_find_view_context_by_name(ctx, regctx->views[i].view);
 	}
     }
-    
-    return PCILIB_VIEW_INVALID;
+
+    return NULL;
 }
 
     // We expect symmetric units. Therefore, we don't distringuish if we read or write
-pcilib_view_t pcilib_find_register_view(pcilib_t *ctx, pcilib_register_t reg, const char *name) {
+pcilib_view_context_t *pcilib_find_register_view_context(pcilib_t *ctx, pcilib_register_t reg, const char *name) {
     pcilib_view_t i;
+    pcilib_view_context_t *view_ctx;
+    pcilib_view_description_t *view_desc;
     pcilib_register_context_t *regctx = &ctx->register_ctx[reg];
 
-    if (!regctx->views) return PCILIB_VIEW_INVALID;
+    if (!regctx->views) return NULL;
 
 	// Check if view is just a name of listed view
-    i = pcilib_find_register_view_by_name(ctx, reg, name);
-    if (i != PCILIB_VIEW_INVALID) return i;
+    view_ctx = pcilib_find_register_view_context_by_name(ctx, reg, name);
+    if (view_ctx) return view_ctx;
 
 	// Check if view is a unit
     for (i = 0; regctx->views[i].name; i++) {
 	pcilib_unit_transform_t *trans;
-	pcilib_view_t view = pcilib_find_view_by_name(ctx, regctx->views[i].view);
-	if (view == PCILIB_VIEW_INVALID) continue;
-        
-        if (ctx->views[view]->unit) {
-	    trans = pcilib_find_transform_by_unit_names(ctx, ctx->views[view]->unit, name);
-	    if (trans) return view;
+
+	view_ctx = pcilib_find_view_context_by_name(ctx, regctx->views[i].view);
+	if (!view_ctx) continue;
+
+        view_desc = ctx->views[view_ctx->view];
+        if (view_desc->unit) {
+	    trans = pcilib_find_transform_by_unit_names(ctx, view_desc->unit, name);
+	    if (trans) return pcilib_find_view_context_by_name(ctx, view_desc->name);
 	}
     }
 
-    return PCILIB_VIEW_INVALID;
+    return NULL;
 }
 
 
 typedef struct {
     pcilib_register_t reg;
-    pcilib_view_t view;
+    pcilib_view_context_t *view;
     pcilib_unit_transform_t *trans;
 } pcilib_view_configuration_t;
 
 static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, const char *regname, const char *view_cname, int write_direction, pcilib_view_configuration_t *cfg) {
     pcilib_view_t view;
-    pcilib_register_t reg = PCILIB_REGISTER_INVALID;
+    pcilib_view_context_t *view_ctx;
     pcilib_unit_transform_t *trans = NULL;
+    pcilib_register_t reg = PCILIB_REGISTER_INVALID;
 
     char *view_name = alloca(strlen(view_cname) + 1);
     char *unit_name;
@@ -147,20 +198,21 @@ static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, con
 	
 	// get value
 	
-	if (unit_name) view = pcilib_find_register_view_by_name(ctx, reg, view_name);
-	else view = pcilib_find_register_view(ctx, reg, view_name);
+	if (unit_name) view_ctx = pcilib_find_register_view_context_by_name(ctx, reg, view_name);
+	else view_ctx = pcilib_find_register_view_context(ctx, reg, view_name);
 
-	if (view == PCILIB_VIEW_INVALID) {
+	if (!view_ctx) {
 	    pcilib_error("Can't find the specified view %s for register %s", view_name, regname);
 	    return PCILIB_ERROR_NOTFOUND;
 	}
     } else {
-        view = pcilib_find_view_by_name(ctx, view_name);
-	if (view == PCILIB_VIEW_INVALID) {
+        view_ctx = pcilib_find_view_context_by_name(ctx, view_name);
+	if (!view_ctx) {
 	    pcilib_error("Can't find the specified view %s", view_name);
 	    return PCILIB_ERROR_NOTFOUND;
 	}
     }
+    view = view_ctx->view;
 
     if (unit_name) {
         if (write_direction) trans = pcilib_find_transform_by_unit_names(ctx, unit_name, ctx->views[view]->unit);
@@ -175,7 +227,7 @@ static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, con
     }
 
     cfg->reg = reg;
-    cfg->view = view;
+    cfg->view = view_ctx;
     cfg->trans = trans;
 
     return 0;
@@ -185,13 +237,16 @@ static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, con
 int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view, pcilib_value_t *val) {
     int err;
 
+    pcilib_view_description_t *v;
     pcilib_view_configuration_t cfg;
     pcilib_register_value_t regvalue = 0;
 
     err = pcilib_detect_view_configuration(ctx, bank, regname, view, 0, &cfg);
     if (err) return err;
 
-    if (!ctx->views[cfg.view]->api->read_from_reg) {
+    v = ctx->views[cfg.view->view];
+
+    if (!v->api->read_from_reg) {
         pcilib_error("The view (%s) does not support reading from the register", view);
         return PCILIB_ERROR_NOTSUPPORTED;
     }
@@ -206,7 +261,7 @@ int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regna
 
     pcilib_clean_value(ctx, val);
 
-    err = ctx->views[cfg.view]->api->read_from_reg(ctx, NULL /*???*/, &regvalue, val);
+    err = v->api->read_from_reg(ctx, cfg.view, &regvalue, val);
     if (err) {
         if (regname) 
             pcilib_error("Error (%i) computing view (%s) of register %s", err, view, regname);
@@ -228,13 +283,16 @@ int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regn
     int err;
     pcilib_value_t val;
 
+    pcilib_view_description_t *v;
     pcilib_view_configuration_t cfg;
     pcilib_register_value_t regvalue = 0;
 
     err = pcilib_detect_view_configuration(ctx, bank, regname, view, 1, &cfg);
     if (err) return err;
 
-    if (!ctx->views[cfg.view]->api->write_to_reg) {
+    v = ctx->views[cfg.view->view];
+
+    if (!v->api->write_to_reg) {
         pcilib_error("The view (%s) does not support reading from the register", view);
         return PCILIB_ERROR_NOTSUPPORTED;
     }
@@ -242,9 +300,9 @@ int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regn
     err = pcilib_copy_value(ctx, &val, valarg);
     if (err) return err;
 
-    err = pcilib_convert_value_type(ctx, &val, ctx->views[cfg.view]->type);
+    err = pcilib_convert_value_type(ctx, &val, v->type);
     if (err) {
-        pcilib_error("Error (%i) converting the value of type (%s) to type (%s) used by view (%s)", pcilib_get_type_name(val.type), pcilib_get_type_name(ctx->views[cfg.view]->type), view);
+        pcilib_error("Error (%i) converting the value of type (%s) to type (%s) used by view (%s)", pcilib_get_type_name(val.type), pcilib_get_type_name(v->type), view);
         return err;
     }
 
@@ -254,7 +312,7 @@ int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regn
     }
 
 
-    err = ctx->views[cfg.view]->api->write_to_reg(ctx, NULL /*???*/, &regvalue, &val);
+    err = v->api->write_to_reg(ctx, cfg.view, &regvalue, &val);
     if (err) {
         if (regname) 
             pcilib_error("Error (%i) computing view (%s) of register %s", err, view, regname);

@@ -208,6 +208,7 @@ pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const ch
     pcilib_register_t i;
     pcilib_register_bank_t bank_id;
     pcilib_register_bank_addr_t bank_addr = 0;
+    pcilib_register_context_t *reg_ctx;
 
     const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
     const pcilib_register_description_t *registers =  model_info->registers;
@@ -220,11 +221,16 @@ pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const ch
 	}
 	
 	bank_addr = model_info->banks[bank_id].addr;
+
+            // ToDo: we can use additionaly per-bank hashes
+        for (i = 0; registers[i].bits; i++) {
+	    if ((!strcasecmp(registers[i].name, reg))&&((!bank)||(registers[i].bank == bank_addr))) return i;
+        }
+    } else {
+        HASH_FIND_STR(ctx->reg_hash, reg, reg_ctx);
+        if (reg_ctx) return reg_ctx->reg;
     }
-    
-    for (i = 0; registers[i].bits; i++) {
-	if ((!strcasecmp(registers[i].name, reg))&&((!bank)||(registers[i].bank == bank_addr))) return i;
-    }
+
 
     return PCILIB_REGISTER_INVALID;
 };

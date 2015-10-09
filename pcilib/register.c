@@ -23,6 +23,7 @@ int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags,
 	// DS: Overrride existing registers 
 	// Registers identified by addr + offset + size + type or name
 	
+    pcilib_register_t i;
     pcilib_register_description_t *regs;
     pcilib_register_context_t *reg_ctx;
     size_t size;
@@ -45,11 +46,26 @@ int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags,
 	
 	memset(reg_ctx + ctx->alloc_reg, 0, (size - ctx->alloc_reg) * sizeof(pcilib_register_context_t));
 
-	ctx->register_ctx = reg_ctx;
+	if (ctx->register_ctx != reg_ctx) {
+	        // We need to recreate cache if context is moved...
+	    HASH_CLEAR(hh, ctx->reg_hash);
+	    for (i = 0; i < ctx->num_reg; i++) {
+                pcilib_register_context_t *cur = &ctx->register_ctx[ctx->num_reg + i];
+                HASH_ADD_KEYPTR(hh, ctx->reg_hash, cur->name, strlen(cur->name), cur);
+	    }
+	}
 
+	ctx->register_ctx = reg_ctx;
 	ctx->alloc_reg = size;
     }
 
+    for (i = 0; i < n; i++) {
+        pcilib_register_context_t *cur = &ctx->register_ctx[ctx->num_reg + i];
+        cur->reg = ctx->num_reg + i;
+        cur->name = registers[i].name;
+        HASH_ADD_KEYPTR(hh, ctx->reg_hash, cur->name, strlen(cur->name), cur);
+    }
+    
     memcpy(ctx->registers + ctx->num_reg, registers, n * sizeof(pcilib_register_description_t));
     memset(ctx->registers + ctx->num_reg + n, 0, sizeof(pcilib_register_description_t));
 
@@ -61,11 +77,28 @@ int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags,
     }
 
     ctx->num_reg += n;
-    
+
 
     return 0;
 }
 
+void pcilib_clean_registers(pcilib_t *ctx) {
+    pcilib_register_t reg;
+
+    HASH_CLEAR(hh, ctx->reg_hash);
+    for (reg = 0; reg < ctx->num_reg; reg++) {
+	if (ctx->register_ctx[reg].views)
+	    free(ctx->register_ctx[reg].views);
+    }
+
+    if (ctx->registers)
+        memset(ctx->registers, 0, sizeof(pcilib_register_description_t));
+
+    if (ctx->register_ctx)
+        memset(ctx->register_ctx, 0, ctx->alloc_reg * sizeof(pcilib_register_context_t));
+
+    ctx->num_reg = 0;
+}
 
 static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, pcilib_register_size_t offset, pcilib_register_size_t bits, pcilib_register_value_t *buf) {
     int err;

@@ -55,6 +55,7 @@ extern "C" {
 #endif
 
 int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_description_t *registers, pcilib_register_t *ids);
+void pcilib_clean_registers(pcilib_t *ctx);
 
 #ifdef __cplusplus
 }

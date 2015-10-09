@@ -8,7 +8,7 @@
 
 #define PCILIB_MAX_TRANSFORMS_PER_UNIT 16			/**< Limits number of supported transforms per unit */
 
-typedef struct pcilib_unit_context_s *pcilib_unit_context_t;
+typedef struct pcilib_unit_context_s pcilib_unit_context_t;
 
 /**
  * unit transformation routines
@@ -28,6 +28,7 @@ extern "C" {
 #endif
 
 int pcilib_add_units(pcilib_t *ctx, size_t n, const pcilib_unit_description_t *desc);
+void pcilib_clean_units(pcilib_t *ctx);
 
 pcilib_unit_t pcilib_find_unit_by_name(pcilib_t *ctx, const char *unit);
 pcilib_unit_transform_t *pcilib_find_transform_by_unit_names(pcilib_t *ctx, const char *from, const char *to);

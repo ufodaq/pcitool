@@ -365,7 +365,6 @@ char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size) {
 
 
 void pcilib_close(pcilib_t *ctx) {
-    int i;
     pcilib_bar_t bar;
 
     if (ctx) {
@@ -385,15 +384,6 @@ void pcilib_close(pcilib_t *ctx) {
 	}
 
 	pcilib_free_register_banks(ctx);
-
-	if (ctx->register_ctx) {
-	    pcilib_register_t reg;
-	    for (reg = 0; reg < ctx->num_reg; reg++) {
-		if (ctx->register_ctx[reg].views)
-		    free(ctx->register_ctx[reg].views);
-	    }
-	    free(ctx->register_ctx);
-	}
 
 	if (ctx->event_plugin)
 	    pcilib_plugin_close(ctx->event_plugin);
@@ -422,14 +412,21 @@ void pcilib_close(pcilib_t *ctx) {
 	if (ctx->pci_cfg_space_fd >= 0)
 	    close(ctx->pci_cfg_space_fd);
 
-	if (ctx->units);
-	    free(ctx->units);
+
+        if (ctx->units) {
+            pcilib_clean_units(ctx);
+            free(ctx->units);
+        }
 
 	if (ctx->views) {
-	    for (i = 0; ctx->views[i]; i++)
-	        free(ctx->views[i]);
+	    pcilib_clean_views(ctx);
 	    free(ctx->views);
 	}
+
+        pcilib_clean_registers(ctx);
+
+	if (ctx->register_ctx)
+            free(ctx->register_ctx);
 
 	if (ctx->registers)
 	    free(ctx->registers);
