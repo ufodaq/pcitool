@@ -1,6 +1,8 @@
 #ifndef _PCILIB_VIEW_H
 #define _PCILIB_VIEW_H
 
+#include <uthash.h>
+
 #include <pcilib.h>
 #include <pcilib/unit.h>
 
@@ -19,7 +21,7 @@ typedef struct {
     pcilib_view_context_t *(*init)(pcilib_t *ctx);
     void (*free)(pcilib_t *ctx, pcilib_view_context_t *view);
     void (*free_description)(pcilib_t *ctx, pcilib_view_description_t *view);
-    int (*read_from_reg)(pcilib_t *ctx, pcilib_view_context_t *view, const pcilib_register_value_t *regval, pcilib_value_t *val);
+    int (*read_from_reg)(pcilib_t *ctx, pcilib_view_context_t *view, pcilib_register_value_t regval, pcilib_value_t *val);
     int (*write_to_reg)(pcilib_t *ctx, pcilib_view_context_t *view, pcilib_register_value_t *regval, const pcilib_value_t *val);
 } pcilib_view_api_description_t;
 
@@ -30,6 +32,12 @@ struct pcilib_view_description_s {
     const char *unit;				                                /**< Returned unit (if any) */
     const char *name;				                                /**< Name of the view */
     const char *description;			                                /**< Short description */
+};
+
+struct pcilib_view_context_s {
+    const char *name;
+    pcilib_view_t view;
+    UT_hash_handle hh;
 };
 
 #ifdef __cplusplus

@@ -574,20 +574,21 @@ void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
 
 void RegisterInfo(pcilib_t *handle, pcilib_register_t reg) {
     int err;
-    pcilib_register_value_t val;
+    pcilib_value_t val = {0};
+    pcilib_register_value_t regval;
 
     const pcilib_model_description_t *model_info = pcilib_get_model_description(handle);
     const pcilib_register_description_t *r = &model_info->registers[reg];
     pcilib_register_bank_t bank = pcilib_find_register_bank_by_addr(handle, r->bank);
     const pcilib_register_bank_description_t *b = &model_info->banks[bank];
 
-    err = pcilib_read_register_by_id(handle, reg, &val);
+    err = pcilib_read_register_by_id(handle, reg, &regval);
     
 
     printf("%s/%s\n", b->name, r->name);
     printf("  Current value: ");
     if (err) printf("error %i", err);
-    else printf(b->format, val);
+    else printf(b->format, regval);
 
     if (r->mode&PCILIB_REGISTER_W) {
 	printf(" (default: ");
@@ -630,6 +631,17 @@ void RegisterInfo(pcilib_t *handle, pcilib_register_t reg) {
 		    printf("unknown");
 	    }
 	    printf(")\n");
+
+            err = pcilib_read_register_view(handle, b->name, r->name, r->views[i].name, &val);
+            if (!err) err = pcilib_convert_value_type(handle, &val, PCILIB_TYPE_STRING);
+
+            if (err)
+                printf("    Current value  : error %i\n", err);
+            else {
+                printf("    Current value  : %s", val.sval);
+                if (v->unit) printf(" (units: %s)", v->unit);
+                printf("\n");
+            }
 
 	    if (v->unit) {
 	        pcilib_unit_t unit = pcilib_find_unit_by_name(handle, v->unit);

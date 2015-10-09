@@ -516,7 +516,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
 
     pcilib_transform_view_description_t desc = {0};
 
-    desc.base.api = &pcilib_enum_view_xml_api;
+    desc.base.api = &pcilib_transform_view_api;
 
     err = pcilib_xml_parse_view(ctx, xpath, doc, node, (pcilib_view_description_t*)&desc);
     if (err) return err;
@@ -1037,6 +1037,7 @@ void pcilib_free_xml(pcilib_t *ctx) {
         xmlFreeParserCtxt(ctx->xml.parser);
         ctx->xml.parser = NULL;
     }
+
     /*
         xmlSchemaCleanupTypes();
         xmlCleanupParser();

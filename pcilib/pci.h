@@ -39,17 +39,6 @@ typedef struct {
     uint8_t max_payload, payload;
 } pcilib_pcie_link_info_t;
 
-struct pcilib_view_context_s {
-    const char *name;
-    pcilib_view_t view;
-    UT_hash_handle hh;
-};
-
-struct pcilib_unit_context_s {
-    const char *name;
-    pcilib_unit_t unit;
-    UT_hash_handle hh;
-};
 
 typedef struct {
     const char *name;                                                                   /**< Register name */

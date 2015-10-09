@@ -10,7 +10,9 @@
 #include "transform.h"
 
 
-static int pcilib_transform_view_read(pcilib_t *ctx, pcilib_view_context_t *view, const pcilib_register_value_t *regval, pcilib_value_t *val) {
+static int pcilib_transform_view_read(pcilib_t *ctx, pcilib_view_context_t *view, pcilib_register_value_t regval, pcilib_value_t *val) {
+    pcilib_set_value_from_int(ctx, val, 0);
+    return 0;
 /*    int j=0;
     pcilib_register_value_t value=0;
     char* formula=NULL;
@@ -43,7 +45,7 @@ static int pcilib_transform_view_read(pcilib_t *ctx, pcilib_view_context_t *view
         }*/
 }
 
-static int pcilib_transform_view_write(pcilib_t *ctx, pcilib_view_context_t *view, pcilib_register_value_t *regval, pcilib_value_t *val) {
+static int pcilib_transform_view_write(pcilib_t *ctx, pcilib_view_context_t *view, pcilib_register_value_t *regval, const pcilib_value_t *val) {
 /*        if(!(strcasecmp(unit, ((pcilib_view_t*)viewval)->base_unit.name))) {
             formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->write_formula));
             strncpy(formula,((pcilib_formula_t*)params)->write_formula,strlen(((pcilib_formula_t*)params)->write_formula));

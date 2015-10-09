@@ -57,6 +57,16 @@ int pcilib_set_value_from_int(pcilib_t *ctx, pcilib_value_t *value, long ival) {
     return 0;
 }
 
+int pcilib_set_value_from_static_string(pcilib_t *ctx, pcilib_value_t *value, const char *str) {
+    pcilib_clean_value(ctx, value);
+
+    value->type = PCILIB_TYPE_STRING;
+    value->sval = str;
+
+    return 0;
+}
+
+
 /*
 double pcilib_value_get_float(pcilib_value_t *val) {
     pcilib_value_t copy;
@@ -108,7 +118,7 @@ int pcilib_convert_value_type(pcilib_t *ctx, pcilib_value_t *val, pcilib_value_t
      case PCILIB_TYPE_STRING:
         switch (val->type) {
          case PCILIB_TYPE_STRING:
-            break;
+            return 0;
          case PCILIB_TYPE_DOUBLE:
             sprintf(val->str, (val->format?val->format:"%lf"), val->fval);
             val->format = NULL;
@@ -132,7 +142,7 @@ int pcilib_convert_value_type(pcilib_t *ctx, pcilib_value_t *val, pcilib_value_t
             val->format = NULL;
             break;
          case PCILIB_TYPE_DOUBLE:
-            break;
+            return 0;
          case PCILIB_TYPE_LONG:
             val->fval = val->ival;
             val->format = NULL;
@@ -155,7 +165,7 @@ int pcilib_convert_value_type(pcilib_t *ctx, pcilib_value_t *val, pcilib_value_t
             val->format = NULL;
             break;
          case PCILIB_TYPE_LONG:
-            break;
+            return 0;
          default:
             return PCILIB_ERROR_NOTSUPPORTED;
         }

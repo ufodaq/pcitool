@@ -126,7 +126,7 @@ pcilib_view_context_t *pcilib_find_register_view_context_by_name(pcilib_t *ctx, 
     if (!regctx->views) return NULL;
 
     for (i = 0; regctx->views[i].name; i++) {
-	if (strcasecmp(name, regctx->views[i].name)) {
+	if (!strcasecmp(name, regctx->views[i].name)) {
 	    return pcilib_find_view_context_by_name(ctx, regctx->views[i].view);
 	}
     }
@@ -261,7 +261,7 @@ int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regna
 
     pcilib_clean_value(ctx, val);
 
-    err = v->api->read_from_reg(ctx, cfg.view, &regvalue, val);
+    err = v->api->read_from_reg(ctx, cfg.view, regvalue, val);
     if (err) {
         if (regname) 
             pcilib_error("Error (%i) computing view (%s) of register %s", err, view, regname);
@@ -281,7 +281,7 @@ int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regna
 
 int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view, const pcilib_value_t *valarg) {
     int err;
-    pcilib_value_t val;
+    pcilib_value_t val = {0};
 
     pcilib_view_description_t *v;
     pcilib_view_configuration_t cfg;

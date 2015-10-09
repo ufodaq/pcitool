@@ -1,6 +1,8 @@
 #ifndef _PCILIB_UNIT_H
 #define _PCILIB_UNIT_H
 
+#include <uthash.h>
+
 #include <pcilib.h>
 
 #define PCILIB_UNIT_INVALID ((pcilib_unit_t)-1)
@@ -22,6 +24,12 @@ typedef struct {
     char *name;										/**< Unit name */
     pcilib_unit_transform_t transforms[PCILIB_MAX_TRANSFORMS_PER_UNIT + 1];		/**< Transforms to other units */
 } pcilib_unit_description_t;
+
+struct pcilib_unit_context_s {
+    const char *name;
+    pcilib_unit_t unit;
+    UT_hash_handle hh;
+};
 
 #ifdef __cplusplus
 extern "C" {
