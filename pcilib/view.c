@@ -135,7 +135,7 @@ pcilib_view_context_t *pcilib_find_register_view_context_by_name(pcilib_t *ctx, 
 }
 
     // We expect symmetric units. Therefore, we don't distringuish if we read or write
-static int pcilib_detect_register_view_and_unit(pcilib_t *ctx, pcilib_register_t reg, const char *name, pcilib_view_context_t **ret_view, pcilib_unit_transform_t **ret_trans) {
+static int pcilib_detect_register_view_and_unit(pcilib_t *ctx, pcilib_register_t reg, const char *name, int write_direction, pcilib_view_context_t **ret_view, pcilib_unit_transform_t **ret_trans) {
     pcilib_view_t i;
     pcilib_view_context_t *view_ctx;
     pcilib_view_description_t *view_desc;
@@ -160,7 +160,10 @@ static int pcilib_detect_register_view_and_unit(pcilib_t *ctx, pcilib_register_t
 
         view_desc = ctx->views[view_ctx->view];
         if (view_desc->unit) {
-	    trans = pcilib_find_transform_by_unit_names(ctx, view_desc->unit, name);
+            if (write_direction)
+	        trans = pcilib_find_transform_by_unit_names(ctx, name, view_desc->unit);
+            else
+	        trans = pcilib_find_transform_by_unit_names(ctx, view_desc->unit, name);
 	    if (trans) {
 	        if (ret_trans) *ret_trans = trans;
 	        if (ret_view) *ret_view = pcilib_find_view_context_by_name(ctx, view_desc->name);
@@ -176,7 +179,7 @@ pcilib_view_context_t *pcilib_find_register_view_context(pcilib_t *ctx, pcilib_r
     int err;
     pcilib_view_context_t *view;
 
-    err = pcilib_detect_register_view_and_unit(ctx, reg, name, &view, NULL);
+    err = pcilib_detect_register_view_and_unit(ctx, reg, name, 0, &view, NULL);
     if (err) return NULL;
 
     return view;
@@ -214,10 +217,8 @@ static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, con
 	    return PCILIB_ERROR_NOTFOUND;
 	}
 	
-	// get value
-	
 	if (unit_name) view_ctx = pcilib_find_register_view_context_by_name(ctx, reg, view_name);
-	else err = pcilib_detect_register_view_and_unit(ctx, reg, view_name, &view_ctx, &trans);
+	else err = pcilib_detect_register_view_and_unit(ctx, reg, view_name, write_direction, &view_ctx, &trans);
 
 	if ((err)||(!view_ctx)) {
 	    pcilib_error("Can't find the specified view %s for register %s", view_name, regname);
@@ -330,7 +331,6 @@ int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regn
         if (err) return err;
     }
 
-
     err = v->api->write_to_reg(ctx, cfg.view, &regvalue, &val);
     if (err) {
         if (regname) 
@@ -339,7 +339,6 @@ int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regn
             pcilib_error("Error (%i) computing view %s", err, view);
         return err;
     }
-
 
     if (regname) {
         err = pcilib_write_register_by_id(ctx, cfg.reg, regvalue);

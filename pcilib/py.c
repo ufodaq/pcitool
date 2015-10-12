@@ -7,6 +7,7 @@
 
 
 #include "pci.h"
+#include "debug.h"
 #include "pcilib.h"
 #include "py.h"
 #include "error.h"
@@ -167,5 +168,6 @@ int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *va
         return PCILIB_ERROR_FAILED;
     }
 
+    pcilib_debug(VIEWS, "Evaluating a Python string \'%s\' to %lf=\'%s\'", codestr, PyFloat_AsDouble(obj), code);
     return pcilib_set_value_from_float(ctx, value, PyFloat_AsDouble(obj));
 }

@@ -36,7 +36,7 @@ static int pcilib_transform_view_write(pcilib_t *ctx, pcilib_view_context_t *vie
     err = pcilib_py_eval_string(ctx, v->write_to_reg, &val_copy);
     if (err) return err;
 
-    *regval = pcilib_get_value_as_register_value(ctx, val, &err);
+    *regval = pcilib_get_value_as_register_value(ctx, &val_copy, &err);
     return err;
 }
 

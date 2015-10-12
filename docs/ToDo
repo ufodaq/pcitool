@@ -2,7 +2,7 @@ High Priority (we would need it for IPE Camera)
 =============
  1. Join multiple XML files and on error use simplified XSD scheme on all files to find the file causing error
  2. Universal tree-style api to access the independent views, frontend all registers as well (pci -l /register; pci -r /register/reg1; pci -r /sensor/width;) Unit is path of the view /view[:unit] or just /unit for register vies
- 3. Information on bank and the view values in the pci -i <reg>
+ 3. Information on bank and the view values in the pci -i <reg>, show listing of enum values (shall we have a type associated with the view: enum, range, ...?)
  4. Integrate hash tables for views, units, and registers
  
 Normal Priority (it would make just few things a bit easier)

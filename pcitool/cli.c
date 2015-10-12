@@ -1144,24 +1144,23 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 
         if (unit) {
             pcilib_value_t val = {0};
-            err = pcilib_read_register_view(handle, bank, model_info->registers[regid].name, unit, &val);
-            if (err) printf("Error reading view %s of register %s\n", unit, reg);
-            else {
-                err = pcilib_convert_value_type(handle, &val, PCILIB_TYPE_STRING);
-                if (err) printf("Error converting view %s of register %s to string\n", unit, reg);
-                else printf("%s = %s\n", reg, val.sval);
-            }
+            err = pcilib_read_register_view(handle, bank, reg, unit, &val);
+            if (err) Error("Error reading view %s of register %s", unit, reg);
+
+            err = pcilib_convert_value_type(handle, &val, PCILIB_TYPE_STRING);
+            if (err) Error("Error converting view %s of register %s to string", unit, reg);
+
+            printf("%s = %s\n", reg, val.sval);
         } else {
             bank_id = pcilib_find_register_bank_by_addr(handle, model_info->registers[regid].bank);
             format = model_info->banks[bank_id].format;
             if (!format) format = "%lu";
             err = pcilib_read_register_by_id(handle, regid, &value);
-            if (err) printf("Error reading register %s\n", reg);
-            else {
-	        printf("%s = ", reg);
-	        printf(format, value);
-	        printf("\n");
-	    }
+            if (err) Error("Error reading register %s", reg);
+
+	    printf("%s = ", reg);
+	    printf(format, value);
+	    printf("\n");
 	}
     } else {
 	if (model_info->registers) {
@@ -1364,12 +1363,10 @@ int WriteRegisterRange(pcilib_t *handle, const pcilib_model_description_t *model
 }
 
 int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, const char *reg, const char *unit, char **data) {
-    int err;
+    int err = 0;
 
-    unsigned long val;
-    pcilib_register_value_t value;
-
-    const char *format = NULL;
+    pcilib_value_t val = {0};
+    pcilib_register_value_t value, verify;
 
     pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
     if (regid == PCILIB_REGISTER_INVALID) Error("Can't find register (%s) from bank (%s)", reg, bank?bank:"autodetected");
@@ -1384,42 +1381,38 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
     if (!format) format = "%lu";
 */
 
-    if (isnumber(*data)) {
-	if (sscanf(*data, "%li", &val) != 1) {
-	    Error("Can't parse data value (%s) is not valid decimal number", *data);
-	}
+    err = pcilib_set_value_from_static_string(handle, &val, *data);
+    if (err) Error("Error (%i) setting value", err);
 
-	format = "%li";
-    } else if (isxnumber(*data)) {
-	if (sscanf(*data, "%lx", &val) != 1) {
-	    Error("Can't parse data value (%s) is not valid decimal number", *data);
-	}
-	
-	format = "0x%lx";
-    } else {
-	    Error("Can't parse data value (%s) is not valid decimal number", *data);
-    }
-
-    value = val;
-    
-    err = pcilib_write_register(handle, bank, reg, value);
-    if (err) Error("Error writting register %s\n", reg);
-
-    if ((model_info->registers[regid].mode&PCILIB_REGISTER_RW) == PCILIB_REGISTER_RW) {
-	err = pcilib_read_register(handle, bank, reg, &value);
-	if (err) Error("Error reading back register %s for verification\n", reg);
-    
-	if (val != value) {
-	    Error("Failed to write register %s: %lu is written and %lu is read back", reg, val, value);
-	} else {
-	    printf("%s = ", reg);
-	    printf(format, value);
-	    printf("\n");
-	}
-    } else {
+    if (unit) {
+        err = pcilib_write_register_view(handle, bank, reg, unit, &val);
+        if (err) Error("Error writting view %s of register %s", unit, reg);
         printf("%s is written\n ", reg);
-    }
+    } else {
+        value = pcilib_get_value_as_register_value(handle, &val, &err);
+        if (err) Error("Error (%i) parsing data value (%s)", *data);
+
+        err = pcilib_write_register(handle, bank, reg, value);
+        if (err) Error("Error writting register %s\n", reg);
+
+        if ((model_info->registers[regid].mode&PCILIB_REGISTER_RW) == PCILIB_REGISTER_RW) {
+            const char *format = (val.format?val.format:"%u");
+	    
+	    err = pcilib_read_register(handle, bank, reg, &verify);
+	    if (err) Error("Error reading back register %s for verification\n", reg);
     
+	    if (verify != value) {
+	        Error("Failed to write register %s: %lu is written and %lu is read back", reg, value, verify);
+	    } else {
+	        printf("%s = ", reg);
+	        printf(format, verify);
+	        printf("\n");
+	    }
+        } else {
+            printf("%s is written\n ", reg);
+        }
+    }
+
     return 0;
 }
 

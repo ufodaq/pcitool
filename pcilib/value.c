@@ -8,6 +8,7 @@
 #include "value.h"
 #include "error.h"
 #include "unit.h"
+#include "tools.h"
 
 void pcilib_clean_value(pcilib_t *ctx, pcilib_value_t *val) {
     if (!val) return;
@@ -235,11 +236,22 @@ int pcilib_convert_value_type(pcilib_t *ctx, pcilib_value_t *val, pcilib_value_t
      case PCILIB_TYPE_LONG:
         switch (val->type) {
          case PCILIB_TYPE_STRING:
-            if (sscanf(val->sval, "%li", &val->ival) != 1) {
+            if (pcilib_isnumber(val->sval)) {
+                if (sscanf(val->sval, "%li", &val->ival) != 1) {
+                    pcilib_warning("Can't convert string (%s) to int", val->sval);
+                    return PCILIB_ERROR_INVALID_DATA;
+                }
+                val->format = NULL;
+            } else if (pcilib_isxnumber(val->sval)) {
+                if (sscanf(val->sval, "%lx", &val->ival) != 1) {
+                    pcilib_warning("Can't convert string (%s) to int", val->sval);
+                    return PCILIB_ERROR_INVALID_DATA;
+                }
+                val->format = "0x%lx";
+            } else {
                 pcilib_warning("Can't convert string (%s) to int", val->sval);
                 return PCILIB_ERROR_INVALID_DATA;
             }
-            val->format = NULL;
             break;
          case PCILIB_TYPE_DOUBLE:
             val->ival = round(val->fval);

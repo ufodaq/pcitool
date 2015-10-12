@@ -4,6 +4,7 @@
 typedef enum {
     PCILIB_DEBUG_DMA_ENV,
     PCILIB_DEBUG_MISSING_EVENTS_ENV,
+    PCILIB_DEBUG_VIEWS_ENV,
     PCILIB_MAX_ENV
 } pcilib_env_t;
 
