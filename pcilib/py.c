@@ -63,7 +63,7 @@ static int pcilib_py_realloc_string(pcilib_t *ctx, size_t required, size_t *size
 static char *pcilib_py_parse_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *value) {
     int i;
     int err = 0;
-    pcilib_value_t val;
+    pcilib_value_t val = {0};
     pcilib_register_value_t regval;
 
     char save;

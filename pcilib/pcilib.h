@@ -223,7 +223,12 @@ void pcilib_clean_value(pcilib_t *ctx, pcilib_value_t *val);
 int pcilib_copy_value(pcilib_t *ctx, pcilib_value_t *dst, const pcilib_value_t *src);
 int pcilib_set_value_from_float(pcilib_t *ctx, pcilib_value_t *val, double fval);
 int pcilib_set_value_from_int(pcilib_t *ctx, pcilib_value_t *val, long ival);
+int pcilib_set_value_from_register_value(pcilib_t *ctx, pcilib_value_t *value, pcilib_register_value_t regval);
 int pcilib_set_value_from_static_string(pcilib_t *ctx, pcilib_value_t *value, const char *str);
+double pcilib_get_value_as_float(pcilib_t *ctx, const pcilib_value_t *val, int *err);
+long pcilib_get_value_as_int(pcilib_t *ctx, const pcilib_value_t *val, int *err);
+pcilib_register_value_t pcilib_get_value_as_register_value(pcilib_t *ctx, const pcilib_value_t *val, int *err);
+
 int pcilib_convert_value_unit(pcilib_t *ctx, pcilib_value_t *val, const char *unit_name);
 int pcilib_convert_value_type(pcilib_t *ctx, pcilib_value_t *val, pcilib_value_type_t type);
 

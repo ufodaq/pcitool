@@ -57,6 +57,10 @@ int pcilib_set_value_from_int(pcilib_t *ctx, pcilib_value_t *value, long ival) {
     return 0;
 }
 
+int pcilib_set_value_from_register_value(pcilib_t *ctx, pcilib_value_t *value, pcilib_register_value_t regval) {
+    return pcilib_set_value_from_int(ctx, value, regval);
+}
+
 int pcilib_set_value_from_static_string(pcilib_t *ctx, pcilib_value_t *value, const char *str) {
     pcilib_clean_value(ctx, value);
 
@@ -65,6 +69,83 @@ int pcilib_set_value_from_static_string(pcilib_t *ctx, pcilib_value_t *value, co
 
     return 0;
 }
+
+double pcilib_get_value_as_float(pcilib_t *ctx, const pcilib_value_t *val, int *ret) {
+    int err;
+    double res;
+    pcilib_value_t copy = {0};
+
+    err = pcilib_copy_value(ctx, &copy, val);
+    if (err) {
+        if (ret) *ret = err;
+        return 0.;
+    }
+
+    err = pcilib_convert_value_type(ctx, &copy, PCILIB_TYPE_DOUBLE);
+    if (err) {
+        if (ret) *ret = err;
+        return 0.;
+    }
+
+    if (ret) *ret = 0;
+    res = copy.fval;
+
+    pcilib_clean_value(ctx, &copy);
+
+    return res;
+}
+
+long pcilib_get_value_as_int(pcilib_t *ctx, const pcilib_value_t *val, int *ret) {
+    int err;
+    long res;
+    pcilib_value_t copy = {0};
+
+    err = pcilib_copy_value(ctx, &copy, val);
+    if (err) {
+        if (ret) *ret = err;
+        return 0;
+    }
+
+    err = pcilib_convert_value_type(ctx, &copy, PCILIB_TYPE_LONG);
+    if (err) {
+        if (ret) *ret = err;
+        return 0;
+    }
+
+    if (ret) *ret = 0;
+    res = copy.ival;
+
+    pcilib_clean_value(ctx, &copy);
+
+    return res;
+}
+
+pcilib_register_value_t pcilib_get_value_as_register_value(pcilib_t *ctx, const pcilib_value_t *val, int *ret) {
+    int err;
+    pcilib_register_value_t res;
+    pcilib_value_t copy = {0};
+
+    err = pcilib_copy_value(ctx, &copy, val);
+    if (err) {
+        if (ret) *ret = err;
+        return 0.;
+    }
+
+    err = pcilib_convert_value_type(ctx, &copy, PCILIB_TYPE_LONG);
+    if (err) {
+        if (ret) *ret = err;
+        return 0.;
+    }
+
+    if (ret) *ret = 0;
+    res = copy.ival;
+
+    pcilib_clean_value(ctx, &copy);
+
+    return res;
+}
+
+
 
 
 /*

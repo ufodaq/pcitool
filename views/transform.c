@@ -8,64 +8,36 @@
 #include "version.h"
 #include "model.h"
 #include "transform.h"
+#include "py.h"
 
 
-static int pcilib_transform_view_read(pcilib_t *ctx, pcilib_view_context_t *view, pcilib_register_value_t regval, pcilib_value_t *val) {
-    pcilib_set_value_from_int(ctx, val, 0);
-    return 0;
-/*    int j=0;
-    pcilib_register_value_t value=0;
-    char* formula=NULL;
+static int pcilib_transform_view_read(pcilib_t *ctx, pcilib_view_context_t *view_ctx, pcilib_register_value_t regval, pcilib_value_t *val) {
+    int err;
 
-    if(view2reg==0) {
-        if(!(strcasecmp(unit,((pcilib_view_t*)viewval)->base_unit.name))) {
-            formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->read_formula));
-            if(!(formula)) {
-                pcilib_error("can't allocate memory for the formula");
-                return PCILIB_ERROR_MEMORY;
-            }
-            strncpy(formula,((pcilib_formula_t*)params)->read_formula,strlen(((pcilib_formula_t*)params)->read_formula));
-            pcilib_view_apply_formula(ctx,formula,regval);
-            return 0;
-        }
+    const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+    pcilib_transform_view_description_t *v = (pcilib_transform_view_description_t*)(model_info->views[view_ctx->view]);
 
-        for(j=0; ((pcilib_view_t*)viewval)->base_unit.transforms[j].name; j++) {
-            if(!(strcasecmp(((pcilib_view_t*)viewval)->base_unit.transforms[j].name,unit))) {
-                // when we have found the correct view of type formula, we apply the formula, that get the good value for return
-                formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->read_formula));
-                if(!(formula)) {
-                    pcilib_error("can't allocate memory for the formula");
-                    return PCILIB_ERROR_MEMORY;
-                }
-                strncpy(formula,((pcilib_formula_t*)params)->read_formula,strlen(((pcilib_formula_t*)params)->read_formula));
-                pcilib_view_apply_formula(ctx,formula, regval);
-                //	  pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.transforms[j],unit,regval);
-                return 0;
-            }
-        }*/
+    err = pcilib_set_value_from_register_value(ctx, val, regval);
+    if (err) return err;
+
+    return  pcilib_py_eval_string(ctx, v->read_from_reg, val);
 }
 
-static int pcilib_transform_view_write(pcilib_t *ctx, pcilib_view_context_t *view, pcilib_register_value_t *regval, const pcilib_value_t *val) {
-/*        if(!(strcasecmp(unit, ((pcilib_view_t*)viewval)->base_unit.name))) {
-            formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->write_formula));
-            strncpy(formula,((pcilib_formula_t*)params)->write_formula,strlen(((pcilib_formula_t*)params)->write_formula));
-            pcilib_view_apply_formula(ctx,formula,regval);
-            return 0;
-        }
+static int pcilib_transform_view_write(pcilib_t *ctx, pcilib_view_context_t *view_ctx, pcilib_register_value_t *regval, const pcilib_value_t *val) {
+    int err = 0;
+    pcilib_value_t val_copy = {0};
 
-        for(j=0; ((pcilib_view_t*)viewval)->base_unit.transforms[j].name; j++) {
-            if(!(strcasecmp(((pcilib_view_t*)viewval)->base_unit.transforms[j].name,unit))) {
-                // when we have found the correct view of type formula, we apply the formula, that get the good value for return
-                formula=malloc(sizeof(char)*strlen(((pcilib_formula_t*)params)->write_formula));
-                strncpy(formula,((pcilib_formula_t*)params)->write_formula,strlen((( pcilib_formula_t*)params)->write_formula));
-                //pcilib_view_apply_unit(((pcilib_view_t*)viewval)->base_unit.transforms[j],unit,regval);
-                pcilib_view_apply_formula(ctx,formula,regval);
-                // we maybe need some error checking there , like temp_value >min and <max
-                return 0;
-            }
-        }
-    free(formula);
-    return PCILIB_ERROR_INVALID_REQUEST;*/
+    const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+    pcilib_transform_view_description_t *v = (pcilib_transform_view_description_t*)(model_info->views[view_ctx->view]);
+
+    err = pcilib_copy_value(ctx, &val_copy, val);
+    if (err) return err;
+
+    err = pcilib_py_eval_string(ctx, v->write_to_reg, &val_copy);
+    if (err) return err;
+
+    *regval = pcilib_get_value_as_register_value(ctx, val, &err);
+    return err;
 }
 
 

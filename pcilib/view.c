@@ -135,17 +135,21 @@ pcilib_view_context_t *pcilib_find_register_view_context_by_name(pcilib_t *ctx, 
 }
 
     // We expect symmetric units. Therefore, we don't distringuish if we read or write
-pcilib_view_context_t *pcilib_find_register_view_context(pcilib_t *ctx, pcilib_register_t reg, const char *name) {
+static int pcilib_detect_register_view_and_unit(pcilib_t *ctx, pcilib_register_t reg, const char *name, pcilib_view_context_t **ret_view, pcilib_unit_transform_t **ret_trans) {
     pcilib_view_t i;
     pcilib_view_context_t *view_ctx;
     pcilib_view_description_t *view_desc;
     pcilib_register_context_t *regctx = &ctx->register_ctx[reg];
 
-    if (!regctx->views) return NULL;
+    if (!regctx->views) return PCILIB_ERROR_NOTFOUND;
 
 	// Check if view is just a name of listed view
     view_ctx = pcilib_find_register_view_context_by_name(ctx, reg, name);
-    if (view_ctx) return view_ctx;
+    if (view_ctx) {
+        if (ret_view) *ret_view = view_ctx;
+        if (ret_trans) *ret_trans = NULL;
+        return 0;
+    }
 
 	// Check if view is a unit
     for (i = 0; regctx->views[i].name; i++) {
@@ -157,13 +161,26 @@ pcilib_view_context_t *pcilib_find_register_view_context(pcilib_t *ctx, pcilib_r
         view_desc = ctx->views[view_ctx->view];
         if (view_desc->unit) {
 	    trans = pcilib_find_transform_by_unit_names(ctx, view_desc->unit, name);
-	    if (trans) return pcilib_find_view_context_by_name(ctx, view_desc->name);
+	    if (trans) {
+	        if (ret_trans) *ret_trans = trans;
+	        if (ret_view) *ret_view = pcilib_find_view_context_by_name(ctx, view_desc->name);
+	        return 0;
+	    }
 	}
     }
 
-    return NULL;
+    return PCILIB_ERROR_NOTFOUND;
 }
 
+pcilib_view_context_t *pcilib_find_register_view_context(pcilib_t *ctx, pcilib_register_t reg, const char *name) {
+    int err;
+    pcilib_view_context_t *view;
+
+    err = pcilib_detect_register_view_and_unit(ctx, reg, name, &view, NULL);
+    if (err) return NULL;
+
+    return view;
+}
 
 typedef struct {
     pcilib_register_t reg;
@@ -172,6 +189,7 @@ typedef struct {
 } pcilib_view_configuration_t;
 
 static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, const char *regname, const char *view_cname, int write_direction, pcilib_view_configuration_t *cfg) {
+    int err = 0;
     pcilib_view_t view;
     pcilib_view_context_t *view_ctx;
     pcilib_unit_transform_t *trans = NULL;
@@ -199,9 +217,9 @@ static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, con
 	// get value
 	
 	if (unit_name) view_ctx = pcilib_find_register_view_context_by_name(ctx, reg, view_name);
-	else view_ctx = pcilib_find_register_view_context(ctx, reg, view_name);
+	else err = pcilib_detect_register_view_and_unit(ctx, reg, view_name, &view_ctx, &trans);
 
-	if (!view_ctx) {
+	if ((err)||(!view_ctx)) {
 	    pcilib_error("Can't find the specified view %s for register %s", view_name, regname);
 	    return PCILIB_ERROR_NOTFOUND;
 	}
@@ -222,9 +240,10 @@ static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, con
             pcilib_error("Don't know how to get the requested unit %s for view %s", unit_name, ctx->views[view]->name);
             return PCILIB_ERROR_NOTFOUND;
         }
-            // No transform is required
-        if (!trans->transform) trans = NULL;
     }
+
+        // No transform is required
+    if (!trans->transform) trans = NULL;
 
     cfg->reg = reg;
     cfg->view = view_ctx;
