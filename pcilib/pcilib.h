@@ -241,6 +241,8 @@ int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, p
 int pcilib_write_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t value);
 int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, pcilib_value_t *value);
 int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, const pcilib_value_t *value);
+int pcilib_read_register_view_by_id(pcilib_t *ctx, pcilib_register_t reg, const char *view, pcilib_value_t *val);
+int pcilib_write_register_view_by_id(pcilib_t *ctx, pcilib_register_t reg, const char *view, const pcilib_value_t *valarg);
 
 void pcilib_clean_value(pcilib_t *ctx, pcilib_value_t *val);
 int pcilib_copy_value(pcilib_t *ctx, pcilib_value_t *dst, const pcilib_value_t *src);
@@ -259,6 +261,10 @@ void pcilib_free_property_info(pcilib_t *ctx, pcilib_property_info_t *info);
 int pcilib_get_property(pcilib_t *ctx, const char *prop, pcilib_value_t *val);
 int pcilib_set_property(pcilib_t *ctx, const char *prop, const pcilib_value_t *val);
 
+int pcilib_get_property_attr(pcilib_t *ctx, const char *prop, const char *attr, pcilib_value_t *val);
+int pcilib_get_register_attr_by_id(pcilib_t *ctx, pcilib_register_t reg, const char *attr, pcilib_value_t *val);
+int pcilib_get_register_attr(pcilib_t *ctx, const char *bank, const char *regname, const char *attr, pcilib_value_t *val);
+int pcilib_get_register_bank_attr(pcilib_t *ctx, const char *bankname, const char *attr, pcilib_value_t *val);
 
 int pcilib_reset(pcilib_t *ctx);
 int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);

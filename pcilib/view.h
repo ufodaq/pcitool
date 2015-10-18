@@ -38,6 +38,7 @@ struct pcilib_view_description_s {
 struct pcilib_view_context_s {
     const char *name;
     pcilib_view_t view;
+    pcilib_xml_node_t *xml;
     UT_hash_handle hh;
 };
 
@@ -56,6 +57,19 @@ extern "C" {
  * @return - error or 0 on success
  */
 int pcilib_add_views(pcilib_t *ctx, size_t n, const pcilib_view_description_t *desc);
+
+/**
+ * Use this function to add new view definitions into the model. It is error to re-register
+ * already registered view. The function will copy the context of unit description, but name, 
+ * transform, and other strings in the structure are considered to have static duration 
+ * and will not be copied. On error no new views are initalized.
+ * @param[in,out] ctx - pcilib context
+ * @param[in] n - number of views to initialize. It is OK to pass 0 if protocols variable is NULL terminated (last member of protocols array have all members set to 0)
+ * @param[in] desc - view descriptions
+ * @param[out] refs - fills allocated view contexts. On error context is undefined.
+ * @return - error or 0 on success
+ */
+int pcilib_add_views_custom(pcilib_t *ctx, size_t n, const pcilib_view_description_t *desc, pcilib_view_context_t **refs);
 
 /**
  * Destroys data associated with views. This is an internal function and will

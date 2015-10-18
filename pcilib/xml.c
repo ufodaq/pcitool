@@ -516,6 +516,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
     int err;
     xmlAttrPtr cur;
     const char *value, *name;
+    pcilib_view_context_t *view_ctx;
 
     pcilib_transform_view_description_t desc = {0};
 
@@ -554,8 +555,11 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
         } 
     }
 
+    err = pcilib_add_views_custom(ctx, 1, (pcilib_view_description_t*)&desc, &view_ctx);
+    if (err) return err;
 
-    return pcilib_add_views(ctx, 1, (pcilib_view_description_t*)&desc);
+    view_ctx->xml = node;
+    return 0;
 }
 
 
@@ -626,6 +630,7 @@ static int pcilib_xml_create_enum_view(pcilib_t *ctx, xmlXPathContextPtr xpath, 
     xmlXPathObjectPtr nodes;
     xmlNodeSetPtr nodeset;
 
+    pcilib_view_context_t *view_ctx;
     pcilib_enum_view_description_t desc = {0};
 
     desc.base.type = PCILIB_TYPE_STRING;
@@ -676,9 +681,13 @@ static int pcilib_xml_create_enum_view(pcilib_t *ctx, xmlXPathContextPtr xpath, 
     xmlXPathFreeObject(nodes);
 
 
-    err = pcilib_add_views(ctx, 1, (pcilib_view_description_t*)&desc);
-    if (err) free(desc.names);
-    return err;
+    err = pcilib_add_views_custom(ctx, 1, (pcilib_view_description_t*)&desc, &view_ctx);
+    if (err) {
+        free(desc.names);
+        return err;
+    }
+    view_ctx->xml = node;
+    return 0;
 }
 
 static int pcilib_xml_parse_unit_transform(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node, pcilib_unit_transform_t *desc) {
@@ -1063,4 +1072,15 @@ void pcilib_free_xml(pcilib_t *ctx) {
         xmlCleanupParser();
         xmlMemoryDump();
     */
+}
+
+int pcilib_get_xml_attr(pcilib_t *ctx, pcilib_xml_node_t *node, const char *attr, pcilib_value_t *val) {
+    xmlAttr *prop;
+    xmlChar *str;
+
+    prop = xmlHasProp(node, BAD_CAST attr);
+    if ((!prop)||(!prop->children)) return PCILIB_ERROR_NOTFOUND;
+
+    str = prop->children->content;
+    return pcilib_set_value_from_static_string(ctx, val, (const char*)str);
 }

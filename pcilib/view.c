@@ -10,7 +10,7 @@
 #include "error.h"
 #include "value.h"
 
-int pcilib_add_views(pcilib_t *ctx, size_t n, const pcilib_view_description_t *desc) {
+int pcilib_add_views_custom(pcilib_t *ctx, size_t n, const pcilib_view_description_t *desc, pcilib_view_context_t **refs) {
     size_t i;
     void *ptr;
 
@@ -76,6 +76,8 @@ int pcilib_add_views(pcilib_t *ctx, size_t n, const pcilib_view_description_t *d
         view_ctx->view = ctx->num_views + i;
         view_ctx->name = v->name;
 
+        if (refs) refs[i] = view_ctx;
+
         HASH_ADD_KEYPTR(hh, ctx->view_hash, view_ctx->name, strlen(view_ctx->name), view_ctx);
         ctx->views[ctx->num_views + i] = cur;
 
@@ -87,6 +89,11 @@ int pcilib_add_views(pcilib_t *ctx, size_t n, const pcilib_view_description_t *d
 
     return 0;
 }
+
+int pcilib_add_views(pcilib_t *ctx, size_t n, const pcilib_view_description_t *desc) {
+    return pcilib_add_views_custom(ctx, n, desc, NULL);
+}
+
 
 void pcilib_clean_views(pcilib_t *ctx, pcilib_view_t start) {
     pcilib_view_t i;
@@ -201,16 +208,15 @@ typedef struct {
     pcilib_unit_transform_t *trans;
 } pcilib_view_configuration_t;
 
-static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, const char *regname, const char *view_cname, const char *unit_cname, int write_direction, pcilib_view_configuration_t *cfg) {
+static int pcilib_detect_view_configuration(pcilib_t *ctx, pcilib_register_t reg, const char *view_cname, const char *unit_cname, int write_direction, pcilib_view_configuration_t *cfg) {
     int err = 0;
     pcilib_view_t view;
+    const char *regname;
     pcilib_view_context_t *view_ctx;
     pcilib_unit_transform_t *trans = NULL;
-    pcilib_register_t reg = PCILIB_REGISTER_INVALID;
 
     char *view_name = alloca(strlen(view_cname) + 1);
     const char *unit_name;
-
 
     strcpy(view_name, view_cname);
 
@@ -223,14 +229,10 @@ static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, con
         }
     }
 
+    if (reg == PCILIB_REGISTER_INVALID) regname = NULL;
+    else regname = ctx->registers[reg].name;
 
     if (regname) {
-	reg = pcilib_find_register(ctx, bank, regname);
-	if (reg == PCILIB_REGISTER_INVALID) {
-	    pcilib_error("Can't find the specified register %s", regname);
-	    return PCILIB_ERROR_NOTFOUND;
-	}
-	
 	if (unit_name) view_ctx = pcilib_find_register_view_context_by_name(ctx, reg, view_name);
 	else err = pcilib_detect_register_view_and_unit(ctx, reg, view_name, write_direction, &view_ctx, &trans);
 
@@ -267,15 +269,19 @@ static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, con
     return 0;
 }
 
-
-int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view, pcilib_value_t *val) {
+int pcilib_read_register_view_by_id(pcilib_t *ctx, pcilib_register_t reg, const char *view, pcilib_value_t *val) {
     int err;
+
+    const char *regname;
 
     pcilib_view_description_t *v;
     pcilib_view_configuration_t cfg;
     pcilib_register_value_t regvalue = 0;
 
-    err = pcilib_detect_view_configuration(ctx, bank, regname, view, NULL, 0, &cfg);
+    if (reg == PCILIB_REGISTER_INVALID) regname = NULL;
+    else regname = ctx->registers[reg].name;
+
+    err = pcilib_detect_view_configuration(ctx, reg, view, NULL, 0, &cfg);
     if (err) return err;
 
     v = ctx->views[cfg.view->view];
@@ -321,16 +327,37 @@ int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regna
     return 0;
 }
 
+int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view, pcilib_value_t *val) {
+    pcilib_register_t reg;
 
-int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view, const pcilib_value_t *valarg) {
+    if (regname) {
+	reg = pcilib_find_register(ctx, bank, regname);
+	if (reg == PCILIB_REGISTER_INVALID) {
+	    pcilib_error("Register (%s) is not found", regname);
+	    return PCILIB_ERROR_NOTFOUND;
+	}
+    } else {
+        reg = PCILIB_REGISTER_INVALID;
+    }
+
+    return pcilib_read_register_view_by_id(ctx, reg, view, val);
+}
+
+
+int pcilib_write_register_view_by_id(pcilib_t *ctx, pcilib_register_t reg, const char *view, const pcilib_value_t *valarg) {
     int err;
     pcilib_value_t val = {0};
+
+    const char *regname;
 
     pcilib_view_description_t *v;
     pcilib_view_configuration_t cfg;
     pcilib_register_value_t regvalue = 0;
 
-    err = pcilib_detect_view_configuration(ctx, bank, regname, view, valarg->unit, 1, &cfg);
+    if (reg == PCILIB_REGISTER_INVALID) regname = NULL;
+    else regname = ctx->registers[reg].name;
+
+    err = pcilib_detect_view_configuration(ctx, reg, view, valarg->unit, 1, &cfg);
     if (err) return err;
 
     v = ctx->views[cfg.view->view];
@@ -377,4 +404,20 @@ int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regn
     }
 
     return 0;
+}
+
+int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *view, const pcilib_value_t *val) {
+    pcilib_register_t reg;
+
+    if (regname) {
+	reg = pcilib_find_register(ctx, bank, regname);
+	if (reg == PCILIB_REGISTER_INVALID) {
+	    pcilib_error("Register (%s) is not found", regname);
+	    return PCILIB_ERROR_NOTFOUND;
+	}
+    } else {
+        reg = PCILIB_REGISTER_INVALID;
+    }
+
+    return pcilib_write_register_view_by_id(ctx, reg, view, val);
 }

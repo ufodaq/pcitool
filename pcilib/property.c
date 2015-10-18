@@ -206,3 +206,17 @@ int pcilib_get_property(pcilib_t *ctx, const char *prop, pcilib_value_t *val) {
 int pcilib_set_property(pcilib_t *ctx, const char *prop, const pcilib_value_t *val) {
     return pcilib_write_register_view(ctx, NULL, NULL, prop, val);
 }
+
+int pcilib_get_property_attr(pcilib_t *ctx, const char *prop, const char *attr, pcilib_value_t *val) {
+    pcilib_view_context_t *view_ctx;
+
+    view_ctx = pcilib_find_view_context_by_name(ctx, prop);
+    if (!view_ctx) {
+        pcilib_error("The specified property (%s) is not found", prop);
+        return PCILIB_ERROR_NOTFOUND;
+    }
+
+    if (!view_ctx->xml) return NULL;
+
+    return pcilib_get_xml_attr(ctx, view_ctx->xml, attr, val);
+}

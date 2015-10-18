@@ -385,3 +385,32 @@ int pcilib_write_register(pcilib_t *ctx, const char *bank, const char *regname, 
 
     return pcilib_write_register_by_id(ctx, reg, value);
 }
+
+
+int pcilib_get_register_attr_by_id(pcilib_t *ctx, pcilib_register_t reg, const char *attr, pcilib_value_t *val) {
+    int err;
+
+    assert(reg < ctx->num_reg);
+
+    err = pcilib_get_xml_attr(ctx, ctx->register_ctx[reg].xml, attr, val);
+/*
+        // Shall we return from parrent register if not found?
+    if ((err == PCILIB_ERROR_NOTFOUND)&&(ctx->registers[reg].type == PCILIB_REGISTER_TYPE_BITS)) {
+        pcilib_register_t parent = pcilib_find_standard_register_by_addr(ctx, ctx->registers[reg].addr);
+        err = pcilib_get_xml_attr(ctx, ctx->register_ctx[parent].xml, attr, val);
+    }
+*/
+    return err;
+}
+
+int pcilib_get_register_attr(pcilib_t *ctx, const char *bank, const char *regname, const char *attr, pcilib_value_t *val) {
+    pcilib_register_t reg;
+    
+    reg = pcilib_find_register(ctx, bank, regname);
+    if (reg == PCILIB_REGISTER_INVALID) {
+        pcilib_error("Register (%s) is not found", regname);
+        return PCILIB_ERROR_NOTFOUND;
+    }
+
+    return pcilib_get_register_attr_by_id(ctx, reg, attr, val);
+}

@@ -78,6 +78,7 @@ typedef enum {
     MODE_READ,
     MODE_READ_REGISTER,
     MODE_READ_PROPERTY,
+    MODE_READ_ATTR,
     MODE_WRITE,
     MODE_WRITE_REGISTER,
     MODE_WRITE_PROPERTY,
@@ -261,11 +262,20 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "  Modes:\n"
 "   -i [target]			- Device or Register (target) Info\n"
 "   -l[l] [bank|/branch]	- List (detailed) Data Banks & Registers\n"
-"   -r <addr|dmaX|reg[/unit]>	- Read Data/Register\n"
-"   -w <addr|dmaX|reg[/unit]>	- Write Data/Register\n"
+"   -r <addr|dmaX|reg|prop>	- Read Data/Register/Property\n"
+"   -w <addr|dmaX|reg|prop>	- Write Data/Register/Property\n"
 "   --benchmark <barX|dmaX>	- Performance Evaluation\n"
 "   --reset			- Reset board\n"
 "   --help			- Help message\n"
+"\n"
+"  Property/Register Modes:\n"
+"   -r <reg>/view[:unit]        - Read register view\n"
+"   -w <reg>/view[:unit]        - Write register view\n"
+"   -r <reg>/unit               - Read register, detect view based on unit\n"
+"   -w <reg>/unit               - Write register, detect view based on unt\n"
+"   -r <prop>[:unit]            - Read property\n"
+"   -w <prop>[:unit]            - Write property\n"
+"   -r <prop|reg>@attr          - Read register/property attribute\n"
 "\n"
 "  Event Modes:\n"
 "   --trigger [event]		- Trigger Events\n"
@@ -1203,7 +1213,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
 
 
 
-int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, const char *reg, const char *view, const char *unit) {
+int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, const char *reg, const char *view, const char *unit, const char *attr) {
     int i;
     int err;
     const char *format;
@@ -1216,9 +1226,29 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 	// Adding DMA registers
     pcilib_get_dma_description(handle);
 
-    if (reg||view) {
-        if (view) {
-            pcilib_value_t val = {0};
+    if (reg||view||attr) {
+        pcilib_value_t val = {0};
+        if (attr) {
+            if (reg) err = pcilib_get_register_attr(handle, bank, reg, attr, &val);
+            else if (view) err = pcilib_get_property_attr(handle, view, attr, &val);
+            else if (bank) err = pcilib_get_register_bank_attr(handle, bank, attr, &val);
+            else err = PCILIB_ERROR_INVALID_ARGUMENT;
+
+            if (err) {
+                if (err == PCILIB_ERROR_NOTFOUND)
+                    Error("Attribute %s is not found", attr);
+                else
+                    Error("Error (%i) reading attribute %s", err, attr);
+            }
+
+            err = pcilib_convert_value_type(handle, &val, PCILIB_TYPE_STRING);
+            if (err) Error("Error converting attribute %s to string", attr);
+
+            printf("%s = %s", attr, val.sval);
+            if ((val.unit)&&(strcasecmp(val.unit, "name")))
+                printf(" %s", val.unit);
+            printf(" (for %s)\n", (reg?reg:(view?view:bank)));
+        } else if (view) {
             if (reg) {
                 err = pcilib_read_register_view(handle, bank, reg, view, &val);
                 if (err) Error("Error reading view %s of register %s", view, reg);
@@ -2865,6 +2895,7 @@ int main(int argc, char **argv) {
     const char *reg = NULL;
     const char *view = NULL;
     const char *unit = NULL;
+    const char *attr = NULL;
     const char *bank = NULL;
     char **data = NULL;
     const char *event = NULL;
@@ -3477,12 +3508,23 @@ int main(int argc, char **argv) {
 		}
 	    }
 	} else {
-            view = strchr(addr, '/');
-            unit = strchr((view?view:addr), ':');
+	    const char *spec;
+
+            attr = strchr(addr, '@');
+            if (attr) {
+                size_t spec_size = strlen(addr) - strlen(attr);
+                spec = strndupa(addr, spec_size);
+                attr++;
+            } else {
+                spec = addr;
+            }
+
+            view = strchr(spec, '/');
+            unit = strchr((view?view:spec), ':');
 
             if (view||unit) {
-                size_t reg_size = strlen(addr) - strlen(view?view:unit);
-                if (reg_size) reg = strndupa(addr, reg_size);
+                size_t reg_size = strlen(spec) - strlen(view?view:unit);
+                if (reg_size) reg = strndupa(spec, reg_size);
                 else reg = NULL;
 
                 if ((reg)&&(view)) view++;
@@ -3495,15 +3537,22 @@ int main(int argc, char **argv) {
                     unit = NULL;
                 }
             } else {
-                reg = addr;
+                if (*spec) reg = spec;
+                else reg = NULL;
             }
 
             if (reg) {
 	        if (pcilib_find_register(handle, bank, reg) == PCILIB_REGISTER_INVALID) {
 	            Usage(argc, argv, "Invalid address (%s) is specified", addr);
-	        } else {
-		    ++mode;
 	        }
+	    }
+
+            if (attr) {
+                if (mode == MODE_WRITE)
+                    Error("Writting of attributes is not supported");
+                mode += 3;
+            } else if (reg) {
+		mode += 1;
 	    } else {
 	        mode += 2;
 	    }
@@ -3608,7 +3657,8 @@ int main(int argc, char **argv) {
      break;
      case MODE_READ_REGISTER:
      case MODE_READ_PROPERTY:
-        if ((reg)||(view)||(!addr)) ReadRegister(handle, model_info, bank, reg, view, unit);
+     case MODE_READ_ATTR:
+        if ((reg)||(view)||(attr)||(!addr)) ReadRegister(handle, model_info, bank, reg, view, unit, attr);
 	else ReadRegisterRange(handle, model_info, bank, start, addr_shift, size, ofile);
      break;
      case MODE_WRITE:

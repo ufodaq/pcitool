@@ -242,7 +242,6 @@ pcilib_register_t pcilib_find_register(pcilib_t *ctx, const char *bank, const ch
     return PCILIB_REGISTER_INVALID;
 };
 
-
 pcilib_register_protocol_t pcilib_find_register_protocol_by_addr(pcilib_t *ctx, pcilib_register_protocol_addr_t protocol) {
     pcilib_register_protocol_t i;
 
@@ -271,4 +270,22 @@ pcilib_register_protocol_t pcilib_find_register_protocol(pcilib_t *ctx, const ch
     }
 
     return pcilib_find_register_protocol_by_name(ctx, protocol);
+}
+
+int pcilib_get_register_bank_attr_by_id(pcilib_t *ctx, pcilib_register_bank_t bank, const char *attr, pcilib_value_t *val) {
+    assert(bank < ctx->num_banks);
+
+    return pcilib_get_xml_attr(ctx, ctx->bank_ctx[bank]->xml, attr, val);
+}
+
+int pcilib_get_register_bank_attr(pcilib_t *ctx, const char *bankname, const char *attr, pcilib_value_t *val) {
+    pcilib_register_bank_t bank;
+
+    bank = pcilib_find_register_bank_by_name(ctx, bankname);
+    if (bank == PCILIB_REGISTER_BANK_INVALID) {
+        pcilib_error("Bank (%s) is not found", bankname);
+        return PCILIB_ERROR_NOTFOUND;
+    }
+
+    return pcilib_get_register_bank_attr_by_id(ctx, bank, attr, val);
 }

@@ -59,6 +59,9 @@ void pcilib_free_xml(pcilib_t *ctx);
 */
 int pcilib_process_xml(pcilib_t *ctx, const char *location);
 
+int pcilib_get_xml_attr(pcilib_t *ctx, pcilib_xml_node_t *node, const char *attr, pcilib_value_t *val);
+
+
 #ifdef __cplusplus
 }
 #endif

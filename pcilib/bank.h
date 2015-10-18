@@ -153,7 +153,6 @@ int pcilib_add_register_protocols(pcilib_t *ctx, pcilib_model_modification_flags
  */
 int pcilib_add_register_ranges(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_range_t *ranges);
 
-
 pcilib_register_bank_t pcilib_find_register_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank);
 pcilib_register_bank_t pcilib_find_register_bank_by_name(pcilib_t *ctx, const char *bankname);
 pcilib_register_bank_t pcilib_find_register_bank(pcilib_t *ctx, const char *bank);
@@ -161,6 +160,9 @@ pcilib_register_bank_t pcilib_find_register_bank(pcilib_t *ctx, const char *bank
 pcilib_register_protocol_t pcilib_find_register_protocol_by_addr(pcilib_t *ctx, pcilib_register_protocol_addr_t protocol);
 pcilib_register_protocol_t pcilib_find_register_protocol_by_name(pcilib_t *ctx, const char *name);
 pcilib_register_protocol_t pcilib_find_register_protocol(pcilib_t *ctx, const char *name);
+
+
+int pcilib_get_register_bank_attr_by_id(pcilib_t *ctx, pcilib_register_bank_t bank, const char *attr, pcilib_value_t *val);
 
 #ifdef __cplusplus
 }
