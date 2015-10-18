@@ -108,7 +108,7 @@ static char *pcilib_py_parse_string(pcilib_t *ctx, const char *codestr, pcilib_v
 
             // find the end of the register name
         reg++;
-        for (i = 0; isalnum(reg[i]); i++);
+        for (i = 0; isalnum(reg[i])||(reg[i] == '_'); i++);
         save = reg[i];
         reg[i] = 0;
 

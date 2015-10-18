@@ -27,6 +27,7 @@ typedef struct {
 
 struct pcilib_view_description_s {
     const pcilib_view_api_description_t *api;
+    pcilib_view_flags_t flags;                                                  /**< Flags specifying type of the view */
     pcilib_value_type_t type;			                                /**< The default data type returned by operation, PCILIB_VIEW_TYPE_STRING is supported by all operations */
     pcilib_access_mode_t mode;                                                  /**< Specifies if the view is read/write-only */
     const char *unit;				                                /**< Returned unit (if any) */
@@ -37,7 +38,6 @@ struct pcilib_view_description_s {
 struct pcilib_view_context_s {
     const char *name;
     pcilib_view_t view;
-    pcilib_view_flags_t flags;                                                  /**< Flags specifying type of the view */
     UT_hash_handle hh;
 };
 

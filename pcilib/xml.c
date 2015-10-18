@@ -488,7 +488,12 @@ static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDoc
         if (!value) continue;
 
         if (!strcasecmp(name, "name")) {
-            desc->name = value;
+                // Overriden by path
+            if (!desc->name)
+                desc->name = value;
+	} else if (!strcasecmp(name, "path")) {
+	    desc->name = value;
+	    desc->flags |= PCILIB_VIEW_FLAG_PROPERTY;
         } else if (!strcasecmp((char*)name, "description")) {
     	    desc->description = value;
         } else if (!strcasecmp((char*)name, "unit")) {
@@ -529,10 +534,22 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
         if (!value) continue;
 
         if (!strcasecmp(name, "read_from_register")) {
+            if (desc.base.flags&PCILIB_VIEW_FLAG_PROPERTY) {
+                if (strstr(value, "$value")) {
+                    pcilib_error("Invalid transform specified in XML property (%s). The properties can't reference $value (%s)", desc.base.name, value);
+                    return PCILIB_ERROR_INVALID_DATA;
+                }
+            }
             desc.read_from_reg = value;
             if ((value)&&(*value)) desc.base.mode |= PCILIB_ACCESS_R;
         } else if (!strcasecmp(name, "write_to_register")) {
-	    desc.write_to_reg = value;
+            if (desc.base.flags&PCILIB_VIEW_FLAG_PROPERTY) {
+                if (strstr(value, "$value")) {
+                    pcilib_error("Invalid transform specified in XML property (%s). The properties can't reference $value (%s)", desc.base.name, value);
+                    return PCILIB_ERROR_INVALID_DATA;
+                }
+            }
+            desc.write_to_reg = value;
             if ((value)&&(*value)) desc.base.mode |= PCILIB_ACCESS_W;
         } 
     }

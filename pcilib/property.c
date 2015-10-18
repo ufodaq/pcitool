@@ -20,7 +20,6 @@ int pcilib_add_register_properties(pcilib_t *ctx, size_t n, const pcilib_registe
 
     pcilib_register_t i;
     pcilib_view_t cur_view = ctx->num_views;
-    pcilib_view_context_t *view_ctx;
 
     if (!n) 
         return PCILIB_ERROR_INVALID_ARGUMENT;
@@ -59,6 +58,7 @@ int pcilib_add_register_properties(pcilib_t *ctx, size_t n, const pcilib_registe
         v.base.name = view_name;
         v.base.description = registers[i].description;
         v.base.mode = registers[i].mode&mode;
+        v.base.flags |= PCILIB_VIEW_FLAG_PROPERTY;
         v.reg = registers[i].name;
         v.bank = b->name;
 
@@ -68,9 +68,10 @@ int pcilib_add_register_properties(pcilib_t *ctx, size_t n, const pcilib_registe
             pcilib_clean_views(ctx, cur_view);
             return err;
         }
-
-        view_ctx = pcilib_find_view_context_by_name(ctx, v.base.name);
+/*
+        pcilib_view_context_t *view_ctx = pcilib_find_view_context_by_name(ctx, v.base.name);
         view_ctx->flags |= PCILIB_VIEW_FLAG_PROPERTY;
+*/
     }
 
     return 0;
@@ -100,7 +101,7 @@ pcilib_property_info_t *pcilib_get_property_list(pcilib_t *ctx, const char *bran
         const char *subname = v->name + name_offset;
         const char *suffix;
 
-        if (!(view_ctx->flags&PCILIB_VIEW_FLAG_PROPERTY)) continue;
+        if (!(v->flags&PCILIB_VIEW_FLAG_PROPERTY)) continue;
         if ((branch)&&(strncasecmp(branch, v->name, strlen(branch)))) continue;
 
         suffix = strchr(subname, '/');
@@ -134,7 +135,7 @@ pcilib_property_info_t *pcilib_get_property_list(pcilib_t *ctx, const char *bran
         const pcilib_view_description_t *v = ctx->views[view_ctx->view];
         const char *subname = v->name + name_offset;
 
-        if (!(view_ctx->flags&PCILIB_VIEW_FLAG_PROPERTY)) continue;
+        if (!(v->flags&PCILIB_VIEW_FLAG_PROPERTY)) continue;
         if ((branch)&&(strncasecmp(branch, v->name, strlen(branch)))) continue;
 
         if (!strchr(subname, '/')) {

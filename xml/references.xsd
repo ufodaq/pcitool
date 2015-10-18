@@ -37,6 +37,10 @@
       <xsd:selector xpath="unit" />
       <xsd:field xpath="@name" />
     </xsd:key>
+    <xsd:key name="pcilib_path_key">
+      <xsd:selector xpath="transform" />
+      <xsd:field xpath="@path" />
+    </xsd:key>
 
     <xsd:keyref name="pcilib_register_view_ref" refer="pcilib_view_key">
       <xsd:selector xpath="bank/register/view|bank/register/field/view" />

@@ -52,7 +52,7 @@
   </xsd:complexType>
 
   <xsd:complexType name="pcilib_view_t">
-    <xsd:attribute name="name" type="xsd:ID" use="required" />
+    <xsd:attribute name="name" type="xsd:ID" />
     <xsd:attribute name="unit" type="xsd:string" />
     <xsd:attribute name="type" type="pcilib_data_type_t" />
     <xsd:attribute name="visible" type="bool_t" default="0" />
@@ -62,6 +62,7 @@
   <xsd:complexType name="pcilib_transform_view_t">
     <xsd:complexContent>
         <xsd:extension base="pcilib_view_t">
+          <xsd:attribute name="path" type="xsd:string" />
           <xsd:attribute name="read_from_register" type="xsd:string" />
           <xsd:attribute name="write_to_register" type="xsd:string" />
         </xsd:extension>
