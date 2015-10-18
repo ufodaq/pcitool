@@ -108,7 +108,17 @@ static char *pcilib_py_parse_string(pcilib_t *ctx, const char *codestr, pcilib_v
 
             // find the end of the register name
         reg++;
-        for (i = 0; isalnum(reg[i])||(reg[i] == '_'); i++);
+        if (*reg == '{') {
+            reg++;
+            for (i = 0; (reg[i])&&(reg[i] != '}'); i++);
+            if (!reg[i]) {
+                pcilib_error("Python formula (%s) contains unterminated variable reference", codestr);
+                err = PCILIB_ERROR_INVALID_DATA;
+                break;
+            }
+        } else {
+            for (i = 0; isalnum(reg[i])||(reg[i] == '_'); i++);
+        }
         save = reg[i];
         reg[i] = 0;
 
@@ -122,14 +132,23 @@ static char *pcilib_py_parse_string(pcilib_t *ctx, const char *codestr, pcilib_v
 
             strcpy(dst + offset, val.sval);
         } else {
-            err = pcilib_read_register(ctx, NULL, reg, &regval);
-            if (err) break;
-
-            sprintf(dst + offset, "0x%x", regval);
+            if (*reg == '/') {
+                pcilib_value_t val = {0};
+                err = pcilib_get_property(ctx, reg, &val);
+                if (err) break;
+                err = pcilib_convert_value_type(ctx, &val, PCILIB_TYPE_STRING);
+                if (err) break;
+                sprintf(dst + offset, "%s", val.sval);
+            } else {
+                err = pcilib_read_register(ctx, NULL, reg, &regval);
+                if (err) break;
+                sprintf(dst + offset, "0x%x", regval);
+            }
         }
 
         offset += strlen(dst + offset);
-        reg[i] = save;
+        if (save == '}') i++;
+        else reg[i] = save;
 
             // Advance to the next register if any
         cur = reg + i;
