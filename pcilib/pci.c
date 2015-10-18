@@ -383,7 +383,7 @@ void pcilib_close(pcilib_t *ctx) {
 		pcilib_return_lock(ctx, PCILIB_LOCK_FLAGS_DEFAULT, ctx->dma_wlock[dma]);
 	}
 
-	pcilib_free_register_banks(ctx);
+	pcilib_free_register_banks(ctx, 0);
 
 	if (ctx->event_plugin)
 	    pcilib_plugin_close(ctx->event_plugin);
@@ -414,16 +414,16 @@ void pcilib_close(pcilib_t *ctx) {
 
 
         if (ctx->units) {
-            pcilib_clean_units(ctx);
+            pcilib_clean_units(ctx, 0);
             free(ctx->units);
         }
 
 	if (ctx->views) {
-	    pcilib_clean_views(ctx);
+	    pcilib_clean_views(ctx, 0);
 	    free(ctx->views);
 	}
 
-        pcilib_clean_registers(ctx);
+        pcilib_clean_registers(ctx, 0);
 
 	if (ctx->register_ctx)
             free(ctx->register_ctx);

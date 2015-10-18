@@ -1,6 +1,8 @@
 #ifndef _PCILIB_REGISTER_H
 #define _PCILIB_REGISTER_H
 
+#include <uthash.h>
+
 #include <pcilib.h>
 #include <pcilib/bank.h>
 
@@ -49,13 +51,43 @@ typedef struct {
     pcilib_view_reference_t *views;		/**< List of supported views for this register */
 } pcilib_register_description_t;
 
+typedef struct {
+    const char *name;                                                                   /**< Register name */
+    pcilib_register_t reg;                                                              /**< Register index */
+    pcilib_register_bank_t bank;							/**< Reference to bank containing the register */
+    pcilib_register_value_t min, max;							/**< Minimum & maximum allowed values */
+    pcilib_xml_node_t *xml;								/**< Additional XML properties */
+    pcilib_view_reference_t *views;							/**< For non-static list of views, this vairables holds a copy of a NULL-terminated list from model (if present, memory should be de-allocated) */
+    UT_hash_handle hh;
+} pcilib_register_context_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/**
+ * Use this function to add new registers into the model. Currently, it is considered a error
+ * to re-add already defined register. If it will turn out to be useful to redefine some registers 
+ * from the model, it may change in the future. However, we should think how to treat bit-registers
+ * in this case. The function will copy the context of registers structure, but name, 
+ * description, and other strings in the structure are considered to have static duration 
+ * and will not be copied. On error no new registers are initalized.
+ * @param[in,out] ctx - pcilib context
+ * @param[in] flags - not used now, but in future may instruct if existing registers should be reported as error (default), overriden or ignored
+ * @param[in] n - number of registers to initialize. It is OK to pass 0 if registers array is NULL terminated (last member of the array have all members set to 0)
+ * @param[in] registers - register descriptions
+ * @param[out] ids - if specified will contain the ids of the newly registered and overriden registers
+ * @return - error or 0 on success
+ */
 int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_description_t *registers, pcilib_register_t *ids);
-void pcilib_clean_registers(pcilib_t *ctx);
+
+/**
+ * Destroys data associated with registers. This is an internal function and will
+ * be called during clean-up.
+ * @param[in,out] ctx - pcilib context
+ * @param[in] start - specifies first register to clean (used to clean only part of the registers to keep the defined state if pcilib_add_registers has failed)
+ */
+void pcilib_clean_registers(pcilib_t *ctx, pcilib_register_t start);
 
 #ifdef __cplusplus
 }

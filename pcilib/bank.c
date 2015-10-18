@@ -19,6 +19,7 @@
 
 int pcilib_init_register_banks(pcilib_t *ctx) {
     int err; 
+    size_t start = ctx->num_banks_init;
 
     err = pcilib_map_register_space(ctx);
     if (err) return err;
@@ -33,6 +34,7 @@ int pcilib_init_register_banks(pcilib_t *ctx) {
 	    const char *name = ctx->banks[ctx->num_banks_init].name;
 	    if (!name) name = "unnamed";
 	    pcilib_error("Invalid register protocol address (%u) is specified for bank %i (%s)", ctx->banks[ctx->num_banks_init].protocol, ctx->banks[ctx->num_banks_init].addr, name);
+	    pcilib_free_register_banks(ctx, start);
 	    return PCILIB_ERROR_INVALID_BANK;
 	}
 	
@@ -46,8 +48,10 @@ int pcilib_init_register_banks(pcilib_t *ctx) {
 	} else
 	    bank_ctx = (pcilib_register_bank_context_t*)malloc(sizeof(pcilib_register_bank_context_t));
 	
-	if (!bank_ctx)
+	if (!bank_ctx) {
+	    pcilib_free_register_banks(ctx, start);
 	    return PCILIB_ERROR_FAILED;
+	}
 	
 	bank_ctx->bank = ctx->banks + ctx->num_banks_init;
 	bank_ctx->api = bapi;
@@ -58,10 +62,10 @@ int pcilib_init_register_banks(pcilib_t *ctx) {
     return 0;
 }
 
-void pcilib_free_register_banks(pcilib_t *ctx) {
+void pcilib_free_register_banks(pcilib_t *ctx, pcilib_register_bank_t start) {
     size_t i;
 
-    for (i = 0; i < ctx->num_banks_init; i++) {
+    for (i = start; i < ctx->num_banks_init; i++) {
 	const pcilib_register_protocol_api_description_t *bapi = ctx->bank_ctx[i]->api;
 	
 	if (ctx->bank_ctx[i]) {
@@ -74,14 +78,16 @@ void pcilib_free_register_banks(pcilib_t *ctx) {
 	}
     }
 
-    ctx->num_banks_init = 0;
+    ctx->num_banks_init = start;
 }
 
 int pcilib_add_register_banks(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_bank_description_t *banks, pcilib_register_bank_t *ids) {
+    int err;
     size_t i;
     pcilib_register_bank_t bank;
     size_t dyn_banks = ctx->dyn_banks;
     size_t num_banks = ctx->num_banks;
+    size_t cur_banks = num_banks;
 	
     if (!n) {
 	for (n = 0; banks[n].access; n++);
@@ -89,11 +95,6 @@ int pcilib_add_register_banks(pcilib_t *ctx, pcilib_model_modification_flags_t f
 
     if ((ctx->num_banks + n + 1) > PCILIB_MAX_REGISTER_BANKS)
 	return PCILIB_ERROR_TOOBIG;
-
-/*
-    memcpy(ctx->banks + ctx->num_banks, banks, n * sizeof(pcilib_register_bank_description_t));
-    ctx->num_banks += n;
-*/
 
     for (i = 0; i < n; i++) {
 	    // Try to find if the bank is already existing...
@@ -111,6 +112,7 @@ int pcilib_add_register_banks(pcilib_t *ctx, pcilib_model_modification_flags_t f
 		pcilib_error("The bank %s is already existing and override flag is not set", banks[i].name);
 	    else
 		pcilib_error("The bank with address 0x%lx is already existing and override flag is not set", banks[i].addr);
+	    memset(ctx->banks + ctx->num_banks, 0, sizeof(pcilib_register_bank_description_t));
 	    return PCILIB_ERROR_EXIST;
 	}
 	
@@ -122,17 +124,22 @@ int pcilib_add_register_banks(pcilib_t *ctx, pcilib_model_modification_flags_t f
 	    dyn_banks++;
 	}
     }
-    
+
     ctx->num_banks = num_banks;
-    ctx->dyn_banks = dyn_banks;
 
 	// If banks are already initialized, we need to re-run the initialization code
-	// DS: Locking is currently missing
     if (ctx->reg_bar_mapped) {
 	ctx->reg_bar_mapped = 0;
-        return pcilib_init_register_banks(ctx);
+        err = pcilib_init_register_banks(ctx);
+        if (err) {
+            ctx->num_banks = cur_banks;
+	    memset(ctx->banks + ctx->num_banks, 0, sizeof(pcilib_register_bank_description_t));
+            return err;
+        }
     }
-    
+
+    ctx->dyn_banks = dyn_banks;
+
     return 0;
 }
 

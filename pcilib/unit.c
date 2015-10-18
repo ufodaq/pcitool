@@ -35,11 +35,19 @@ int pcilib_add_units(pcilib_t *ctx, size_t n, const pcilib_unit_description_t *d
 
         // ToDo: Check if exists...
     for (i = 0; i < n; i++) {
+        pcilib_unit_t unit = pcilib_find_unit_by_name(ctx, desc[i].name);
+        if (unit != PCILIB_UNIT_INVALID) {
+            pcilib_clean_units(ctx, ctx->num_units);
+            pcilib_error("Unit %s is already defined in the model", desc[i].name);
+            return PCILIB_ERROR_EXIST;
+        }
+
         pcilib_unit_context_t *unit_ctx = (pcilib_unit_context_t*)malloc(sizeof(pcilib_unit_context_t));
         if (!unit_ctx) {
-            err = PCILIB_ERROR_MEMORY;
-            break;
+            pcilib_clean_units(ctx, ctx->num_units);
+            return PCILIB_ERROR_MEMORY;
         }
+
         memset(unit_ctx, 0, sizeof(pcilib_unit_context_t));
         unit_ctx->unit = ctx->num_units + i;
         unit_ctx->name = desc[i].name;
@@ -48,24 +56,26 @@ int pcilib_add_units(pcilib_t *ctx, size_t n, const pcilib_unit_description_t *d
         memcpy(ctx->units + ctx->num_units + i, &desc[i], sizeof(pcilib_unit_description_t));
     }
 
-    memset(ctx->units + ctx->num_units + i, 0, sizeof(pcilib_unit_description_t));
-    ctx->num_units += i;
+    ctx->num_units += n;
+    memset(ctx->units + ctx->num_units, 0, sizeof(pcilib_unit_description_t));
 
     return err;
 }
 
-void pcilib_clean_units(pcilib_t *ctx) {
+void pcilib_clean_units(pcilib_t *ctx, pcilib_unit_t start) {
     pcilib_unit_context_t *s, *tmp;
 
     if (ctx->unit_hash) {
         HASH_ITER(hh, ctx->unit_hash, s, tmp) {
-            HASH_DEL(ctx->unit_hash, s);
-            free(s);
+            if (s->unit >= start) {
+                HASH_DEL(ctx->unit_hash, s);
+                free(s);
+            }
         }
     }
 
-    memset(ctx->units, 0, sizeof(pcilib_unit_description_t));
-    ctx->num_units = 0;
+    memset(&ctx->units[start], 0, sizeof(pcilib_unit_description_t));
+    ctx->num_units = start;
 }
 
 pcilib_unit_t pcilib_find_unit_by_name(pcilib_t *ctx, const char *name) {
@@ -105,13 +115,18 @@ pcilib_unit_transform_t *pcilib_find_transform_by_unit_names(pcilib_t *ctx, cons
     return NULL;
 }
 
-int pcilib_transform_unit(pcilib_t *ctx, pcilib_unit_transform_t *trans, pcilib_value_t *value) {
+int pcilib_transform_unit(pcilib_t *ctx, const pcilib_unit_transform_t *trans, pcilib_value_t *value) {
     int err;
 
-    err = pcilib_py_eval_string(ctx, trans->transform, value);
-    if (err) return err;
+    if (trans->transform) {
+        err = pcilib_py_eval_string(ctx, trans->transform, value);
+        if (err) return err;
 
-    value->unit = trans->unit;
+        value->unit = trans->unit;
+    } else if (trans->unit) {
+        value->unit = trans->unit;
+    } 
+
     return 0;
 }
 

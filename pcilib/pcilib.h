@@ -41,6 +41,12 @@ typedef enum {
 } pcilib_endianess_t;
 
 typedef enum {
+    PCILIB_ACCESS_R = 1,			/**< getting property is allowed */
+    PCILIB_ACCESS_W = 2,			/**< setting property is allowed */
+    PCILIB_ACCESS_RW = 3
+} pcilib_access_mode_t;
+
+typedef enum {
     PCILIB_TYPE_INVALID = 0,                    /**< uninitialized */
     PCILIB_TYPE_DEFAULT = 0,			/**< default type */
     PCILIB_TYPE_STRING = 1,			/**< char* */
@@ -74,14 +80,14 @@ typedef enum {
 } pcilib_dma_flags_t;
 
 typedef enum {
-    PCILIB_STREAMING_STOP = 0, 		/**< stop streaming */
-    PCILIB_STREAMING_CONTINUE = 1, 	/**< wait the default DMA timeout for a new data */
-    PCILIB_STREAMING_WAIT = 2,		/**< wait the specified timeout for a new data */
-    PCILIB_STREAMING_CHECK = 3,		/**< do not wait for the data, bail out imideatly if no data ready */
-    PCILIB_STREAMING_FAIL = 4,		/**< fail if data is not available on timeout */
-    PCILIB_STREAMING_REQ_FRAGMENT = 5,	/**< only fragment of a packet is read, wait for next fragment and fail if no data during DMA timeout */
-    PCILIB_STREAMING_REQ_PACKET = 6,	/**< wait for next packet and fail if no data during the specified timeout */
-    PCILIB_STREAMING_TIMEOUT_MASK = 3	/**< mask specifying all timeout modes */
+    PCILIB_STREAMING_STOP = 0,                  /**< stop streaming */
+    PCILIB_STREAMING_CONTINUE = 1,              /**< wait the default DMA timeout for a new data */
+    PCILIB_STREAMING_WAIT = 2,                  /**< wait the specified timeout for a new data */
+    PCILIB_STREAMING_CHECK = 3,                 /**< do not wait for the data, bail out imideatly if no data ready */
+    PCILIB_STREAMING_FAIL = 4,                  /**< fail if data is not available on timeout */
+    PCILIB_STREAMING_REQ_FRAGMENT = 5,          /**< only fragment of a packet is read, wait for next fragment and fail if no data during DMA timeout */
+    PCILIB_STREAMING_REQ_PACKET = 6,            /**< wait for next packet and fail if no data during the specified timeout */
+    PCILIB_STREAMING_TIMEOUT_MASK = 3           /**< mask specifying all timeout modes */
 } pcilib_streaming_action_t;
 
 typedef enum {
@@ -104,22 +110,37 @@ typedef struct {
     pcilib_event_info_flags_t flags;		/**< flags */
 } pcilib_event_info_t;
 
+typedef enum {
+    PCILIB_LIST_FLAGS_DEFAULT = 0,
+    PCILIB_LIST_FLAG_CHILDS = 1                 /**< Request all sub-elements or indicated that sub-elements are available */
+} pcilib_list_flags_t;
+
 typedef struct {
-    pcilib_value_type_t type;
-    const char *unit;
-    const char *format;
+    pcilib_value_type_t type;                   /**< Current data type */
+    const char *unit;                           /**< Units (if known) */
+    const char *format;                         /**< requested printf format (may enforce using output in hex form) */
 
     union {
-	long ival;
-	double fval;
-	const char *sval;
+	long ival;                              /**< The value if type = PCILIB_TYPE_LONG */
+	double fval;                            /**< The value if type = PCILIB_TYPE_DOUBLE */
+	const char *sval;                       /**< The value if type = PCILIB_TYPE_STRING, the pointer may point to static location or reference actual string in str or data */
     };
 
         // This is a private part
-    size_t size;
-    void *data;
-    char str[16];
+    size_t size;                                /**< Size of the data */
+    void *data;                                 /**< Arbitrary data, for instance actual string referenced by the sval */
+    char str[16];                               /**< Used for shorter strings converted from integer/float types */
 } pcilib_value_t;
+
+typedef struct {
+    const char *name;                           /**< Name of the property view */
+    const char *path;                           /**< Full path to the property */
+    const char *description;                    /**< Short description */
+    pcilib_value_type_t type;                   /**< The default data type or PCILIB_TYPE_INVALID if directory */
+    pcilib_access_mode_t mode;                  /**< Specifies if the view is read/write-only */
+    pcilib_list_flags_t flags;                  /**< Indicates if have sub-folders, etc. */
+    const char *unit;                           /**< Returned unit (if any) */
+} pcilib_property_info_t;
 
 
 #define PCILIB_BAR_DETECT 		((pcilib_bar_t)-1)
@@ -218,6 +239,8 @@ int pcilib_read_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_regi
 int pcilib_write_register_by_id(pcilib_t *ctx, pcilib_register_t reg, pcilib_register_value_t value);
 int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t *value);
 int pcilib_write_register(pcilib_t *ctx, const char *bank, const char *regname, pcilib_register_value_t value);
+int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, pcilib_value_t *value);
+int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, const pcilib_value_t *value);
 
 void pcilib_clean_value(pcilib_t *ctx, pcilib_value_t *val);
 int pcilib_copy_value(pcilib_t *ctx, pcilib_value_t *dst, const pcilib_value_t *src);
@@ -228,12 +251,14 @@ int pcilib_set_value_from_static_string(pcilib_t *ctx, pcilib_value_t *value, co
 double pcilib_get_value_as_float(pcilib_t *ctx, const pcilib_value_t *val, int *err);
 long pcilib_get_value_as_int(pcilib_t *ctx, const pcilib_value_t *val, int *err);
 pcilib_register_value_t pcilib_get_value_as_register_value(pcilib_t *ctx, const pcilib_value_t *val, int *err);
-
 int pcilib_convert_value_unit(pcilib_t *ctx, pcilib_value_t *val, const char *unit_name);
 int pcilib_convert_value_type(pcilib_t *ctx, pcilib_value_t *val, pcilib_value_type_t type);
 
-int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, pcilib_value_t *value);
-int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, const pcilib_value_t *value);
+pcilib_property_info_t *pcilib_get_property_list(pcilib_t *ctx, const char *branch, pcilib_list_flags_t flags);
+void pcilib_free_property_info(pcilib_t *ctx, pcilib_property_info_t *info);
+int pcilib_get_property(pcilib_t *ctx, const char *prop, pcilib_value_t *val);
+int pcilib_set_property(pcilib_t *ctx, const char *prop, const pcilib_value_t *val);
+
 
 int pcilib_reset(pcilib_t *ctx);
 int pcilib_trigger(pcilib_t *ctx, pcilib_event_t event, size_t trigger_size, void *trigger_data);

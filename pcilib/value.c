@@ -267,5 +267,6 @@ int pcilib_convert_value_type(pcilib_t *ctx, pcilib_value_t *val, pcilib_value_t
         return PCILIB_ERROR_NOTSUPPORTED;
     }
 
+    val->type = type;
     return 0;
 }

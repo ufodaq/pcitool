@@ -40,16 +40,6 @@ typedef struct {
 } pcilib_pcie_link_info_t;
 
 
-typedef struct {
-    const char *name;                                                                   /**< Register name */
-    pcilib_register_t reg;                                                              /**< Register index */
-    pcilib_register_bank_t bank;							/**< Reference to bank containing the register */
-    pcilib_register_value_t min, max;							/**< Minimum & maximum allowed values */
-    pcilib_xml_node_t *xml;								/**< Additional XML properties */
-    pcilib_view_reference_t *views;							/**< For non-static list of views, this vairables holds a copy of a NULL-terminated list from model (if present, memory should be de-allocated) */
-    UT_hash_handle hh;
-} pcilib_register_context_t;
-
 struct pcilib_s {
     int handle;										/**< file handle of device */
     

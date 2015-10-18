@@ -11,22 +11,28 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <assert.h>
+#include <alloca.h>
 
 #include "pci.h"
 #include "bank.h"
 
 #include "tools.h"
 #include "error.h"
-
+#include "property.h"
 
 int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_description_t *registers, pcilib_register_t *ids) {
 	// DS: Overrride existing registers 
 	// Registers identified by addr + offset + size + type or name
-	
+    int err;
+    size_t size;
     pcilib_register_t i;
+
     pcilib_register_description_t *regs;
     pcilib_register_context_t *reg_ctx;
-    size_t size;
+
+    pcilib_register_bank_t bank = PCILIB_REGISTER_BANK_INVALID;
+    pcilib_register_bank_addr_t bank_addr = (pcilib_register_bank_addr_t)-1;
+    pcilib_register_bank_t *banks;
 
     if (!n) {
 	for (n = 0; registers[n].bits; n++);
@@ -59,13 +65,43 @@ int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags,
 	ctx->alloc_reg = size;
     }
 
+    banks = (pcilib_register_bank_t*)alloca(n * sizeof(pcilib_register_bank_t));
+    if (!banks) return PCILIB_ERROR_MEMORY;
+
+    for (i = 0; i < n; i++) {
+        if (registers[i].bank != bank_addr) {
+            bank_addr = registers[i].bank;
+            bank = pcilib_find_register_bank_by_addr(ctx, bank_addr);
+            if (bank == PCILIB_REGISTER_BANK_INVALID) {
+                pcilib_error("Invalid bank address (0x%lx) is specified for register %s", bank_addr, registers[i].name);
+                return PCILIB_ERROR_INVALID_BANK;
+            }
+        }
+
+/*
+            // No hash so far, will iterate.
+        pcilib_register_t reg = pcilib_find_register(ctx, ctx->banks[bank].name, registers[i].name);
+        if (reg != PCILIB_REGISTER_INVALID) {
+            pcilib_error("Register %s is already defined in the model", registers[i].name);
+            return PCILIB_ERROR_EXIST;
+        }
+*/
+
+        banks[i] = bank;
+    }
+
+    err = pcilib_add_register_properties(ctx, n, banks, registers);
+    if (err) return err;
+
     for (i = 0; i < n; i++) {
         pcilib_register_context_t *cur = &ctx->register_ctx[ctx->num_reg + i];
+
         cur->reg = ctx->num_reg + i;
         cur->name = registers[i].name;
+        cur->bank = banks[i];
         HASH_ADD_KEYPTR(hh, ctx->reg_hash, cur->name, strlen(cur->name), cur);
     }
-    
+
     memcpy(ctx->registers + ctx->num_reg, registers, n * sizeof(pcilib_register_description_t));
     memset(ctx->registers + ctx->num_reg + n, 0, sizeof(pcilib_register_description_t));
 
@@ -78,26 +114,35 @@ int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags,
 
     ctx->num_reg += n;
 
-
     return 0;
 }
 
-void pcilib_clean_registers(pcilib_t *ctx) {
+void pcilib_clean_registers(pcilib_t *ctx, pcilib_register_t start) {
     pcilib_register_t reg;
+    pcilib_register_context_t *reg_ctx, *tmp;
 
-    HASH_CLEAR(hh, ctx->reg_hash);
-    for (reg = 0; reg < ctx->num_reg; reg++) {
+    if (start) {
+        HASH_ITER(hh, ctx->reg_hash, reg_ctx, tmp) {
+            if (reg_ctx->reg >= start) {
+                HASH_DEL(ctx->reg_hash, reg_ctx);
+            }
+        }
+    } else {
+        HASH_CLEAR(hh, ctx->reg_hash);
+    }
+
+    for (reg = start; reg < ctx->num_reg; reg++) {
 	if (ctx->register_ctx[reg].views)
 	    free(ctx->register_ctx[reg].views);
     }
 
     if (ctx->registers)
-        memset(ctx->registers, 0, sizeof(pcilib_register_description_t));
+        memset(&ctx->registers[start], 0, sizeof(pcilib_register_description_t));
 
     if (ctx->register_ctx)
-        memset(ctx->register_ctx, 0, ctx->alloc_reg * sizeof(pcilib_register_context_t));
+        memset(&ctx->register_ctx[start], 0, (ctx->alloc_reg - start) * sizeof(pcilib_register_context_t));
 
-    ctx->num_reg = 0;
+    ctx->num_reg = start;
 }
 
 static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, pcilib_register_size_t offset, pcilib_register_size_t bits, pcilib_register_value_t *buf) {

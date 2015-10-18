@@ -479,8 +479,6 @@ static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDoc
     xmlAttrPtr cur;
     const char *value, *name;
 
-    desc->type = PCILIB_TYPE_STRING;
-
     for (cur = node->properties; cur != NULL; cur = cur->next) {
         if (!cur->children) continue;
         if (!xmlNodeIsText(cur->children)) continue;
@@ -517,6 +515,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
     pcilib_transform_view_description_t desc = {0};
 
     desc.base.api = &pcilib_transform_view_api;
+    desc.base.type = PCILIB_TYPE_DOUBLE;
 
     err = pcilib_xml_parse_view(ctx, xpath, doc, node, (pcilib_view_description_t*)&desc);
     if (err) return err;
@@ -531,8 +530,10 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
 
         if (!strcasecmp(name, "read_from_register")) {
             desc.read_from_reg = value;
+            if ((value)&&(*value)) desc.base.mode |= PCILIB_ACCESS_R;
         } else if (!strcasecmp(name, "write_to_register")) {
 	    desc.write_to_reg = value;
+            if ((value)&&(*value)) desc.base.mode |= PCILIB_ACCESS_W;
         } 
     }
 
@@ -610,8 +611,10 @@ static int pcilib_xml_create_enum_view(pcilib_t *ctx, xmlXPathContextPtr xpath, 
 
     pcilib_enum_view_description_t desc = {0};
 
+    desc.base.type = PCILIB_TYPE_STRING;
     desc.base.unit = pcilib_xml_enum_view_unit;
     desc.base.api = &pcilib_enum_view_xml_api;
+    desc.base.mode = PCILIB_ACCESS_RW;
 
     err = pcilib_xml_parse_view(ctx, xpath, doc, node, (pcilib_view_description_t*)&desc);
     if (err) return err;

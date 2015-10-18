@@ -11,7 +11,6 @@
 #include "value.h"
 
 int pcilib_add_views(pcilib_t *ctx, size_t n, const pcilib_view_description_t *desc) {
-    int err = 0;
     size_t i;
     void *ptr;
 
@@ -44,55 +43,68 @@ int pcilib_add_views(pcilib_t *ctx, size_t n, const pcilib_view_description_t *d
     ptr = (void*)desc;
     for (i = 0; i < n; i++) {
         const pcilib_view_description_t *v = (const pcilib_view_description_t*)ptr;
+        pcilib_view_description_t *cur;
         pcilib_view_context_t *view_ctx;
 
-        ctx->views[ctx->num_views + i] = (pcilib_view_description_t*)malloc(v->api->description_size);
-        if (!ctx->views[ctx->num_views + i]) {
-            err = PCILIB_ERROR_MEMORY;
-            break;
+        pcilib_view_t view = pcilib_find_view_by_name(ctx, v->name);
+        if (view != PCILIB_VIEW_INVALID) {
+            pcilib_clean_views(ctx, ctx->num_views);
+            pcilib_error("View %s is already defined in the model", v->name);
+            return PCILIB_ERROR_EXIST;
+        }
+
+        cur = (pcilib_view_description_t*)malloc(v->api->description_size);
+        if (!cur) {
+            pcilib_clean_views(ctx, ctx->num_views);
+            return PCILIB_ERROR_MEMORY;
         }
 
         if (v->api->init) 
             view_ctx = v->api->init(ctx);
         else {
             view_ctx = (pcilib_view_context_t*)malloc(sizeof(pcilib_view_context_t));
-            memset(view_ctx, 0, sizeof(pcilib_view_context_t));
+            if (view_ctx) memset(view_ctx, 0, sizeof(pcilib_view_context_t));
         }
 
+        if (!view_ctx) {
+            free(cur);
+            pcilib_clean_views(ctx, ctx->num_views);
+            return PCILIB_ERROR_FAILED;
+        }
+
+        memcpy(cur, v, v->api->description_size);
         view_ctx->view = ctx->num_views + i;
         view_ctx->name = v->name;
 
-        if (!view_ctx) {
-            free(ctx->views[ctx->num_views + i]);
-            err = PCILIB_ERROR_MEMORY;
-            break;
-        }
-
         HASH_ADD_KEYPTR(hh, ctx->view_hash, view_ctx->name, strlen(view_ctx->name), view_ctx);
-        memcpy(ctx->views[ctx->num_views + i], v, v->api->description_size);
+        ctx->views[ctx->num_views + i] = cur;
+
         ptr += v->api->description_size;
     }
-    ctx->views[ctx->num_views + i] = NULL;
-    ctx->num_views += i;
 
-    return err;
+    ctx->views[ctx->num_views + n] = NULL;
+    ctx->num_views += n;
+
+    return 0;
 }
 
-void pcilib_clean_views(pcilib_t *ctx) {
+void pcilib_clean_views(pcilib_t *ctx, pcilib_view_t start) {
     pcilib_view_t i;
     pcilib_view_context_t *view_ctx, *tmp;
 
-    if (ctx->unit_hash) {
+    if (ctx->view_hash) {
         HASH_ITER(hh, ctx->view_hash, view_ctx, tmp) {
             const pcilib_view_description_t *v = ctx->views[view_ctx->view];
 
-            HASH_DEL(ctx->view_hash, view_ctx);
-            if (v->api->free) v->api->free(ctx, view_ctx);
-            else free(view_ctx);
+            if (view_ctx->view >= start) {
+                HASH_DEL(ctx->view_hash, view_ctx);
+                if (v->api->free) v->api->free(ctx, view_ctx);
+                else free(view_ctx);
+            }
         }
     }
 
-    for (i = 0; ctx->views[i]; i++) {
+    for (i = start; ctx->views[i]; i++) {
 	if (ctx->views[i]->api->free_description) {
 	    ctx->views[i]->api->free_description(ctx, ctx->views[i]);
 	} else {
@@ -100,8 +112,8 @@ void pcilib_clean_views(pcilib_t *ctx) {
 	}
     }
 
-    ctx->views[0] = NULL;
-    ctx->num_views = 0;
+    ctx->views[start] = NULL;
+    ctx->num_views = start;
 }
 
 pcilib_view_context_t *pcilib_find_view_context_by_name(pcilib_t *ctx, const char *name) {
@@ -116,8 +128,6 @@ pcilib_view_t pcilib_find_view_by_name(pcilib_t *ctx, const char *name) {
     if (view_ctx) return view_ctx->view;
     return PCILIB_VIEW_INVALID;
 }
-
-
 
 pcilib_view_context_t *pcilib_find_register_view_context_by_name(pcilib_t *ctx, pcilib_register_t reg, const char *name) {
     pcilib_view_t i;
@@ -191,7 +201,7 @@ typedef struct {
     pcilib_unit_transform_t *trans;
 } pcilib_view_configuration_t;
 
-static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, const char *regname, const char *view_cname, int write_direction, pcilib_view_configuration_t *cfg) {
+static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, const char *regname, const char *view_cname, const char *unit_cname, int write_direction, pcilib_view_configuration_t *cfg) {
     int err = 0;
     pcilib_view_t view;
     pcilib_view_context_t *view_ctx;
@@ -199,16 +209,20 @@ static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, con
     pcilib_register_t reg = PCILIB_REGISTER_INVALID;
 
     char *view_name = alloca(strlen(view_cname) + 1);
-    char *unit_name;
+    const char *unit_name;
 
 
     strcpy(view_name, view_cname);
 
-    unit_name = strchr(view_name, ':');
-    if (unit_name) {
-	*unit_name = 0;
-	unit_name++;
+    if (unit_cname) unit_name = unit_cname;
+    else {
+        unit_name = strchr(view_name, ':');
+        if (unit_name) {
+	    *(char*)unit_name = 0;
+	    unit_name++;
+        }
     }
+
 
     if (regname) {
 	reg = pcilib_find_register(ctx, bank, regname);
@@ -244,7 +258,7 @@ static int pcilib_detect_view_configuration(pcilib_t *ctx, const char *bank, con
     }
 
         // No transform is required
-    if (!trans->transform) trans = NULL;
+    if ((trans)&&(!trans->transform)) trans = NULL;
 
     cfg->reg = reg;
     cfg->view = view_ctx;
@@ -261,7 +275,7 @@ int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regna
     pcilib_view_configuration_t cfg;
     pcilib_register_value_t regvalue = 0;
 
-    err = pcilib_detect_view_configuration(ctx, bank, regname, view, 0, &cfg);
+    err = pcilib_detect_view_configuration(ctx, bank, regname, view, NULL, 0, &cfg);
     if (err) return err;
 
     v = ctx->views[cfg.view->view];
@@ -269,6 +283,11 @@ int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regna
     if (!v->api->read_from_reg) {
         pcilib_error("The view (%s) does not support reading from the register", view);
         return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    if ((v->mode & PCILIB_REGISTER_R) == 0) {
+        pcilib_error("The view (%s) does not allow reading from the register", view);
+        return PCILIB_ERROR_NOTPERMITED;
     }
 
     if (regname) {
@@ -290,6 +309,10 @@ int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regna
         return err;
     }
 
+    if (v->unit) {
+        val->unit = v->unit;
+    }
+
     if (cfg.trans) {
         err = pcilib_transform_unit(ctx, cfg.trans, val);
         if (err) return err;
@@ -307,14 +330,19 @@ int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regn
     pcilib_view_configuration_t cfg;
     pcilib_register_value_t regvalue = 0;
 
-    err = pcilib_detect_view_configuration(ctx, bank, regname, view, 1, &cfg);
+    err = pcilib_detect_view_configuration(ctx, bank, regname, view, valarg->unit, 1, &cfg);
     if (err) return err;
 
     v = ctx->views[cfg.view->view];
 
     if (!v->api->write_to_reg) {
-        pcilib_error("The view (%s) does not support reading from the register", view);
+        pcilib_error("The view (%s) does not support writting to the register", view);
         return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    if ((v->mode & PCILIB_REGISTER_W) == 0) {
+        pcilib_error("The view (%s) does not allow writting to the register", view);
+        return PCILIB_ERROR_NOTPERMITED;
     }
 
     err = pcilib_copy_value(ctx, &val, valarg);

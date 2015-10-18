@@ -77,8 +77,10 @@ typedef enum {
     MODE_BENCHMARK,
     MODE_READ,
     MODE_READ_REGISTER,
+    MODE_READ_PROPERTY,
     MODE_WRITE,
     MODE_WRITE_REGISTER,
+    MODE_WRITE_PROPERTY,
     MODE_RESET,
     MODE_GRAB,
     MODE_START_DMA,
@@ -193,7 +195,7 @@ static struct option long_options[] = {
     {"timeout",			required_argument, 0, OPT_TIMEOUT },
     {"iterations",		required_argument, 0, OPT_ITERATIONS },
     {"info",			optional_argument, 0, OPT_INFO },
-    {"list",			no_argument, 0, OPT_LIST },
+    {"list",			optional_argument, 0, OPT_LIST },
     {"reset",			no_argument, 0, OPT_RESET },
     {"benchmark",		optional_argument, 0, OPT_BENCHMARK },
     {"read",			optional_argument, 0, OPT_READ },
@@ -258,7 +260,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 " %s <mode> [options] [hex data]\n"
 "  Modes:\n"
 "   -i [target]			- Device or Register (target) Info\n"
-"   -l[l]			- List (detailed) Data Banks & Registers\n"
+"   -l[l] [bank|/branch]	- List (detailed) Data Banks & Registers\n"
 "   -r <addr|dmaX|reg[/unit]>	- Read Data/Register\n"
 "   -w <addr|dmaX|reg[/unit]>	- Write Data/Register\n"
 "   --benchmark <barX|dmaX>	- Performance Evaluation\n"
@@ -406,6 +408,79 @@ int RegisterCompare(const void *aptr, const void *bptr, void *registers) {
     return 0;
 }
 
+void ListProperties(pcilib_t *handle, const char *branch, int details) {
+    int i;
+    pcilib_property_info_t *props;
+
+    props = pcilib_get_property_list(handle, branch, 0);
+    if (!props) Error("Error getting properties");
+
+    if (props[0].path) {
+        printf("Properties: \n");
+
+        for (i = 0; props[i].path; i++) {
+            const char *mode;
+            const char *type;
+
+            switch (props[i].type) {
+                case PCILIB_TYPE_LONG:
+                    type = "int    ";
+                    break;
+                case PCILIB_TYPE_DOUBLE:
+                    type = "float  ";
+                    break;
+                case PCILIB_TYPE_STRING:
+                    type = "string ";
+                    break;
+                case PCILIB_TYPE_INVALID:
+                    type = NULL;
+                    break;
+                default:
+                    type = "unknown";
+            }
+            
+            switch (props[i].mode) {
+                case PCILIB_ACCESS_RW:
+                    mode = "RW";
+                    break;
+                case PCILIB_ACCESS_R:
+                    mode = "R ";
+                    break;
+                case PCILIB_ACCESS_W:
+                    mode = "W ";
+                    break;
+                default:
+                    mode = "  ";
+            }
+
+            if (type)
+                printf(" (%s %s) ", type, mode);
+            else
+                printf(" %12s", "");
+
+            if (props[i].flags&PCILIB_LIST_FLAG_CHILDS)
+                printf(" + ");
+            else
+                printf("   ");
+
+	    if (details > 0) {
+	        printf("%s", props[i].name);
+	        if ((props[i].description)&&(props[i].description[0])) {
+		    printf(": %s", props[i].description);
+	        }
+	    } else {
+	        printf("%s", props[i].path);
+	    }
+	    printf("\n");
+        }
+
+        printf("\n");
+
+        pcilib_free_property_info(handle, props);
+    }
+
+}
+
 void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, int details) {
     int i, j, k;
     const pcilib_register_bank_description_t *banks;
@@ -415,7 +490,7 @@ void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
 
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
     const pcilib_dma_description_t *dma_info = pcilib_get_dma_description(handle);
-    
+
     for (i = 0; i < PCILIB_MAX_BARS; i++) {
 	if (board_info->bar_length[i] > 0) {
 	    printf(" BAR %d - ", i);
@@ -470,7 +545,7 @@ void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
 
     if ((bank)&&(bank != (char*)-1)) banks = NULL;
     else banks = model_info->banks;
-    
+
     if (banks) {
 	printf("Banks: \n");
 	for (i = 0; banks[i].access; i++) {
@@ -542,6 +617,8 @@ void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
 	}
 	printf("\n");
     }
+
+    ListProperties(handle, "/", details);
 
     if (bank == (char*)-1) events = NULL;
     else {
@@ -1126,7 +1203,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
 
 
 
-int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, const char *reg, const char *unit) {
+int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, const char *reg, const char *view, const char *unit) {
     int i;
     int err;
     const char *format;
@@ -1139,19 +1216,37 @@ int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info,
 	// Adding DMA registers
     pcilib_get_dma_description(handle);
 
-    if (reg) {
-        pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
-
-        if (unit) {
+    if (reg||view) {
+        if (view) {
             pcilib_value_t val = {0};
-            err = pcilib_read_register_view(handle, bank, reg, unit, &val);
-            if (err) Error("Error reading view %s of register %s", unit, reg);
+            if (reg) {
+                err = pcilib_read_register_view(handle, bank, reg, view, &val);
+                if (err) Error("Error reading view %s of register %s", view, reg);
+            } else {
+                err = pcilib_get_property(handle, view, &val);
+                if (err) Error("Error reading property %s", view);
+            }
 
+            if (unit) {
+                err = pcilib_convert_value_unit(handle, &val, unit);
+                if (err) {
+                    if (reg) Error("Error converting view %s of register %s to unit %s", view, reg, unit);
+                    else Error("Error converting property %s to unit %s", view, unit);
+                }
+            }
+            
             err = pcilib_convert_value_type(handle, &val, PCILIB_TYPE_STRING);
-            if (err) Error("Error converting view %s of register %s to string", unit, reg);
+            if (err) {
+                if (reg) Error("Error converting view %s of register %s to string", view);
+                else Error("Error converting property %s to string", view);
+            }
 
-            printf("%s = %s\n", reg, val.sval);
+            printf("%s = %s", (reg?reg:view), val.sval);
+            if ((val.unit)&&(strcasecmp(val.unit, "name")))
+                printf(" %s", val.unit);
+            printf("\n");
         } else {
+            pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
             bank_id = pcilib_find_register_bank_by_addr(handle, model_info->registers[regid].bank);
             format = model_info->banks[bank_id].format;
             if (!format) format = "%lu";
@@ -1362,14 +1457,12 @@ int WriteRegisterRange(pcilib_t *handle, const pcilib_model_description_t *model
 
 }
 
-int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, const char *reg, const char *unit, char **data) {
+int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, const char *reg, const char *view, const char *unit, char **data) {
     int err = 0;
 
     pcilib_value_t val = {0};
     pcilib_register_value_t value, verify;
 
-    pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
-    if (regid == PCILIB_REGISTER_INVALID) Error("Can't find register (%s) from bank (%s)", reg, bank?bank:"autodetected");
 
 /*
     pcilib_register_bank_t bank_id;
@@ -1384,11 +1477,23 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
     err = pcilib_set_value_from_static_string(handle, &val, *data);
     if (err) Error("Error (%i) setting value", err);
 
-    if (unit) {
-        err = pcilib_write_register_view(handle, bank, reg, unit, &val);
-        if (err) Error("Error writting view %s of register %s", unit, reg);
-        printf("%s is written\n ", reg);
+    if (view) {
+        if (unit)
+            val.unit = unit;
+
+        if (reg) {
+            err = pcilib_write_register_view(handle, bank, reg, view, &val);
+            if (err) Error("Error writting view %s of register %s", view, reg);
+            printf("%s is written\n ", reg);
+        } else {
+            err = pcilib_set_property(handle, view, &val);
+            if (err) Error("Error setting property %s", view);
+            printf("%s is written\n ", view);
+        }
     } else {
+        pcilib_register_t regid = pcilib_find_register(handle, bank, reg);
+        if (regid == PCILIB_REGISTER_INVALID) Error("Can't find register (%s) from bank (%s)", reg, bank?bank:"autodetected");
+
         value = pcilib_get_value_as_register_value(handle, &val, &err);
         if (err) Error("Error (%i) parsing data value (%s)", *data);
 
@@ -2758,6 +2863,7 @@ int main(int argc, char **argv) {
     pcilib_bar_t bar = PCILIB_BAR_DETECT;
     const char *addr = NULL;
     const char *reg = NULL;
+    const char *view = NULL;
     const char *unit = NULL;
     const char *bank = NULL;
     char **data = NULL;
@@ -2767,6 +2873,7 @@ int main(int argc, char **argv) {
     const char *use = NULL;
     const char *lock = NULL;
     const char *info_target = NULL;
+    const char *list_target = NULL;
     size_t block = (size_t)-1;
     pcilib_irq_type_t irq_type = PCILIB_IRQ_TYPE_ALL;
     pcilib_irq_hw_source_t irq_source =  PCILIB_IRQ_SOURCE_DEFAULT;
@@ -2812,6 +2919,9 @@ int main(int argc, char **argv) {
 	    case OPT_LIST:
 		if (mode == MODE_LIST) details++;
 		else if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+
+		if (optarg) list_target = optarg;
+		else if ((optind < argc)&&(argv[optind][0] != '-')) list_target = argv[optind++];
 
 		mode = MODE_LIST;
 	    break;
@@ -3302,15 +3412,23 @@ int main(int argc, char **argv) {
 		num_offset = dma_channel + 3;
 		itmp -= 3;
 	    }
-	    
+
 	    if (bank) {
 		if (strncmp(num_offset, bank, itmp)) Usage(argc, argv, "Conflicting DMA channels are specified in mode parameter (%s) and bank parameter (%s)", dma_channel, bank);
 	    }
-		 
+ 
 	    if (!isnumber_n(num_offset, itmp))
 		 Usage(argc, argv, "Invalid DMA channel (%s) is specified", dma_channel);
 
 	    dma = atoi(num_offset);
+	}
+     break;
+     case MODE_LIST:
+	if (bank&&list_target) {
+	    if (strcmp(list_target, bank)) 
+		Usage(argc, argv, "Conflicting banks are specified in list parameter (%s) and bank parameter (%s)", list_target, bank);
+	} else if (bank) {
+	    list_target = bank;
 	}
      break;
      default:
@@ -3359,24 +3477,35 @@ int main(int argc, char **argv) {
 		}
 	    }
 	} else {
-            unit = strchr(addr, '/');
-            if (!unit) unit = strchr(addr, ':');
-            if (unit) {
-                char *reg_name;
-                size_t reg_size = strlen(addr) - strlen(unit);
-                reg_name = alloca(reg_size + 1);
-                memcpy(reg_name, addr, reg_size);
-                reg_name[reg_size] = 0;
-                reg = reg_name;
-                unit++;
+            view = strchr(addr, '/');
+            unit = strchr((view?view:addr), ':');
+
+            if (view||unit) {
+                size_t reg_size = strlen(addr) - strlen(view?view:unit);
+                if (reg_size) reg = strndupa(addr, reg_size);
+                else reg = NULL;
+
+                if ((reg)&&(view)) view++;
+                if (unit) unit++;
+
+                if (view&&unit) {
+                    view = strndupa(view, strlen(view) - strlen(unit) - 1);
+                } else if ((reg)&&(unit)) {
+                    view = unit;
+                    unit = NULL;
+                }
             } else {
                 reg = addr;
             }
 
-	    if (pcilib_find_register(handle, bank, reg) == PCILIB_REGISTER_INVALID) {
-	        Usage(argc, argv, "Invalid address (%s) is specified", addr);
+            if (reg) {
+	        if (pcilib_find_register(handle, bank, reg) == PCILIB_REGISTER_INVALID) {
+	            Usage(argc, argv, "Invalid address (%s) is specified", addr);
+	        } else {
+		    ++mode;
+	        }
 	    } else {
-		++mode;
+	        mode += 2;
 	    }
 	} 
     }
@@ -3458,7 +3587,10 @@ int main(int argc, char **argv) {
         Info(handle, model_info, info_target);
      break;
      case MODE_LIST:
-        List(handle, model_info, bank, details);
+        if ((list_target)&&(*list_target == '/'))
+            ListProperties(handle, list_target, details);
+        else
+            List(handle, model_info, list_target, details);
      break;
      case MODE_BENCHMARK:
         Benchmark(handle, amode, dma, bar, start, size_set?size:0, access, iterations);
@@ -3475,14 +3607,16 @@ int main(int argc, char **argv) {
 	}
      break;
      case MODE_READ_REGISTER:
-        if ((reg)||(!addr)) ReadRegister(handle, model_info, bank, reg, unit);
+     case MODE_READ_PROPERTY:
+        if ((reg)||(view)||(!addr)) ReadRegister(handle, model_info, bank, reg, view, unit);
 	else ReadRegisterRange(handle, model_info, bank, start, addr_shift, size, ofile);
      break;
      case MODE_WRITE:
 	WriteData(handle, amode, dma, bar, start, size, access, endianess, data, verify);
      break;
      case MODE_WRITE_REGISTER:
-        if (reg) WriteRegister(handle, model_info, bank, reg, unit, data);
+     case MODE_WRITE_PROPERTY:
+        if (reg||view) WriteRegister(handle, model_info, bank, reg, view, unit, data);
 	else WriteRegisterRange(handle, model_info, bank, start, addr_shift, size, data);
      break;
      case MODE_RESET:

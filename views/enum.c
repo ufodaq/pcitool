@@ -34,7 +34,7 @@ static int pcilib_enum_view_read(pcilib_t *ctx, pcilib_view_context_t *view_ctx,
             return pcilib_set_value_from_static_string(ctx, val, v->names[i].name);
     }
 
-    return pcilib_set_value_from_int(ctx, val, regval);
+    return pcilib_set_value_from_register_value(ctx, val, regval);
 }
 
 static int pcilib_enum_view_write(pcilib_t *ctx, pcilib_view_context_t *view_ctx, pcilib_register_value_t *regval, const pcilib_value_t *val) {

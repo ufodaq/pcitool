@@ -96,13 +96,63 @@ struct pcilib_register_bank_context_s {
 extern "C" {
 #endif
 
-    // we don't copy strings, they should be statically allocated
+/**
+ * Initalizes context of register banks. This is an internal function and will
+ * be called automatically when new register banks are added. On error no new
+ * banks are initalized 
+ * @param[in,out] ctx - pcilib context
+ * @return - error or 0 on success
+ */
 int pcilib_init_register_banks(pcilib_t *ctx);
-void pcilib_free_register_banks(pcilib_t *ctx);
 
+/**
+ * Destroys contexts of register banks. This is an internal function and will
+ * be called during clean-up. 
+ * @param[in,out] ctx - pcilib context
+ * @param[in] start - specifies first bank to clean (used to clean only part of the banks to keep the defined state if pcilib_init_register_banks has failed)
+ */
+void pcilib_free_register_banks(pcilib_t *ctx, pcilib_register_bank_t start);
+
+
+/**
+ * Use this function to add new register banks into the model or override configuration
+ * of the existing banks. The function will copy the context of banks structure, but name, 
+ * description, and other strings in the structure are considered to have static duration 
+ * and will not be copied. On error no new banks are initalized.
+ * @param[in,out] ctx - pcilib context
+ * @param[in] flags - instructs if existing banks should be reported as error (default), overriden or ignored
+ * @param[in] n - number of banks to initialize. It is OK to pass 0 if banks variable is NULL terminated (last member of banks array have all members set to 0)
+ * @param[in] banks - bank descriptions
+ * @param[out] ids - if specified will contain the ids of the newly registered and overriden banks
+ * @return - error or 0 on success
+ */
 int pcilib_add_register_banks(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_bank_description_t *banks, pcilib_register_bank_t *ids);
+
+/**
+ * Use this function to add new register protocols into the model. It is error to re-register
+ * already registered protocols. The function will copy the context of banks structure, but name, 
+ * description, and other strings in the structure are considered to have static duration 
+ * and will not be copied. On error no new protocols are initalized.
+ * @param[in,out] ctx - pcilib context
+ * @param[in] flags - not used
+ * @param[in] n - number of protocols to initialize. It is OK to pass 0 if protocols variable is NULL terminated (last member of protocols array have all members set to 0)
+ * @param[in] protocols - protocol descriptions
+ * @param[out] ids - if specified will contain the ids of the newly registered protocols
+ * @return - error or 0 on success
+ */
 int pcilib_add_register_protocols(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_protocol_description_t *protocols, pcilib_register_protocol_t *ids);
+
+/**
+ * Use this function to add new register ranges into the model. It is error register
+ * overlapping registered ranges. On error no new ranges are initalized.
+ * @param[in,out] ctx - pcilib context
+ * @param[in] flags - not used
+ * @param[in] n - number of protocols to initialize. It is OK to pass 0 if protocols variable is NULL terminated.
+ * @param[in] ranges - range descriptions
+ * @return - error or 0 on success
+ */
 int pcilib_add_register_ranges(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_range_t *ranges);
+
 
 pcilib_register_bank_t pcilib_find_register_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank);
 pcilib_register_bank_t pcilib_find_register_bank_by_name(pcilib_t *ctx, const char *bankname);

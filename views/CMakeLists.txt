@@ -8,6 +8,6 @@ include_directories(
     ${UTHASH_INCLUDE_DIRS}
 )
 
-set(HEADERS ${HEADERS} enum.h transform.h)
+set(HEADERS ${HEADERS} enum.h transform.h register.h)
 
-add_library(views STATIC enum.c transform.c)
+add_library(views STATIC enum.c transform.c register.c)
