@@ -1,7 +1,6 @@
 High Priority (we would need it for IPE Camera)
 =============
  1. Join multiple XML files and on error use simplified XSD scheme on all files to find the file causing error
- 2. Information on bank and the view values in the pci -i <reg>, show listing of enum values (shall we have a type associated with the view: enum, range, ...?)
  
 Normal Priority (it would make just few things a bit easier)
 ===============
@@ -9,6 +8,7 @@ Normal Priority (it would make just few things a bit easier)
  2. Provide OR and AND operations on registers in cli
  3. Support writting a data from a binary file in cli
  4. Support Python-scripts in a views, we need to provide python function to read registers/properties...
+ 5. Really check the specified min, max values while setting registers
 
 Low Priority (only as generalization for other projects)
 ============

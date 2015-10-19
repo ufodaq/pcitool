@@ -35,9 +35,9 @@ typedef enum {
 } pcilib_log_priority_t;
 
 typedef enum {
-    PCILIB_HOST_ENDIAN = 0,
-    PCILIB_LITTLE_ENDIAN,
-    PCILIB_BIG_ENDIAN
+    PCILIB_HOST_ENDIAN = 0,                     /**< The same byte ordering as on the host system running the driver */
+    PCILIB_LITTLE_ENDIAN,                       /**< x86 is Little-endian, least significant bytes are at the lower addresses */
+    PCILIB_BIG_ENDIAN                           /**< Old mainframes and network byte order, most significant bytes are at the lower addresses */
 } pcilib_endianess_t;
 
 typedef enum {
@@ -45,6 +45,16 @@ typedef enum {
     PCILIB_ACCESS_W = 2,			/**< setting property is allowed */
     PCILIB_ACCESS_RW = 3
 } pcilib_access_mode_t;
+
+typedef enum {
+    PCILIB_REGISTER_R = 1,			/**< reading from register is allowed */
+    PCILIB_REGISTER_W = 2,			/**< normal writting to register is allowed */
+    PCILIB_REGISTER_RW = 3,
+    PCILIB_REGISTER_W1C = 4,			/**< writting 1 resets the bit, writting 0 keeps the value */
+    PCILIB_REGISTER_RW1C = 5,
+    PCILIB_REGISTER_W1I = 8,			/**< writting 1 inversts the bit, writting 0 keeps the value */
+    PCILIB_REGISTER_RW1I = 9,
+} pcilib_register_mode_t;
 
 typedef enum {
     PCILIB_TYPE_INVALID = 0,                    /**< uninitialized */
@@ -102,14 +112,6 @@ typedef enum {
     PCILIB_EVENT_INFO_FLAG_BROKEN = 1		/**< Indicates broken frames (if this flag is fales, the frame still can be broken) */
 } pcilib_event_info_flags_t;
 
-typedef struct {
-    pcilib_event_t type;
-    uint64_t seqnum;				/**< we will add seqnum_overflow if required */
-    uint64_t offset;				/**< nanoseconds */
-    struct timeval timestamp;			/**< most accurate timestamp */
-    pcilib_event_info_flags_t flags;		/**< flags */
-} pcilib_event_info_t;
-
 typedef enum {
     PCILIB_LIST_FLAGS_DEFAULT = 0,
     PCILIB_LIST_FLAG_CHILDS = 1                 /**< Request all sub-elements or indicated that sub-elements are available */
@@ -133,6 +135,27 @@ typedef struct {
 } pcilib_value_t;
 
 typedef struct {
+    pcilib_register_value_t min, max;           /**< Minimum and maximum allowed values */
+} pcilib_register_value_range_t;
+
+typedef struct {
+    pcilib_register_value_t value;              /**< This value will get assigned instead of the name */
+    pcilib_register_value_t min, max;	        /**< the values in the specified range are aliased by name */
+    const char *name; 				/**< corresponding string to value */
+} pcilib_register_value_name_t;
+
+typedef struct {
+    pcilib_register_t id;                       /**< Direct register ID which can be used in API calls */
+    const char *name;                           /**< The access name of the register */
+    const char *description;                    /**< Brief description of the register */
+    const char *bank;                           /**< The name of the bank register belongs to */
+    pcilib_register_mode_t mode;                /**< Register access (ro/wo/rw) and how writting to register works (clearing/inverting set bits) */
+    pcilib_register_value_t defvalue;           /**< Default register value */
+    const pcilib_register_value_range_t *range; /**< Specifies default, minimum, and maximum values */
+    const pcilib_register_value_name_t *values; /**< The list of enum names for the register value */
+} pcilib_register_info_t;
+
+typedef struct {
     const char *name;                           /**< Name of the property view */
     const char *path;                           /**< Full path to the property */
     const char *description;                    /**< Short description */
@@ -141,6 +164,14 @@ typedef struct {
     pcilib_list_flags_t flags;                  /**< Indicates if have sub-folders, etc. */
     const char *unit;                           /**< Returned unit (if any) */
 } pcilib_property_info_t;
+
+typedef struct {
+    pcilib_event_t type;
+    uint64_t seqnum;				/**< we will add seqnum_overflow if required */
+    uint64_t offset;				/**< nanoseconds */
+    struct timeval timestamp;			/**< most accurate timestamp */
+    pcilib_event_info_flags_t flags;		/**< flags */
+} pcilib_event_info_t;
 
 
 #define PCILIB_BAR_DETECT 		((pcilib_bar_t)-1)
@@ -194,10 +225,18 @@ extern "C" {
 #endif
 
 
+
 int pcilib_set_logger(pcilib_log_priority_t min_prio, pcilib_logger_t logger, void *arg);
 
 pcilib_t *pcilib_open(const char *device, const char *model);
 void pcilib_close(pcilib_t *ctx);
+
+pcilib_property_info_t *pcilib_get_property_list(pcilib_t *ctx, const char *branch, pcilib_list_flags_t flags);
+void pcilib_free_property_info(pcilib_t *ctx, pcilib_property_info_t *info);
+pcilib_register_info_t *pcilib_get_register_list(pcilib_t *ctx, const char *bank, pcilib_list_flags_t flags);
+pcilib_register_info_t *pcilib_get_register_info(pcilib_t *ctx, const char *req_bank_name, const char *req_reg_name, pcilib_list_flags_t flags);
+void pcilib_free_register_info(pcilib_t *ctx, pcilib_register_info_t *info);
+
 
 int pcilib_start_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
 int pcilib_stop_dma(pcilib_t *ctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags);
@@ -243,6 +282,8 @@ int pcilib_read_register_view(pcilib_t *ctx, const char *bank, const char *regna
 int pcilib_write_register_view(pcilib_t *ctx, const char *bank, const char *regname, const char *unit, const pcilib_value_t *value);
 int pcilib_read_register_view_by_id(pcilib_t *ctx, pcilib_register_t reg, const char *view, pcilib_value_t *val);
 int pcilib_write_register_view_by_id(pcilib_t *ctx, pcilib_register_t reg, const char *view, const pcilib_value_t *valarg);
+int pcilib_get_property(pcilib_t *ctx, const char *prop, pcilib_value_t *val);
+int pcilib_set_property(pcilib_t *ctx, const char *prop, const pcilib_value_t *val);
 
 void pcilib_clean_value(pcilib_t *ctx, pcilib_value_t *val);
 int pcilib_copy_value(pcilib_t *ctx, pcilib_value_t *dst, const pcilib_value_t *src);
@@ -255,11 +296,6 @@ long pcilib_get_value_as_int(pcilib_t *ctx, const pcilib_value_t *val, int *err)
 pcilib_register_value_t pcilib_get_value_as_register_value(pcilib_t *ctx, const pcilib_value_t *val, int *err);
 int pcilib_convert_value_unit(pcilib_t *ctx, pcilib_value_t *val, const char *unit_name);
 int pcilib_convert_value_type(pcilib_t *ctx, pcilib_value_t *val, pcilib_value_type_t type);
-
-pcilib_property_info_t *pcilib_get_property_list(pcilib_t *ctx, const char *branch, pcilib_list_flags_t flags);
-void pcilib_free_property_info(pcilib_t *ctx, pcilib_property_info_t *info);
-int pcilib_get_property(pcilib_t *ctx, const char *prop, pcilib_value_t *val);
-int pcilib_set_property(pcilib_t *ctx, const char *prop, const pcilib_value_t *val);
 
 int pcilib_get_property_attr(pcilib_t *ctx, const char *prop, const char *attr, pcilib_value_t *val);
 int pcilib_get_register_attr_by_id(pcilib_t *ctx, pcilib_register_t reg, const char *attr, pcilib_value_t *val);

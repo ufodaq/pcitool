@@ -19,6 +19,7 @@
 #include "tools.h"
 #include "error.h"
 #include "property.h"
+#include "views/enum.h"
 
 int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_description_t *registers, pcilib_register_t *ids) {
 	// DS: Overrride existing registers 
@@ -413,4 +414,91 @@ int pcilib_get_register_attr(pcilib_t *ctx, const char *bank, const char *regnam
     }
 
     return pcilib_get_register_attr_by_id(ctx, reg, attr, val);
+}
+
+pcilib_register_info_t *pcilib_get_register_info(pcilib_t *ctx, const char *req_bank_name, const char *req_reg_name, pcilib_list_flags_t flags) {
+    pcilib_register_t i, from, to, pos = 0;
+    pcilib_register_info_t *info;
+    pcilib_register_bank_t bank;
+    pcilib_register_bank_addr_t bank_addr;
+    const char *bank_name;
+
+    info = (pcilib_register_info_t*)malloc((ctx->num_reg + 1) * sizeof(pcilib_register_info_t));
+    if (!info) return NULL;
+
+    if (req_bank_name) {
+        bank = pcilib_find_register_bank_by_name(ctx, req_bank_name);
+        if (bank == PCILIB_REGISTER_BANK_INVALID) {
+            pcilib_error("The specified bank (%s) is not found", req_bank_name);
+            return NULL;
+        }
+        bank_addr = ctx->banks[bank].addr;
+        bank_name = req_bank_name;
+    } else {
+        bank_addr = PCILIB_REGISTER_BANK_INVALID;
+        bank_name = NULL;
+    }
+
+    if (req_reg_name) {
+        pcilib_register_t reg = pcilib_find_register(ctx, req_bank_name, req_reg_name);
+        if (reg == PCILIB_REGISTER_INVALID) {
+            pcilib_error("The specified register (%s) is not found", req_reg_name);
+            return NULL;
+        }
+        from = reg;
+        to = reg + 1;
+    } else {
+        from = 0;
+        to = ctx->num_reg;
+    }
+
+    for (i = from; i < to; i++) {
+        const pcilib_register_value_range_t *range = &ctx->register_ctx[i].range;
+        const pcilib_register_value_name_t *names = NULL;
+
+        if (req_bank_name) {
+            if (ctx->registers[i].bank != bank_addr) continue;
+        } else {
+            if (ctx->registers[i].bank != bank_addr) {
+                bank_addr = ctx->registers[i].bank;
+                bank = pcilib_find_register_bank_by_addr(ctx, bank_addr);
+                if (bank == PCILIB_REGISTER_BANK_INVALID) bank_name = NULL;
+                else bank_name = ctx->banks[bank].name;
+            }
+        }
+
+        if (ctx->registers[i].views) {
+            int j;
+            for (j = 0; ctx->registers[i].views[j].view; j++) {
+                pcilib_view_t view = pcilib_find_view_by_name(ctx, ctx->registers[i].views[j].view);
+                if ((view != PCILIB_VIEW_INVALID)&&((ctx->views[view]->api == &pcilib_enum_view_xml_api)||(ctx->views[view]->api == &pcilib_enum_view_static_api)))
+                    names = ((pcilib_enum_view_description_t*)(ctx->views[view]))->names;
+            }
+        }
+
+        if (range->min == range->max) 
+            range = NULL;
+
+        info[pos++] = (pcilib_register_info_t){
+            .id = i,
+            .name = ctx->registers[i].name,
+            .description = ctx->registers[i].description,
+            .bank = bank_name,
+            .mode = ctx->registers[i].mode,
+            .defvalue = ctx->registers[i].defvalue,
+            .range = range,
+            .values = names
+        };
+    }
+    memset(&info[pos], 0, sizeof(pcilib_register_info_t));
+    return info;
+}
+
+pcilib_register_info_t *pcilib_get_register_list(pcilib_t *ctx, const char *req_bank_name, pcilib_list_flags_t flags) {
+    return pcilib_get_register_info(ctx, req_bank_name, NULL, flags);
+}
+
+void pcilib_free_register_info(pcilib_t *ctx, pcilib_register_info_t *info) {
+    if (info)
+        free(info);
 }

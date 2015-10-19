@@ -32,6 +32,8 @@
 #include "pcitool/sysinfo.h"
 #include "pcitool/formaters.h"
 
+#include "views/transform.h"
+#include "views/enum.h"
 #include "pci.h"
 #include "plugin.h"
 #include "config.h"
@@ -659,10 +661,114 @@ void List(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
     }
 }
 
+void ViewInfo(pcilib_t *handle, pcilib_register_t reg, size_t id) {
+    int err;
+
+    int i;
+    pcilib_value_t val = {0};
+    pcilib_register_value_name_t *vnames;
+
+    pcilib_view_t view;
+    const pcilib_model_description_t *model_info = pcilib_get_model_description(handle);
+    const pcilib_register_description_t *r;
+    const pcilib_view_description_t *v;
+
+    if (reg == PCILIB_REGISTER_INVALID) {
+        r = NULL;
+        view = id;
+    } else {
+        r = &model_info->registers[reg];
+        view = pcilib_find_view_by_name(handle, r->views[id].view);
+    }
+
+    if (view == PCILIB_VIEW_INVALID) return;
+    v = model_info->views[view];
+
+    if (r) {
+        printf("  View %s (", r->views[id].name);
+    } else {
+        printf("%s\n", v->name);
+        printf("    Data type      : ");
+    }
+    switch (v->type) {
+	case PCILIB_TYPE_STRING:
+	    printf("char*");
+	    break;
+	case PCILIB_TYPE_DOUBLE:
+	    printf("double");
+	    break;
+	case PCILIB_TYPE_LONG:
+	    printf("long");
+	    break;
+	default:
+	    printf("unknown");
+    }
+    if (r) printf(")");
+    printf("\n");
+
+    if (r) {
+        err = pcilib_read_register_view_by_id(handle, reg, r->views[id].name, &val);
+    } else {
+        err = pcilib_get_property(handle, v->name, &val);
+    }
+    if (!err) err = pcilib_convert_value_type(handle, &val, PCILIB_TYPE_STRING);
+
+    if (err)
+        printf("    Current value  : error %i\n", err);
+    else {
+        printf("    Current value  : %s", val.sval);
+        if (v->unit) printf(" (units: %s)", v->unit);
+        printf("\n");
+    }
+
+    if (v->unit) {
+	pcilib_unit_t unit = pcilib_find_unit_by_name(handle, v->unit);
+
+	printf("    Supported units: %s", v->unit);
+
+	if (unit != PCILIB_UNIT_INVALID) {
+	    const pcilib_unit_description_t *u = &model_info->units[unit];
+
+	    for (i = 0; u->transforms[i].unit; i++)
+		printf(", %s", u->transforms[i].unit);
+	}
+	printf("\n");
+    }
+
+    printf("    Access         : ");
+    if ((v->mode&PCILIB_REGISTER_RW) == 0) printf("-");
+    if (v->mode&PCILIB_REGISTER_R) printf("R");
+    if (v->mode&PCILIB_REGISTER_W) printf("W");
+    printf("\n");
+
+    if ((v->api == &pcilib_enum_view_static_api)||(v->api == &pcilib_enum_view_xml_api)) {
+	vnames = ((pcilib_enum_view_description_t*)v)->names;
+        printf("    Value aliases  :");
+	for (i = 0; vnames[i].name; i++) {
+	    if (i) printf(",");
+	    printf(" %s = %u", vnames[i].name, vnames[i].value);
+	    if (vnames[i].min != vnames[i].max) 
+	        printf(" (%u - %u)", vnames[i].min, vnames[i].max);
+	}
+	printf("\n");
+    } else if (v->api == &pcilib_transform_view_api) {
+	const pcilib_transform_view_description_t *tv = (const pcilib_transform_view_description_t*)v;
+	if (tv->read_from_reg)
+            printf("    Read function  : %s\n", tv->read_from_reg);
+	if (tv->write_to_reg)
+            printf("    Write function : %s\n", tv->write_to_reg);
+    }
+
+    if (v->description)
+	printf("    Description    : %s\n", v->description);
+}
+
 void RegisterInfo(pcilib_t *handle, pcilib_register_t reg) {
     int err;
-    pcilib_value_t val = {0};
+
+    int i;
     pcilib_register_value_t regval;
+    pcilib_register_info_t *info;
 
     const pcilib_model_description_t *model_info = pcilib_get_model_description(handle);
     const pcilib_register_description_t *r = &model_info->registers[reg];
@@ -670,7 +776,9 @@ void RegisterInfo(pcilib_t *handle, pcilib_register_t reg) {
     const pcilib_register_bank_description_t *b = &model_info->banks[bank];
 
     err = pcilib_read_register_by_id(handle, reg, &regval);
-    
+
+    info = pcilib_get_register_info(handle, b->name, r->name, 0);
+    if (!info) Error("Can't obtain register info for %s", r->name);
 
     printf("%s/%s\n", b->name, r->name);
     printf("  Current value: ");
@@ -680,11 +788,23 @@ void RegisterInfo(pcilib_t *handle, pcilib_register_t reg) {
     if (r->mode&PCILIB_REGISTER_W) {
 	printf(" (default: ");
 	printf(b->format, r->defvalue);
+	if (info->range) {
+	    printf(", range: ");
+	    printf(b->format, info->range->min);
+	    printf (" - ");
+	    printf(b->format, info->range->max);
+	}
 	printf(")");
     }
     printf("\n");
 
     printf("  Address      : 0x%x [%u:%u]\n", r->addr, r->offset, r->offset + r->bits);
+    if ((info->values)&&(info->values[0].name)) {
+        printf("  Value aliases:");
+        for (i = 0; info->values[i].name; i++)
+            printf(" %s", info->values[i].name);
+        printf("\n");
+    }
     printf("  Access       : ");
     if ((r->mode&PCILIB_REGISTER_RW) == 0) printf("-");
     if (r->mode&PCILIB_REGISTER_R) printf("R");
@@ -698,60 +818,13 @@ void RegisterInfo(pcilib_t *handle, pcilib_register_t reg) {
 	printf("  Description  : %s\n", r->description);
 
     if (r->views) {
-	int i;
 	printf("\nSupported Views:\n");
 	for (i = 0; r->views[i].name; i++) {
-	    pcilib_view_t view = pcilib_find_view_by_name(handle, r->views[i].view);
-	    if (view == PCILIB_VIEW_INVALID) continue;
-
-	    const pcilib_view_description_t *v = model_info->views[view];
-
-	    printf("  View %s (", r->views[i].name);
-	    switch (v->type) {
-		case PCILIB_TYPE_STRING:
-		    printf("char*");
-		    break;
-		case PCILIB_TYPE_DOUBLE:
-		    printf("double");
-		    break;
-		default:
-		    printf("unknown");
-	    }
-	    printf(")\n");
-
-            err = pcilib_read_register_view(handle, b->name, r->name, r->views[i].name, &val);
-            if (!err) err = pcilib_convert_value_type(handle, &val, PCILIB_TYPE_STRING);
-
-            if (err)
-                printf("    Current value  : error %i\n", err);
-            else {
-                printf("    Current value  : %s", val.sval);
-                if (v->unit) printf(" (units: %s)", v->unit);
-                printf("\n");
-            }
-
-	    if (v->unit) {
-	        pcilib_unit_t unit = pcilib_find_unit_by_name(handle, v->unit);
-
-	        printf("    Supported units: %s", v->unit);
-
-		if (unit != PCILIB_UNIT_INVALID) {
-		    int j;
-		    const pcilib_unit_description_t *u = &model_info->units[unit];
-
-		    for (j = 0; u->transforms[j].unit; j++)
-			printf(", %s", u->transforms[j].unit);
-		}
-		printf("\n");
-	    }
-
-	    if (v->description)
-	        printf("    Description    : %s\n", v->description);
+            ViewInfo(handle, reg, i);
 	}
     }
 
-
-//    printf("Type: %s". r->rw
+    pcilib_free_register_info(handle, info);
 }
 
 void Info(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *target) {
@@ -780,13 +853,23 @@ void Info(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
     printf("\n");
 
     if (target) {
-	pcilib_register_t reg;
+	if (*target == '/') {
+	    pcilib_view_t view;
+	    view = pcilib_find_view_by_name(handle, target);
+	    if (view != PCILIB_VIEW_INVALID)
+	        return ViewInfo(handle, PCILIB_REGISTER_INVALID, view);
+
+	    Error(" No property %s is found", target);
+	} else {
+	    pcilib_register_t reg;
 	
-	reg = pcilib_find_register(handle, NULL, target);
-	if (reg != PCILIB_REGISTER_INVALID) 
-	    return RegisterInfo(handle, reg);
+	    reg = pcilib_find_register(handle, NULL, target);
+	    if (reg != PCILIB_REGISTER_INVALID) 
+	        return RegisterInfo(handle, reg);
+
+	    Error(" No register %s is found", target);
+	}
 	
-	Error(" No register %s is found", target);
     }
 
     List(handle, model_info, (char*)-1, 0);

@@ -9,15 +9,6 @@
 #define PCILIB_REGISTER_NO_BITS			0
 #define PCILIB_REGISTER_ALL_BITS		((pcilib_register_value_t)-1)
 
-typedef enum {
-    PCILIB_REGISTER_R = 1,			/**< reading from register is allowed */
-    PCILIB_REGISTER_W = 2,			/**< normal writting to register is allowed */
-    PCILIB_REGISTER_RW = 3,
-    PCILIB_REGISTER_W1C = 4,			/**< writting 1 resets the bit, writting 0 keeps the value */
-    PCILIB_REGISTER_RW1C = 5,
-    PCILIB_REGISTER_W1I = 8,			/**< writting 1 inversts the bit, writting 0 keeps the value */
-    PCILIB_REGISTER_RW1I = 9,
-} pcilib_register_mode_t;
 
 typedef enum {
     PCILIB_REGISTER_STANDARD = 0,
@@ -55,7 +46,7 @@ typedef struct {
     const char *name;                                                                   /**< Register name */
     pcilib_register_t reg;                                                              /**< Register index */
     pcilib_register_bank_t bank;							/**< Reference to bank containing the register */
-    pcilib_register_value_t min, max;							/**< Minimum & maximum allowed values */
+    pcilib_register_value_range_t range;						/**< Minimum & maximum allowed values */
     pcilib_xml_node_t *xml;								/**< Additional XML properties */
     pcilib_view_reference_t *views;							/**< For non-static list of views, this vairables holds a copy of a NULL-terminated list from model (if present, memory should be de-allocated) */
     UT_hash_handle hh;

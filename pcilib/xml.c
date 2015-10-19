@@ -61,7 +61,7 @@ static const char *pcilib_xml_enum_view_unit = "name";
 
 typedef struct {
     pcilib_register_description_t base;
-    pcilib_register_value_t min, max;
+    pcilib_register_value_range_t range;
 } pcilib_xml_register_description_t;
 
 /*
@@ -156,14 +156,14 @@ static int pcilib_xml_parse_register(pcilib_t *ctx, pcilib_xml_register_descript
                 pcilib_error("Invalid minimum value (%s) is specified in the XML register description", value);
                 return PCILIB_ERROR_INVALID_DATA;
             }
-            xml_desc->min = min;
+            xml_desc->range.min = min;
         } else if (!strcasecmp(name, "max")) {
             pcilib_register_value_t max = strtol(value, &endptr, 0);
             if ((strlen(endptr) > 0)) {
                 pcilib_error("Invalid minimum value (%s) is specified in the XML register description", value);
                 return PCILIB_ERROR_INVALID_DATA;
             }
-            xml_desc->max = max;
+            xml_desc->range.max = max;
         } else if (!strcasecmp((char*)name,"rwmask")) {
             if (!strcasecmp(value, "all")) {
                 desc->rwmask = PCILIB_REGISTER_ALL_BITS;
@@ -275,8 +275,7 @@ static int pcilib_xml_create_register(pcilib_t *ctx, pcilib_register_bank_t bank
     }
 
     ctx->register_ctx[reg].xml = node;
-    ctx->register_ctx[reg].min = desc.min;
-    ctx->register_ctx[reg].max = desc.max;
+    memcpy(&ctx->register_ctx[reg].range, &desc.range, sizeof(pcilib_register_value_range_t));
     ctx->register_ctx[reg].views = desc.base.views;
 
 
@@ -319,8 +318,7 @@ static int pcilib_xml_create_register(pcilib_t *ctx, pcilib_register_bank_t bank
             }
 
             ctx->register_ctx[reg].xml = nodeset->nodeTab[i];
-            ctx->register_ctx[reg].min = fdesc.min;
-            ctx->register_ctx[reg].max = fdesc.max;
+            memcpy(&ctx->register_ctx[reg].range, &fdesc.range, sizeof(pcilib_register_value_range_t));
             ctx->register_ctx[reg].views = fdesc.base.views;
         }
     }
@@ -563,7 +561,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
 }
 
 
-static int pcilib_xml_parse_value_name(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node, pcilib_value_name_t *desc) {
+static int pcilib_xml_parse_value_name(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node, pcilib_register_value_name_t *desc) {
     xmlAttr *cur;
     char *value, *name;
     char *endptr;
@@ -660,7 +658,7 @@ static int pcilib_xml_create_enum_view(pcilib_t *ctx, xmlXPathContextPtr xpath, 
 	return PCILIB_ERROR_INVALID_DATA; 
     }
 
-    desc.names = (pcilib_value_name_t*)malloc((nodeset->nodeNr + 1) * sizeof(pcilib_value_name_t));
+    desc.names = (pcilib_register_value_name_t*)malloc((nodeset->nodeNr + 1) * sizeof(pcilib_register_value_name_t));
     if (!desc.names) {
 	xmlXPathFreeObject(nodes);
 	pcilib_error("No names is defined for enum view (%s)", desc.base.name);
@@ -676,7 +674,7 @@ static int pcilib_xml_create_enum_view(pcilib_t *ctx, xmlXPathContextPtr xpath, 
 	    return err;
 	}
     }
-    memset(&desc.names[nodeset->nodeNr], 0, sizeof(pcilib_value_name_t));
+    memset(&desc.names[nodeset->nodeNr], 0, sizeof(pcilib_register_value_name_t));
 
     xmlXPathFreeObject(nodes);
 

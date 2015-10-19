@@ -83,7 +83,7 @@
     <register address="0xd0" offset="21" size="11" default="0" rwmask="all" mode="RW" name="fr_num_lines_thr"/>
     <register address="0x100" offset="0" size="32" default="0" rwmask="0" mode="RW" name="rawdata_pkt_addr"/>
     <register address="0x110" offset="0" size="32" default="0" rwmask="0" mode="R" name="temperature_info">
-      <field offset="0" size="16" mode="R" name="sensor_temperature"><view view="formuu1"/><view view="formuu2"/><view view="enumm2"/></field>
+      <field offset="0" size="16" mode="RW" name="sensor_temperature" min="5" max="15"><view view="formuu1"/><view view="formuu2"/><view view="enumm2"/></field>
       <field offset="16" size="3" mode="R" name="sensor_temperature_alarms"/>
       <field offset="19" size="10" mode="RW" name="fpga_temperature"><view view="formuu1"/><view view="enumm1"/></field>
       <field offset="29" size="3" mode="R" name="fpga_temperature_alarms"/>
