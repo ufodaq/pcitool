@@ -68,6 +68,7 @@
           <xsd:attribute name="path" type="xsd:string" />
           <xsd:attribute name="read_from_register" type="xsd:string" />
           <xsd:attribute name="write_to_register" type="xsd:string" />
+          <!-- xsd 1.1 <xsd:assert test="(@path and not(@name)) or (not(@path) and @name)"/> -->
         </xsd:extension>
     </xsd:complexContent>
   </xsd:complexType>
@@ -87,6 +88,7 @@
     <xsd:attribute name="min" type="pcilib_register_value_t" />
     <xsd:attribute name="max" type="pcilib_register_value_t" />
     <xsd:attribute name="name" type="xsd:string" use="required" />
+    <xsd:attribute name="description" type="xsd:string" />
   </xsd:complexType>
 
   <xsd:complexType name="pcilib_unit_t">

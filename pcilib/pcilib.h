@@ -142,6 +142,7 @@ typedef struct {
     pcilib_register_value_t value;              /**< This value will get assigned instead of the name */
     pcilib_register_value_t min, max;	        /**< the values in the specified range are aliased by name */
     const char *name; 				/**< corresponding string to value */
+    const char *description;                    /**< longer description */
 } pcilib_register_value_name_t;
 
 typedef struct {

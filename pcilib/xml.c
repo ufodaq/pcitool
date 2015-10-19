@@ -578,6 +578,8 @@ static int pcilib_xml_parse_value_name(pcilib_t *ctx, xmlXPathContextPtr xpath, 
 
         if (!strcasecmp(name, "name")) {
 	    desc->name = value;
+        } else if (!strcasecmp(name, "description")) {
+	    desc->description = value;
         } else if (!strcasecmp(name, "value")) {
             val = strtol(value, &endptr, 0);
             if ((strlen(endptr) > 0)) {
