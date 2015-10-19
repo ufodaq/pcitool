@@ -1,52 +1,5 @@
 <?xml version="1.0"?>
 <model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <bank bar="0" size="128" protocol="software_registers" read_address="0x9010" write_address="0x9000" word_size="8" endianess="little" format="%lu" name="cmosis" description="CMOSIS CMV2000 Registers">
-    <register address="1" offset="0" size="16" default="1088" rwmask="0" mode="RW" name="cmosis_number_lines" description="test"/>
-    <register address="3" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start1"/>
-    <register address="5" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start2"/>
-    <register address="7" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start3"/>
-    <register address="9" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start4"/>
-    <register address="11" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start5"/>
-    <register address="13" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start6"/>
-    <register address="15" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start7"/>
-    <register address="17" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start8"/>
-    <register address="19" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines1"/>
-    <register address="21" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines2"/>
-    <register address="23" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines3"/>
-    <register address="25" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines4"/>
-    <register address="27" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines5"/>
-    <register address="29" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines6"/>
-    <register address="31" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines7"/>
-    <register address="33" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines8"/>
-    <register address="35" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_sub_s"/>
-    <register address="37" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_sub_a"/>
-    <register address="39" offset="0" size="1" default="1" rwmask="0" mode="RW" name="cmosis_color"/>
-    <register address="40" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_image_flipping"/>
-    <register address="41" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_exp_flags"/>
-    <register address="42" offset="0" size="24" default="1088" rwmask="0" mode="RW" name="cmosis_exp_time"><view view="formuu3"/><view view="enumm3"/></register>
-    <register address="45" offset="0" size="24" default="1088" rwmask="0" mode="RW" name="cmosis_exp_step"/>
-    <register address="48" offset="0" size="24" default="1" rwmask="0" mode="RW" name="cmosis_exp_kp1"/>
-    <register address="51" offset="0" size="24" default="1" rwmask="0" mode="RW" name="cmosis_exp_kp2"/>
-    <register address="54" offset="0" size="2" default="1" rwmask="0" mode="RW" name="cmosis_nr_slopes"/>
-    <register address="55" offset="0" size="8" default="1" rwmask="0" mode="RW" name="cmosis_exp_seq"/>
-    <register address="56" offset="0" size="24" default="1088" rwmask="0" mode="RW" name="cmosis_exp_time2"/>
-    <register address="59" offset="0" size="24" default="1088" rwmask="0" mode="RW" name="cmosis_exp_step2"/>
-    <register address="68" offset="0" size="2" default="1" rwmask="0" mode="RW" name="cmosis_nr_slopes2"/>
-    <register address="69" offset="0" size="8" default="1" rwmask="0" mode="RW" name="cmosis_exp_seq2"/>
-    <register address="70" offset="0" size="16" default="1" rwmask="0" mode="RW" name="cmosis_number_frames"/>
-    <register address="72" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_output_mode"/>
-    <register address="78" offset="0" size="12" default="85" rwmask="0" mode="RW" name="cmosis_training_pattern"/>
-    <register address="80" offset="0" size="18" default="0x3FFFF" rwmask="0" mode="RW" name="cmosis_channel_en"/>
-    <register address="82" offset="0" size="3" default="7" rwmask="0" mode="RW" name="cmosis_special_82"/>
-    <register address="89" offset="0" size="8" default="96" rwmask="0" mode="RW" name="cmosis_vlow2"/>
-    <register address="90" offset="0" size="8" default="96" rwmask="0" mode="RW" name="cmosis_vlow3"/>
-    <register address="100" offset="0" size="14" default="16260" rwmask="0" mode="RW" name="cmosis_offset"/>
-    <register address="102" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_pga"/>
-    <register address="103" offset="0" size="8" default="32" rwmask="0" mode="RW" name="cmosis_adc_gain"/>
-    <register address="111" offset="0" size="1" default="1" rwmask="0" mode="RW" name="cmosis_bit_mode"/>
-    <register address="112" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_adc_resolution"/>
-    <register address="115" offset="0" size="1" default="1" rwmask="0" mode="RW" name="cmosis_special_115"/>
-  </bank>
   <bank bar="0" size="0x0200" protocol="software_registers" read_address="0x9000" write_address="0x9000" word_size="32" endianess="little" format="0x%lx" name="fpga" description="IPECamera Registers">
     <register address="0x00" offset="0" size="32" default="0" rwmask="0" mode="RW" name="spi_conf_input"/>
     <register address="0x10" offset="0" size="32" default="0" rwmask="0" mode="R" name="spi_conf_output"/>
@@ -105,54 +58,4 @@
     <register address="0x1a0" offset="0" size="32" default="0x64" rwmask="0" mode="RW" name="ddr_max_frames"/>
     <register address="0x1b0" offset="0" size="32" default="0" rwmask="0" mode="R" name="ddr_num_frames"/>
   </bank>
-  <bank bar="0" size="0x0200" protocol="software_registers" read_address="0x0" write_address="0x0" word_size="32" endianess="little" format="0x%lx" name="dma" description="DMA Registers"/>
-  <transform path="/test/prop1" register="test_prop1" unit="C" read_from_register="(503975./1024000)*${/registers/fpga/sensor_temperature:C} - 27315./100" description="formula to get real fpga temperature from the fpga_temperature register in decimal"/>
-  <transform name="formuu1" unit="C" read_from_register="(503975./1024000)*$value - 27315./100" write_to_register="($value + 27315./100)*(1024000./503975)" description="formula to get real fpga temperature from the fpga_temperature register in decimal"/>
-  <transform name="formuu2" unit="C1" read_from_register="((1./4)*($value - 1200)) if $freq==0 else ((3./10)*($value - 1000))" write_to_register="4*$value + 1200 if $freq==0 else (10./3)*$value + 1000" description="formula to get real sensor temperature from the sensor_temperature register in decimal"/>
-  <transform name="formuu3" unit="us" read_from_register="($value+(43./100))*129./(40*1000000)if $freq==0 else ($value+(43./100))*129./(48*1000000)" write_to_register="$value/129.*(40*1000000) - 43./100 if $freq==0 else $value/129.*(48*1000000) - 43./100" description="formula to get real exposure time from the cmosis_exp_time register in decimal"/>
-  <enum name="enumm1" description="enum towards temperatures register">
-    <name name="high" value="0x100" min="0x2" max="0x300"/>
-    <name name="low" value="0x010"/>
-  </enum>
-  <enum name="enumm2" description="enum towards sensor_temperature register">
-    <name name="high" value="0x120"/>
-    <name name="low" value="0x010" min="0x00" max="0x020"/>
-  </enum>
-  <enum name="enumm3" description="enum towards cmosis_exp_register register">
-    <name name="short" value="0x000"/>
-    <name name="mid" value="0x010"/>
-    <name name="long" value="0x100" min="0x0F0"/>
-  </enum>
-  <unit name="C">
-    <transform unit="K" transform="$value+273.15"/>
-    <transform unit="F" transform="$value*(9./5)+32"/>
-  </unit>
-  <unit name="K">
-    <transform unit="C" transform="$value-273.15"/>
-    <transform unit="F" transform="($value-273.15)*(9./5)+32"/>
-  </unit>
-  <unit name="F">
-    <transform unit="C" transform="($value-32)*5./9"/>
-    <transform unit="K" transform="($value+273.15-32)*5./9"/>
-  </unit>
-  <unit name="s">
-    <transform unit="ms" transform="$value*1000"/>
-    <transform unit="us" transform="$value*1000000"/>
-    <transform unit="ns" transform="$value*1000000000"/>
-  </unit>
-  <unit name="ms">
-    <transform unit="s" transform="$value/1000"/>
-    <transform unit="us" transform="$value*1000"/>
-    <transform unit="ns" transform="$value*1000000"/>
-  </unit>
-  <unit name="us">
-    <transform unit="s" transform="$value/1000000"/>
-    <transform unit="ms" transform="$value/1000"/>
-    <transform unit="ns" transform="$value*1000"/>
-  </unit>
-  <unit name="ns">
-    <transform unit="s" transform="$value/1000000000"/>
-    <transform unit="ms" transform="$value/1000000"/>
-    <transform unit="us" transform="$value/1000"/>
-  </unit>
 </model>

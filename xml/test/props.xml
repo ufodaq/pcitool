@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <transform path="/test/prop1" register="test_prop1" unit="C" read_from_register="(503975./1024000)*${/registers/fpga/sensor_temperature:C} - 27315./100" description="formula to get real fpga temperature from the fpga_temperature register in decimal"/>
+</model>

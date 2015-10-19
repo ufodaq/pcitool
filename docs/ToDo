@@ -1,23 +1,30 @@
 High Priority (we would need it for IPE Camera)
 =============
- 1. Join multiple XML files and on error use simplified XSD scheme on all files to find the file causing error
+ 1. DMA without ring buffer, just send data in the newly configured buffers while there is the space...
+    * We need a way to add (remove?) pages into the same use. Some times in the middle of existing pages, i.e. tructuring seems complicated.
+    * vmsplice them out trough the device?
+ 2. Allow DMA into the user pages
+    * Dangerous as hardware accessed memory is only valid during life-time of one application. Instead the kernel pages can be re-assembled as big buffer using vmmngr_map_page (?)
+ 3. Use huge-pages + dynamicaly configure DMA page size
+ 4. DirectGMA/GPUDirect support
+ 5. High-speed interface to Infiniband
  
 Normal Priority (it would make just few things a bit easier)
 ===============
- 1. Implement pcilib_configure_autotrigger
- 2. Provide OR and AND operations on registers in cli
- 3. Support writting a data from a binary file in cli
- 4. Support Python-scripts in a views, we need to provide python function to read registers/properties...
- 5. Really check the specified min, max values while setting registers
+ 1. Support Python-scripts in the views (we need to provide python API to read registers/properties)
+ 2. Integrate base streaming model into the pcitool
+ 3. Implement pcilib_configure_autotrigger
+ 4. Really check the specified min, max values while setting registers
+ 5. Provide OR and AND operations on registers in cli
+ 6. Support writting a data from a binary file in cli
 
 Low Priority (only as generalization for other projects)
 ============
- 1. Shall we allow overriding of registers?
+ 1. We managed kmem performance using next kmem prediction, but it is still wise to provide additionally a binary tree for faster search
  2. Support for Network Registers and Network DMA
  3. Define a syntax for register dependencies / delays (?)
  4. Use pthread_condition_t instead of polling
  5. Support FIFO reads/writes from/to registers
- 6. We managed kmem performance using next kmem prediction, but it is still wise to provide additionally a binary tree for faster search
 
 Performance
 ===========

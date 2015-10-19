@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <bank bar="0" size="128" protocol="software_registers" read_address="0x9010" write_address="0x9000" word_size="8" endianess="little" format="%lu" name="cmosis" description="CMOSIS CMV2000 Registers">
+    <register address="1" offset="0" size="16" default="1088" rwmask="0" mode="RW" name="cmosis_number_lines" description="test"/>
+    <register address="3" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start1"/>
+    <register address="5" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start2"/>
+    <register address="7" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start3"/>
+    <register address="9" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start4"/>
+    <register address="11" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start5"/>
+    <register address="13" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start6"/>
+    <register address="15" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start7"/>
+    <register address="17" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_start8"/>
+    <register address="19" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines1"/>
+    <register address="21" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines2"/>
+    <register address="23" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines3"/>
+    <register address="25" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines4"/>
+    <register address="27" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines5"/>
+    <register address="29" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines6"/>
+    <register address="31" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines7"/>
+    <register address="33" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_number_lines8"/>
+    <register address="35" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_sub_s"/>
+    <register address="37" offset="0" size="16" default="0" rwmask="0" mode="RW" name="cmosis_sub_a"/>
+    <register address="39" offset="0" size="1" default="1" rwmask="0" mode="RW" name="cmosis_color"/>
+    <register address="40" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_image_flipping"/>
+    <register address="41" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_exp_flags"/>
+    <register address="42" offset="0" size="24" default="1088" rwmask="0" mode="RW" name="cmosis_exp_time"><view view="formuu3"/><view view="enumm3"/></register>
+    <register address="45" offset="0" size="24" default="1088" rwmask="0" mode="RW" name="cmosis_exp_step"/>
+    <register address="48" offset="0" size="24" default="1" rwmask="0" mode="RW" name="cmosis_exp_kp1"/>
+    <register address="51" offset="0" size="24" default="1" rwmask="0" mode="RW" name="cmosis_exp_kp2"/>
+    <register address="54" offset="0" size="2" default="1" rwmask="0" mode="RW" name="cmosis_nr_slopes"/>
+    <register address="55" offset="0" size="8" default="1" rwmask="0" mode="RW" name="cmosis_exp_seq"/>
+    <register address="56" offset="0" size="24" default="1088" rwmask="0" mode="RW" name="cmosis_exp_time2"/>
+    <register address="59" offset="0" size="24" default="1088" rwmask="0" mode="RW" name="cmosis_exp_step2"/>
+    <register address="68" offset="0" size="2" default="1" rwmask="0" mode="RW" name="cmosis_nr_slopes2"/>
+    <register address="69" offset="0" size="8" default="1" rwmask="0" mode="RW" name="cmosis_exp_seq2"/>
+    <register address="70" offset="0" size="16" default="1" rwmask="0" mode="RW" name="cmosis_number_frames"/>
+    <register address="72" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_output_mode"/>
+    <register address="78" offset="0" size="12" default="85" rwmask="0" mode="RW" name="cmosis_training_pattern"/>
+    <register address="80" offset="0" size="18" default="0x3FFFF" rwmask="0" mode="RW" name="cmosis_channel_en"/>
+    <register address="82" offset="0" size="3" default="7" rwmask="0" mode="RW" name="cmosis_special_82"/>
+    <register address="89" offset="0" size="8" default="96" rwmask="0" mode="RW" name="cmosis_vlow2"/>
+    <register address="90" offset="0" size="8" default="96" rwmask="0" mode="RW" name="cmosis_vlow3"/>
+    <register address="100" offset="0" size="14" default="16260" rwmask="0" mode="RW" name="cmosis_offset"/>
+    <register address="102" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_pga"/>
+    <register address="103" offset="0" size="8" default="32" rwmask="0" mode="RW" name="cmosis_adc_gain"/>
+    <register address="111" offset="0" size="1" default="1" rwmask="0" mode="RW" name="cmosis_bit_mode"/>
+    <register address="112" offset="0" size="2" default="0" rwmask="0" mode="RW" name="cmosis_adc_resolution"/>
+    <register address="115" offset="0" size="1" default="1" rwmask="0" mode="RW" name="cmosis_special_115"/>
+  </bank>
+</model>

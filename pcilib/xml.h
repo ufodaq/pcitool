@@ -28,8 +28,10 @@ struct pcilib_xml_s {
     xmlXPathContextPtr xpath[PCILIB_MAX_MODEL_FILES];	/**< Per-file XPath context */
     
     xmlParserCtxtPtr parser;				/**< Pointer to the XML parser context */
-    xmlSchemaPtr schema;    				/**< Pointer to the parsed xsd schema */
+    xmlSchemaPtr schema;  				/**< Pointer to the parsed xsd schema */
     xmlSchemaValidCtxtPtr validator;       		/**< Pointer to the XML validation context */
+    xmlSchemaPtr parts_schema; 				/**< Pointer to the parsed xsd schema capable of validating individual XML files - no check for cross-references */
+    xmlSchemaValidCtxtPtr parts_validator;     		/**< Pointer to the XML validation context capable of validating individual XML files - no check for cross-references */
 
     xmlNodePtr bank_nodes[PCILIB_MAX_REGISTER_BANKS];	/**< pointer to xml nodes of banks in the xml file */
 };
@@ -38,27 +40,46 @@ struct pcilib_xml_s {
 extern "C" {
 #endif
 
-/**
- * this function gets the xml files and validates them, before filling the pcilib_t struct with the registers and banks of those files
- *@param[in,out] ctx the pcilib_t struct running that gets filled with banks and registers
- *@param[in] model the name of the model
+/** pcilib_init_xml
+ * Initializes XML stack and loads a default set of XML files. The default location for model XML files is
+ * /usr/local/share/pcilib/models/<current_model>. This can be altered using CMake PCILIB_MODEL_DIR variable
+ * while building or using PCILIB_MODEL_DIR environmental variable dynamicly.  More XML files can be added
+ * later using pcilib_process_xml call.
+ * @param[in,out] ctx - pcilib context
+ * @param[in] model - the name of the model
+ * @return - error or 0 on success
  */
 int pcilib_init_xml(pcilib_t *ctx, const char *model);
 
 /** pcilib_free_xml
  * this function free the xml parts of the pcilib_t running, and some libxml ashes
  * @param[in] ctx the pcilib_t running
-*/
+ */
 void pcilib_free_xml(pcilib_t *ctx);
 
-
 /** pcilib_process_xml
- * this function free the xml parts of the pcilib_t running, and some libxml ashes
- * @param[in] ctx the pcilib_t running
- * @param[in] location of XML files relative to the PCILIB_MODEL_DIR
-*/
+ * Processes a bunch of XML files in the specified directory. During the initialization, all XML files
+ * in the corresponding model directory will be loaded. This function allows to additionally load XML 
+ * files from the specified subdirectories of the model directory. I.e. the XML files from the 
+ * /usr/local/share/pcilib/models/<current_model>/<location> will be loaded. As with pcilib_init_xml,
+ * the directory can be adjusted using CMake build configuration or PCILIB_MODEL_DIR environmental
+ * variable.
+ * @param[in] ctx - pcilib context
+ * @param[in] location - Specifies sub-directory with XML files relative to the model directory.
+ * @return - error or 0 on success
+ */
 int pcilib_process_xml(pcilib_t *ctx, const char *location);
 
+/** pcilib_get_xml_attr
+ * This is an internal function which returns a specified node attribute in the pcilib_value_t structure.
+ * This function should not be used directly. Instead subsystem specific calls like pcilib_get_register_attr,
+ * pcilib_get_property_attr, ...have to be used.
+ * @param[in] ctx - pcilib context
+ * @param[in] node - LibXML2 node
+ * @param[in] attr - attribute name
+ * @param[out] val - the result will be returned in this variable. Prior to first usage pcilib_value_t variable should be initalized to 0.
+ * @return - error or 0 on success
+ */
 int pcilib_get_xml_attr(pcilib_t *ctx, pcilib_xml_node_t *node, const char *attr, pcilib_value_t *val);
 
 

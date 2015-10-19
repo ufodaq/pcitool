@@ -1,9 +1,9 @@
 <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
  <xsd:include schemaLocation="types.xsd"/>
- 
+
  <xsd:element name="model">
     <xsd:complexType>
-      <xsd:choice minOccurs="0" maxOccurs="unbounded">
+      <xsd:choice minOccurs="1" maxOccurs="unbounded">
         <xsd:element name="bank" type="pcilib_bank_t" minOccurs="0" maxOccurs="unbounded" />
         <xsd:element name="transform" type="pcilib_transform_view_t" minOccurs="0" maxOccurs="unbounded" />
         <xsd:element name="enum" type="pcilib_enum_view_t" minOccurs="0" maxOccurs="unbounded">
@@ -25,30 +25,31 @@
       <xsd:selector xpath="bank" />
       <xsd:field xpath="@name" />
     </xsd:key>
+<!-- Currently, we define all registers, banks, views, and units as xsd:ID which prevents them from sharing name anyway.
+Currently it seems fine, but later it could turn out too be to strict. Then, we get problem also here as transform[@name]
+is ID of view, not register. But how can we restrict transform field to @register only? -->
     <xsd:key name="pcilib_register_key">
-      <xsd:selector xpath="bank/register|bank/register/field" />
-      <xsd:field xpath="@name" />
+      <xsd:selector xpath="bank/register|bank/register/field|transform" />
+      <xsd:field xpath="@name|@register" />
     </xsd:key>
     <xsd:key name="pcilib_view_key">
       <xsd:selector xpath="transform|enum" />
-      <xsd:field xpath="@name" />
+      <xsd:field xpath="@name|@path" />
     </xsd:key>
     <xsd:key name="pcilib_unit_key">
       <xsd:selector xpath="unit" />
       <xsd:field xpath="@name" />
-    </xsd:key>
-    <xsd:key name="pcilib_path_key">
-      <xsd:selector xpath="transform" />
-      <xsd:field xpath="@path" />
     </xsd:key>
 
     <xsd:keyref name="pcilib_register_view_ref" refer="pcilib_view_key">
       <xsd:selector xpath="bank/register/view|bank/register/field/view" />
       <xsd:field xpath="@view" />
     </xsd:keyref>
+<!-- Actually, it is no problem to reference non-existing unit just for informative purposes
     <xsd:keyref name="pcilib_unit_ref" refer="pcilib_unit_key">
       <xsd:selector xpath="transform|enum" />
       <xsd:field xpath="@unit" />
     </xsd:keyref>
+-->
  </xsd:element>
 </xsd:schema>

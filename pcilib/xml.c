@@ -78,6 +78,17 @@ static xmlNodePtr pcilib_xml_get_parent_register_node(xmlDocPtr doc, xmlNodePtr 
 }
 */
 
+int pcilib_get_xml_attr(pcilib_t *ctx, pcilib_xml_node_t *node, const char *attr, pcilib_value_t *val) {
+    xmlAttr *prop;
+    xmlChar *str;
+
+    prop = xmlHasProp(node, BAD_CAST attr);
+    if ((!prop)||(!prop->children)) return PCILIB_ERROR_NOTFOUND;
+
+    str = prop->children->content;
+    return pcilib_set_value_from_static_string(ctx, val, (const char*)str);
+}
+
 static int pcilib_xml_parse_view_reference(pcilib_t *ctx, xmlDocPtr doc, xmlNodePtr node, pcilib_view_reference_t *desc) {
     xmlAttr *cur;
     char *value, *name;
@@ -873,10 +884,13 @@ static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathCon
     return 0;
 }
 
-static int pcilib_xml_load_xsd(pcilib_t *ctx, char *xsd_filename) {
+static int pcilib_xml_load_xsd_file(pcilib_t *ctx, char *xsd_filename, xmlSchemaPtr *schema, xmlSchemaValidCtxtPtr *validator) {
     int err;
 
     xmlSchemaParserCtxtPtr ctxt;
+
+    *schema = NULL;
+    *validator = NULL;
 
     /** we first parse the xsd file for AST with validation*/
     ctxt = xmlSchemaNewParserCtxt(xsd_filename);
@@ -887,8 +901,8 @@ static int pcilib_xml_load_xsd(pcilib_t *ctx, char *xsd_filename) {
         return PCILIB_ERROR_FAILED;
     }
 
-    ctx->xml.schema = xmlSchemaParse(ctxt);
-    if (!ctx->xml.schema) {
+    *schema = xmlSchemaParse(ctxt);
+    if (!*schema) {
         xmlErrorPtr xmlerr = xmlGetLastError();
         xmlSchemaFreeParserCtxt(ctxt);
         if (xmlerr) pcilib_error("Failed to parse XML schema, xmlSchemaParse reported error %d - %s", xmlerr->code, xmlerr->message);
@@ -898,15 +912,15 @@ static int pcilib_xml_load_xsd(pcilib_t *ctx, char *xsd_filename) {
 
     xmlSchemaFreeParserCtxt(ctxt);
 
-    ctx->xml.validator  = xmlSchemaNewValidCtxt(ctx->xml.schema);
-    if (!ctx->xml.validator) {
+    *validator  = xmlSchemaNewValidCtxt(*schema);
+    if (!*validator) {
         xmlErrorPtr xmlerr = xmlGetLastError();
         if (xmlerr) pcilib_error("xmlSchemaNewValidCtxt reported error %d - %s", xmlerr->code, xmlerr->message);
         else pcilib_error("Failed to create a validation context");
         return PCILIB_ERROR_FAILED;
     }
 
-    err = xmlSchemaSetValidOptions(ctx->xml.validator, XML_SCHEMA_VAL_VC_I_CREATE);
+    err = xmlSchemaSetValidOptions(*validator, XML_SCHEMA_VAL_VC_I_CREATE);
     if (err) {
         xmlErrorPtr xmlerr = xmlGetLastError();
         if (xmlerr) pcilib_error("xmlSchemaSetValidOptions reported error %d - %s", xmlerr->code, xmlerr->message);
@@ -917,16 +931,45 @@ static int pcilib_xml_load_xsd(pcilib_t *ctx, char *xsd_filename) {
     return 0;
 }
 
-static int pcilib_xml_load_file(pcilib_t *ctx, const char *path, const char *name) {
+
+static int pcilib_xml_load_xsd(pcilib_t *ctx, char *model_dir) {
+    int err;
+
+    struct stat st;
+    char *xsd_path;
+
+    xsd_path = (char*)alloca(strlen(model_dir) + 32);
+    if (!xsd_path) return PCILIB_ERROR_MEMORY;
+
+    sprintf(xsd_path, "%s/model.xsd", model_dir);
+    if (stat(xsd_path, &st)) {
+        pcilib_info("XML models are not present, missing parts schema");
+        return PCILIB_ERROR_NOTFOUND;
+    }
+
+    err = pcilib_xml_load_xsd_file(ctx, xsd_path, &ctx->xml.parts_schema, &ctx->xml.parts_validator);
+    if (err) return err;
+
+    sprintf(xsd_path, "%s/references.xsd", model_dir);
+    if (stat(xsd_path, &st)) {
+        pcilib_info("XML models are not present, missing schema");
+        return PCILIB_ERROR_NOTFOUND;
+    }
+
+    return pcilib_xml_load_xsd_file(ctx, xsd_path, &ctx->xml.schema, &ctx->xml.validator);
+}
+
+
+
+static xmlDocPtr pcilib_xml_load_file(pcilib_t *ctx, const char *path, const char *name) {
     int err;
     char *full_name;
     xmlDocPtr doc;
-    xmlXPathContextPtr xpath;
 
     full_name = (char*)alloca(strlen(path) + strlen(name) + 2);
     if (!name) {
         pcilib_error("Error allocating %zu bytes of memory in stack to create a file name", strlen(path) + strlen(name) + 2);
-        return PCILIB_ERROR_MEMORY;
+        return NULL;
     }
 
     sprintf(full_name, "%s/%s", path, name);
@@ -936,15 +979,105 @@ static int pcilib_xml_load_file(pcilib_t *ctx, const char *path, const char *nam
         xmlErrorPtr xmlerr = xmlCtxtGetLastError(ctx->xml.parser);
         if (xmlerr) pcilib_error("Error parsing %s, xmlCtxtReadFile reported error %d - %s", full_name, xmlerr->code, xmlerr->message);
         else pcilib_error("Error parsing %s", full_name);
-        return PCILIB_ERROR_INVALID_DATA;
+        return NULL;
     }
 
-    err = xmlSchemaValidateDoc(ctx->xml.validator, doc);
+    err = xmlSchemaValidateDoc(ctx->xml.parts_validator, doc);
     if (err) {
         xmlErrorPtr xmlerr = xmlCtxtGetLastError(ctx->xml.parser);
         xmlFreeDoc(doc);
         if (xmlerr) pcilib_error("Error validating %s, xmlSchemaValidateDoc reported error %d - %s", full_name, xmlerr->code, xmlerr->message);
         else pcilib_error("Error validating %s", full_name);
+        return NULL;
+    }
+
+    return doc;
+}
+
+static int pcilib_process_xml_internal(pcilib_t *ctx, const char *model, const char *location) {
+    int err;
+
+    DIR *rep;
+    struct dirent *file = NULL;
+    char *model_dir, *model_path;
+
+    xmlDocPtr doc = NULL;
+    xmlNodePtr root = NULL;
+    xmlXPathContextPtr xpath;
+
+    if (ctx->xml.num_files == PCILIB_MAX_MODEL_FILES) {
+        pcilib_error("Too many XML locations for a model, only up to %zu are supported", PCILIB_MAX_MODEL_FILES);
+        return PCILIB_ERROR_TOOBIG;
+    }
+
+    model_dir = getenv("PCILIB_MODEL_DIR");
+    if (!model_dir) model_dir = PCILIB_MODEL_DIR;
+
+    if (!model) model = ctx->model;
+    if (!location) location = "";
+
+    model_path = (char*)alloca(strlen(model_dir) + strlen(model) + strlen(location) + 3);
+    if (!model_path) return PCILIB_ERROR_MEMORY;
+
+    sprintf(model_path, "%s/%s/%s", model_dir, model, location);
+
+    rep = opendir(model_path);
+    if (!rep) return PCILIB_ERROR_NOTFOUND;
+
+    while ((file = readdir(rep)) != NULL) {
+        xmlDocPtr newdoc;
+        
+        size_t len = strlen(file->d_name);
+        if ((len < 4)||(strcasecmp(file->d_name + len - 4, ".xml"))) continue;
+        if (file->d_type != DT_REG) continue;
+
+        newdoc = pcilib_xml_load_file(ctx, model_path, file->d_name);
+        if (!newdoc) {
+            pcilib_error("Error processing XML file %s", file->d_name);
+            continue;
+        }
+
+        if (doc) {
+            xmlNodePtr node;
+
+            node = xmlDocGetRootElement(newdoc);
+            if (node) node = xmlFirstElementChild(node);
+            if (node) node = xmlDocCopyNodeList(doc, node);
+            xmlFreeDoc(newdoc);
+
+            if ((!node)||(!xmlAddChildList(root, node))) {
+                xmlErrorPtr xmlerr = xmlCtxtGetLastError(ctx->xml.parser);
+                if (node) xmlFreeNode(node);
+                if (xmlerr) pcilib_error("Error manipulating XML tree of %s, libXML2 reported error %d - %s", file->d_name, xmlerr->code, xmlerr->message);
+                else pcilib_error("Error manipulating XML tree of %s", file->d_name);
+                continue;
+            }
+        } else {
+            root = xmlDocGetRootElement(newdoc);
+            if (!root) {
+                xmlErrorPtr xmlerr = xmlCtxtGetLastError(ctx->xml.parser);
+                xmlFreeDoc(newdoc);
+                if (xmlerr) pcilib_error("Error manipulating XML tree of %s, libXML2 reported error %d - %s", file->d_name, xmlerr->code, xmlerr->message);
+                else pcilib_error("Error manipulating XML tree of %s", file->d_name);
+                continue;
+            }
+            doc = newdoc;
+                // This is undocumented, but should be fine...
+            if (doc->URL) xmlFree((xmlChar*)doc->URL);
+            doc->URL = xmlStrdup(BAD_CAST model_path);
+        }
+    }
+    closedir(rep);
+
+    if (!doc)
+        return 0;
+
+    err = xmlSchemaValidateDoc(ctx->xml.validator, doc);
+    if (err) {
+        xmlErrorPtr xmlerr = xmlCtxtGetLastError(ctx->xml.parser);
+        xmlFreeDoc(doc);
+        if (xmlerr) pcilib_error("Error validating %s, xmlSchemaValidateDoc reported error %d - %s", model_path, xmlerr->code, xmlerr->message);
+        else pcilib_error("Error validating %s", model_path);
         return PCILIB_ERROR_VERIFY;
     }
 
@@ -952,20 +1085,13 @@ static int pcilib_xml_load_file(pcilib_t *ctx, const char *path, const char *nam
     if (!xpath) {
         xmlErrorPtr xmlerr = xmlGetLastError();
         xmlFreeDoc(doc);
-        if (xmlerr) pcilib_error("Document %s: xmlXpathNewContext reported error %d - %s for document %s", full_name, xmlerr->code, xmlerr->message);
-        else pcilib_error("Error creating XPath context for %s", full_name);
+        if (xmlerr) pcilib_error("Document %s: xmlXpathNewContext reported error %d - %s for document %s", model_path, xmlerr->code, xmlerr->message);
+        else pcilib_error("Error creating XPath context for %s", model_path);
         return PCILIB_ERROR_FAILED;
     }
 
-    // This can only partially fail... Therefore we need to keep XML and just return the error...
+        // This can only partially fail... Therefore we need to keep XML and just return the error...
     err = pcilib_xml_process_document(ctx, doc, xpath);
-
-    if (ctx->xml.num_files == PCILIB_MAX_MODEL_FILES) {
-        xmlFreeDoc(doc);
-        xmlXPathFreeContext(xpath);
-        pcilib_error("Too many XML files for a model, only up to %zu are supported", PCILIB_MAX_MODEL_FILES);
-        return PCILIB_ERROR_TOOBIG;
-    }
 
     ctx->xml.docs[ctx->xml.num_files] = doc;
     ctx->xml.xpath[ctx->xml.num_files] = xpath;
@@ -974,65 +1100,17 @@ static int pcilib_xml_load_file(pcilib_t *ctx, const char *path, const char *nam
     return err;
 }
 
-
 int pcilib_process_xml(pcilib_t *ctx, const char *location) {
-    int err;
-
-    DIR *rep;
-    struct dirent *file = NULL;
-    char *model_dir, *model_path;
-
-    model_dir = getenv("PCILIB_MODEL_DIR");
-    if (!model_dir) model_dir = PCILIB_MODEL_DIR;
-
-    model_path = (char*)alloca(strlen(model_dir) + strlen(location) + 2);
-    if (!model_path) return PCILIB_ERROR_MEMORY;
-
-    sprintf(model_path, "%s/%s", model_dir, location);
-
-    rep = opendir(model_path);
-    if (!rep) return PCILIB_ERROR_NOTFOUND;
-
-    while ((file = readdir(rep)) != NULL) {
-        size_t len = strlen(file->d_name);
-        if ((len < 4)||(strcasecmp(file->d_name + len - 4, ".xml"))) continue;
-        if (file->d_type != DT_REG) continue;
-
-        err = pcilib_xml_load_file(ctx, model_path, file->d_name);
-        if (err) pcilib_error("Error processing XML file %s", file->d_name);
-    }
-
-    closedir(rep);
-
-    return 0;
+    return pcilib_process_xml_internal(ctx, NULL, location);
 }
 
-
-/** pcilib_init_xml
- * this function will initialize the registers and banks from the xml files
- * @param[in,out] ctx the pciilib_t running that gets filled with structures
- * @param[in] model the current model of ctx
- * @return an error code
- */
 int pcilib_init_xml(pcilib_t *ctx, const char *model) {
     int err;
 
     char *model_dir;
-    char *xsd_path;
-
-    struct stat st;
 
     model_dir = getenv("PCILIB_MODEL_DIR");
     if (!model_dir) model_dir = PCILIB_MODEL_DIR;
-
-    xsd_path = (char*)alloca(strlen(model_dir) + 16);
-    if (!xsd_path) return PCILIB_ERROR_MEMORY;
-
-    sprintf(xsd_path, "%s/model.xsd", model_dir);
-    if (stat(xsd_path, &st)) {
-        pcilib_info("XML models are not present");
-        return PCILIB_ERROR_NOTFOUND;
-    }
 
     ctx->xml.parser = xmlNewParserCtxt();
     if (!ctx->xml.parser) {
@@ -1042,16 +1120,12 @@ int pcilib_init_xml(pcilib_t *ctx, const char *model) {
         return PCILIB_ERROR_FAILED;
     }
 
-    err = pcilib_xml_load_xsd(ctx, xsd_path);
+    err = pcilib_xml_load_xsd(ctx, model_dir);
     if (err) return err;
 
-    return pcilib_process_xml(ctx, model);
+    return pcilib_process_xml_internal(ctx, model, NULL);
 }
 
-/** pcilib_free_xml
- * this function free the xml parts of the pcilib_t running, and some libxml ashes
- * @param[in] pci the pcilib_t running
-*/
 void pcilib_free_xml(pcilib_t *ctx) {
     int i;
 
@@ -1085,7 +1159,16 @@ void pcilib_free_xml(pcilib_t *ctx) {
     if (ctx->xml.schema) {
         xmlSchemaFree(ctx->xml.schema);
         ctx->xml.schema = NULL;
+    }
 
+    if (ctx->xml.parts_validator) {
+        xmlSchemaFreeValidCtxt(ctx->xml.parts_validator);
+        ctx->xml.parts_validator = NULL;
+    }
+
+    if (ctx->xml.parts_schema) {
+        xmlSchemaFree(ctx->xml.parts_schema);
+        ctx->xml.parts_schema = NULL;
     }
 
     if (ctx->xml.parser) {
@@ -1098,15 +1181,4 @@ void pcilib_free_xml(pcilib_t *ctx) {
         xmlCleanupParser();
         xmlMemoryDump();
     */
-}
-
-int pcilib_get_xml_attr(pcilib_t *ctx, pcilib_xml_node_t *node, const char *attr, pcilib_value_t *val) {
-    xmlAttr *prop;
-    xmlChar *str;
-
-    prop = xmlHasProp(node, BAD_CAST attr);
-    if ((!prop)||(!prop->children)) return PCILIB_ERROR_NOTFOUND;
-
-    str = prop->children->content;
-    return pcilib_set_value_from_static_string(ctx, val, (const char*)str);
 }
