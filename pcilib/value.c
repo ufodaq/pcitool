@@ -141,6 +141,9 @@ pcilib_register_value_t pcilib_get_value_as_register_value(pcilib_t *ctx, const 
     if (ret) *ret = 0;
     res = copy.ival;
 
+    if (copy.ival < 0)
+        pcilib_warning("Data corruption while converting negative polymorph value (%li) to the register type, result %u", copy.ival, res);
+
     pcilib_clean_value(ctx, &copy);
 
     return res;
@@ -254,6 +257,9 @@ int pcilib_convert_value_type(pcilib_t *ctx, pcilib_value_t *val, pcilib_value_t
             }
             break;
          case PCILIB_TYPE_DOUBLE:
+            if (val->fval != round(val->fval))
+                pcilib_info("Precision is lost while converting float value %lf to integer %.0lf", val->fval, round(val->fval));
+
             val->ival = round(val->fval);
             val->format = NULL;
             break;
