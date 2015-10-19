@@ -706,16 +706,23 @@ void ViewInfo(pcilib_t *handle, pcilib_register_t reg, size_t id) {
     if (r) printf(")");
     printf("\n");
 
-    if (r) {
-        err = pcilib_read_register_view_by_id(handle, reg, r->views[id].name, &val);
+    if (v->mode&PCILIB_ACCESS_R) {
+        if (r) {
+            err = pcilib_read_register_view_by_id(handle, reg, r->views[id].name, &val);
+        } else {
+            err = pcilib_get_property(handle, v->name, &val);
+        }
+        if (!err) err = pcilib_convert_value_type(handle, &val, PCILIB_TYPE_STRING);
     } else {
-        err = pcilib_get_property(handle, v->name, &val);
+        err = PCILIB_ERROR_NOTPERMITED;
     }
-    if (!err) err = pcilib_convert_value_type(handle, &val, PCILIB_TYPE_STRING);
 
-    if (err)
-        printf("    Current value  : error %i\n", err);
-    else {
+    if (err) {
+        if (err == PCILIB_ERROR_NOTPERMITED)
+            printf("    Current value  : no read access\n");
+        else
+            printf("    Current value  : error %i\n", err);
+    } else {
         printf("    Current value  : %s", val.sval);
         if (v->unit) printf(" (units: %s)", v->unit);
         printf("\n");
@@ -775,15 +782,21 @@ void RegisterInfo(pcilib_t *handle, pcilib_register_t reg) {
     pcilib_register_bank_t bank = pcilib_find_register_bank_by_addr(handle, r->bank);
     const pcilib_register_bank_description_t *b = &model_info->banks[bank];
 
-    err = pcilib_read_register_by_id(handle, reg, &regval);
+    if (r->mode&PCILIB_ACCESS_R) {
+        err = pcilib_read_register_by_id(handle, reg, &regval);
+    } else {
+        err = PCILIB_ERROR_NOTPERMITED;
+    }
 
     info = pcilib_get_register_info(handle, b->name, r->name, 0);
     if (!info) Error("Can't obtain register info for %s", r->name);
 
     printf("%s/%s\n", b->name, r->name);
     printf("  Current value: ");
-    if (err) printf("error %i", err);
-    else printf(b->format, regval);
+    if (err) {
+        if (err == PCILIB_ERROR_NOTPERMITED) printf("no read access");
+        else printf("error %i", err);
+    } else printf(b->format, regval);
 
     if (r->mode&PCILIB_REGISTER_W) {
 	printf(" (default: ");

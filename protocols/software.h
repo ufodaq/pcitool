@@ -3,8 +3,8 @@
  * @brief header file for implementation of the protocol with software registers allocated in the kernel space, for parameters sharing between concurrent pcitool instances
  */
 
-#ifndef _PCILIB_SOFTWARE_H
-#define _PCILIB_SOFTWARE_H
+#ifndef _PCILIB_PROTOCOL_SOFTWARE_H
+#define _PCILIB_PROTOCOL_SOFTWARE_H
 
 #include "pcilib.h"
 #include "version.h"
@@ -51,8 +51,8 @@ int pcilib_software_registers_write(pcilib_t *ctx,pcilib_register_bank_context_t
 /**
  * software protocol addition to the protocol api.
  */
-const pcilib_register_protocol_api_description_t pcilib_register_software_protocol_api =
+const pcilib_register_protocol_api_description_t pcilib_software_protocol_api =
   { PCILIB_VERSION, pcilib_software_registers_open, pcilib_software_registers_close,pcilib_software_registers_read, pcilib_software_registers_write }; /**< we add there the protocol to the list of possible protocols*/
 #endif /* _PCILIB_EXPORT_C */
 
-#endif /* _PCILIB_SOFTWARE_H */
+#endif /* _PCILIB_PROTOCOL_SOFTWARE_H */

@@ -11,9 +11,10 @@
 
 
 typedef enum {
-    PCILIB_REGISTER_STANDARD = 0,
-    PCILIB_REGISTER_FIFO,
-    PCILIB_REGISTER_BITS
+    PCILIB_REGISTER_STANDARD = 0,               /**< Standard register */
+    PCILIB_REGISTER_FIFO,                       /**< FIFO register */
+    PCILIB_REGISTER_BITS,                       /**< Besides a big standard register, the register bit-fields may be described by bit registers */
+    PCILIB_REGISTER_PROPERTY                    /**< A special register bound to a property and gettings/setting it value through it */
 } pcilib_register_type_t;
 
 typedef struct {

@@ -9,8 +9,11 @@
 #include "view.h"
 #include "error.h"
 #include "value.h"
+#include "property.h"
 
 int pcilib_add_views_custom(pcilib_t *ctx, size_t n, const pcilib_view_description_t *desc, pcilib_view_context_t **refs) {
+    int err;
+
     size_t i;
     void *ptr;
 
@@ -23,6 +26,11 @@ int pcilib_add_views_custom(pcilib_t *ctx, size_t n, const pcilib_view_descripti
             else break;
             ptr += v->api->description_size;
         }
+    }
+
+    if (!refs) {
+        refs = (pcilib_view_context_t**)alloca(n * sizeof(pcilib_view_context_t*));
+        if (!refs) return PCILIB_ERROR_MEMORY;
     }
 
     if ((ctx->num_views + n + 1) > ctx->alloc_views) {
@@ -48,6 +56,7 @@ int pcilib_add_views_custom(pcilib_t *ctx, size_t n, const pcilib_view_descripti
 
         pcilib_view_t view = pcilib_find_view_by_name(ctx, v->name);
         if (view != PCILIB_VIEW_INVALID) {
+            ctx->views[ctx->num_views + i] = NULL;
             pcilib_clean_views(ctx, ctx->num_views);
             pcilib_error("View %s is already defined in the model", v->name);
             return PCILIB_ERROR_EXIST;
@@ -55,6 +64,7 @@ int pcilib_add_views_custom(pcilib_t *ctx, size_t n, const pcilib_view_descripti
 
         cur = (pcilib_view_description_t*)malloc(v->api->description_size);
         if (!cur) {
+            ctx->views[ctx->num_views + i] = NULL;
             pcilib_clean_views(ctx, ctx->num_views);
             return PCILIB_ERROR_MEMORY;
         }
@@ -68,6 +78,7 @@ int pcilib_add_views_custom(pcilib_t *ctx, size_t n, const pcilib_view_descripti
 
         if (!view_ctx) {
             free(cur);
+            ctx->views[ctx->num_views + i] = NULL;
             pcilib_clean_views(ctx, ctx->num_views);
             return PCILIB_ERROR_FAILED;
         }
@@ -85,6 +96,13 @@ int pcilib_add_views_custom(pcilib_t *ctx, size_t n, const pcilib_view_descripti
     }
 
     ctx->views[ctx->num_views + n] = NULL;
+
+    err = pcilib_add_registers_from_properties(ctx, n, refs, ctx->views + ctx->num_views);
+    if (err) {
+        pcilib_clean_views(ctx, ctx->num_views);
+        return err;
+    }
+
     ctx->num_views += n;
 
     return 0;

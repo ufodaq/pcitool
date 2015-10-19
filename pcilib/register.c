@@ -74,8 +74,17 @@ int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags,
             bank_addr = registers[i].bank;
             bank = pcilib_find_register_bank_by_addr(ctx, bank_addr);
             if (bank == PCILIB_REGISTER_BANK_INVALID) {
-                pcilib_error("Invalid bank address (0x%lx) is specified for register %s", bank_addr, registers[i].name);
-                return PCILIB_ERROR_INVALID_BANK;
+                    // We need to add a bank first in this case
+                if (registers[i].type == PCILIB_REGISTER_PROPERTY) {
+                    err = pcilib_add_register_banks(ctx, 0, 1, &pcilib_property_register_bank, &bank);
+                } else {
+                    err = PCILIB_ERROR_INVALID_BANK;
+                }
+
+                if (err) {
+                    pcilib_error("Invalid bank address (0x%lx) is specified for register %s", bank_addr, registers[i].name);
+                    return err;
+                }
             }
         }
 
@@ -91,7 +100,7 @@ int pcilib_add_registers(pcilib_t *ctx, pcilib_model_modification_flags_t flags,
         banks[i] = bank;
     }
 
-    err = pcilib_add_register_properties(ctx, n, banks, registers);
+    err = pcilib_add_properties_from_registers(ctx, n, banks, registers);
     if (err) return err;
 
     for (i = 0; i < n; i++) {
@@ -148,7 +157,9 @@ void pcilib_clean_registers(pcilib_t *ctx, pcilib_register_t start) {
 
 static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, pcilib_register_size_t offset, pcilib_register_size_t bits, pcilib_register_value_t *buf) {
     int err;
+
     size_t i;
+    size_t space_size;
 
     pcilib_register_bank_context_t *bctx = ctx->bank_ctx[bank];
     const pcilib_register_protocol_api_description_t *bapi = bctx->api;
@@ -163,13 +174,30 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
 	return PCILIB_ERROR_NOTSUPPORTED;
     }
 
-    if (((addr + n) > b->size)||(((addr + n) == b->size)&&(bits))) {
+    if (b->protocol == PCILIB_REGISTER_PROTOCOL_PROPERTY) space_size = ctx->num_views;
+    else space_size = b->size;
+
+    if (((addr + n) > space_size)||(((addr + n) == space_size)&&(bits))) {
 	if ((b->format)&&(strchr(b->format, 'x')))
-	    pcilib_error("Accessing register (%u regs at addr 0x%x) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
+	    pcilib_error("Accessing register (%u regs at addr 0x%x) out of register space (%u registers total)", bits?(n+1):n, addr, space_size);
 	else 
-	    pcilib_error("Accessing register (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
+	    pcilib_error("Accessing register (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, space_size);
 	return PCILIB_ERROR_OUTOFRANGE;
     }
+
+    if (b->protocol == PCILIB_REGISTER_PROTOCOL_PROPERTY) {
+        for (i = 0; i < (bits?(n+1):n); i++) {
+            if ((ctx->views[i]->flags&PCILIB_VIEW_FLAG_REGISTER) == 0) {
+                pcilib_error("Accessing invalid register %u (associated view does not provide register functionality)", addr + i);
+                return PCILIB_ERROR_INVALID_REQUEST;
+            }
+
+            if ((ctx->views[i]->mode&PCILIB_ACCESS_R) == 0) {
+                pcilib_error("Read access is not allowed to register %u", addr + i);
+                return PCILIB_ERROR_NOTPERMITED;
+            }
+        }
+    } 
 
     //err = pcilib_init_register_banks(ctx);
     //if (err) return err;
@@ -259,7 +287,9 @@ int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, p
 
 static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, pcilib_register_size_t offset, pcilib_register_size_t bits, pcilib_register_value_t rwmask, pcilib_register_value_t *buf) {
     int err;
+
     size_t i;
+    size_t space_size;
 
     pcilib_register_bank_context_t *bctx = ctx->bank_ctx[bank];
     const pcilib_register_protocol_api_description_t *bapi = bctx->api;
@@ -274,13 +304,30 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
 	return PCILIB_ERROR_NOTSUPPORTED;
     }
 
-    if (((addr + n) > b->size)||(((addr + n) == b->size)&&(bits))) {
+    if (b->protocol == PCILIB_REGISTER_PROTOCOL_PROPERTY) space_size = ctx->num_views;
+    else space_size = b->size;
+
+    if (((addr + n) > space_size)||(((addr + n) == space_size)&&(bits))) {
 	if ((b->format)&&(strchr(b->format, 'x')))
-	    pcilib_error("Accessing register (%u regs at addr 0x%x) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
+	    pcilib_error("Accessing register (%u regs at addr 0x%x) out of register space (%u registers total)", bits?(n+1):n, addr, space_size);
 	else 
-	    pcilib_error("Accessing register (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, b->size);
+	    pcilib_error("Accessing register (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, space_size);
 	return PCILIB_ERROR_OUTOFRANGE;
     }
+
+    if (b->protocol == PCILIB_REGISTER_PROTOCOL_PROPERTY) {
+        for (i = 0; i < (bits?(n+1):n); i++) {
+            if ((ctx->views[i]->flags&PCILIB_VIEW_FLAG_REGISTER) == 0) {
+                pcilib_error("Accessing invalid register %u (associated view does not provide register functionality)", addr + i);
+                return PCILIB_ERROR_INVALID_REQUEST;
+            }
+
+            if ((ctx->views[i]->mode&PCILIB_ACCESS_W) == 0) {
+                pcilib_error("Write access is not allowed to register %u", addr + i);
+                return PCILIB_ERROR_NOTPERMITED;
+            }
+        }
+    } 
 
     //err = pcilib_init_register_banks(ctx);
     //if (err) return err;

@@ -1,5 +1,5 @@
-#ifndef _PCILIB_DEFAULT_H
-#define _PCILIB_DEFAULT_H
+#ifndef _PCILIB_PROTOCOL_DEFAULT_H
+#define _PCILIB_PROTOCOL_DEFAULT_H
 
 #include "pcilib.h"
 #include "version.h"
@@ -13,4 +13,4 @@ const pcilib_register_protocol_api_description_t pcilib_default_protocol_api =
     { PCILIB_VERSION, NULL, NULL, pcilib_default_read, pcilib_default_write };
 #endif /* _PCILIB_EXPORT_C */
 
-#endif /* _PCILIB_DEFAULT_H */
+#endif /* _PCILIB_PROTOCOL_DEFAULT_H */

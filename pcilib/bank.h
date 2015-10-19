@@ -8,13 +8,15 @@
 #define PCILIB_REGISTER_BANK1 			1
 #define PCILIB_REGISTER_BANK2 			2
 #define PCILIB_REGISTER_BANK3 			3
-#define PCILIB_REGISTER_BANK_DMA		64					/**< First BANK address to be used by DMA engines */
-#define PCILIB_REGISTER_BANK_DMACONF		65					/**< DMA configuration in the software registers */
+#define PCILIB_REGISTER_BANK_PROPERTY           64                                      /**< Registers abstracting properties and other computed registers */
+#define PCILIB_REGISTER_BANK_DMA		96					/**< First BANK address to be used by DMA engines */
+#define PCILIB_REGISTER_BANK_DMACONF		96					/**< DMA configuration in the software registers */
 #define PCILIB_REGISTER_BANK_DYNAMIC		128					/**< First BANK address to map dynamic XML configuration */
 #define PCILIB_REGISTER_PROTOCOL_INVALID	((pcilib_register_protocol_t)-1)
 #define PCILIB_REGISTER_PROTOCOL0		0					/**< First PROTOCOL address to be used in the event engine */
 #define PCILIB_REGISTER_PROTOCOL_DEFAULT	64					/**< Default memmap based protocol */
 #define PCILIB_REGISTER_PROTOCOL_SOFTWARE	65					/**< Software registers */
+#define PCILIB_REGISTER_PROTOCOL_PROPERTY       66                                      /**< Protocol to access registers interfacing properties */
 #define PCILIB_REGISTER_PROTOCOL_DMA		96					/**< First PROTOCOL address to be used by DMA engines */
 #define PCILIB_REGISTER_PROTOCOL_DYNAMIC	128					/**< First PROTOCOL address to be used by plugins */
 

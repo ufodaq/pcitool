@@ -184,12 +184,16 @@ static int pcilib_xml_parse_register(pcilib_t *ctx, pcilib_xml_register_descript
                 desc->mode = PCILIB_REGISTER_W;
             } else if (!strcasecmp(value, "RW")) {
                 desc->mode = PCILIB_REGISTER_RW;
-            } else if (!strcasecmp(value, "W")) {
-                desc->mode = PCILIB_REGISTER_W;
             } else if (!strcasecmp(value, "RW1C")) {
                 desc->mode = PCILIB_REGISTER_RW1C;
             } else if (!strcasecmp(value, "W1C")) {
                 desc->mode = PCILIB_REGISTER_W1C;
+            } else if (!strcasecmp(value, "RW1I")) {
+                desc->mode = PCILIB_REGISTER_RW1I;
+            } else if (!strcasecmp(value, "W1I")) {
+                desc->mode = PCILIB_REGISTER_W1I;
+            } else if (!strcasecmp(value, "-")) {
+                desc->mode = 0;
             } else {
                 pcilib_error("Invalid access mode (%s) is specified in the XML register description", value);
                 return PCILIB_ERROR_INVALID_DATA;
@@ -487,11 +491,16 @@ static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDoc
 
         if (!strcasecmp(name, "name")) {
                 // Overriden by path
-            if (!desc->name)
-                desc->name = value;
+            if (desc->name) continue;
+            if (*value == '/')
+	        desc->flags |= PCILIB_VIEW_FLAG_PROPERTY;
+            desc->name = value;
 	} else if (!strcasecmp(name, "path")) {
 	    desc->name = value;
 	    desc->flags |= PCILIB_VIEW_FLAG_PROPERTY;
+	} else if (!strcasecmp(name, "register")) {
+	    desc->regname = value;
+	    desc->flags |= PCILIB_VIEW_FLAG_REGISTER;
         } else if (!strcasecmp((char*)name, "description")) {
     	    desc->description = value;
         } else if (!strcasecmp((char*)name, "unit")) {
@@ -502,6 +511,19 @@ static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDoc
             else if (!strcasecmp(value, "int")) desc->type = PCILIB_TYPE_LONG;
             else {
                 pcilib_error("Invalid type (%s) of register view is specified in the XML bank description", value);
+                return PCILIB_ERROR_INVALID_DATA;
+            }
+        } else if (!strcasecmp(name, "mode")) {
+            if (!strcasecmp(value, "R")) {
+                desc->mode = PCILIB_REGISTER_R;
+            } else if (!strcasecmp(value, "W")) {
+                desc->mode = PCILIB_REGISTER_W;
+            } else if (!strcasecmp(value, "RW")) {
+                desc->mode = PCILIB_REGISTER_RW;
+            } else if (!strcasecmp(value, "-")) {
+                desc->mode = 0;
+            } else {
+                pcilib_error("Invalid access mode (%s) is specified in the XML register description", value);
                 return PCILIB_ERROR_INVALID_DATA;
             }
         }
@@ -516,10 +538,12 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
     const char *value, *name;
     pcilib_view_context_t *view_ctx;
 
+    pcilib_access_mode_t mode = 0;
     pcilib_transform_view_description_t desc = {0};
 
     desc.base.api = &pcilib_transform_view_api;
     desc.base.type = PCILIB_TYPE_DOUBLE;
+    desc.base.mode = PCILIB_ACCESS_RW;
 
     err = pcilib_xml_parse_view(ctx, xpath, doc, node, (pcilib_view_description_t*)&desc);
     if (err) return err;
@@ -540,7 +564,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
                 }
             }
             desc.read_from_reg = value;
-            if ((value)&&(*value)) desc.base.mode |= PCILIB_ACCESS_R;
+            if ((value)&&(*value)) mode |= PCILIB_ACCESS_R;
         } else if (!strcasecmp(name, "write_to_register")) {
             if (desc.base.flags&PCILIB_VIEW_FLAG_PROPERTY) {
                 if (strstr(value, "$value")) {
@@ -549,9 +573,11 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
                 }
             }
             desc.write_to_reg = value;
-            if ((value)&&(*value)) desc.base.mode |= PCILIB_ACCESS_W;
+            if ((value)&&(*value)) mode |= PCILIB_ACCESS_W;
         } 
     }
+
+    desc.base.mode &= mode;
 
     err = pcilib_add_views_custom(ctx, 1, (pcilib_view_description_t*)&desc, &view_ctx);
     if (err) return err;

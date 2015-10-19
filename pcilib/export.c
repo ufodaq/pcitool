@@ -10,12 +10,19 @@ const char *pcilib_data_types[] = { "default", "string", "double", "long" };
 
 #include "protocols/default.h"
 #include "protocols/software.h"
+#include "protocols/property.h"
 
 const pcilib_register_protocol_description_t pcilib_protocols[] = {
     { PCILIB_REGISTER_PROTOCOL_DEFAULT, &pcilib_default_protocol_api, NULL, NULL, "default", "" },
-    { PCILIB_REGISTER_PROTOCOL_SOFTWARE, &pcilib_register_software_protocol_api, NULL, NULL, "software_registers", "" },
+    { PCILIB_REGISTER_PROTOCOL_SOFTWARE, &pcilib_software_protocol_api, NULL, NULL, "software_registers", "" },
+    { PCILIB_REGISTER_PROTOCOL_PROPERTY, &pcilib_property_protocol_api, NULL, NULL, "property_registers", "" },
     { 0 }
 };
+
+const pcilib_register_bank_description_t pcilib_property_register_bank = 
+    { PCILIB_REGISTER_BANK_PROPERTY, PCILIB_REGISTER_PROTOCOL_PROPERTY, PCILIB_BAR_NOBAR, 0, 0, 32, 0, PCILIB_HOST_ENDIAN, PCILIB_HOST_ENDIAN, "%lu", "property", "Computed registers interfacing properties"};
+
+
 
 #include "dma/nwl.h"
 #include "dma/ipe.h"

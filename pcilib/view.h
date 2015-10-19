@@ -12,7 +12,8 @@ typedef struct pcilib_view_context_s pcilib_view_context_t;
 typedef struct pcilib_view_description_s pcilib_view_description_t;
 
 typedef enum {
-    PCILIB_VIEW_FLAG_PROPERTY = 1                                               /**< Indicates that view does not depend on a value and is independent property */
+    PCILIB_VIEW_FLAG_PROPERTY = 1,                                              /**< Indicates that view does not depend on a value and is independent property */
+    PCILIB_VIEW_FLAG_REGISTER = 2                                               /**< Indicates that view does not depend on a value and should be mapped to the register space */
 } pcilib_view_flags_t;
 
 typedef struct {
@@ -32,6 +33,7 @@ struct pcilib_view_description_s {
     pcilib_access_mode_t mode;                                                  /**< Specifies if the view is read/write-only */
     const char *unit;				                                /**< Returned unit (if any) */
     const char *name;				                                /**< Name of the view */
+    const char *regname;                                                        /**< Specifies the register name if the view should be mapped to register space */
     const char *description;			                                /**< Short description */
 };
 

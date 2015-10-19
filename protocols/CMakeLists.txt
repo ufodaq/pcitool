@@ -8,6 +8,6 @@ include_directories(
     ${UTHASH_INCLUDE_DIRS}
 )
 
-set(HEADERS ${HEADERS} default.h software.h)
+set(HEADERS ${HEADERS} default.h software.h property.h)
 
-add_library(protocols STATIC default.c software.c)
+add_library(protocols STATIC default.c software.c property.c)

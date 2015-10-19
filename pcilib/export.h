@@ -13,6 +13,8 @@ extern const pcilib_dma_description_t pcilib_dma[];
 
 extern const pcilib_register_protocol_api_description_t pcilib_default_protocol_api;
 
+extern const pcilib_register_bank_description_t pcilib_property_register_bank;
+
 extern const pcilib_dma_description_t pcilib_ipedma;
 extern const pcilib_dma_description_t pcilib_nwldma;
 

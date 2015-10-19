@@ -15,7 +15,34 @@
 #include "tools.h"
 #include "error.h"
 
-int pcilib_add_register_properties(pcilib_t *ctx, size_t n, const pcilib_register_bank_t *banks, const pcilib_register_description_t *registers) {
+
+int pcilib_add_registers_from_properties(pcilib_t *ctx, size_t n, pcilib_view_context_t* const *view_ctx, pcilib_view_description_t* const *v) {
+    pcilib_view_t i;
+    pcilib_register_t pos = 0;
+    pcilib_register_description_t regs[n];
+
+    for (i = 0; i < n; i++) {
+        if ((v[i]->flags&PCILIB_VIEW_FLAG_REGISTER) == 0) continue;
+
+        regs[pos++] = (pcilib_register_description_t){
+            .addr = view_ctx[i]->view,
+            .bits = 8 * sizeof(pcilib_register_value_t),
+            .mode = v[i]->mode,
+            .type = PCILIB_REGISTER_PROPERTY,
+            .bank = PCILIB_REGISTER_BANK_PROPERTY,
+            .name = (v[i]->regname?v[i]->regname:v[i]->name),
+            .description = v[i]->description
+        };
+    }
+
+    if (pos)
+        return pcilib_add_registers(ctx, 0, pos, regs, NULL);
+
+    return 0;
+}
+
+
+int pcilib_add_properties_from_registers(pcilib_t *ctx, size_t n, const pcilib_register_bank_t *banks, const pcilib_register_description_t *registers) {
     int err;
 
     pcilib_register_t i;
@@ -26,12 +53,15 @@ int pcilib_add_register_properties(pcilib_t *ctx, size_t n, const pcilib_registe
 
 
     for (i = 0; i < n; i++) {
+        char *view_name;
         pcilib_access_mode_t mode = 0;
 
         pcilib_register_view_description_t v;
         pcilib_register_bank_description_t *b = &ctx->banks[banks[i]];
 
-        char *view_name = malloc(strlen(registers[i].name) + strlen(b->name) + 13);
+        if (registers[i].type == PCILIB_REGISTER_PROPERTY) continue;
+
+        view_name = malloc(strlen(registers[i].name) + strlen(b->name) + 13);
         if (!view_name) {
             pcilib_clean_views(ctx, cur_view);
             return PCILIB_ERROR_MEMORY;
