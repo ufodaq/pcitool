@@ -67,7 +67,7 @@ pcilib_lock_t *pcilib_get_lock_by_id(pcilib_t *ctx, pcilib_lock_id_t id);
  *this function verify if the lock requested exists in the kernel space. If yes, then nothing is done, else we create the lock in the kernel space. This function also gives the number of processes that may request the lock afterwards, including the one that just created it. 
  *@param[in] ctx - the pcilib_t structure running
  *@param[in] flags - the flag defining the property of the lock
- *@param[in@ lock_id - the identifier name for the lock
+ *@param[in] lock_id - the identifier name for the lock
  *@return the corresponding lock, or a new one if it did not exist before
  */
 pcilib_lock_t *pcilib_get_lock(pcilib_t *ctx, pcilib_lock_flags_t flags, const char *lock_id, ...);

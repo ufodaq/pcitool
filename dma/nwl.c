@@ -13,6 +13,7 @@
 #include "pcilib.h"
 #include "error.h"
 #include "tools.h"
+#include "bar.h"
 
 #include "nwl_private.h"
 #include "nwl_defines.h"

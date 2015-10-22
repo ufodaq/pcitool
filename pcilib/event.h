@@ -84,6 +84,12 @@ extern "C" {
 
 int pcilib_init_event_engine(pcilib_t *ctx);
 
+/*
+ * Configures maximal number of preprocessing threads. Actual amount of threads 
+ * may be bigger. For instance, additionaly a real-time reader thread will be 
+ * executed for most of hardware
+ */
+int pcilib_configure_preprocessing_threads(pcilib_t *ctx, size_t max_threads);
 
 #ifdef __cplusplus
 }

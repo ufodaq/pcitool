@@ -5,6 +5,7 @@
 #include "tools.h"
 #include "model.h"
 #include "error.h"
+#include "bar.h"
 
 #define default_datacpy(dst, src, access, bank)   pcilib_datacpy(dst, src, access, 1, bank->raw_endianess)
 

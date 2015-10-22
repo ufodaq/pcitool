@@ -4,6 +4,8 @@ set(PCILIB_VERSION "0.2.3")
 set(PCILIB_ABI_VERSION "2")
 
 cmake_minimum_required(VERSION 2.6)
+#set(PKG_CONFIG_USE_CMAKE_PREFIX_PATH true)
+#set(CMAKE_PREFIX_PATH ${CMAKE_SYSTEM_PREFIX_PATH})
 
 set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library") 
 

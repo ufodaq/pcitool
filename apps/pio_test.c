@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    bar = pcilib_map_bar(pci, BAR);
+    bar = pcilib_resolve_bar_address(pci, BAR, 0);
     if (!bar) {
 	pcilib_close(pci);
 	printf("map bar\n");
@@ -92,6 +92,5 @@ int main(int argc, char *argv[]) {
 
     }
 
-    pcilib_unmap_bar(pci, BAR, bar);
     pcilib_close(pci);
 }

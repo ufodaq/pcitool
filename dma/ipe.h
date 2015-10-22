@@ -39,7 +39,7 @@ static const pcilib_dma_engine_description_t ipe_dma_engines[] = {
 
 static const pcilib_register_bank_description_t ipe_dma_banks[] = {
     { PCILIB_REGISTER_BANK_DMA, PCILIB_REGISTER_PROTOCOL_DEFAULT, PCILIB_BAR0, 0, 0, 32, 0x0200, PCILIB_LITTLE_ENDIAN, PCILIB_LITTLE_ENDIAN, "0x%lx", "dma", "DMA Registers"},
-    { PCILIB_REGISTER_BANK_DMACONF, PCILIB_REGISTER_PROTOCOL_SOFTWARE, PCILIB_BAR_NOBAR, 0, 0, 32, 0x1000, PCILIB_HOST_ENDIAN, PCILIB_HOST_ENDIAN, "0x%lx", "dmaconf", "DMA Software Registers"},
+    { PCILIB_REGISTER_BANK_DMACONF, PCILIB_REGISTER_PROTOCOL_SOFTWARE, PCILIB_BAR_NOBAR, 0, 0, 32, 0x1000, PCILIB_HOST_ENDIAN, PCILIB_HOST_ENDIAN, "0x%lx", "dmaconf", "DMA Configuration"},
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL }
 };
 

@@ -147,6 +147,9 @@ int pcilib_configure_preprocessing_threads(pcilib_t *ctx, size_t max_threads) {
 }
 
 int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, pcilib_event_flags_t flags) {
+    int err;
+    pcilib_register_value_t max_threads;
+
     const pcilib_event_api_description_t *api;
     const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
 
@@ -154,6 +157,12 @@ int pcilib_start(pcilib_t *ctx, pcilib_event_t event_mask, pcilib_event_flags_t 
     if (!api) {
 	pcilib_error("Event API is not supported by the selected model");
 	return PCILIB_ERROR_NOTSUPPORTED;
+    }
+
+    err = pcilib_read_register(ctx, "conf", "max_threads", &max_threads);
+    if (!err) {
+	err = pcilib_configure_preprocessing_threads(ctx, max_threads);
+	if (err) pcilib_warning("Error (%i) configuring number of preprocessing threads", err);
     }
 
     if (api->start) 
@@ -430,7 +439,12 @@ int pcilib_grab(pcilib_t *ctx, pcilib_event_t event_mask, size_t *size, void **d
     pcilib_grab_callback_user_data_t user = {ctx, size, data};
     
     err = pcilib_start(ctx, event_mask, PCILIB_EVENT_FLAGS_DEFAULT);
-    if (!err) err = pcilib_trigger(ctx, event_mask, 0, NULL);
+    if (!err) {
+	if (timeout == PCILIB_TIMEOUT_IMMEDIATE) {
+	     err = pcilib_trigger(ctx, event_mask, 0, NULL);
+	     timeout = PCILIB_EVENT_TIMEOUT;
+	}
+    }
     if (!err) {
 	err = pcilib_get_next_event(ctx, timeout, &eid, 0, NULL);
 	if (!err) pcilib_grab_callback(event_mask, eid, &user);

@@ -1,5 +1,5 @@
 /**
- * @file pcilib_xml.c
+ * @file xml.c
  * @version 1.0
  *
  * @brief this file is the main source file for the implementation of dynamic registers using xml and several funtionalities for the "pci-tool" line command tool from XML files. the xml part has been implemented using libxml2
@@ -550,7 +550,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
     pcilib_view_context_t *view_ctx;
 
     pcilib_access_mode_t mode = 0;
-    pcilib_transform_view_description_t desc = {0};
+    pcilib_transform_view_description_t desc = {{0}};
 
     desc.base.api = &pcilib_transform_view_api;
     desc.base.type = PCILIB_TYPE_DOUBLE;
@@ -668,7 +668,7 @@ static int pcilib_xml_create_enum_view(pcilib_t *ctx, xmlXPathContextPtr xpath, 
     xmlNodeSetPtr nodeset;
 
     pcilib_view_context_t *view_ctx;
-    pcilib_enum_view_description_t desc = {0};
+    pcilib_enum_view_description_t desc = {{0}};
 
     desc.base.type = PCILIB_TYPE_STRING;
     desc.base.unit = pcilib_xml_enum_view_unit;

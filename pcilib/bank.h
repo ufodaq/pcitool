@@ -8,9 +8,10 @@
 #define PCILIB_REGISTER_BANK1 			1
 #define PCILIB_REGISTER_BANK2 			2
 #define PCILIB_REGISTER_BANK3 			3
-#define PCILIB_REGISTER_BANK_PROPERTY           64                                      /**< Registers abstracting properties and other computed registers */
-#define PCILIB_REGISTER_BANK_DMA		96					/**< First BANK address to be used by DMA engines */
+#define PCILIB_REGISTER_BANK_CONF		64					/**< Configuration registers */
+#define PCILIB_REGISTER_BANK_PROPERTY           65                                      /**< Registers abstracting properties and other computed registers */
 #define PCILIB_REGISTER_BANK_DMACONF		96					/**< DMA configuration in the software registers */
+#define PCILIB_REGISTER_BANK_DMA		97					/**< First BANK address to be used by DMA engines */
 #define PCILIB_REGISTER_BANK_DYNAMIC		128					/**< First BANK address to map dynamic XML configuration */
 #define PCILIB_REGISTER_PROTOCOL_INVALID	((pcilib_register_protocol_t)-1)
 #define PCILIB_REGISTER_PROTOCOL0		0					/**< First PROTOCOL address to be used in the event engine */
@@ -60,7 +61,7 @@ typedef struct {
     uintptr_t write_addr;							/**< protocol specific (normally offset in the BAR of the first address used to write registers) */
 
     uint8_t access;								/**< Default register size in bits (or word-size in plain addressing mode) */
-    size_t size;								/**< Number of register addresses (plain addressing) in the bank (more register names can be defined if bit-fields/views are used) */
+    size_t size;								/**< The size of the bank in bytes (i.e. number of registers in plain addressing mode multiplied by access; this does not limit number of register names since indefinite number of names can be provided if bit-fields/views are used) */
     pcilib_endianess_t raw_endianess;						/**< Specifies endianess in the plain-addressing mode, PCILIB_HOST_ENDIAN have to be specified if no conversion desired. 
 										Conversion applied after protocol. This value does not get into the account in register-access mode */
     pcilib_endianess_t endianess;						/**< Specifies endianess in the register-access mode, this may differ from raw_endianess if multi-word registers are used. 
@@ -163,8 +164,8 @@ pcilib_register_protocol_t pcilib_find_register_protocol_by_addr(pcilib_t *ctx, 
 pcilib_register_protocol_t pcilib_find_register_protocol_by_name(pcilib_t *ctx, const char *name);
 pcilib_register_protocol_t pcilib_find_register_protocol(pcilib_t *ctx, const char *name);
 
-
 int pcilib_get_register_bank_attr_by_id(pcilib_t *ctx, pcilib_register_bank_t bank, const char *attr, pcilib_value_t *val);
+int pcilib_get_register_bank_attr(pcilib_t *ctx, const char *bankname, const char *attr, pcilib_value_t *val);
 
 #ifdef __cplusplus
 }

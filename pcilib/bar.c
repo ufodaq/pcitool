@@ -130,6 +130,41 @@ void pcilib_unmap_bar(pcilib_t *ctx, pcilib_bar_t bar, void *data) {
 #endif
 }
 
+char *pcilib_resolve_bar_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr) {
+    if (bar == PCILIB_BAR_DETECT) {    
+	bar = pcilib_detect_bar(ctx, addr, 1);
+	if (bar != PCILIB_BAR_INVALID) {
+	    size_t offset = addr - ctx->board_info.bar_start[bar];
+	    if ((offset < ctx->board_info.bar_length[bar])&&(ctx->bar_space[bar])) {
+		if (!ctx->bar_space[bar]) {
+		    if (!pcilib_map_bar(ctx, bar)) {
+			pcilib_error("Failed to map the requested bar (%i)", bar);
+			return NULL;
+		    }
+		}
+		return ctx->bar_space[bar] + offset + (ctx->board_info.bar_start[bar] & ctx->page_mask);
+	    }
+	}
+    } else {
+	if (!ctx->bar_space[bar]) {
+	    if (!pcilib_map_bar(ctx, bar)) {
+		pcilib_error("Failed to map the requested bar (%i)", bar);
+		return NULL;
+	    }
+	}
+	
+	if (addr < ctx->board_info.bar_length[bar]) {
+	    return ctx->bar_space[bar] + addr + (ctx->board_info.bar_start[bar] & ctx->page_mask);
+	}
+	
+	if ((addr >= ctx->board_info.bar_start[bar])&&(addr < (ctx->board_info.bar_start[bar] + ctx->board_info.bar_length[ctx->reg_bar]))) {
+	    return ctx->bar_space[bar] + (addr - ctx->board_info.bar_start[bar]) + (ctx->board_info.bar_start[bar] & ctx->page_mask);
+	}
+    }
+
+    return NULL;
+}
+
 int pcilib_map_register_space(pcilib_t *ctx) {
     int err;
     pcilib_register_bank_t i;
@@ -182,6 +217,91 @@ int pcilib_map_register_space(pcilib_t *ctx) {
     
     return 0;
 }
+
+char *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr) {
+    if (bar == PCILIB_BAR_DETECT) {
+	    // First checking the default register bar
+	size_t offset = addr - ctx->board_info.bar_start[ctx->reg_bar];
+	if ((addr > ctx->board_info.bar_start[ctx->reg_bar])&&(offset < ctx->board_info.bar_length[ctx->reg_bar])) {
+	    return pcilib_resolve_bar_address(ctx, ctx->reg_bar, addr - ctx->board_info.bar_start[ctx->reg_bar]);
+	}
+    }
+	// Otherwise trying to detect
+    return pcilib_resolve_bar_address(ctx, bar, addr);
+}
+
+int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr) {
+    int err;
+    pcilib_bar_t i;
+    
+    if (!ctx->data_bar_mapped) {
+        const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
+	if (!board_info) return PCILIB_ERROR_FAILED;
+
+	err = pcilib_map_register_space(ctx);
+	if (err) {
+	    pcilib_error("Error mapping register space");
+	    return err;
+	}
+	
+	int data_bar = -1;
+	
+	for (i = 0; i < PCILIB_MAX_BARS; i++) {
+	    if ((ctx->bar_space[i])||(!board_info->bar_length[i])) continue;
+	    
+	    if (addr) {
+	        if (board_info->bar_start[i] == addr) {
+		    data_bar = i;
+		    break;
+		}
+	    } else {
+		if (data_bar >= 0) {
+		    data_bar = -1;
+		    break;
+		}
+		
+		data_bar = i;
+	    }
+	}
+	    
+
+	if (data_bar < 0) {
+	    if (addr) pcilib_error("Unable to find the specified data space (%lx)", addr);
+	    else pcilib_error("Unable to find the data space");
+	    return PCILIB_ERROR_NOTFOUND;
+	}
+	
+	ctx->data_bar = data_bar;
+	
+	if (!ctx->bar_space[data_bar]) {
+	    char *data_space = pcilib_map_bar(ctx, data_bar);
+	    if (data_space) ctx->bar_space[data_bar] = data_space;
+	    else {
+	        pcilib_error("Unable to map the data space");
+		return PCILIB_ERROR_FAILED;
+	    }
+	}
+	
+	ctx->data_bar_mapped = 0;
+    }
+    
+    return 0;
+}
+	
+char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size) {
+    int err;
+    
+    err = pcilib_map_data_space(ctx, addr);
+    if (err) {
+	pcilib_error("Failed to map the specified address space (%lx)", addr);
+	return NULL;
+    }
+    
+    if (size) *size = ctx->board_info.bar_length[ctx->data_bar];
+    
+    return ctx->bar_space[ctx->data_bar] + (ctx->board_info.bar_start[ctx->data_bar] & ctx->page_mask);
+}
+
 
 int pcilib_read(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf) {
     void *data;

@@ -8,13 +8,16 @@
 #include "error.h"
 
 
-int pcilib_property_registers_read(pcilib_t *ctx, pcilib_register_bank_context_t *bank, pcilib_register_addr_t addr, pcilib_register_value_t *regval) {
+int pcilib_property_registers_read(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx, pcilib_register_addr_t addr, pcilib_register_value_t *regval) {
     int err;
 
-    pcilib_view_t view = addr;
+    const pcilib_register_bank_description_t *b = bank_ctx->bank;
+    int access = b->access / 8;
+
+    pcilib_view_t view = addr / access;
     pcilib_value_t val = {0};
 
-    if ((view == PCILIB_VIEW_INVALID)||(view >= ctx->num_views))
+    if ((view == PCILIB_VIEW_INVALID)||(view >= ctx->num_views)||(addr % access))
         return PCILIB_ERROR_INVALID_ARGUMENT;
 
     err = pcilib_get_property(ctx, ctx->views[view]->name, &val);
@@ -26,13 +29,16 @@ int pcilib_property_registers_read(pcilib_t *ctx, pcilib_register_bank_context_t
 }
 
 
-int pcilib_property_registers_write(pcilib_t *ctx, pcilib_register_bank_context_t *bank, pcilib_register_addr_t addr, pcilib_register_value_t regval) {
+int pcilib_property_registers_write(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx, pcilib_register_addr_t addr, pcilib_register_value_t regval) {
     int err;
 
-    pcilib_view_t view = addr;
+    const pcilib_register_bank_description_t *b = bank_ctx->bank;
+    int access = b->access / 8;
+
+    pcilib_view_t view = addr / access;
     pcilib_value_t val = {0};
 
-    if ((view == PCILIB_VIEW_INVALID)||(view >= ctx->num_views))
+    if ((view == PCILIB_VIEW_INVALID)||(view >= ctx->num_views)||(addr % access))
         return PCILIB_ERROR_INVALID_ARGUMENT;
 
     err = pcilib_set_value_from_register_value(ctx, &val, regval);

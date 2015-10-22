@@ -15,6 +15,7 @@
 #include "error.h"
 #include "tools.h"
 #include "debug.h"
+#include "bar.h"
 
 #include "ipe.h"
 #include "ipe_private.h"

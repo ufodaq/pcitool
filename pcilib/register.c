@@ -174,14 +174,14 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
 	return PCILIB_ERROR_NOTSUPPORTED;
     }
 
-    if (b->protocol == PCILIB_REGISTER_PROTOCOL_PROPERTY) space_size = ctx->num_views;
+    if (b->protocol == PCILIB_REGISTER_PROTOCOL_PROPERTY) space_size = ctx->num_views * access;
     else space_size = b->size;
 
-    if (((addr + n) > space_size)||(((addr + n) == space_size)&&(bits))) {
+    if (((addr + n * access) > space_size)||(((addr + n * access) == space_size)&&(bits))) {
 	if ((b->format)&&(strchr(b->format, 'x')))
-	    pcilib_error("Accessing register (%u regs at addr 0x%x) out of register space (%u registers total)", bits?(n+1):n, addr, space_size);
+	    pcilib_error("Accessing register (%u regs at addr 0x%x) out of register space (%u %u-bit registers total)", bits?(n+1):n, addr, space_size / access, access * 8);
 	else 
-	    pcilib_error("Accessing register (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, space_size);
+	    pcilib_error("Accessing register (%u regs at addr %u) out of register space (%u %u-bit registers total)", bits?(n+1):n, addr, space_size / access, access * 8);
 	return PCILIB_ERROR_OUTOFRANGE;
     }
 
@@ -285,7 +285,7 @@ int pcilib_read_register(pcilib_t *ctx, const char *bank, const char *regname, p
 }
 
 
-static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, pcilib_register_size_t offset, pcilib_register_size_t bits, pcilib_register_value_t rwmask, pcilib_register_value_t *buf) {
+static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_bank_t bank, pcilib_register_addr_t addr, size_t n, pcilib_register_size_t offset, pcilib_register_size_t bits, pcilib_register_value_t rwmask, const pcilib_register_value_t *buf) {
     int err;
 
     size_t i;
@@ -304,14 +304,14 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
 	return PCILIB_ERROR_NOTSUPPORTED;
     }
 
-    if (b->protocol == PCILIB_REGISTER_PROTOCOL_PROPERTY) space_size = ctx->num_views;
+    if (b->protocol == PCILIB_REGISTER_PROTOCOL_PROPERTY) space_size = ctx->num_views * access;
     else space_size = b->size;
 
-    if (((addr + n) > space_size)||(((addr + n) == space_size)&&(bits))) {
+    if (((addr + n * access) > space_size)||(((addr + n * access) == space_size)&&(bits))) {
 	if ((b->format)&&(strchr(b->format, 'x')))
-	    pcilib_error("Accessing register (%u regs at addr 0x%x) out of register space (%u registers total)", bits?(n+1):n, addr, space_size);
+	    pcilib_error("Accessing register (%u regs at addr 0x%x) out of register space (%u %u-bit registers total)", bits?(n+1):n, addr, space_size / access, access * 8);
 	else 
-	    pcilib_error("Accessing register (%u regs at addr %u) out of register space (%u registers total)", bits?(n+1):n, addr, space_size);
+	    pcilib_error("Accessing register (%u regs at addr %u) out of register space (%u %u-bit registers total)", bits?(n+1):n, addr, space_size / access, access * 8);
 	return PCILIB_ERROR_OUTOFRANGE;
     }
 
@@ -364,7 +364,7 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
     return err;
 }
 
-int pcilib_write_register_space(pcilib_t *ctx, const char *bank, pcilib_register_addr_t addr, size_t n, pcilib_register_value_t *buf) {
+int pcilib_write_register_space(pcilib_t *ctx, const char *bank, pcilib_register_addr_t addr, size_t n, const pcilib_register_value_t *buf) {
     pcilib_register_bank_t bank_id = pcilib_find_register_bank(ctx, bank);
     if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
 	if (bank) pcilib_error("Invalid register bank is specified (%s)", bank);

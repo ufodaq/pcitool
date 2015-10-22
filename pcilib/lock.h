@@ -50,7 +50,7 @@ void pcilib_free_lock(pcilib_lock_t *lock_ctx);
 
 /**
  * this function gives the identifier name associated to a lock in the kernel space
- * @param[in] loc - pointer to the lock we want the name
+ * @param[in] lock - pointer to the lock we want the name
  * @return string corresponding to the name
  */
 const char *pcilib_lock_get_name(pcilib_lock_t *lock);
@@ -64,7 +64,7 @@ const char *pcilib_lock_get_name(pcilib_lock_t *lock);
 void pcilib_lock_ref(pcilib_lock_t *lock);
 
 /**
- * Decrement reference count(number of processes that may access the given lock).
+ * Decrement reference count (number of processes that may access the given lock)
  * Not thread/process safe unless system supports stdatomic (gcc 4.9+). In this case, the access should be synchronized by the caller
  * @param[in,out] lock - pointer to initialized lock
  */

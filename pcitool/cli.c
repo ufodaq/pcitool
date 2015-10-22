@@ -964,19 +964,19 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	    err = pcilib_wait_irq(handle, 0, 0, &irqs);
 	    if (err) irqs = 0;
 	    
-	    printf("%8zu KB - ", size / 1024);
+	    printf("%8zu KiB - ", size / 1024);
 	    
 	    printf("RW: ");
 	    if (mbs < 0) printf("failed ...   ");
-	    else printf("%8.2lf MB/s", mbs);
+	    else printf("%8.2lf MiB/s", mbs);
 
 	    printf(", R: ");
 	    if (mbs_in < 0) printf("failed ...   ");
-	    else printf("%8.2lf MB/s", mbs_in);
+	    else printf("%8.2lf MiB/s", mbs_in);
 
 	    printf(", W: ");
 	    if (mbs_out < 0) printf("failed ...   ");
-	    else printf("%8.2lf MB/s", mbs_out);
+	    else printf("%8.2lf MiB/s", mbs_out);
 	    
 	    if (irqs) {
 	        printf(", IRQs: %lu", irqs);
@@ -1022,13 +1022,12 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
     if (!err) err = posix_memalign( (void**)&check, 256, max_size );
     if ((err)||(!buf)||(!check)) Error("Allocation of %i bytes of memory have failed", max_size);
 
-    data = pcilib_map_bar(handle, bar);
-    if (!data) Error("Can't map bar %i", bar);
-
     if (mode == ACCESS_FIFO) {
-        fifo = data + (addr - board_info->bar_start[bar]) + (board_info->bar_start[bar] & pcilib_get_page_mask());
-//	pcilib_resolve_register_address(handle, bar, addr);
+	fifo = pcilib_resolve_bar_address(handle, bar, addr);
 	if (!fifo) Error("Can't resolve address (%lx) in bar (%u)", addr, bar);
+    } else {
+	data = pcilib_resolve_bar_address(handle, bar, 0);
+	if (!data) Error("Can't resolve start of bar (%u)", bar);
     }
 
     if (mode == ACCESS_FIFO)
@@ -1052,7 +1051,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	gettimeofday(&end,NULL);
 
 	time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	printf("%8zu bytes - read: %8.2lf MB/s", size, 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
+	printf("%8zu bytes - read: %8.2lf MiB/s", size, 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
 	
 	fflush(0);
 
@@ -1071,11 +1070,9 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	gettimeofday(&end,NULL);
 
 	time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	printf(", write: %8.2lf MB/s\n", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
+	printf(", write: %8.2lf MiB/s\n", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
     }
     
-    pcilib_unmap_bar(handle, bar, data);
-
     printf("\n\nOpen-Transfer-Close time: \n");
     
     for (size = 4 ; size < max_size; size *= 8) {
@@ -1092,7 +1089,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	gettimeofday(&end,NULL);
 
 	time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	printf("%8zu bytes - read: %8.2lf MB/s", size, 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
+	printf("%8zu bytes - read: %8.2lf MiB/s", size, 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
 	
 	fflush(0);
 
@@ -1110,7 +1107,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	gettimeofday(&end,NULL);
 
 	time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	printf(", write: %8.2lf MB/s", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
+	printf(", write: %8.2lf MiB/s", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
 
 	if (mode == ACCESS_BAR) {
 	    gettimeofday(&start,NULL);
@@ -1122,7 +1119,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	    gettimeofday(&end,NULL);
 
 	    time = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-	    printf(", write-verify: %8.2lf MB/s", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
+	    printf(", write-verify: %8.2lf MiB/s", 1000000. * size * BENCHMARK_ITERATIONS / (time * 1024. * 1024.));
 	    if (errors) printf(", errors: %u of %u", errors, BENCHMARK_ITERATIONS);
 	}
 	printf("\n");
@@ -1687,7 +1684,7 @@ typedef struct {
     struct timeval stop_time;
 } GRABContext;
 
-int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *user) {
+int GrabCallback(pcilib_event_id_t event_id, const pcilib_event_info_t *info, void *user) {
     int err = 0;
     void *data;
     size_t size;
@@ -1784,7 +1781,7 @@ int GrabCallback(pcilib_event_id_t event_id, pcilib_event_info_t *info, void *us
     return PCILIB_STREAMING_CONTINUE;
 }
 
-int raw_data(pcilib_event_id_t event_id, pcilib_event_info_t *info, pcilib_event_flags_t flags, size_t size, void *data, void *user) {
+int raw_data(pcilib_event_id_t event_id, const pcilib_event_info_t *info, pcilib_event_flags_t flags, size_t size, void *data, void *user) {
     int err;
 
     GRABContext *ctx = (GRABContext*)user;
@@ -2149,7 +2146,7 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
     }
     
     if (flags&PCILIB_EVENT_FLAG_PREPROCESS) {
-	pcilib_configure_preprocessing_threads(handle, threads);
+	pcilib_write_register(handle, "conf", "max_threads", threads);
     }
     
     if (grab_mode&GRAB_MODE_TRIGGER) {
@@ -3419,7 +3416,7 @@ int main(int argc, char **argv) {
 		    buffer *= 1024 * 1024;
 		} else {
 		    buffer = get_free_memory();
-		    if (buffer < 256) Error("Not enough free memory (%lz MB) for buffering", buffer / 1024 / 1024);
+		    if (buffer < 256) Error("Not enough free memory (%lz MiB) for buffering", buffer / 1024 / 1024);
 		    
 		    buffer -= 128 + buffer/16;
 		}

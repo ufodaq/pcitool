@@ -17,15 +17,31 @@
 
 
 int pcilib_add_registers_from_properties(pcilib_t *ctx, size_t n, pcilib_view_context_t* const *view_ctx, pcilib_view_description_t* const *v) {
+    int err;
+    
     pcilib_view_t i;
     pcilib_register_t pos = 0;
     pcilib_register_description_t regs[n];
 
+    int access;
+    pcilib_register_bank_t bank;
+
+    bank = pcilib_find_register_bank_by_addr(ctx, pcilib_property_register_bank.addr);
+    if (bank == PCILIB_REGISTER_BANK_INVALID) {
+        err = pcilib_add_register_banks(ctx, 0, 1, &pcilib_property_register_bank, &bank);
+        if (err) {
+            pcilib_error("Error (%i) adding register bank (%s)", err, pcilib_property_register_bank.name);
+            return err;
+        }
+    }
+    
+    access = ctx->banks[bank].access;
+    
     for (i = 0; i < n; i++) {
         if ((v[i]->flags&PCILIB_VIEW_FLAG_REGISTER) == 0) continue;
 
         regs[pos++] = (pcilib_register_description_t){
-            .addr = view_ctx[i]->view,
+            .addr = view_ctx[i]->view * access,
             .bits = 8 * sizeof(pcilib_register_value_t),
             .mode = v[i]->mode,
             .type = PCILIB_REGISTER_PROPERTY,
@@ -246,7 +262,7 @@ int pcilib_get_property_attr(pcilib_t *ctx, const char *prop, const char *attr, 
         return PCILIB_ERROR_NOTFOUND;
     }
 
-    if (!view_ctx->xml) return NULL;
+    if (!view_ctx->xml) return PCILIB_ERROR_NOTFOUND;
 
     return pcilib_get_xml_attr(ctx, view_ctx->xml, attr, val);
 }
