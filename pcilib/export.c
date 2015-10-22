@@ -20,7 +20,7 @@ const pcilib_register_protocol_description_t pcilib_standard_register_protocols[
 };
 
 const pcilib_register_bank_description_t pcilib_standard_register_banks[] = {
-    { PCILIB_REGISTER_BANK_CONF, PCILIB_REGISTER_PROTOCOL_SOFTWARE, PCILIB_BAR_NOBAR, 0, 0, 32, 0, PCILIB_HOST_ENDIAN, PCILIB_HOST_ENDIAN, "%lu", "conf", "pcilib configuration"},
+    { PCILIB_REGISTER_BANK_CONF, PCILIB_REGISTER_PROTOCOL_SOFTWARE, PCILIB_BAR_NOBAR, 0, 0, 32, 0x1000, PCILIB_HOST_ENDIAN, PCILIB_HOST_ENDIAN, "%lu", "conf", "pcilib configuration"},
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL }
 };
 
