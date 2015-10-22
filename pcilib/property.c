@@ -72,7 +72,7 @@ int pcilib_add_properties_from_registers(pcilib_t *ctx, size_t n, const pcilib_r
         char *view_name;
         pcilib_access_mode_t mode = 0;
 
-        pcilib_register_view_description_t v;
+        pcilib_register_view_description_t v = {0};
         pcilib_register_bank_description_t *b = &ctx->banks[banks[i]];
 
         if (registers[i].type == PCILIB_REGISTER_PROPERTY) continue;
@@ -114,6 +114,7 @@ int pcilib_add_properties_from_registers(pcilib_t *ctx, size_t n, const pcilib_r
             pcilib_clean_views(ctx, cur_view);
             return err;
         }
+
 /*
         pcilib_view_context_t *view_ctx = pcilib_find_view_context_by_name(ctx, v.base.name);
         view_ctx->flags |= PCILIB_VIEW_FLAG_PROPERTY;
