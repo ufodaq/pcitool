@@ -185,26 +185,6 @@ static int pcilib_read_register_space_internal(pcilib_t *ctx, pcilib_register_ba
 	return PCILIB_ERROR_OUTOFRANGE;
     }
 
-    if (b->protocol == PCILIB_REGISTER_PROTOCOL_PROPERTY) {
-        for (i = 0; i < (bits?(n+1):n); i++) {
-            if ((ctx->views[i]->flags&PCILIB_VIEW_FLAG_REGISTER) == 0) {
-                pcilib_error("Accessing invalid register %u (associated view does not provide register functionality)", addr + i);
-                return PCILIB_ERROR_INVALID_REQUEST;
-            }
-
-            if ((ctx->views[i]->mode&PCILIB_ACCESS_R) == 0) {
-                pcilib_error("Read access is not allowed to register %u", addr + i);
-                return PCILIB_ERROR_NOTPERMITED;
-            }
-        }
-    } 
-
-    //err = pcilib_init_register_banks(ctx);
-    //if (err) return err;
-    
-    //n += bits / b->access;
-    //bits %= b->access; 
-    
     for (i = 0; i < n; i++) {
 	err = bapi->read(ctx, bctx, addr + i * access, buf + i);
 	if (err) break;
@@ -315,26 +295,6 @@ static int pcilib_write_register_space_internal(pcilib_t *ctx, pcilib_register_b
 	return PCILIB_ERROR_OUTOFRANGE;
     }
 
-    if (b->protocol == PCILIB_REGISTER_PROTOCOL_PROPERTY) {
-        for (i = 0; i < (bits?(n+1):n); i++) {
-            if ((ctx->views[i]->flags&PCILIB_VIEW_FLAG_REGISTER) == 0) {
-                pcilib_error("Accessing invalid register %u (associated view does not provide register functionality)", addr + i);
-                return PCILIB_ERROR_INVALID_REQUEST;
-            }
-
-            if ((ctx->views[i]->mode&PCILIB_ACCESS_W) == 0) {
-                pcilib_error("Write access is not allowed to register %u", addr + i);
-                return PCILIB_ERROR_NOTPERMITED;
-            }
-        }
-    } 
-
-    //err = pcilib_init_register_banks(ctx);
-    //if (err) return err;
-    
-    //n += bits / b->access;
-    //bits %= b->access; 
-    
     for (i = 0; i < n; i++) {
 	err = bapi->write(ctx, bctx, addr + i * access, buf[i]);
 	if (err) break;

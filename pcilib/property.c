@@ -34,9 +34,9 @@ int pcilib_add_registers_from_properties(pcilib_t *ctx, size_t n, pcilib_view_co
             return err;
         }
     }
-    
-    access = ctx->banks[bank].access;
-    
+
+    access = ctx->banks[bank].access / 8;
+
     for (i = 0; i < n; i++) {
         if ((v[i]->flags&PCILIB_VIEW_FLAG_REGISTER) == 0) continue;
 
