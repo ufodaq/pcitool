@@ -142,7 +142,7 @@ static char *pcilib_py_parse_string(pcilib_t *ctx, const char *codestr, pcilib_v
             } else {
                 err = pcilib_read_register(ctx, NULL, reg, &regval);
                 if (err) break;
-                sprintf(dst + offset, "0x%x", regval);
+                sprintf(dst + offset, "0x%lx", regval);
             }
         }
 

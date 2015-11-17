@@ -16,6 +16,7 @@
 #include "pci.h"
 #include "bank.h"
 
+#include "datacpy.h"
 #include "tools.h"
 #include "error.h"
 #include "property.h"

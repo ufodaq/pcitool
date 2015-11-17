@@ -17,7 +17,7 @@ typedef uint16_t pcilib_view_t;			/**< Type holding the register view position w
 typedef uint16_t pcilib_unit_t;			/**< Type holding the value unit position within unit listing in the model */
 typedef uint32_t pcilib_register_addr_t;	/**< Type holding the register address within address-space of BARs */
 typedef uint8_t pcilib_register_size_t;		/**< Type holding the size in bits of the register */
-typedef uint32_t pcilib_register_value_t;	/**< Type holding the register value */
+typedef uint64_t pcilib_register_value_t;	/**< Type holding the register value */
 typedef uint8_t pcilib_dma_engine_addr_t;
 typedef uint8_t pcilib_dma_engine_t;
 typedef uint64_t pcilib_event_id_t;

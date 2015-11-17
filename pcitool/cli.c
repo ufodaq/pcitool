@@ -753,9 +753,9 @@ void ViewInfo(pcilib_t *handle, pcilib_register_t reg, size_t id) {
         printf("    Value aliases  :");
 	for (i = 0; vnames[i].name; i++) {
 	    if (i) printf(",");
-	    printf(" %s = %u", vnames[i].name, vnames[i].value);
+	    printf(" %s = %lu", vnames[i].name, vnames[i].value);
 	    if (vnames[i].min != vnames[i].max) 
-	        printf(" (%u - %u)", vnames[i].min, vnames[i].max);
+	        printf(" (%lu - %lu)", vnames[i].min, vnames[i].max);
 	}
 	printf("\n");
     } else if (v->api == &pcilib_transform_view_api) {

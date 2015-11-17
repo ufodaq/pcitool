@@ -4,11 +4,14 @@
 #include <string.h>
 #include <sys/file.h>
 
+
+#include "tools.h"
 #include "model.h"
 #include "error.h"
 #include "kmem.h"
 #include "pcilib.h"
 #include "pci.h"
+#include "datacpy.h"
 
 typedef struct pcilib_software_register_bank_context_s pcilib_software_register_bank_context_t;
 
@@ -103,23 +106,33 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 }
 
 int pcilib_software_registers_read(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx, pcilib_register_addr_t addr, pcilib_register_value_t *value){
-	if ((addr + sizeof(pcilib_register_value_t)) > bank_ctx->bank->size) {
-	    pcilib_error("Trying to access space outside of the define register bank (bank: %s, addr: 0x%lx)", bank_ctx->bank->name, addr);
-	    return PCILIB_ERROR_INVALID_ADDRESS;
-	}
+    const pcilib_register_bank_description_t *b = bank_ctx->bank;
+    int access = b->access / 8;
 
-	    // we consider this atomic operation and, therefore, do no locking
-	*value = *(pcilib_register_value_t*)(((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr);
-	return 0;
+    pcilib_register_value_t val = 0;
+
+    if ((addr + sizeof(pcilib_register_value_t)) > bank_ctx->bank->size) {
+	pcilib_error("Trying to access space outside of the define register bank (bank: %s, addr: 0x%lx)", bank_ctx->bank->name, addr);
+	return PCILIB_ERROR_INVALID_ADDRESS;
+    }
+
+    pcilib_datacpy(&val, ((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr, access, 1, b->raw_endianess);
+    *value = val;
+
+    return 0;
 }
 
 int pcilib_software_registers_write(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx, pcilib_register_addr_t addr, pcilib_register_value_t value) {
-	if ((addr + sizeof(pcilib_register_value_t)) > bank_ctx->bank->size) {
-	    pcilib_error("Trying to access space outside of the define register bank (bank: %s, addr: 0x%lx)", bank_ctx->bank->name, addr);
-	    return PCILIB_ERROR_INVALID_ADDRESS;
-	}
-	
-	    // we consider this atomic operation and, therefore, do no locking
-	*(pcilib_register_value_t*)(((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr) = value;
-	return 0;
+    const pcilib_register_bank_description_t *b = bank_ctx->bank;
+    int access = b->access / 8;
+
+    if ((addr + sizeof(pcilib_register_value_t)) > bank_ctx->bank->size) {
+	pcilib_error("Trying to access space outside of the define register bank (bank: %s, addr: 0x%lx)", bank_ctx->bank->name, addr);
+	return PCILIB_ERROR_INVALID_ADDRESS;
+    }
+
+    // we consider this atomic operation and, therefore, do no locking
+    pcilib_datacpy(((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr, &value, access, 1, b->raw_endianess);
+
+    return 0;
 }

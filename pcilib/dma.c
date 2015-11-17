@@ -17,6 +17,8 @@
 #include "pcilib.h"
 #include "pci.h"
 #include "dma.h"
+#include "tools.h"
+#include "pagecpy.h"
 
 const pcilib_dma_description_t *pcilib_get_dma_description(pcilib_t *ctx) {
     int err;
@@ -194,8 +196,8 @@ static int pcilib_dma_read_callback(void *arg, pcilib_dma_flags_t flags, size_t 
 	    pcilib_error("Buffer size (%li) is not large enough for DMA packet, at least %li bytes is required", ctx->size, ctx->pos + bufsize); 
 	return -PCILIB_ERROR_TOOBIG;
     }
-    
-    memcpy(ctx->data + ctx->pos, buf, bufsize);
+
+    pcilib_pagecpy(ctx->data + ctx->pos, buf, bufsize);
     ctx->pos += bufsize;
 
     if (flags & PCILIB_DMA_FLAG_EOP) {

@@ -20,6 +20,8 @@
 #include "linux-3.10.h"
 #include "driver/pciDriver.h"
 
+#include "timing.h"
+#include "cpu.h"
 #include "pcilib.h"
 #include "register.h"
 #include "kmem.h"
@@ -32,6 +34,7 @@
 #include "xml.h"
 #include "py.h"
 #include "view.h"
+#include "memcpy.h"
 
 typedef struct {
     uint8_t max_link_speed, link_speed;
