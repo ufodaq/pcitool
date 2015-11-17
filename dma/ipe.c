@@ -1,12 +1,14 @@
 #define _PCILIB_DMA_IPE_C
 #define _BSD_SOURCE
 #define _DEFAULT_SOURCE
+#define _POSIX_C_SOURCE 199309L
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sched.h>
+#include <time.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
 
@@ -45,6 +47,10 @@ pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const vo
 	ctx->dma_bank = model_info->banks + dma_bank;
 	ctx->base_addr = pcilib_resolve_register_address(pcilib, ctx->dma_bank->bar, ctx->dma_bank->read_addr);
 
+
+	RD(IPEDMA_REG_VERSION, value);
+	ctx->version = value;
+	
 	RD(IPEDMA_REG_PCIE_GEN, value);
 
 #ifdef IPEDMA_ENFORCE_64BIT_MODE
@@ -101,7 +107,27 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     if (flags&PCILIB_DMA_FLAG_PERSISTENT) ctx->preserve = 1;
 
     if (ctx->pages) return 0;
-    
+
+    if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "dma_timeout", &value))
+	ctx->dma_timeout = value;
+    else 
+	ctx->dma_timeout = IPEDMA_DMA_TIMEOUT;
+
+    if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "dma_page_size", &value))
+	ctx->dma_page_size = value;
+    else
+	ctx->dma_page_size = IPEDMA_PAGE_SIZE;
+
+    if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "dma_pages", &value))
+	ctx->dma_pages = value;
+    else
+	ctx->dma_pages = IPEDMA_DMA_PAGES;
+
+    if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "ipedma_flags", &value))
+	ctx->dma_flags = value;
+    else
+	ctx->dma_flags = 0;
+
     kflags = PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_EXCLUSIVE|PCILIB_KMEM_FLAG_HARDWARE|(ctx->preserve?PCILIB_KMEM_FLAG_PERSISTENT:0);
     pcilib_kmem_handle_t *desc = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, IPEDMA_DESCRIPTOR_SIZE, IPEDMA_DESCRIPTOR_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, 0x00), kflags);
     pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_DMA_C2S_PAGE, IPEDMA_DMA_PAGES, 0, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, 0x00), kflags);
@@ -409,17 +435,9 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
     volatile uint32_t *empty_detected_ptr;
 
     pcilib_dma_flags_t packet_flags = PCILIB_DMA_FLAG_EOP;
-    size_t nodata_sleep;
 
-    switch (sched_getscheduler(0)) {
-     case SCHED_FIFO:
-     case SCHED_RR:
-	nodata_sleep = IPEDMA_NODATA_SLEEP;
-	break;
-     default:
-	pcilib_info_once("Streaming DMA data using non real-time thread (may cause extra CPU load)", errno);
-	nodata_sleep = 0;
-    }
+    size_t nodata_sleep;
+    struct timespec sleep_ts = {0};
 
     size_t cur_read;
 
@@ -435,6 +453,19 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
     empty_detected_ptr = last_written_addr_ptr - 2;
 
+    switch (sched_getscheduler(0)) {
+     case SCHED_FIFO:
+     case SCHED_RR:
+        if (ctx->dma_flags&IPEDMA_FLAG_NOSLEEP)
+    	    nodata_sleep = 0;
+    	else
+	    nodata_sleep = IPEDMA_NODATA_SLEEP;
+	break;
+     default:
+	pcilib_info_once("Streaming DMA data using non real-time thread (may cause extra CPU load)", errno);
+	nodata_sleep = 0;
+    }
+
     do {
 	switch (ret&PCILIB_STREAMING_TIMEOUT_MASK) {
 	    case PCILIB_STREAMING_CONTINUE: 
@@ -444,10 +475,10 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 		    wait = 0;
 		else
 #endif /* IPEDMA_SUPPORT_EMPTY_DETECTED */
-		    wait = IPEDMA_DMA_TIMEOUT; 
+		    wait = ctx->dma_timeout; 
 	    break;
 	    case PCILIB_STREAMING_WAIT: 
-		wait = (timeout > IPEDMA_DMA_TIMEOUT)?timeout:IPEDMA_DMA_TIMEOUT;
+		wait = (timeout > ctx->dma_timeout)?timeout:ctx->dma_timeout;
 	    break;
 //	    case PCILIB_STREAMING_CHECK: wait = 0; break;
 	}
@@ -460,8 +491,10 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	gettimeofday(&start, NULL);
 	memcpy(&cur, &start, sizeof(struct timeval));
 	while (((*last_written_addr_ptr == 0)||(ctx->last_read_addr == (*last_written_addr_ptr)))&&((wait == PCILIB_TIMEOUT_INFINITE)||(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < wait))) {
-	    if (nodata_sleep) 
-		usleep(nodata_sleep);
+	    if (nodata_sleep) {
+	        sleep_ts.tv_nsec = nodata_sleep;
+		nanosleep(&sleep_ts, NULL);
+	    }
 		
 #ifdef IPEDMA_SUPPORT_EMPTY_DETECTED
 	    if ((ret != PCILIB_STREAMING_REQ_PACKET)&&(*empty_detected_ptr)) break;
@@ -494,13 +527,14 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	else packet_flags = 0;
 #endif /* IPEDMA_DETECT_PACKETS */
 	
-	pcilib_kmem_sync_block(ctx->dmactx.pcilib, ctx->pages, PCILIB_KMEM_SYNC_FROMDEVICE, cur_read);
+	if ((ctx->dma_flags&IPEDMA_FLAG_NOSYNC) == 0)
+	    pcilib_kmem_sync_block(ctx->dmactx.pcilib, ctx->pages, PCILIB_KMEM_SYNC_FROMDEVICE, cur_read);
         void *buf = pcilib_kmem_get_block_ua(ctx->dmactx.pcilib, ctx->pages, cur_read);
 	ret = cb(cbattr, packet_flags, ctx->page_size, buf);
 	if (ret < 0) return -ret;
 	
 	    // We don't need this because hardware does not intend to read anything from the memory
-//	pcilib_kmem_sync_block(ctx->dmactx.pcilib, ctx->pages, PCILIB_KMEM_SYNC_TODEVICE, cur_read);
+	//pcilib_kmem_sync_block(ctx->dmactx.pcilib, ctx->pages, PCILIB_KMEM_SYNC_TODEVICE, cur_read);
 
 	    // Return buffer into the DMA pool when processed
 	if (ctx->streaming) {
@@ -510,7 +544,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	    else last_free = IPEDMA_DMA_PAGES - 1;
 
 	    uintptr_t buf_ba = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, last_free);
-	    WR(IPEDMA_REG_PAGE_ADDR, buf_ba);    
+	    WR(IPEDMA_REG_PAGE_ADDR, buf_ba);
 # ifdef IPEDMA_STREAMING_CHECKS
 	    pcilib_register_value_t streaming_status;
 	    RD(IPEDMA_REG_STREAMING_STATUS, streaming_status);

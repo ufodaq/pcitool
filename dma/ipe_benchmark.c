@@ -1,6 +1,7 @@
 #define _PCILIB_DMA_IPE_C
 #define _BSD_SOURCE
 #define _DEFAULT_SOURCE
+#define _POSIX_C_SOURCE 200112L
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -84,6 +85,7 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	read_dma = pcilib_read_dma_custom;
 
 	// There is no significant difference and we can remove this when testing phase is over.
+	// DS: With large number of buffers this is quite slow due to skimming of initially written buffers
     if (getenv("PCILIB_BENCHMARK_STREAMING")) {
 	size_t dma_buffer_space;
 	pcilib_dma_engine_status_t dma_status;
@@ -97,7 +99,7 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	WR(IPEDMA_REG_CONTROL, 0x1);
 
 	gettimeofday(&start, NULL);
-	pcilib_calc_deadline(&start, IPEDMA_DMA_TIMEOUT * IPEDMA_DMA_PAGES);
+	pcilib_calc_deadline(&start, ctx->dma_timeout * IPEDMA_DMA_PAGES);
 
 #ifdef IPEDMA_BUG_LAST_READ
 	dma_buffer_space = (IPEDMA_DMA_PAGES - 2) * IPEDMA_PAGE_SIZE;
@@ -106,8 +108,8 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 #endif /* IPEDMA_BUG_LAST_READ */
 
 	// Allocate memory and prepare data
-	buf = malloc(size + dma_buffer_space);
-	if (!buf) return -1;
+	err = posix_memalign(&buf, 4096, size + dma_buffer_space);
+	if ((err)||(!buf)) return -1;
 
 	    // Wait all DMA buffers are filled 
 	memset(&dma_status, 0, sizeof(dma_status));
@@ -127,7 +129,7 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	gettimeofday(&start, NULL);
 	for (iter = 0; iter < iterations; iter++) {
 	    for (bytes = 0; bytes < (size + dma_buffer_space); bytes += rbytes) {
-		err = read_dma(ctx->dmactx.pcilib, 0, addr, size + dma_buffer_space - bytes, PCILIB_DMA_FLAG_MULTIPACKET, PCILIB_DMA_TIMEOUT,  buf + bytes, &rbytes);
+		err = read_dma(ctx->dmactx.pcilib, 0, addr, size + dma_buffer_space - bytes, PCILIB_DMA_FLAG_MULTIPACKET, ctx->dma_timeout,  buf + bytes, &rbytes);
 	        if (err) {
 		    pcilib_error("Can't read data from DMA, error %i", err);
 		    return -1;
@@ -141,12 +143,15 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
 	    // Stopping DMA
 	WR(IPEDMA_REG_CONTROL, 0x0);
+	usleep(IPEDMA_RESET_DELAY);
+	
 	pcilib_skip_dma(ctx->dmactx.pcilib, 0);
     } else {
 	if (read_dma == dma_ipe_skim_dma_custom)
 	    pcilib_info_once("Benchmarking the DMA hardware (without memcpy)");
 
 	WR(IPEDMA_REG_CONTROL, 0x0);
+	usleep(IPEDMA_RESET_DELAY);
 
 	err = pcilib_skip_dma(ctx->dmactx.pcilib, 0);
 	if (err) {
@@ -155,35 +160,44 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	}
 
 	// Allocate memory and prepare data
-	buf = malloc(size);
-	if (!buf) return -1;
+	err = posix_memalign(&buf, 4096, size);
+	if ((err)||(!buf)) return -1;
 
-	for (iter = 0; iter < iterations; iter++) {
+	for (iter = 0; iter <= iterations; iter++) {
 	    gettimeofday(&start, NULL);
 
 	    // Starting DMA
 	    WR(IPEDMA_REG_CONTROL, 0x1);
 	
 	    for (bytes = 0; bytes < size; bytes += rbytes) {
-		err = read_dma(ctx->dmactx.pcilib, 0, addr, size - bytes, PCILIB_DMA_FLAG_MULTIPACKET, PCILIB_DMA_TIMEOUT,  buf + bytes, &rbytes);
+		err = read_dma(ctx->dmactx.pcilib, 0, addr, size - bytes, PCILIB_DMA_FLAG_MULTIPACKET, ctx->dma_timeout,  buf + bytes, &rbytes);
 	        if (err) {
 		    pcilib_error("Can't read data from DMA (iteration: %zu, offset: %zu), error %i", iter, bytes, err);
 		    return -1;
 		}
 	    }
 
+	    gettimeofday(&cur, NULL);
+
 		// Stopping DMA
 	    WR(IPEDMA_REG_CONTROL, 0x0);
+	    usleep(IPEDMA_RESET_DELAY);
 	    if (err) break;
 	
-	    gettimeofday(&cur, NULL);
-	    us += ((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec));
-	    
+		// Heating up during the first iteration
+	    if (iter)
+		us += ((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec));
+
+	    pcilib_info("Iteration %-4i latency: %lu", iter, ((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)));
+
+
 	    err = pcilib_skip_dma(ctx->dmactx.pcilib, 0);
 	    if (err) {
 		pcilib_error("Can't start iteration, devices continuously writes unexpected data using DMA engine");
 		break;
 	    }
+	    
+	    usleep(ctx->dma_timeout);
 
 	}
     }

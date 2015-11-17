@@ -5,6 +5,11 @@
 #include "pcilib.h"
 #include "version.h"
 
+#define IPEDMA_PAGE_SIZE		4096		/**< page size */
+#define IPEDMA_DMA_PAGES		1024		/**< number of DMA pages in the ring buffer to allocate */
+
+#define IPEDMA_DMA_TIMEOUT 		100000		/**< us, overrides PCILIB_DMA_TIMEOUT (actual hardware timeout is 50ms according to Lorenzo) */
+
 pcilib_dma_context_t *dma_ipe_init(pcilib_t *ctx, const char *model, const void *arg);
 void  dma_ipe_free(pcilib_dma_context_t *vctx);
 
@@ -68,6 +73,7 @@ static const pcilib_register_description_t ipe_dma_registers[] = {
     {0x0018, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "dma_mode_flags",		"DMA operation mode"},
     {0x0018, 	0, 	4, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "pcie_gen",  			"PCIe version 2/3 depending on the used XILINX core"},
     {0x0018, 	4, 	1, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "streaming_dma", 			"Streaming mode (enabled/disabled)"},
+    {0x0020,	0,	32,	0,	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "dma_firmware",		"Version of DMA firmware"},
     {0x0028, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "mwr_perf",			"MWR Performance"},
     {0x003C, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "cfg_lnk_width",		"Negotiated and max width of PCIe Link"},
     {0x003C, 	0, 	6, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "cfg_cap_max_lnk_width", 		"Max link width"},
@@ -81,9 +87,18 @@ static const pcilib_register_description_t ipe_dma_registers[] = {
     {0x0058, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "last_descriptor_read",	"Last descriptor read by the host"},
     {0x005C, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "desc_mem_addr", 		"Number of descriptors configured"},
     {0x0060, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "update_thresh",  		"Update threshold of progress register"},
-    {0x0000, 	0, 	32, 	PCILIB_VERSION, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_version",  		"Version of DMA engine"},
+    {0x0000, 	0, 	32, 	PCILIB_VERSION, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_version",	"Version of DMA engine"},
+    {0x0004, 	0, 	32, 	IPEDMA_DMA_TIMEOUT, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_timeout",	"Default DMA timeout"},
+    {0x0008, 	0, 	32, 	IPEDMA_DMA_PAGES,	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_pages",	"Number of buffers in DMA page ring"},
+    {0x000C, 	0, 	32, 	IPEDMA_PAGE_SIZE,	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_page_size",	"Size of a page in DMA page ring (multiple of 4K)"},
+    {0x0010, 	0, 	32, 	0,			0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "ipedma_flags",	"DMA Control Register"},
+    {0x0010, 	0, 	1, 	0,			0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS,	PCILIB_REGISTER_BANK_DMACONF, "ipedma_nosync",	"Do not synchronize DMA pages"},
+    {0x0010, 	1, 	1, 	0,			0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS,	PCILIB_REGISTER_BANK_DMACONF, "ipedma_nosleep",	"Do not sleep while there is no data"},
     {0,		0,	0,	0,	0x00000000,	0,                                           0,                        0, NULL, 			NULL}
 };
+
+
+
 #endif /* _PCILIB_EXPORT_C */
 
 

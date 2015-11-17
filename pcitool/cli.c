@@ -3715,6 +3715,10 @@ int main(int argc, char **argv) {
         if (amode != ACCESS_DMA)
 	    break;
      case MODE_BENCHMARK:
+        sched_param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+        err = sched_setscheduler(0, SCHED_FIFO, &sched_param);
+        if (err) pcilib_info("Failed to acquire real-time priority (errno: %i)", errno);
+     break;
      case MODE_GRAB:
         sched_param.sched_priority = sched_get_priority_min(SCHED_FIFO);
         err = sched_setscheduler(0, SCHED_FIFO, &sched_param);

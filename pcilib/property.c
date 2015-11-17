@@ -72,7 +72,7 @@ int pcilib_add_properties_from_registers(pcilib_t *ctx, size_t n, const pcilib_r
         char *view_name;
         pcilib_access_mode_t mode = 0;
 
-        pcilib_register_view_description_t v = {0};
+        pcilib_register_view_description_t v = {{0}};
         pcilib_register_bank_description_t *b = &ctx->banks[banks[i]];
 
         if (registers[i].type == PCILIB_REGISTER_PROPERTY) continue;
