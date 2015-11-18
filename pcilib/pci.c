@@ -431,3 +431,10 @@ const pcilib_pcie_link_info_t *pcilib_get_pcie_link_info(pcilib_t *ctx) {
 
     return &ctx->link_info;
 }
+
+int pcilib_set_dma_mask(pcilib_t *ctx, int mask) {
+    if (ioctl( ctx->handle, PCIDRIVER_IOC_SET_DMA_MASK, mask ) < 0)
+	return PCILIB_ERROR_FAILED;
+
+    return 0;
+}

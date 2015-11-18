@@ -111,6 +111,8 @@ void  dma_ipe_free(pcilib_dma_context_t *vctx) {
 
 
 int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags) {
+    int err;
+    int mask = 32;
     size_t i, num_pages;
 
     ipe_dma_t *ctx = (ipe_dma_t*)vctx;
@@ -159,6 +161,16 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	ctx->dma_flags = value;
     else
 	ctx->dma_flags = 0;
+
+#ifdef IPEDMA_CONFIGURE_DMA_MASK
+    if (ctx->version >= 3) mask = 64;
+
+    err = pcilib_set_dma_mask(ctx->dmactx.pcilib, mask);
+    if (err) {
+	pcilib_error("Error (%i) configuring dma mask (%i)", err, mask);
+	return err;
+    }
+#endif /* IPEDMA_CONFIGURE_DMA_MASK */
 
     kflags = PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_EXCLUSIVE|PCILIB_KMEM_FLAG_HARDWARE|(ctx->preserve?PCILIB_KMEM_FLAG_PERSISTENT:0);
     pcilib_kmem_handle_t *desc = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, IPEDMA_DESCRIPTOR_SIZE, IPEDMA_DESCRIPTOR_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, 0x00), kflags);

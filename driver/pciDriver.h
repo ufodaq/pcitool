@@ -217,4 +217,7 @@ typedef struct {
 /* Clear interrupt queues */
 #define PCIDRIVER_IOC_CLEAR_IOQ   _IO(   PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 13 )
 
+#define PCIDRIVER_IOC_SET_DMA_MASK	_IO(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 14 )
+
+
 #endif

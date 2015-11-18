@@ -406,6 +406,33 @@ static int ioctl_clear_ioq(pcidriver_privdata_t *privdata, unsigned long arg)
 #endif
 }
 
+
+/**
+ *
+ * Sets DMA mask for the following DMA mappings.
+ *
+ * @param arg Not a pointer, but a number of bits
+ *
+ */
+static int ioctl_set_dma_mask(pcidriver_privdata_t *privdata, unsigned long arg)
+{
+	int err;
+
+	if ((arg < 24) && (arg > 63))
+		return -EINVAL;
+
+	err = pci_set_dma_mask(privdata->pdev, DMA_BIT_MASK(arg));
+	if (err < 0) {
+	    printk(KERN_ERR "pci_set_dma_mask(%lu) failed\n", arg);
+	    return err;
+	}
+	
+	printk(KERN_ERR "pci_set_dma_mask(%lu) successeded\n", arg);
+
+	return 0;
+}
+
+
 /**
  *
  * This function handles all ioctl file operations.
@@ -464,6 +491,9 @@ long pcidriver_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		case PCIDRIVER_IOC_CLEAR_IOQ:
 			return ioctl_clear_ioq(privdata, arg);
+
+		case PCIDRIVER_IOC_SET_DMA_MASK:
+			return ioctl_set_dma_mask(privdata, arg);
 
 		default:
 			return -EINVAL;

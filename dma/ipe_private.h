@@ -17,7 +17,8 @@
 
 //#define IPEDMA_BUG_LAST_READ				/**< We should forbid writting the second last available DMA buffer (the last is forbidden by design) */
 //#define IPEDMA_DETECT_PACKETS				/**< Using empty_deceted flag */
-#define  IPEDMA_SUPPORT_EMPTY_DETECTED			/**< Avoid waiting for data when empty_detected flag is set in hardware */
+#define IPEDMA_SUPPORT_EMPTY_DETECTED			/**< Avoid waiting for data when empty_detected flag is set in hardware */
+#define IPEDMA_CONFIGURE_DMA_MASK			/**< Enforce maximal DMA mask (to avoid bounce-buffers) */
 
 #define IPEDMA_REG_ADDR_MASK 0xFFF
 #define IPEDMA_REG_BANK_MASK 0xF000
