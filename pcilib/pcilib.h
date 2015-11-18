@@ -185,6 +185,7 @@ typedef struct {
 #define PCILIB_DMA_FLAGS_DEFAULT	((pcilib_dma_flags_t)0)
 #define PCILIB_DMA_ENGINE_ADDR_INVALID	((pcilib_dma_engine_addr_t)-1)
 #define PCILIB_REGISTER_INVALID		((pcilib_register_t)-1)
+#define PCILIB_REGISTER_ADDRESS_INVALID	((pcilib_register_addr_t)-1)
 #define PCILIB_ADDRESS_INVALID		((uintptr_t)-1)
 #define PCILIB_EVENT0			1
 #define PCILIB_EVENT1			2

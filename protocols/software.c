@@ -105,6 +105,21 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 	return (pcilib_register_bank_context_t*)bank_ctx;
 }
 
+uintptr_t pcilib_software_registers_resolve(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx, pcilib_address_resolution_flags_t flags, pcilib_register_addr_t addr) {
+    if (addr == PCILIB_REGISTER_ADDRESS_INVALID) addr = 0;
+
+    switch (flags&PCILIB_ADDRESS_RESOLUTION_MASK_ADDRESS_TYPE) {
+     case 0:
+        return (uintptr_t)((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr;
+
+     case PCILIB_ADDRESS_RESOLUTION_FLAG_PHYS_ADDRESS:
+	return pcilib_kmem_get_block_pa(ctx, ((pcilib_software_register_bank_context_t*)bank_ctx)->kmem, 0) + addr;
+    }
+
+    return PCILIB_ADDRESS_INVALID;
+}
+
+
 int pcilib_software_registers_read(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx, pcilib_register_addr_t addr, pcilib_register_value_t *value){
     const pcilib_register_bank_description_t *b = bank_ctx->bank;
     int access = b->access / 8;

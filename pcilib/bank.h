@@ -12,6 +12,10 @@
 #define PCILIB_REGISTER_BANK_PROPERTY           65                                      /**< Registers abstracting properties and other computed registers */
 #define PCILIB_REGISTER_BANK_DMACONF		96					/**< DMA configuration in the software registers */
 #define PCILIB_REGISTER_BANK_DMA		97					/**< First BANK address to be used by DMA engines */
+#define PCILIB_REGISTER_BANK_DMA0		PCILIB_REGISTER_BANK_DMA		/**< First BANK address to be used by DMA engines */
+#define PCILIB_REGISTER_BANK_DMA1		(PCILIB_REGISTER_BANK_DMA + 1)		/**< Second BANK address to be used by DMA engines */
+#define PCILIB_REGISTER_BANK_DMA2		(PCILIB_REGISTER_BANK_DMA + 2)		/**< Third BANK address to be used by DMA engines */
+#define PCILIB_REGISTER_BANK_DMA3		(PCILIB_REGISTER_BANK_DMA + 3)		/**< Fourth BANK address to be used by DMA engines */
 #define PCILIB_REGISTER_BANK_DYNAMIC		128					/**< First BANK address to map dynamic XML configuration */
 #define PCILIB_REGISTER_PROTOCOL_INVALID	((pcilib_register_protocol_t)-1)
 #define PCILIB_REGISTER_PROTOCOL0		0					/**< First PROTOCOL address to be used in the event engine */
@@ -34,11 +38,22 @@ typedef enum {
     PCILIB_MODEL_MODIFICATION_FLAG_SKIP_EXISTING = 2				/**< If flag is set, pcilib will just skip existing registers/banks/etc instead of reporting a error */
 } pcilib_model_modification_flags_t;
 
+typedef enum {
+    PCILIB_ADDRESS_RESOLUTION_FLAGS_DEFAULT = 0,
+    PCILIB_ADDRESS_RESOLUTION_FLAG_BUS_ADDRESS = 1,				/**< Resolve bus address instead of VA */
+    PCILIB_ADDRESS_RESOLUTION_FLAG_PHYS_ADDRESS = 2,				/**< Resolve hardware address instead of VA */
+    PCILIB_ADDRESS_RESOLUTION_MASK_ADDRESS_TYPE = 3,
+    PCILIB_ADDRESS_RESOLUTION_FLAG_READ_ONLY = 4,				/**< Request read-only memory, in case if read-write resolution is impossible */
+    PCILIB_ADDRESS_RESOLUTION_FLAG_WRITE_ONLY = 8,				/**< Request write-only resolution, in case if read-write resolution is impossible */
+    PCILIB_ADDRESS_RESOLUTION_MASK_ACCESS_MODE = 12
+} pcilib_address_resolution_flags_t;
+
 typedef struct {
     pcilib_version_t version;
 
     pcilib_register_bank_context_t *(*init)(pcilib_t *ctx, pcilib_register_bank_t bank, const char *model, const void *args);			/**< Optional API call to initialize bank context */
     void (*free)(pcilib_t *pcilib, pcilib_register_bank_context_t *ctx);									/**< Optional API call to cleanup bank context */
+    uintptr_t (*resolve)(pcilib_t *pcilib, pcilib_register_bank_context_t *ctx, pcilib_address_resolution_flags_t flags, pcilib_register_addr_t addr); /**< Resolves register virtual address (if supported) */
     int (*read)(pcilib_t *pcilib, pcilib_register_bank_context_t *ctx, pcilib_register_addr_t addr, pcilib_register_value_t *value);		/**< Read from register, mandatory for RO/RW registers */
     int (*write)(pcilib_t *pcilib, pcilib_register_bank_context_t *ctx, pcilib_register_addr_t addr, pcilib_register_value_t value);		/**< Write to register, mandatory for WO/RW registers */
 } pcilib_register_protocol_api_description_t;
@@ -163,6 +178,12 @@ pcilib_register_bank_t pcilib_find_register_bank(pcilib_t *ctx, const char *bank
 pcilib_register_protocol_t pcilib_find_register_protocol_by_addr(pcilib_t *ctx, pcilib_register_protocol_addr_t protocol);
 pcilib_register_protocol_t pcilib_find_register_protocol_by_name(pcilib_t *ctx, const char *name);
 pcilib_register_protocol_t pcilib_find_register_protocol(pcilib_t *ctx, const char *name);
+
+uintptr_t pcilib_resolve_bank_address_by_id(pcilib_t *ctx, pcilib_address_resolution_flags_t flags, pcilib_register_bank_t bank);
+uintptr_t pcilib_resolve_bank_address(pcilib_t *ctx, pcilib_address_resolution_flags_t flags, const char *bank);
+
+uintptr_t pcilib_resolve_register_address_by_id(pcilib_t *ctx, pcilib_address_resolution_flags_t flags, pcilib_register_t reg);
+uintptr_t pcilib_resolve_register_address(pcilib_t *ctx, pcilib_address_resolution_flags_t flags, const char *bank, const char *regname);
 
 int pcilib_get_register_bank_attr_by_id(pcilib_t *ctx, pcilib_register_bank_t bank, const char *attr, pcilib_value_t *val);
 int pcilib_get_register_bank_attr(pcilib_t *ctx, const char *bankname, const char *attr, pcilib_value_t *val);

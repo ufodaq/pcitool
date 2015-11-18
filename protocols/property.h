@@ -10,7 +10,7 @@ int pcilib_property_registers_write(pcilib_t *ctx, pcilib_register_bank_context_
 
 #ifdef _PCILIB_EXPORT_C
 const pcilib_register_protocol_api_description_t pcilib_property_protocol_api =
-    { PCILIB_VERSION, NULL, NULL, pcilib_property_registers_read, pcilib_property_registers_write };
+    { PCILIB_VERSION, NULL, NULL, NULL, pcilib_property_registers_read, pcilib_property_registers_write };
 #endif /* _PCILIB_EXPORT_C */
 
 #endif /* _PCILIB_PROTOCOL_PROPERTY_H */

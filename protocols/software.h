@@ -28,6 +28,16 @@ pcilib_register_bank_context_t* pcilib_software_registers_open(pcilib_t *ctx, pc
 void pcilib_software_registers_close(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx);
 
 /**
+ * this function resolve the virtual address of the register for direct access
+ * @param[in] - ctx the pcilib_t structure runnning
+ * @param[in] - bank_ctx the bank context that was returned by the initialisation function
+ * @param[in] - flags 
+ * @param[in] - addr the adress of the register we want to read
+ * @return virtual address or PCILIB_ADDRESS_INVALID on error 
+ */
+uintptr_t pcilib_software_registers_resolve(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx, pcilib_address_resolution_flags_t flags, pcilib_register_addr_t addr);
+
+/**
  * this function read the value of a said register in the kernel space.
  * @param[in] - ctx the pcilib_t structure runnning
  * @param[in] - bank_ctx the bank context that was returned by the initialisation function
@@ -52,7 +62,7 @@ int pcilib_software_registers_write(pcilib_t *ctx,pcilib_register_bank_context_t
  * software protocol addition to the protocol api.
  */
 const pcilib_register_protocol_api_description_t pcilib_software_protocol_api =
-  { PCILIB_VERSION, pcilib_software_registers_open, pcilib_software_registers_close,pcilib_software_registers_read, pcilib_software_registers_write }; /**< we add there the protocol to the list of possible protocols*/
+  { PCILIB_VERSION, pcilib_software_registers_open, pcilib_software_registers_close, pcilib_software_registers_resolve, pcilib_software_registers_read, pcilib_software_registers_write }; 
 #endif /* _PCILIB_EXPORT_C */
 
 #endif /* _PCILIB_PROTOCOL_SOFTWARE_H */

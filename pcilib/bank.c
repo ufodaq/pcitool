@@ -272,6 +272,45 @@ pcilib_register_protocol_t pcilib_find_register_protocol(pcilib_t *ctx, const ch
     return pcilib_find_register_protocol_by_name(ctx, protocol);
 }
 
+uintptr_t pcilib_resolve_bank_address_by_id(pcilib_t *ctx, pcilib_address_resolution_flags_t flags, pcilib_register_bank_t bank) {
+    pcilib_register_bank_context_t *bctx = ctx->bank_ctx[bank];
+
+    if (!bctx->api->resolve)
+	return PCILIB_ADDRESS_INVALID;
+	
+    return bctx->api->resolve(ctx, bctx, flags, PCILIB_REGISTER_ADDRESS_INVALID);
+}
+
+uintptr_t pcilib_resolve_bank_address(pcilib_t *ctx, pcilib_address_resolution_flags_t flags, const char *bank) {
+    pcilib_register_bank_t bank_id = pcilib_find_register_bank(ctx, bank);
+    if (bank_id == PCILIB_REGISTER_BANK_INVALID) {
+	if (bank) pcilib_error("Invalid register bank is specified (%s)", bank);
+	else pcilib_error("Register bank should be specified");
+	return PCILIB_ADDRESS_INVALID;
+    }
+
+    return pcilib_resolve_bank_address_by_id(ctx, flags, bank_id);
+}
+
+uintptr_t pcilib_resolve_register_address_by_id(pcilib_t *ctx, pcilib_address_resolution_flags_t flags, pcilib_register_t reg) {
+    pcilib_register_bank_context_t *bctx = ctx->bank_ctx[ctx->register_ctx[reg].bank];
+
+    if (!bctx->api->resolve)
+	return PCILIB_ADDRESS_INVALID;
+
+    return bctx->api->resolve(ctx, bctx, 0, ctx->registers[reg].addr);
+}
+
+uintptr_t pcilib_resolve_register_address(pcilib_t *ctx, pcilib_address_resolution_flags_t flags, const char *bank, const char *regname) {
+    pcilib_register_t reg = pcilib_find_register(ctx, bank, regname);
+    if (reg == PCILIB_REGISTER_INVALID) {
+	pcilib_error("Register (%s) is not found", regname);
+	return PCILIB_ADDRESS_INVALID;
+    }
+
+    return pcilib_resolve_register_address_by_id(ctx, flags, reg);
+}
+
 int pcilib_get_register_bank_attr_by_id(pcilib_t *ctx, pcilib_register_bank_t bank, const char *attr, pcilib_value_t *val) {
     assert(bank < ctx->num_banks);
 
