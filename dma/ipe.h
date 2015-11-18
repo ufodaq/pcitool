@@ -44,6 +44,7 @@ static const pcilib_dma_engine_description_t ipe_dma_engines[] = {
 
 static const pcilib_register_bank_description_t ipe_dma_banks[] = {
     { PCILIB_REGISTER_BANK_DMA, PCILIB_REGISTER_PROTOCOL_DEFAULT, PCILIB_BAR0, 0, 0, 32, 0x0200, PCILIB_LITTLE_ENDIAN, PCILIB_LITTLE_ENDIAN, "0x%lx", "dma", "DMA Registers"},
+    { PCILIB_REGISTER_BANK_DMA1, PCILIB_REGISTER_PROTOCOL_DEFAULT, PCILIB_BAR0, 0x9000, 0x9000, 32, 0x0100, PCILIB_LITTLE_ENDIAN, PCILIB_LITTLE_ENDIAN, "0x%lx", "dma9000", "Additional DMA Registers"},
     { PCILIB_REGISTER_BANK_DMACONF, PCILIB_REGISTER_PROTOCOL_SOFTWARE, PCILIB_BAR_NOBAR, 0, 0, 32, 0x1000, PCILIB_HOST_ENDIAN, PCILIB_HOST_ENDIAN, "0x%lx", "dmaconf", "DMA Configuration"},
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL }
 };
@@ -73,20 +74,12 @@ static const pcilib_register_description_t ipe_dma_registers[] = {
     {0x0018, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "dma_mode_flags",		"DMA operation mode"},
     {0x0018, 	0, 	4, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "pcie_gen",  			"PCIe version 2/3 depending on the used XILINX core"},
     {0x0018, 	4, 	1, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "streaming_dma", 			"Streaming mode (enabled/disabled)"},
-    {0x0020,	0,	32,	0,	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "dma_firmware",		"Version of DMA firmware"},
     {0x0028, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "mwr_perf",			"MWR Performance"},
     {0x003C, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "cfg_lnk_width",		"Negotiated and max width of PCIe Link"},
     {0x003C, 	0, 	6, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "cfg_cap_max_lnk_width", 		"Max link width"},
     {0x003C, 	8, 	6, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "cfg_prg_max_lnk_width", 		"Negotiated link width"},
-    {0x0040, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "cfg_payload_size",  		""},
-    {0x0040, 	0, 	4, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "cfg_cap_max_payload_size",	"Max payload size"},
-    {0x0040, 	8, 	3, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "cfg_prg_max_payload_size",	"Prog max payload size"},
-    {0x0040, 	16, 	3, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "cfg_max_rd_req_size",		"Max read request size"},
-    {0x0050, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "desc_mem_din",  		"Descriptor memory"},
-    {0x0054, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "update_addr",  		"Address of progress register"},
-    {0x0058, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "last_descriptor_read",	"Last descriptor read by the host"},
-    {0x005C, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "desc_mem_addr", 		"Number of descriptors configured"},
     {0x0060, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "update_thresh",  		"Update threshold of progress register"},
+	// software registers
     {0x0000, 	0, 	32, 	PCILIB_VERSION, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_version",	"Version of DMA engine"},
     {0x0004, 	0, 	32, 	IPEDMA_DMA_TIMEOUT, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_timeout",	"Default DMA timeout"},
     {0x0008, 	0, 	32, 	IPEDMA_DMA_PAGES,	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_pages",	"Number of buffers in DMA page ring"},
@@ -96,10 +89,43 @@ static const pcilib_register_description_t ipe_dma_registers[] = {
     {0x0010, 	1, 	1, 	0,			0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS,	PCILIB_REGISTER_BANK_DMACONF, "ipedma_nosleep",	"Do not sleep while there is no data"},
     {0,		0,	0,	0,	0x00000000,	0,                                           0,                        0, NULL, 			NULL}
 };
-
-
-
 #endif /* _PCILIB_EXPORT_C */
+
+#ifdef _PCILIB_DMA_IPE_C
+static const pcilib_register_description_t ipe_dma_app_registers[] = {
+    {0x0000,	0,	32,	0,	0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA1, "cntgen",			"Dummy counter"},
+    {0x0000,	0,	1,	0,	0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA1, "enable_cntgen",			"Enable counting/fixed pattern dummy generator"},
+    {0x0000,	4,	1,	0,	0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA1, "reset_cntgen",			"Reset dummy counter of dummy generator"},
+    {0x0000,	8,	1,	0,	0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA1, "fix_cntgen",			"Enable fixed pattern mode of dummy generator"},
+    {0x0004,	0,	32,	0,	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA1, "cntgen_pattern",		"Pattern for fixed pattern dummy generator"},
+    {0x0008,	0,	32,	0,	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA1, "update_word0",		"Content of first 32-bit word in the progress register"},
+    {0x0020,	0,	32,	0,	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA1, "dma_firmware",		"Version of DMA firmware"},
+    {0,		0,	0,	0,	0x00000000,	0,                                           0,                        0, NULL, 			NULL}
+};
+
+static const pcilib_register_description_t ipe_dma_v2_registers[] = {
+    {0x0040, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "cfg_payload_size",  		""},
+    {0x0040, 	0, 	4, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "cfg_cap_max_payload_size",	"Max payload size"},
+    {0x0040, 	8, 	3, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "cfg_prg_max_payload_size",	"Prog max payload size"},
+    {0x0040, 	16, 	3, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_BITS, PCILIB_REGISTER_BANK_DMA, "cfg_max_rd_req_size",		"Max read request size"},
+    {0x0050, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "desc_mem_din",  		"Descriptor memory"},
+    {0x0054, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "update_addr",  		"Address of progress register"},
+    {0x0058, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "last_descriptor_read",	"Last descriptor read by the host"},
+    {0x005C, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "desc_mem_addr", 		"Number of descriptors configured"},
+    {0,		0,	0,	0,	0x00000000,	0,                                           0,                        0, NULL, 			NULL}
+};
+
+static const pcilib_register_description_t ipe_dma_v3_registers[] = {
+    {0x0040, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "desc_mem_addr", 		"Number of descriptors configured"},
+    {0x0050, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "desc_mem_din_hi",  		"Descriptor memory (high bits)"},
+    {0x0054, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "desc_mem_din_lo",  		"Descriptor memory (low bits)"},
+    {0x0058, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "update_addr_hi",  		"Address of progress register (high bits)"},
+    {0x005C, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_R   , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMA, "update_addr_lo",  		"Address of progress register (low bits)"},
+	// software registgers
+    {0x0080, 	0, 	32, 	0, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "last_descriptor_read",	"Last descriptor read by the host"},
+    {0,		0,	0,	0,	0x00000000,	0,                                           0,                        0, NULL, 			NULL}
+};
+#endif /* _PCILIB_DMA_IPE_C */
 
 
 #endif /* _PCILIB_DMA_IPE_H */

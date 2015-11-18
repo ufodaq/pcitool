@@ -19,19 +19,36 @@
 //#define IPEDMA_DETECT_PACKETS				/**< Using empty_deceted flag */
 #define  IPEDMA_SUPPORT_EMPTY_DETECTED			/**< Avoid waiting for data when empty_detected flag is set in hardware */
 
+#define IPEDMA_REG_ADDR_MASK 0xFFF
+#define IPEDMA_REG_BANK_MASK 0xF000
+#define IPEDMA_REG_BANK_SHIFT 24
+
+#define REG2VIRT(reg) (ctx->base_addr[(reg&IPEDMA_REG_BANK_MASK)>>IPEDMA_REG_BANK_SHIFT] + (reg&IPEDMA_REG_ADDR_MASK))
+#define REG(bank, addr) ((bank<<IPEDMA_REG_BANK_SHIFT)|addr)
+#define CONFREG(addr) REG(2, addr)
+
+#define IPEDMA_REG_VERSION		REG(1, 0x20)
 
 #define IPEDMA_REG_RESET		0x00
 #define IPEDMA_REG_CONTROL		0x04
 #define IPEDMA_REG_TLP_SIZE		0x0C
 #define IPEDMA_REG_TLP_COUNT		0x10
 #define IPEDMA_REG_PCIE_GEN		0x18
-#define IPEDMA_REG_VERSION		0x20
-#define IPEDMA_REG_PAGE_ADDR		0x50
-#define IPEDMA_REG_UPDATE_ADDR		0x54
-#define IPEDMA_REG_LAST_READ		0x58		/**< In streaming mode, we can use it freely to track current status */
-#define IPEDMA_REG_PAGE_COUNT		0x5C
 #define IPEDMA_REG_UPDATE_THRESHOLD	0x60
 #define IPEDMA_REG_STREAMING_STATUS	0x68
+
+    // PCIe gen2
+#define IPEDMA_REG2_PAGE_ADDR		0x50
+#define IPEDMA_REG2_UPDATE_ADDR		0x54
+#define IPEDMA_REG2_LAST_READ		0x58		/**< In streaming mode, we can use it freely to track current status */
+#define IPEDMA_REG2_PAGE_COUNT		0x5C
+
+    // PCIe gen3
+#define IPEDMA_REG3_PAGE_COUNT		0x40		/**< Read-only now */
+#define IPEDMA_REG3_PAGE_ADDR		0x50
+#define IPEDMA_REG3_UPDATE_ADDR		0x58
+#define IPEDMA_REG3_LAST_READ		CONFREG(0x80)
+
 
 #define IPEDMA_FLAG_NOSYNC		0x01		/**< Do not call kernel space for page synchronization */
 #define IPEDMA_FLAG_NOSLEEP		0x02		/**< Do not sleep in the loop while waiting for the data */
@@ -44,8 +61,8 @@
 #define IPEDMA_NODATA_SLEEP		100		/**< To keep CPU free, in nanoseconds */
 
 
-#define WR(addr, value) { *(uint32_t*)(ctx->base_addr + addr) = value; }
-#define RD(addr, value) { value = *(uint32_t*)(ctx->base_addr + addr); }
+#define WR(addr, value) { *(uint32_t*)(REG2VIRT(addr)) = value; }
+#define RD(addr, value) { value = *(uint32_t*)(REG2VIRT(addr)); }
 
 
 typedef struct ipe_dma_s ipe_dma_t;
@@ -55,7 +72,7 @@ struct ipe_dma_s {
     //pcilib_dma_engine_description_t engine[2];
 
     const pcilib_register_bank_description_t *dma_bank;
-    char *base_addr;
+    char *base_addr[3];
 
     pcilib_irq_type_t irq_enabled;	/**< indicates that IRQs are enabled */
     pcilib_irq_type_t irq_preserve;	/**< indicates that IRQs should not be disabled during clean-up */

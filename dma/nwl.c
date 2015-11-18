@@ -98,7 +98,7 @@ pcilib_dma_context_t *dma_nwl_init(pcilib_t *pcilib, const char *model, const vo
     }
 
     ctx->dma_bank = model_info->banks + dma_bank;
-    ctx->base_addr = pcilib_resolve_register_address(pcilib, ctx->dma_bank->bar, ctx->dma_bank->read_addr);
+    ctx->base_addr = pcilib_resolve_bar_address(pcilib, ctx->dma_bank->bar, ctx->dma_bank->read_addr);
 
     if ((model)&&(strcasestr(model, "ipecamera"))) {
 	ctx->type = NWL_MODIFICATION_IPECAMERA;

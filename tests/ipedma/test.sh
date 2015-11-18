@@ -26,7 +26,7 @@ pci -w 0x9000 0x1
 #done
 
 echo "Reading the data from DMA..."
-for i in `seq 1 1000`; do
+for i in `seq 1 100`; do
     pci -r dma0 --multipacket -s $size -o bench.out --timeout 1000000
 #    pci -r dma0 --multipacket -s $size -o /dev/null --timeout 10000000
     if [ $? -ne 0 ]; then

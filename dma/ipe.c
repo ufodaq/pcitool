@@ -26,31 +26,59 @@
 
 
 pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const void *arg) {
+    int err = 0;
     pcilib_register_value_t value;
 
-    const pcilib_model_description_t *model_info = pcilib_get_model_description(pcilib);
+//    const pcilib_model_description_t *model_info = pcilib_get_model_description(pcilib);
 
     ipe_dma_t *ctx = malloc(sizeof(ipe_dma_t));
 
     if (ctx) {
 	memset(ctx, 0, sizeof(ipe_dma_t));
 	ctx->dmactx.pcilib = pcilib;
+	pcilib_register_bank_t dma_bankc = pcilib_find_register_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMACONF);
+	pcilib_register_bank_t dma_bank0 = pcilib_find_register_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA0);
+	pcilib_register_bank_t dma_bank1 = pcilib_find_register_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA1);
 
-	pcilib_register_bank_t dma_bank = pcilib_find_register_bank_by_addr(pcilib, PCILIB_REGISTER_BANK_DMA);
-
-	if (dma_bank == PCILIB_REGISTER_BANK_INVALID) {
+	if ((dma_bankc == PCILIB_REGISTER_BANK_INVALID)||(dma_bank0 == PCILIB_REGISTER_BANK_INVALID)||(dma_bank1 == PCILIB_REGISTER_BANK_INVALID)) {
 	    free(ctx);
 	    pcilib_error("DMA Register Bank could not be found");
 	    return NULL;
 	}
 
-	ctx->dma_bank = model_info->banks + dma_bank;
-	ctx->base_addr = pcilib_resolve_register_address(pcilib, ctx->dma_bank->bar, ctx->dma_bank->read_addr);
+	ctx->base_addr[0] = (void*)pcilib_resolve_bank_address_by_id(pcilib, 0, dma_bank0);
+	ctx->base_addr[1] = (void*)pcilib_resolve_bank_address_by_id(pcilib, 0, dma_bank1);
+	ctx->base_addr[2] = (void*)pcilib_resolve_bank_address_by_id(pcilib, 0, dma_bankc);
 
 
-	RD(IPEDMA_REG_VERSION, value);
-	ctx->version = value;
+	if ((model)&&(!strcasecmp(model, "ipecamera"))) {
+	    ctx->version = 2;
+	} else {
+	    RD(IPEDMA_REG_VERSION, value);
+
+	    if (value >= 0xa7) {
+		ctx->version = 3;
+	    } else {
+		ctx->version = 2;
+	    }
+
+	    err = pcilib_add_registers(pcilib, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, ipe_dma_app_registers, NULL);
+	}
 	
+	if (ctx->version >= 3) {
+	    if (!err) 
+		err = pcilib_add_registers(pcilib, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, ipe_dma_v3_registers, NULL);
+	} else {
+	    if (!err)
+	        err = pcilib_add_registers(pcilib, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, ipe_dma_v2_registers, NULL);
+	}
+	
+	if (err) {
+	    free(ctx);
+	    pcilib_error("Error (%i) registering firmware-dependent IPEDMA registers", err);
+	    return NULL;
+	}
+
 	RD(IPEDMA_REG_PCIE_GEN, value);
 
 #ifdef IPEDMA_ENFORCE_64BIT_MODE
@@ -149,7 +177,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 		if (ctx->streaming)
 		    preserve = 1;
 		else {
-		    RD(IPEDMA_REG_PAGE_COUNT, value);
+		    RD(IPEDMA_REG2_PAGE_COUNT, value);
 
 		    if (value != IPEDMA_DMA_PAGES) 
 			pcilib_warning("Inconsistent DMA buffers are found (Number of allocated buffers (%lu) does not match current request (%lu)), reinitializing...", value + 1, IPEDMA_DMA_PAGES);
@@ -169,7 +197,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	ctx->preserve = 1;
 	
 	    // Detect the current state of DMA engine
-	RD(IPEDMA_REG_LAST_READ, value);
+	RD(IPEDMA_REG2_LAST_READ, value);
 	    // Numbered from 1 in FPGA
 # ifdef IPEDMA_BUG_LAST_READ
 	if (value == IPEDMA_DMA_PAGES)
@@ -218,15 +246,15 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	WR(IPEDMA_REG_UPDATE_THRESHOLD, IPEDMA_DMA_PROGRESS_THRESHOLD);
         
 	    // Reseting configured DMA pages
-        WR(IPEDMA_REG_PAGE_COUNT, 0);
+        WR(IPEDMA_REG2_PAGE_COUNT, 0);
         
 	    // Setting current read position and configuring progress register
 #ifdef IPEDMA_BUG_LAST_READ
-	WR(IPEDMA_REG_LAST_READ, IPEDMA_DMA_PAGES - 1);
+	WR(IPEDMA_REG2_LAST_READ, IPEDMA_DMA_PAGES - 1);
 #else /* IPEDMA_BUG_LAST_READ */
-	WR(IPEDMA_REG_LAST_READ, IPEDMA_DMA_PAGES);
+	WR(IPEDMA_REG2_LAST_READ, IPEDMA_DMA_PAGES);
 #endif /* IPEDMA_BUG_LAST_READ */
-	WR(IPEDMA_REG_UPDATE_ADDR, pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, desc, 0));
+	WR(IPEDMA_REG2_UPDATE_ADDR, pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, desc, 0));
 
 	    // Instructing DMA engine that writting should start from the first DMA page
 	*last_written_addr_ptr = 0;
@@ -239,10 +267,10 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	
 	for (i = 0; i < num_pages; i++) {
 	    uintptr_t bus_addr_check, bus_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, pages, i);
-	    WR(IPEDMA_REG_PAGE_ADDR, bus_addr);
+	    WR(IPEDMA_REG2_PAGE_ADDR, bus_addr);
 	    if (bus_addr%4096) printf("Bad address %lu: %lx\n", i, bus_addr);
 
-	    RD(IPEDMA_REG_PAGE_ADDR, bus_addr_check);
+	    RD(IPEDMA_REG2_PAGE_ADDR, bus_addr_check);
 	    if (bus_addr_check != bus_addr) {
 		pcilib_error("Written (%x) and read (%x) bus addresses does not match\n", bus_addr, bus_addr_check);
 	    }
@@ -298,7 +326,7 @@ int dma_ipe_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
 	usleep(IPEDMA_RESET_DELAY);
 
 	    // Reseting configured DMA pages
-        WR(IPEDMA_REG_PAGE_COUNT, 0);
+        WR(IPEDMA_REG2_PAGE_COUNT, 0);
 	usleep(IPEDMA_RESET_DELAY);
     }
 
@@ -544,7 +572,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	    else last_free = IPEDMA_DMA_PAGES - 1;
 
 	    uintptr_t buf_ba = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, last_free);
-	    WR(IPEDMA_REG_PAGE_ADDR, buf_ba);
+	    WR(IPEDMA_REG2_PAGE_ADDR, buf_ba);
 # ifdef IPEDMA_STREAMING_CHECKS
 	    pcilib_register_value_t streaming_status;
 	    RD(IPEDMA_REG_STREAMING_STATUS, streaming_status);
@@ -555,9 +583,9 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
 	    // Numbered from 1
 #ifdef IPEDMA_BUG_LAST_READ
-	WR(IPEDMA_REG_LAST_READ, cur_read?cur_read:IPEDMA_DMA_PAGES);
+	WR(IPEDMA_REG2_LAST_READ, cur_read?cur_read:IPEDMA_DMA_PAGES);
 #else /* IPEDMA_BUG_LAST_READ */
-	WR(IPEDMA_REG_LAST_READ, cur_read + 1);
+	WR(IPEDMA_REG2_LAST_READ, cur_read + 1);
 #endif /* IPEDMA_BUG_LAST_READ */
 
 	pcilib_debug(DMA, "Buffer returned     %4u - last read: %4u, last_read_addr: %4u (0x%x), last_written: %4u (0x%x)", cur_read, ctx->last_read, 
