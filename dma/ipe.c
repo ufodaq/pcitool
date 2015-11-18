@@ -66,9 +66,13 @@ pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const vo
 	}
 	
 	if (ctx->version >= 3) {
+	    ctx->reg_last_read = IPEDMA_REG3_LAST_READ;
+
 	    if (!err) 
 		err = pcilib_add_registers(pcilib, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, ipe_dma_v3_registers, NULL);
 	} else {
+	    ctx->reg_last_read = IPEDMA_REG2_LAST_READ;
+	    
 	    if (!err)
 	        err = pcilib_add_registers(pcilib, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, ipe_dma_v2_registers, NULL);
 	}
@@ -120,7 +124,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     pcilib_kmem_reuse_state_t reuse_desc, reuse_pages;
 
     volatile void *desc_va;
-    volatile uint32_t *last_written_addr_ptr;
+    volatile void *last_written_addr_ptr;
 
     pcilib_register_value_t value;
 
@@ -189,15 +193,19 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     } else pcilib_warning("Inconsistent DMA buffers (modes of ring and page buffers does not match), reinitializing....");
 
     desc_va = pcilib_kmem_get_ua(ctx->dmactx.pcilib, desc);
-    if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
-    else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
+    if (ctx->version < 3) {
+	if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
+	else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
+    }  else {
+	last_written_addr_ptr = desc_va + 2 * sizeof(uint32_t);
+    }
 
     if (preserve) {
 	ctx->reused = 1;
 	ctx->preserve = 1;
 	
 	    // Detect the current state of DMA engine
-	RD(IPEDMA_REG2_LAST_READ, value);
+	RD(ctx->reg_last_read, value);
 	    // Numbered from 1 in FPGA
 # ifdef IPEDMA_BUG_LAST_READ
 	if (value == IPEDMA_DMA_PAGES)
@@ -244,20 +252,30 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
 	    // Setting progress register threshold
 	WR(IPEDMA_REG_UPDATE_THRESHOLD, IPEDMA_DMA_PROGRESS_THRESHOLD);
-        
+
 	    // Reseting configured DMA pages
-        WR(IPEDMA_REG2_PAGE_COUNT, 0);
-        
+	if (ctx->version < 3) {
+	    WR(IPEDMA_REG2_PAGE_COUNT, 0);
+	}
+
 	    // Setting current read position and configuring progress register
 #ifdef IPEDMA_BUG_LAST_READ
-	WR(IPEDMA_REG2_LAST_READ, IPEDMA_DMA_PAGES - 1);
+	WR(ctx->reg_last_read, IPEDMA_DMA_PAGES - 1);
 #else /* IPEDMA_BUG_LAST_READ */
-	WR(IPEDMA_REG2_LAST_READ, IPEDMA_DMA_PAGES);
+	WR(ctx->reg_last_read, IPEDMA_DMA_PAGES);
 #endif /* IPEDMA_BUG_LAST_READ */
-	WR(IPEDMA_REG2_UPDATE_ADDR, pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, desc, 0));
+
+	if (ctx->version < 3) {
+	    WR(IPEDMA_REG2_UPDATE_ADDR, pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, desc, 0));
+	} else {
+	    WR64(IPEDMA_REG3_UPDATE_ADDR, pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, desc, 0));
+	}
 
 	    // Instructing DMA engine that writting should start from the first DMA page
-	*last_written_addr_ptr = 0;
+	if (ctx->version < 3)
+	    *(uint32_t*)last_written_addr_ptr = 0;
+	else
+	    *(uint64_t*)last_written_addr_ptr = 0;
 	
 	    // In ring buffer mode, the hardware taking care to preserve an empty buffer to help distinguish between
 	    // completely empty and completely full cases. In streaming mode, it is our responsibility to track this
@@ -267,12 +285,19 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	
 	for (i = 0; i < num_pages; i++) {
 	    uintptr_t bus_addr_check, bus_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, pages, i);
-	    WR(IPEDMA_REG2_PAGE_ADDR, bus_addr);
+	    if (ctx->version < 3) {
+		WR(IPEDMA_REG2_PAGE_ADDR, bus_addr);
+	    } else {
+		WR64(IPEDMA_REG3_PAGE_ADDR, bus_addr);
+	    }
+
 	    if (bus_addr%4096) printf("Bad address %lu: %lx\n", i, bus_addr);
 
-	    RD(IPEDMA_REG2_PAGE_ADDR, bus_addr_check);
-	    if (bus_addr_check != bus_addr) {
-		pcilib_error("Written (%x) and read (%x) bus addresses does not match\n", bus_addr, bus_addr_check);
+	    if (ctx->version < 3) {
+	        RD(IPEDMA_REG2_PAGE_ADDR, bus_addr_check);
+		if (bus_addr_check != bus_addr) {
+		    pcilib_error("Written (%x) and read (%x) bus addresses does not match\n", bus_addr, bus_addr_check);
+		}
 	    }
 
 	    usleep(IPEDMA_ADD_PAGE_DELAY);
@@ -326,7 +351,10 @@ int dma_ipe_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
 	usleep(IPEDMA_RESET_DELAY);
 
 	    // Reseting configured DMA pages
-        WR(IPEDMA_REG2_PAGE_COUNT, 0);
+	if (ctx->version < 3) {
+	    WR(IPEDMA_REG2_PAGE_COUNT, 0);
+	}
+
 	usleep(IPEDMA_RESET_DELAY);
     }
 
@@ -363,20 +391,25 @@ int dma_ipe_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcil
     ipe_dma_t *ctx = (ipe_dma_t*)vctx;
 
     void *desc_va = (void*)pcilib_kmem_get_ua(ctx->dmactx.pcilib, ctx->desc);
-    volatile uint32_t *last_written_addr_ptr;
-    uint32_t last_written_addr;
+    volatile void *last_written_addr_ptr;
+    uint64_t last_written_addr;
 
     if (!status) return -1;
 
-    if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
-    else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
+    if (ctx->version < 3) {
+	if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
+	else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
+	last_written_addr = *(uint32_t*)last_written_addr_ptr;
+    } else {
+	last_written_addr_ptr = desc_va + 2 * sizeof(uint32_t);
+	last_written_addr = *(uint64_t*)last_written_addr_ptr;
+    }
 
-    pcilib_debug(DMA, "Current DMA status      - last read: %4u, last_read_addr: %4u (0x%x), last_written: %4u (0x%x)", ctx->last_read, 
+    pcilib_debug(DMA, "Current DMA status      - last read: %4u, last_read_addr: %4u (0x%x), last_written: %4lu (0x%lx)", ctx->last_read, 
 	dma_ipe_find_buffer_by_bus_addr(ctx, ctx->last_read_addr), ctx->last_read_addr, 
-	dma_ipe_find_buffer_by_bus_addr(ctx, *last_written_addr_ptr), *last_written_addr_ptr
+	dma_ipe_find_buffer_by_bus_addr(ctx, last_written_addr), last_written_addr
     );
 
-    last_written_addr = *last_written_addr_ptr;
 
     status->started = ctx->started;
     status->ring_size = ctx->ring_size;
@@ -459,7 +492,8 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
     struct timeval start, cur;
 
     volatile void *desc_va;
-    volatile uint32_t *last_written_addr_ptr;
+    volatile void *last_written_addr_ptr;
+    uint32_t empty_detected_dummy = 0;
     volatile uint32_t *empty_detected_ptr;
 
     pcilib_dma_flags_t packet_flags = PCILIB_DMA_FLAG_EOP;
@@ -476,10 +510,15 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
     desc_va = (void*)pcilib_kmem_get_ua(ctx->dmactx.pcilib, ctx->desc);
 
-    if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
-    else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
+    if (ctx->version < 3) {
+	if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
+	else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
+	empty_detected_ptr = last_written_addr_ptr - 2;
+    } else {
+	last_written_addr_ptr = desc_va + 2 * sizeof(uint32_t);
+	empty_detected_ptr = &empty_detected_dummy;
+    }
 
-    empty_detected_ptr = last_written_addr_ptr - 2;
 
     switch (sched_getscheduler(0)) {
      case SCHED_FIFO:
@@ -513,12 +552,12 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
 	pcilib_debug(DMA, "Waiting for data in %4u - last_read: %4u, last_read_addr: %4u (0x%08x), last_written: %4u (0x%08x)", ctx->last_read + 1, ctx->last_read, 
 		dma_ipe_find_buffer_by_bus_addr(ctx, ctx->last_read_addr), ctx->last_read_addr, 
-		dma_ipe_find_buffer_by_bus_addr(ctx, *last_written_addr_ptr), *last_written_addr_ptr
+		dma_ipe_find_buffer_by_bus_addr(ctx, DEREF(last_written_addr_ptr)), DEREF(last_written_addr_ptr)
 	);
 
 	gettimeofday(&start, NULL);
 	memcpy(&cur, &start, sizeof(struct timeval));
-	while (((*last_written_addr_ptr == 0)||(ctx->last_read_addr == (*last_written_addr_ptr)))&&((wait == PCILIB_TIMEOUT_INFINITE)||(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < wait))) {
+	while (((DEREF(last_written_addr_ptr) == 0)||(ctx->last_read_addr == DEREF(last_written_addr_ptr)))&&((wait == PCILIB_TIMEOUT_INFINITE)||(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < wait))) {
 	    if (nodata_sleep) {
 	        sleep_ts.tv_nsec = nodata_sleep;
 		nanosleep(&sleep_ts, NULL);
@@ -531,10 +570,10 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	}
 	
 	    // Failing out if we exited on timeout
-	if ((ctx->last_read_addr == (*last_written_addr_ptr))||(*last_written_addr_ptr == 0)) {
+	if ((ctx->last_read_addr == DEREF(last_written_addr_ptr))||(DEREF(last_written_addr_ptr) == 0)) {
 #ifdef IPEDMA_SUPPORT_EMPTY_DETECTED
 # ifdef PCILIB_DEBUG_DMA
-	    if ((wait)&&(*last_written_addr_ptr)&&(!*empty_detected_ptr))
+	    if ((wait)&&(DEREF(last_written_addr_ptr))&&(!*empty_detected_ptr))
 		pcilib_debug(DMA, "The empty_detected flag is not set, but no data arrived within %lu us", wait);
 # endif /* PCILIB_DEBUG_DMA */
 #endif /* IPEDMA_SUPPORT_EMPTY_DETECTED */
@@ -547,11 +586,11 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
 	pcilib_debug(DMA, "Got buffer          %4u - last read: %4u, last_read_addr: %4u (0x%x), last_written: %4u (0x%x)", cur_read, ctx->last_read, 
 		dma_ipe_find_buffer_by_bus_addr(ctx, ctx->last_read_addr), ctx->last_read_addr, 
-		dma_ipe_find_buffer_by_bus_addr(ctx, *last_written_addr_ptr), *last_written_addr_ptr
+		dma_ipe_find_buffer_by_bus_addr(ctx, DEREF(last_written_addr_ptr)), DEREF(last_written_addr_ptr)
 	);
 
 #ifdef IPEDMA_DETECT_PACKETS
-	if ((*empty_detected_ptr)&&(pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, cur_read) == (*last_written_addr_ptr))) packet_flags = PCILIB_DMA_FLAG_EOP;
+	if ((*empty_detected_ptr)&&(pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, cur_read) == DEREF(last_written_addr_ptr))) packet_flags = PCILIB_DMA_FLAG_EOP;
 	else packet_flags = 0;
 #endif /* IPEDMA_DETECT_PACKETS */
 	
@@ -572,7 +611,11 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	    else last_free = IPEDMA_DMA_PAGES - 1;
 
 	    uintptr_t buf_ba = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, last_free);
-	    WR(IPEDMA_REG2_PAGE_ADDR, buf_ba);
+	    if (ctx->version < 3) {
+		WR(IPEDMA_REG2_PAGE_ADDR, buf_ba);
+	    } else {
+		WR64(IPEDMA_REG3_PAGE_ADDR, buf_ba);
+	    }
 # ifdef IPEDMA_STREAMING_CHECKS
 	    pcilib_register_value_t streaming_status;
 	    RD(IPEDMA_REG_STREAMING_STATUS, streaming_status);
@@ -583,14 +626,14 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
 	    // Numbered from 1
 #ifdef IPEDMA_BUG_LAST_READ
-	WR(IPEDMA_REG2_LAST_READ, cur_read?cur_read:IPEDMA_DMA_PAGES);
+	WR(ctx->reg_last_read, cur_read?cur_read:IPEDMA_DMA_PAGES);
 #else /* IPEDMA_BUG_LAST_READ */
-	WR(IPEDMA_REG2_LAST_READ, cur_read + 1);
+	WR(ctx->reg_last_read, cur_read + 1);
 #endif /* IPEDMA_BUG_LAST_READ */
 
 	pcilib_debug(DMA, "Buffer returned     %4u - last read: %4u, last_read_addr: %4u (0x%x), last_written: %4u (0x%x)", cur_read, ctx->last_read, 
 		dma_ipe_find_buffer_by_bus_addr(ctx, ctx->last_read_addr), ctx->last_read_addr, 
-		dma_ipe_find_buffer_by_bus_addr(ctx, *last_written_addr_ptr), *last_written_addr_ptr
+		dma_ipe_find_buffer_by_bus_addr(ctx, DEREF(last_written_addr_ptr)), DEREF(last_written_addr_ptr)
 	);
 
 

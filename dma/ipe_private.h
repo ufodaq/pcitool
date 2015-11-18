@@ -21,7 +21,7 @@
 
 #define IPEDMA_REG_ADDR_MASK 0xFFF
 #define IPEDMA_REG_BANK_MASK 0xF000
-#define IPEDMA_REG_BANK_SHIFT 24
+#define IPEDMA_REG_BANK_SHIFT 12
 
 #define REG2VIRT(reg) (ctx->base_addr[(reg&IPEDMA_REG_BANK_MASK)>>IPEDMA_REG_BANK_SHIFT] + (reg&IPEDMA_REG_ADDR_MASK))
 #define REG(bank, addr) ((bank<<IPEDMA_REG_BANK_SHIFT)|addr)
@@ -64,7 +64,12 @@
 #define WR(addr, value) { *(uint32_t*)(REG2VIRT(addr)) = value; }
 #define RD(addr, value) { value = *(uint32_t*)(REG2VIRT(addr)); }
 
+#define WR64(addr, value) { *(uint64_t*)(REG2VIRT(addr)) = value; }
+#define RD64(addr, value) { value = *(uint64_t*)(REG2VIRT(addr)); }
 
+#define DEREF(ptr) ((ctx->version<3)?(*(uint32_t*)ptr):(*(uint64_t*)ptr))
+
+typedef uint32_t reg_t;
 typedef struct ipe_dma_s ipe_dma_t;
 
 struct ipe_dma_s {
@@ -95,8 +100,10 @@ struct ipe_dma_s {
     pcilib_kmem_handle_t *pages;	/**< collection of memory-locked pages for DMA operation */
 
     size_t ring_size, page_size;
-    size_t last_read, last_read_addr, last_written;
+    size_t last_read, last_written;
+    uintptr_t last_read_addr;
 
+    reg_t reg_last_read;		/**< actual location of last_read register (removed from hardware for version 3) */
 };
 
 #endif /* _PCILIB_DMA_IPE_PRIVATE_H */
