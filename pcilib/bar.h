@@ -1,6 +1,15 @@
 #ifndef _PCILIB_BAR_H
 #define _PCILIB_BAR_H
 
+
+typedef struct {
+    pcilib_bar_t bar;
+    size_t size;
+    uintptr_t phys_addr;
+    void *virt_addr;
+} pcilib_bar_info_t;
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -63,17 +72,9 @@ int pcilib_detect_address(pcilib_t *ctx, pcilib_bar_t *bar, uintptr_t *addr, siz
  */
 char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size);
 
+const pcilib_bar_info_t *pcilib_get_bar_info(pcilib_t *ctx, pcilib_bar_t bar);
+const pcilib_bar_info_t *pcilib_get_bar_list(pcilib_t *ctx);
 
-/**
- * The wrapper arround pcilib_resolve_bar_address() provided for backward compatibility. 
- * If bar is not specified, it first checks the first BAR with registers, before searching
- * in other available BARs.
- * @param[in,out] ctx	- pcilib context
- * @param[in] bar	- specifies the BAR address belong to, use PCILIB_BAR_DETECT for autodetection
- * @param[in] addr	- specifies the physical address on the PCI bus or offset in the BAR if \a bar is specified
- * @return		- the virtual address in the process address space or NULL in case of error
- */
-char *pcilib_resolve_register_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr);	
 
 #ifdef __cplusplus
 }

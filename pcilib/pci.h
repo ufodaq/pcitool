@@ -22,6 +22,7 @@
 
 #include "timing.h"
 #include "cpu.h"
+#include "bar.h"
 #include "pcilib.h"
 #include "register.h"
 #include "kmem.h"
@@ -50,6 +51,7 @@ struct pcilib_s {
     pcilib_board_info_t board_info;							/**< The mandatory information about board as defined by PCI specification */
     pcilib_pcie_link_info_t link_info;							/**< Infomation about PCIe connection */
     char *bar_space[PCILIB_MAX_BARS];							/**< Pointers to the mapped BARs in virtual address space */
+    pcilib_bar_info_t bar_info[PCILIB_MAX_BARS + 1];					/**< NULL terminated list of PCI bar descriptions */
 
     int pci_cfg_space_fd;								/**< File descriptor linking to PCI configuration space in sysfs */
     uint32_t pci_cfg_space_cache[64];							/**< Cached PCI configuration space */
