@@ -1,6 +1,6 @@
 
 obj-m := pciDriver.o
-pciDriver-objs := base.o int.o umem.o kmem.o sysfs.o ioctl.o
+pciDriver-objs := base.o int.o umem.o kmem.o sysfs.o ioctl.o compat.o
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 INSTALLDIR ?= /lib/modules/$(shell uname -r)/kernel/extra

@@ -195,4 +195,7 @@ static inline void set_pages_reserved_compat(unsigned long cpua, unsigned long s
 #endif
 }
 
+int pcidriver_pcie_get_mps(struct pci_dev *dev);
+int pcidriver_pcie_set_mps(struct pci_dev *dev, int mps);
+
 #endif

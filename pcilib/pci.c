@@ -483,3 +483,10 @@ int pcilib_set_dma_mask(pcilib_t *ctx, int mask) {
 
     return 0;
 }
+
+int pcilib_set_mps(pcilib_t *ctx, int mps) {
+    if (ioctl(ctx->handle, PCIDRIVER_IOC_MPS, mps) < 0)
+	return PCILIB_ERROR_FAILED;
+
+    return 0;
+}

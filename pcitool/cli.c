@@ -97,6 +97,7 @@ typedef enum {
     MODE_ACK_IRQ,
     MODE_WAIT_IRQ,
     MODE_SET_DMASK,
+    MODE_SET_MPS,
     MODE_ALLOC_KMEM,
     MODE_LIST_KMEM,
     MODE_READ_KMEM,
@@ -173,6 +174,7 @@ typedef enum {
     OPT_WAIT_IRQ,
     OPT_ITERATIONS,
     OPT_SET_DMASK,
+    OPT_SET_MPS,
     OPT_ALLOC_KMEM,
     OPT_LIST_KMEM,
     OPT_FREE_KMEM,
@@ -227,6 +229,7 @@ static struct option long_options[] = {
     {"acknowledge-irq",		optional_argument, 0, OPT_ACK_IRQ },
     {"wait-irq",		optional_argument, 0, OPT_WAIT_IRQ },
     {"set-dma-mask",		required_argument, 0, OPT_SET_DMASK },
+    {"set-mps",			required_argument, 0, OPT_SET_MPS },
     {"list-kernel-memory",	optional_argument, 0, OPT_LIST_KMEM },
     {"read-kernel-memory",	required_argument, 0, OPT_READ_KMEM },
     {"alloc-kernel-memory",	required_argument, 0, OPT_ALLOC_KMEM },
@@ -303,8 +306,11 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   --list-dma-buffers <dma>	- List buffers for specified DMA engine\n"
 "   --read-dma-buffer <dma:buf>	- Read the specified buffer\n"
 "\n"
-"  Kernel Modes:\n"
+"  PCI Configuration:\n"
 "   --set-dma-mask [bits]	- Set DMA address width (DANGEROUS)\n"
+"   --set-mps [bits]		- Set PCIe Payload Size (DANGEROUS)\n"
+"\n"
+"  Kernel Memory Modes:\n"
 "   --list-kernel-memory [use] 	- List kernel buffers\n"
 "   --read-kernel-memory <blk>	- Read the specified block of the kernel memory\n"
 "				  block is specified as: use:block_number\n"
@@ -3089,6 +3095,7 @@ int main(int argc, char **argv) {
     size_t iterations = BENCHMARK_ITERATIONS;
 
     unsigned long dma_mask = 0;
+    unsigned long pcie_mps = 0;
 
     pcilib_t *handle;
 
@@ -3289,6 +3296,13 @@ int main(int argc, char **argv) {
 
 		if ((!isnumber(optarg))||(sscanf(optarg, "%lu", &dma_mask) != 1)||(dma_mask<24)||(dma_mask>64))
 			Usage(argc, argv, "Invalid DMA mask is specified (%s)", optarg);
+	    break;
+	    case OPT_SET_MPS:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		mode = MODE_SET_MPS;
+
+		if ((!isnumber(optarg))||(sscanf(optarg, "%lu", &pcie_mps) != 1)||(pcie_mps<128)||(pcie_mps>2048))
+			Usage(argc, argv, "Invalid payload size is specified (%s)", optarg);
 	    break;
 	    case OPT_LIST_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
@@ -3887,6 +3901,9 @@ int main(int argc, char **argv) {
      break;
      case MODE_SET_DMASK:
         pcilib_set_dma_mask(handle, dma_mask);
+     break;
+     case MODE_SET_MPS:
+        pcilib_set_mps(handle, pcie_mps);
      break;
      case MODE_LIST_KMEM:
         if (use) DetailKMEM(handle, fpga_device, use, block);

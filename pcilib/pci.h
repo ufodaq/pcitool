@@ -124,6 +124,7 @@ int pcilib_map_register_space(pcilib_t *ctx);
 int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr);
 
 int pcilib_set_dma_mask(pcilib_t *ctx, int mask);
+int pcilib_set_mps(pcilib_t *ctx, int mps);
 
 #ifdef __cplusplus
 }

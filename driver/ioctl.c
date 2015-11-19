@@ -433,7 +433,6 @@ static int ioctl_version(pcidriver_privdata_t *privdata, unsigned long arg)
 	return 0;
 }
 
-
 /**
  *
  * Gets current device and driver configuration
@@ -448,6 +447,7 @@ static int ioctl_device_state(pcidriver_privdata_t *privdata, unsigned long arg)
 
 	info = (pcilib_device_state_t) {
 	    .iommu = iommu_present(privdata->pdev->dev.bus),
+	    .mps = pcidriver_pcie_get_mps(privdata->pdev),
 	    .dma_mask = privdata->pdev->dma_mask
 	};
 
@@ -468,7 +468,7 @@ static int ioctl_set_dma_mask(pcidriver_privdata_t *privdata, unsigned long arg)
 {
 	int err;
 
-	if ((arg < 24) && (arg > 63))
+	if ((arg < 24) || (arg > 64))
 		return -EINVAL;
 
 	err = pci_set_dma_mask(privdata->pdev, DMA_BIT_MASK(arg));
@@ -477,8 +477,29 @@ static int ioctl_set_dma_mask(pcidriver_privdata_t *privdata, unsigned long arg)
 	    return err;
 	}
 	
-	printk(KERN_ERR "pci_set_dma_mask(%lu) successeded\n", arg);
+	return 0;
+}
 
+/**
+ *
+ * Sets Max Payload Size.
+ *
+ * @param arg Not a pointer, but payload size in bits
+ *
+ */
+static int ioctl_set_mps(pcidriver_privdata_t *privdata, unsigned long arg)
+{
+	int err;
+
+	if ((arg != 128) && (arg != 256) && (arg != 512))
+		return -EINVAL;
+
+	err = pcidriver_pcie_set_mps(privdata->pdev, arg);
+	if (err < 0) {
+	    printk(KERN_ERR "pcie_set_mps(%lu) failed\n", arg);
+	    return err;
+	}
+	
 	return 0;
 }
 
@@ -550,6 +571,9 @@ long pcidriver_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		case PCIDRIVER_IOC_DMA_MASK:
 			return ioctl_set_dma_mask(privdata, arg);
+
+		case PCIDRIVER_IOC_MPS:
+			return ioctl_set_mps(privdata, arg);
 
 		default:
 			return -EINVAL;

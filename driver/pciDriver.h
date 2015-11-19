@@ -130,8 +130,9 @@ typedef struct {
 } pcilib_driver_version_t;
 
 typedef struct {
-    unsigned long iommu;
-    unsigned long dma_mask;
+    int iommu;						/**< Specifies if IOMMU is enabled or disabled */
+    int mps;						/**< Maximum payload size */
+    unsigned long dma_mask;				/**< DMA mask */
 } pcilib_device_state_t;
 
 typedef struct {
@@ -235,7 +236,8 @@ typedef struct {
 #define PCIDRIVER_IOC_VERSION		_IOR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 14, pcilib_driver_version_t * )
 #define PCIDRIVER_IOC_DEVICE_STATE	_IOR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 15, pcilib_device_state_t * )
 #define PCIDRIVER_IOC_DMA_MASK		_IO(   PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 16)
+#define PCIDRIVER_IOC_MPS		_IO(   PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 17)
 
-#define PCIDRIVER_IOC_MAX 16
+#define PCIDRIVER_IOC_MAX 17
 
 #endif
