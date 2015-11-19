@@ -108,6 +108,7 @@ static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
 pcilib_t *pcilib_open(const char *device, const char *model) {
     int err, xmlerr;
     pcilib_t *ctx = malloc(sizeof(pcilib_t));
+    const pcilib_driver_version_t *drv_version;
 	
     if (!model)
 	model = getenv("PCILIB_MODEL");
@@ -119,6 +120,13 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	ctx->handle = open(device, O_RDWR);
 	if (ctx->handle < 0) {
 	    pcilib_error("Error opening device (%s)", device);
+	    free(ctx);
+	    return NULL;
+	}
+	
+	drv_version = pcilib_get_driver_version(ctx);
+	if (!drv_version) {
+	    pcilib_error("Driver verification has failed (%s)", device);
 	    free(ctx);
 	    return NULL;
 	}
@@ -224,6 +232,34 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 }
 
 
+const pcilib_driver_version_t *pcilib_get_driver_version(pcilib_t *ctx) {
+    int ret;
+    
+    if (!ctx->driver_version.version) {
+	ret = ioctl( ctx->handle, PCIDRIVER_IOC_VERSION, &ctx->driver_version );
+	if (ret) {
+	    pcilib_error("PCIDRIVER_IOC_DRIVER_VERSION ioctl have failed");
+	    return NULL;
+	}
+	
+	if (ctx->driver_version.interface != PCIDRIVER_INTERFACE_VERSION) {
+	    pcilib_error("Using pcilib (version: %u.%u.%u, driver interface: 0x%lx) with incompatible driver (version: %u.%u.%u, interface: 0x%lx)", 
+		PCILIB_VERSION_GET_MAJOR(PCILIB_VERSION),
+		PCILIB_VERSION_GET_MINOR(PCILIB_VERSION),
+		PCILIB_VERSION_GET_MICRO(PCILIB_VERSION),
+		PCIDRIVER_INTERFACE_VERSION,
+		PCILIB_VERSION_GET_MAJOR(ctx->driver_version.version),
+		PCILIB_VERSION_GET_MINOR(ctx->driver_version.version),
+		PCILIB_VERSION_GET_MICRO(ctx->driver_version.version),
+		ctx->driver_version.interface
+	    );
+	    return NULL;
+	}
+    }
+
+    return &ctx->driver_version;
+}
+
 const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx) {
     int ret;
     
@@ -236,7 +272,7 @@ const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx) {
 	
 	ctx->page_mask = pcilib_get_page_mask();
     }
-    
+
     return &ctx->board_info;
 }
 
@@ -432,8 +468,17 @@ const pcilib_pcie_link_info_t *pcilib_get_pcie_link_info(pcilib_t *ctx) {
     return &ctx->link_info;
 }
 
+int pcilib_get_device_state(pcilib_t *ctx, pcilib_device_state_t *state) {
+    int ret = ioctl( ctx->handle, PCIDRIVER_IOC_DEVICE_STATE, state);
+    if (ret < 0) {
+	pcilib_error("PCIDRIVER_IOC_DEVICE_STATE ioctl have failed");
+	return PCILIB_ERROR_FAILED;
+    }
+    return 0;
+}
+
 int pcilib_set_dma_mask(pcilib_t *ctx, int mask) {
-    if (ioctl( ctx->handle, PCIDRIVER_IOC_SET_DMA_MASK, mask ) < 0)
+    if (ioctl(ctx->handle, PCIDRIVER_IOC_DMA_MASK, mask) < 0)
 	return PCILIB_ERROR_FAILED;
 
     return 0;

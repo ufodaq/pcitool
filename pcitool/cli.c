@@ -74,6 +74,7 @@ typedef enum {
 
 typedef enum {
     MODE_INVALID,
+    MODE_VERSION,
     MODE_INFO,
     MODE_LIST,
     MODE_BENCHMARK,
@@ -95,6 +96,7 @@ typedef enum {
     MODE_DISABLE_IRQ,
     MODE_ACK_IRQ,
     MODE_WAIT_IRQ,
+    MODE_SET_DMASK,
     MODE_ALLOC_KMEM,
     MODE_LIST_KMEM,
     MODE_READ_KMEM,
@@ -148,7 +150,8 @@ typedef enum {
     OPT_GRAB = 'g',
     OPT_QUIETE = 'q',
     OPT_HELP = 'h',
-    OPT_RESET = 128,
+    OPT_VERSION = 128,
+    OPT_RESET,
     OPT_BENCHMARK,
     OPT_TRIGGER,
     OPT_DATA_TYPE,
@@ -169,6 +172,7 @@ typedef enum {
     OPT_ACK_IRQ,
     OPT_WAIT_IRQ,
     OPT_ITERATIONS,
+    OPT_SET_DMASK,
     OPT_ALLOC_KMEM,
     OPT_LIST_KMEM,
     OPT_FREE_KMEM,
@@ -222,6 +226,7 @@ static struct option long_options[] = {
     {"disable-irq",		optional_argument, 0, OPT_DISABLE_IRQ },
     {"acknowledge-irq",		optional_argument, 0, OPT_ACK_IRQ },
     {"wait-irq",		optional_argument, 0, OPT_WAIT_IRQ },
+    {"set-dma-mask",		required_argument, 0, OPT_SET_DMASK },
     {"list-kernel-memory",	optional_argument, 0, OPT_LIST_KMEM },
     {"read-kernel-memory",	required_argument, 0, OPT_READ_KMEM },
     {"alloc-kernel-memory",	required_argument, 0, OPT_ALLOC_KMEM },
@@ -239,6 +244,7 @@ static struct option long_options[] = {
     {"verify",			no_argument, 0, OPT_VERIFY },
     {"multipacket",		no_argument, 0, OPT_MULTIPACKET },
     {"wait",			no_argument, 0, OPT_WAIT },
+    {"version",			no_argument, 0, OPT_VERSION },
     {"help",			no_argument, 0, OPT_HELP },
     { 0, 0, 0, 0 }
 };
@@ -268,6 +274,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   -w <addr|dmaX|reg|prop>	- Write Data/Register/Property\n"
 "   --benchmark <barX|dmaX>	- Performance Evaluation\n"
 "   --reset			- Reset board\n"
+"   --version			- Version information\n"
 "   --help			- Help message\n"
 "\n"
 "  Property/Register Modes:\n"
@@ -297,6 +304,7 @@ void Usage(int argc, char *argv[], const char *format, ...) {
 "   --read-dma-buffer <dma:buf>	- Read the specified buffer\n"
 "\n"
 "  Kernel Modes:\n"
+"   --set-dma-mask [bits]	- Set DMA address width (DANGEROUS)\n"
 "   --list-kernel-memory [use] 	- List kernel buffers\n"
 "   --read-kernel-memory <blk>	- Read the specified block of the kernel memory\n"
 "				  block is specified as: use:block_number\n"
@@ -840,6 +848,49 @@ void RegisterInfo(pcilib_t *handle, pcilib_register_t reg) {
     pcilib_free_register_info(handle, info);
 }
 
+void Version(pcilib_t *handle, const pcilib_model_description_t *model_info) {
+    const pcilib_driver_version_t *driver_version;
+
+    driver_version = pcilib_get_driver_version(handle);
+
+    printf("pcilib version: %u.%u.%u\n",
+	PCILIB_VERSION_GET_MAJOR(PCILIB_VERSION),
+	PCILIB_VERSION_GET_MINOR(PCILIB_VERSION),
+	PCILIB_VERSION_GET_MICRO(PCILIB_VERSION)
+    );
+
+    printf("driver version: %lu.%lu.%lu, interface: 0x%lx, registered ioctls: %lu\n",
+	PCILIB_VERSION_GET_MAJOR(driver_version->version),
+	PCILIB_VERSION_GET_MINOR(driver_version->version),
+	PCILIB_VERSION_GET_MICRO(driver_version->version),
+	driver_version->interface,
+	driver_version->ioctls
+    );
+
+    if (model_info) {
+	pcilib_version_t version = model_info->interface_version;
+	printf("Model: %s", handle->model);
+	if (version) {
+	    printf(", version: %u.%u.%u\n",
+		PCILIB_VERSION_GET_MAJOR(version),
+		PCILIB_VERSION_GET_MINOR(version),
+		PCILIB_VERSION_GET_MICRO(version)
+	    );
+	} else {
+	    printf(" (embedded)\n");
+	}
+    }
+
+    if (model_info->dma) {
+	pcilib_version_t version = model_info->dma->api->version;
+	printf("DMA Engine: %s, version: %u.%u.%u\n", model_info->dma->name,
+	    PCILIB_VERSION_GET_MAJOR(version),
+	    PCILIB_VERSION_GET_MINOR(version),
+	    PCILIB_VERSION_GET_MICRO(version)
+	);
+    }
+}
+
 void Info(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *target) {
     int i, j;
     DIR *dir;
@@ -850,14 +901,33 @@ void Info(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
     const pcilib_board_info_t *board_info = pcilib_get_board_info(handle);
     const pcilib_pcie_link_info_t *link_info = pcilib_get_pcie_link_info(handle);
 
+    int have_state;
+    pcilib_device_state_t state;
+
     path = getenv("PCILIB_PLUGIN_DIR");
     if (!path) path = PCILIB_PLUGIN_DIR;
+
+    have_state = !pcilib_get_device_state(handle, &state);
 
     if (board_info)
 	printf("Vendor: %x, Device: %x, Bus: %x, Slot: %x, Function: %x, Model: %s\n", board_info->vendor_id, board_info->device_id, board_info->bus, board_info->slot, board_info->func, handle->model);
 
     if (link_info) {
-	printf(" PCIe x%u (gen%u), DMA Payload: %u (of %u)\n", link_info->link_width, link_info->link_speed, 1<<link_info->payload, 1<<link_info->max_payload);
+	printf(" PCIe x%u (gen%u), DMA Payload: %u (of %u)", link_info->link_width, link_info->link_speed, 1<<link_info->payload, 1<<link_info->max_payload);
+	if (have_state) {
+	    int bits = 0;
+	    unsigned long mask;
+
+	    for (mask = state.dma_mask; mask&1; mask>>=1) bits++;
+
+	    printf(", DMA Mask: ");
+
+	    if (mask) printf("0x%lx", state.dma_mask);
+	    else printf("%u bits", bits);
+
+	    printf(", IOMMU: %s", state.iommu?"on":"off");
+	}
+	printf("\n");
     }
 
     if (board_info)
@@ -3018,6 +3088,8 @@ int main(int argc, char **argv) {
     FILE *ofile = NULL;
     size_t iterations = BENCHMARK_ITERATIONS;
 
+    unsigned long dma_mask = 0;
+
     pcilib_t *handle;
 
     int size_set = 0;
@@ -3031,6 +3103,10 @@ int main(int argc, char **argv) {
 	switch (c) {
 	    case OPT_HELP:
 		Usage(argc, argv, NULL);
+	    break;
+	    case OPT_VERSION:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		mode = MODE_VERSION;
 	    break;
 	    case OPT_INFO:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
@@ -3206,6 +3282,13 @@ int main(int argc, char **argv) {
 
 		    irq_source = itmp;
 		}
+	    break;
+	    case OPT_SET_DMASK:
+		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+		mode = MODE_SET_DMASK;
+
+		if ((!isnumber(optarg))||(sscanf(optarg, "%lu", &dma_mask) != 1)||(dma_mask<24)||(dma_mask>64))
+			Usage(argc, argv, "Invalid DMA mask is specified (%s)", optarg);
 	    break;
 	    case OPT_LIST_KMEM:
 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
@@ -3729,6 +3812,9 @@ int main(int argc, char **argv) {
     }
 
     switch (mode) {
+     case MODE_VERSION:
+        Version(handle, model_info);
+    break;
      case MODE_INFO:
         Info(handle, model_info, info_target);
      break;
@@ -3798,6 +3884,9 @@ int main(int argc, char **argv) {
      break;
      case MODE_WAIT_IRQ:
         WaitIRQ(handle, model_info, irq_source, timeout);
+     break;
+     case MODE_SET_DMASK:
+        pcilib_set_dma_mask(handle, dma_mask);
      break;
      case MODE_LIST_KMEM:
         if (use) DetailKMEM(handle, fpga_device, use, block);

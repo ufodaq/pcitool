@@ -28,6 +28,9 @@
 #include <linux/interrupt.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#include <linux/iommu.h>
+
+#include "../pcilib/version.h"
 
 #include "config.h" 			/* Configuration for the driver */
 #include "compat.h" 			/* Compatibility functions/definitions */
@@ -409,6 +412,53 @@ static int ioctl_clear_ioq(pcidriver_privdata_t *privdata, unsigned long arg)
 
 /**
  *
+ * Gets the device and API versions.
+ *
+ * @see pcilib_driver_version_t
+ *
+ */
+static int ioctl_version(pcidriver_privdata_t *privdata, unsigned long arg)
+{
+	int ret;
+	pcilib_driver_version_t info;
+
+	info = (pcilib_driver_version_t) {
+	    .version = PCILIB_VERSION,
+	    .interface = PCIDRIVER_INTERFACE_VERSION,
+	    .ioctls = PCIDRIVER_IOC_MAX + 1
+	};
+
+	WRITE_TO_USER(pcilib_driver_version_t, info);
+
+	return 0;
+}
+
+
+/**
+ *
+ * Gets current device and driver configuration
+ *
+ * @see pcilib_device_state_t
+ *
+ */
+static int ioctl_device_state(pcidriver_privdata_t *privdata, unsigned long arg)
+{
+	int ret;
+	pcilib_device_state_t info;
+
+	info = (pcilib_device_state_t) {
+	    .iommu = iommu_present(privdata->pdev->dev.bus),
+	    .dma_mask = privdata->pdev->dma_mask
+	};
+
+	WRITE_TO_USER(pcilib_device_state_t, info);
+
+	return 0;
+}
+
+
+/**
+ *
  * Sets DMA mask for the following DMA mappings.
  *
  * @param arg Not a pointer, but a number of bits
@@ -491,8 +541,14 @@ long pcidriver_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		case PCIDRIVER_IOC_CLEAR_IOQ:
 			return ioctl_clear_ioq(privdata, arg);
+		
+		case PCIDRIVER_IOC_VERSION:
+			return ioctl_version(privdata, arg);
 
-		case PCIDRIVER_IOC_SET_DMA_MASK:
+		case PCIDRIVER_IOC_DEVICE_STATE:
+			return ioctl_device_state(privdata, arg);
+
+		case PCIDRIVER_IOC_DMA_MASK:
 			return ioctl_set_dma_mask(privdata, arg);
 
 		default:

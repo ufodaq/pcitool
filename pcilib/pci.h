@@ -48,6 +48,7 @@ struct pcilib_s {
     int handle;										/**< file handle of device */
     
     uintptr_t page_mask;								/**< Selects bits which define offset within the page */
+    pcilib_driver_version_t driver_version;						/**< Version reported by the driver */
     pcilib_board_info_t board_info;							/**< The mandatory information about board as defined by PCI specification */
     pcilib_pcie_link_info_t link_info;							/**< Infomation about PCIe connection */
     char *bar_space[PCILIB_MAX_BARS];							/**< Pointers to the mapped BARs in virtual address space */
@@ -112,8 +113,12 @@ extern "C" {
 #endif
 
 pcilib_context_t *pcilib_get_implementation_context(pcilib_t *ctx);
+
+const pcilib_driver_version_t *pcilib_get_driver_version(pcilib_t *ctx);
 const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx);
 const pcilib_pcie_link_info_t *pcilib_get_pcie_link_info(pcilib_t *ctx);
+int pcilib_get_device_state(pcilib_t *ctx, pcilib_device_state_t *state);
+
 
 int pcilib_map_register_space(pcilib_t *ctx);
 int pcilib_map_data_space(pcilib_t *ctx, uintptr_t addr);

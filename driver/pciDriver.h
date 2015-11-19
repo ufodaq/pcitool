@@ -58,6 +58,8 @@
 
 #include <linux/ioctl.h>
 
+#define PCIDRIVER_INTERFACE_VERSION 1					/**< Driver API version, only the pcilib with the same driver interface version is allowed */
+
 /* Identifies the PCI-E Xilinx ML605 */
 #define PCIE_XILINX_VENDOR_ID 0x10ee
 #define PCIE_ML605_DEVICE_ID 0x6024
@@ -119,6 +121,19 @@
 #define KMEM_FLAG_REUSED_HW 		PCILIB_KMEM_FLAG_HARDWARE	/**< Indicates that reused buffer had a HW reference before the call */
 
 /* Types */
+
+typedef struct {
+    unsigned long version;				/**< pcilib version */
+    unsigned long interface;				/**< driver interface version */
+    unsigned long ioctls;				/**< number of supporterd ioctls */
+    unsigned long reserved[5];				/**< reserved for the future use */
+} pcilib_driver_version_t;
+
+typedef struct {
+    unsigned long iommu;
+    unsigned long dma_mask;
+} pcilib_device_state_t;
+
 typedef struct {
     unsigned short vendor_id;
     unsigned short device_id;
@@ -193,31 +208,34 @@ typedef struct {
  * This type is only 8-bits wide, and half-documented in 
  * <linux-src>/Documentation/ioctl-number.txt.
  * previous SHL -> 'S' definition, conflicts with several devices,
- * so I changed it to be pci -> 'p', in the range 0xA0-AF
+ * so I changed it to be pci -> 'p', in the range 0xA0-BF
  */
 #define PCIDRIVER_IOC_MAGIC 'p'
 #define PCIDRIVER_IOC_BASE  0xA0
 
-#define PCIDRIVER_IOC_MMAP_MODE  _IO(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 0 )
-#define PCIDRIVER_IOC_MMAP_AREA  _IO(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 1 )
-#define PCIDRIVER_IOC_KMEM_ALLOC _IOWR( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 2, kmem_handle_t * )
-#define PCIDRIVER_IOC_KMEM_FREE  _IOW ( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 3, kmem_handle_t * )
-#define PCIDRIVER_IOC_KMEM_SYNC  _IOWR( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 4, kmem_sync_t * )
-#define PCIDRIVER_IOC_UMEM_SGMAP _IOWR( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 5, umem_handle_t * )
-#define PCIDRIVER_IOC_UMEM_SGUNMAP _IOW(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 6, umem_handle_t * )
-#define PCIDRIVER_IOC_UMEM_SGGET _IOWR( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 7, umem_sglist_t * )
-#define PCIDRIVER_IOC_UMEM_SYNC  _IOW(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 8, umem_handle_t * )
-#define PCIDRIVER_IOC_WAITI      _IO(   PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 9 )
+#define PCIDRIVER_IOC_MMAP_MODE		_IO(   PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 0 )
+#define PCIDRIVER_IOC_MMAP_AREA		_IO(   PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 1 )
+#define PCIDRIVER_IOC_KMEM_ALLOC	_IOWR( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 2, kmem_handle_t * )
+#define PCIDRIVER_IOC_KMEM_FREE		_IOW ( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 3, kmem_handle_t * )
+#define PCIDRIVER_IOC_KMEM_SYNC		_IOWR( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 4, kmem_sync_t * )
+#define PCIDRIVER_IOC_UMEM_SGMAP	_IOWR( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 5, umem_handle_t * )
+#define PCIDRIVER_IOC_UMEM_SGUNMAP	_IOW(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 6, umem_handle_t * )
+#define PCIDRIVER_IOC_UMEM_SGGET	_IOWR( PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 7, umem_sglist_t * )
+#define PCIDRIVER_IOC_UMEM_SYNC		_IOW(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 8, umem_handle_t * )
+#define PCIDRIVER_IOC_WAITI		_IO(   PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 9 )
 
 /* And now, the methods to access the PCI configuration area */
-#define PCIDRIVER_IOC_PCI_CFG_RD  _IOWR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 10, pci_cfg_cmd * )
-#define PCIDRIVER_IOC_PCI_CFG_WR  _IOWR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 11, pci_cfg_cmd * )
-#define PCIDRIVER_IOC_PCI_INFO    _IOWR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 12, pcilib_board_info_t * )
+#define PCIDRIVER_IOC_PCI_CFG_RD  	_IOWR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 10, pci_cfg_cmd * )
+#define PCIDRIVER_IOC_PCI_CFG_WR  	_IOWR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 11, pci_cfg_cmd * )
+#define PCIDRIVER_IOC_PCI_INFO    	_IOWR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 12, pcilib_board_info_t * )
 
 /* Clear interrupt queues */
-#define PCIDRIVER_IOC_CLEAR_IOQ   _IO(   PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 13 )
+#define PCIDRIVER_IOC_CLEAR_IOQ		_IO(   PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 13 )
 
-#define PCIDRIVER_IOC_SET_DMA_MASK	_IO(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 14 )
+#define PCIDRIVER_IOC_VERSION		_IOR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 14, pcilib_driver_version_t * )
+#define PCIDRIVER_IOC_DEVICE_STATE	_IOR(  PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 15, pcilib_device_state_t * )
+#define PCIDRIVER_IOC_DMA_MASK		_IO(   PCIDRIVER_IOC_MAGIC, PCIDRIVER_IOC_BASE + 16)
 
+#define PCIDRIVER_IOC_MAX 16
 
 #endif
