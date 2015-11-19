@@ -505,7 +505,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
     volatile void *desc_va;
     volatile void *last_written_addr_ptr;
-    uint32_t empty_detected_dummy = 0;
+//    uint32_t empty_detected_dummy = 0;
     volatile uint32_t *empty_detected_ptr;
 
     pcilib_dma_flags_t packet_flags = PCILIB_DMA_FLAG_EOP;
@@ -528,7 +528,8 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	empty_detected_ptr = last_written_addr_ptr - 2;
     } else {
 	last_written_addr_ptr = desc_va + 2 * sizeof(uint32_t);
-	empty_detected_ptr = &empty_detected_dummy;
+	empty_detected_ptr = desc_va + sizeof(uint32_t);
+//	empty_detected_ptr = &empty_detected_dummy;
     }
 
 
