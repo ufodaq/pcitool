@@ -131,7 +131,8 @@ typedef struct {
 
 typedef struct {
     int iommu;						/**< Specifies if IOMMU is enabled or disabled */
-    int mps;						/**< Maximum payload size */
+    int mps;						/**< PCIe maximum payload size */
+    int readrq;						/**< PCIe read request size */
     unsigned long dma_mask;				/**< DMA mask */
 } pcilib_device_state_t;
 

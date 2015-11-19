@@ -448,8 +448,10 @@ static int ioctl_device_state(pcidriver_privdata_t *privdata, unsigned long arg)
 	info = (pcilib_device_state_t) {
 	    .iommu = iommu_present(privdata->pdev->dev.bus),
 	    .mps = pcidriver_pcie_get_mps(privdata->pdev),
+	    .readrq = pcie_get_readrq(privdata->pdev),
 	    .dma_mask = privdata->pdev->dma_mask
 	};
+
 
 	WRITE_TO_USER(pcilib_device_state_t, info);
 
