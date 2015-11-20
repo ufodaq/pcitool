@@ -64,3 +64,19 @@ void *pcilib_memcpy64(void * dst, void const * src, size_t len) {
     return (dst);
 } 
 
+typedef void* (*pcilib_memcpy_routine_t)(void * dst, void const *src, size_t bytes);
+static pcilib_memcpy_routine_t pcilib_memcpy_routines[4] = {
+    pcilib_memcpy8, NULL, pcilib_memcpy32, pcilib_memcpy64
+};
+
+void *pcilib_memcpy(void * dst, void const * src, uint8_t access, size_t n) {
+    size_t pos = 0, size = n * access;
+    pcilib_memcpy_routine_t routine;
+
+    assert((access)&&(access <= 8));
+
+    while (access >>= 1) ++pos;
+    routine = pcilib_memcpy_routines[pos];
+
+    return routine(dst, src, size);
+}

@@ -327,22 +327,24 @@ char *pcilib_resolve_bar_address(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr
  * @param[in,out] ctx	- pcilib context
  * @param[in] bar	- the BAR to read, use PCILIB_BAR_DETECT to detect bar by the specified physical address
  * @param[in] addr	- absolute physical address to read or the offset in the specified bar
- * @param[in] size	- number of bytes to read
+ * @param[in] access	- word size (access width in bytes)
+ * @param[in] n		- number of words to read
  * @param[out] buf	- the read data will be placed in this buffer
  * @return 		- error code or 0 on success
  */ 
-int pcilib_read(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf);
+int pcilib_read(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t access, size_t n, void *buf);
 
 /**
  * Performs PIO write to the PCI BAR. The BAR will be automatically mapped and unmapped if necessary.
  * @param[in,out] ctx	- pcilib context
  * @param[in] bar	- the BAR to write, use PCILIB_BAR_DETECT to detect bar by the specified physical address
  * @param[in] addr	- absolute physical address to write or the offset in the specified bar
- * @param[in] size	- number of bytes to write
+ * @param[in] access	- word size (access width in bytes)
+ * @param[in] n		- number of words to write
  * @param[out] buf	- the pointer to the data to be written
  * @return 		- error code or 0 on success
  */ 
-int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf);
+int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t access, size_t n, void *buf);
 
 /**
  * Performs PIO read from the PCI BAR. The specified address is treated as FIFO and will be read

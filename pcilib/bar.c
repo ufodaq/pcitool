@@ -119,6 +119,7 @@ void *pcilib_map_bar(pcilib_t *ctx, pcilib_bar_t bar) {
 	return NULL;
     }
 
+    ctx->bar_space[bar] = res;
     return res;
 }
 
@@ -323,26 +324,26 @@ const pcilib_bar_info_t *pcilib_get_bar_info(pcilib_t *ctx, pcilib_bar_t bar) {
     return NULL;
 }
 
-int pcilib_read(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf) {
+int pcilib_read(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t access, size_t n, void *buf) {
     void *data;
 
-    pcilib_detect_address(ctx, &bar, &addr, size);
+    pcilib_detect_address(ctx, &bar, &addr, access * n);
     data = pcilib_map_bar(ctx, bar);
 
-    pcilib_memcpy(buf, data + addr, size);
+    pcilib_memcpy(buf, data + addr, access, n);
 
     pcilib_unmap_bar(ctx, bar, data);
 
     return 0;
 }
 
-int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, size_t size, void *buf) {
+int pcilib_write(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t access, size_t n, void *buf) {
     void *data;
 
-    pcilib_detect_address(ctx, &bar, &addr, size);
+    pcilib_detect_address(ctx, &bar, &addr, access * n);
     data = pcilib_map_bar(ctx, bar);
 
-    pcilib_memcpy(data + addr, buf, size);
+    pcilib_memcpy(data + addr, buf, access, n);
 
     pcilib_unmap_bar(ctx, bar, data);
 

@@ -81,7 +81,7 @@ void *pcilib_datacpy(void * dst, void const * src, uint8_t size, size_t n, pcili
     size_t pos = 0;
     pcilib_datacpy_routine_t routine;
 
-    assert((size)&&(size < 64));
+    assert((size)&&(size <= 8));
 
     while (size >>= 1) ++pos;
     routine = pcilib_datacpy_routines[pos];

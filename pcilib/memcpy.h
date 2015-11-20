@@ -5,8 +5,6 @@
 #include <stdint.h>
 
 
-#define pcilib_memcpy pcilib_memcpy32
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -14,6 +12,7 @@ extern "C" {
 void *pcilib_memcpy8(void * dst, void const * src, size_t len);
 void *pcilib_memcpy32(void * dst, void const * src, size_t len);
 void *pcilib_memcpy64(void * dst, void const * src, size_t len);
+void *pcilib_memcpy(void * dst, void const * src, uint8_t access, size_t n);
 
 #ifdef __cplusplus
 }

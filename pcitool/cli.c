@@ -1115,12 +1115,12 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	gettimeofday(&start,NULL);
 	if (mode == ACCESS_BAR) {
 	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
-		pcilib_memcpy(buf, data, size);
+		pcilib_memcpy(buf, data, access, size / access);
 	    }
 	} else {
 	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
 		for (j = 0; j < (size/access); j++) {
-		    pcilib_memcpy(buf + j * access, fifo, access);
+		    pcilib_memcpy(buf + j * access, fifo, access, 1);
 		}
 	    }
 	}
@@ -1134,12 +1134,12 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	gettimeofday(&start,NULL);
 	if (mode == ACCESS_BAR) {
 	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
-		pcilib_memcpy(data, buf, size);
+		pcilib_memcpy(data, buf, access, size / access);
 	    }
 	} else {
 	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
 		for (j = 0; j < (size/access); j++) {
-		    pcilib_memcpy(fifo, buf + j * access, access);
+		    pcilib_memcpy(fifo, buf + j * access, access, 1);
 		}
 	    }
 	}
@@ -1155,7 +1155,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	gettimeofday(&start,NULL);
 	if (mode == ACCESS_BAR) {
 	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
-		pcilib_read(handle, bar, 0, size, buf);
+		pcilib_read(handle, bar, 0, access, size / access, buf);
 	    }
 	} else {
 	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
@@ -1172,7 +1172,7 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	gettimeofday(&start,NULL);
 	if (mode == ACCESS_BAR) {
 	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
-		pcilib_write(handle, bar, 0, size, buf);
+		pcilib_write(handle, bar, 0, access, size / access, buf);
 	    }
 	} else {
 	    for (i = 0; i < BENCHMARK_ITERATIONS; i++) {
@@ -1188,8 +1188,8 @@ int Benchmark(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	if (mode == ACCESS_BAR) {
 	    gettimeofday(&start,NULL);
 	    for (i = 0, errors = 0; i < BENCHMARK_ITERATIONS; i++) {
-		pcilib_write(handle, bar, 0, size, buf);
-		pcilib_read(handle, bar, 0, size, check);
+		pcilib_write(handle, bar, 0, access, size / access, buf);
+		pcilib_read(handle, bar, 0, access, size / access, check);
 		if (memcmp(buf, check, size)) ++errors;
 	    }
 	    gettimeofday(&end,NULL);
@@ -1344,7 +1344,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
 	close(fd);
       break;
       default:
-	pcilib_read(handle, bar, addr, size, buf);
+	pcilib_read(handle, bar, addr, access, size / access, buf);
     }
     
     if (endianess) pcilib_swap(buf, buf, abs(access), n);
@@ -1601,9 +1601,9 @@ int WriteData(pcilib_t *handle, ACCESS_MODE mode, pcilib_dma_engine_addr_t dma, 
 	pcilib_write_fifo(handle, bar, addr, access, n, buf);
       break;
       default:
-	pcilib_write(handle, bar, addr, size, buf);
+	pcilib_write(handle, bar, addr, access, size / access, buf);
 	if (verify) {
-	    pcilib_read(handle, bar, addr, size, check);
+	    pcilib_read(handle, bar, addr, access, size / access, check);
 	    read_back = 1;
 	}
     }

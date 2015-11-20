@@ -31,7 +31,7 @@ int pcilib_read_fifo(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t fi
     data = pcilib_map_bar(ctx, bar);
 
     for (i = 0; i < n; i++) {
-	pcilib_memcpy(buf + i * fifo_size, data + addr, fifo_size);
+	pcilib_memcpy(buf + i * fifo_size, data + addr, fifo_size, 1);
     }
 
     pcilib_unmap_bar(ctx, bar, data);
@@ -47,7 +47,7 @@ int pcilib_write_fifo(pcilib_t *ctx, pcilib_bar_t bar, uintptr_t addr, uint8_t f
     data = pcilib_map_bar(ctx, bar);
 
     for (i = 0; i < n; i++) {
-	pcilib_memcpy(data + addr, buf + i * fifo_size, fifo_size);
+	pcilib_memcpy(data + addr, buf + i * fifo_size, fifo_size, 1);
     }
 
     pcilib_unmap_bar(ctx, bar, data);
