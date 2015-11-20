@@ -87,7 +87,7 @@ void *memcpy128(void * dst, void const * src, size_t len) {
 } 
 */
 
-void pcilib_memcpy4k_avx(void *dst, void *src, size_t size) {
+void pcilib_memcpy4k_avx(void *dst, const void *src, size_t size) {
     size_t sse_size = (size / 512);
 
     __asm__ __volatile__ (
@@ -96,57 +96,57 @@ void pcilib_memcpy4k_avx(void *dst, void *src, size_t size) {
 
             "1:					\n\t"
 
-            "vmovdqa 	   (%0,%%rax), %%ymm0	\n\t"
-            "vmovdqa 	 32(%0,%%rax), %%ymm1	\n\t"
-            "vmovdqa 	 64(%0,%%rax), %%ymm2	\n\t"
-            "vmovdqa 	 96(%0,%%rax), %%ymm3	\n\t"
-            "vmovdqa 	128(%0,%%rax), %%ymm4	\n\t"
-            "vmovdqa 	160(%0,%%rax), %%ymm5	\n\t"
-            "vmovdqa 	192(%0,%%rax), %%ymm6	\n\t"
-            "vmovdqa 	224(%0,%%rax), %%ymm7	\n\t"
+            "vmovdqa 	   (%1,%%rax), %%ymm0	\n\t"
+            "vmovdqa 	 32(%1,%%rax), %%ymm1	\n\t"
+            "vmovdqa 	 64(%1,%%rax), %%ymm2	\n\t"
+            "vmovdqa 	 96(%1,%%rax), %%ymm3	\n\t"
+            "vmovdqa 	128(%1,%%rax), %%ymm4	\n\t"
+            "vmovdqa 	160(%1,%%rax), %%ymm5	\n\t"
+            "vmovdqa 	192(%1,%%rax), %%ymm6	\n\t"
+            "vmovdqa 	224(%1,%%rax), %%ymm7	\n\t"
 
-            "vmovdqa 	256(%0,%%rax), %%ymm8	\n\t"
-            "vmovdqa 	288(%0,%%rax), %%ymm9	\n\t"
-            "vmovdqa 	320(%0,%%rax), %%ymm10	\n\t"
-            "vmovdqa 	352(%0,%%rax), %%ymm11	\n\t"
-            "vmovdqa 	384(%0,%%rax), %%ymm12	\n\t"
-            "vmovdqa 	416(%0,%%rax), %%ymm13	\n\t"
-            "vmovdqa 	448(%0,%%rax), %%ymm14	\n\t"
-            "vmovdqa 	480(%0,%%rax), %%ymm15	\n\t"
+            "vmovdqa 	256(%1,%%rax), %%ymm8	\n\t"
+            "vmovdqa 	288(%1,%%rax), %%ymm9	\n\t"
+            "vmovdqa 	320(%1,%%rax), %%ymm10	\n\t"
+            "vmovdqa 	352(%1,%%rax), %%ymm11	\n\t"
+            "vmovdqa 	384(%1,%%rax), %%ymm12	\n\t"
+            "vmovdqa 	416(%1,%%rax), %%ymm13	\n\t"
+            "vmovdqa 	448(%1,%%rax), %%ymm14	\n\t"
+            "vmovdqa 	480(%1,%%rax), %%ymm15	\n\t"
 
-            "vmovntps	%%ymm0,    (%1,%%rax)	\n\t"
-            "vmovntps	%%ymm1,  32(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm2,  64(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm3,  96(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm4, 128(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm5, 160(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm6, 192(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm7, 224(%1,%%rax)	\n\t"
+            "vmovdqa	%%ymm0,    (%0,%%rax)	\n\t"
+            "vmovdqa	%%ymm1,  32(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm2,  64(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm3,  96(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm4, 128(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm5, 160(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm6, 192(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm7, 224(%0,%%rax)	\n\t"
 
-            "vmovntps	%%ymm8,  256(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm9,  288(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm10, 320(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm11, 352(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm12, 384(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm13, 416(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm14, 448(%1,%%rax)	\n\t"
-            "vmovntps	%%ymm15, 480(%1,%%rax)	\n\t"
+            "vmovntps	%%ymm8,  256(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm9,  288(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm10, 320(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm11, 352(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm12, 384(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm13, 416(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm14, 448(%0,%%rax)	\n\t"
+            "vmovntps	%%ymm15, 480(%0,%%rax)	\n\t"
 
             "add	$512, %%rax		\n\t"
             "dec	%2			\n\t"
             "jnz 	1b			\n\t"
             "pop 	%2			\n\t"
 
-            "sfence"
+            "mfence"
     :
     : "p" (dst), "p" (src), "r" (sse_size)
     : "%rax"
         );
 }
 
-void pcilib_pagecpy(void *dst, void *src, size_t size) {
+void pcilib_pagecpy(void *dst, const void *src, size_t size) {
     int gen = pcilib_get_cpu_gen();
-    if ((gen > 3)&&(size%4096==0)&&((uintptr_t)dst%32==0)&&((uintptr_t)src%32==0)) {
+    if ((gen > 3)&&((size%4096)==0)&&(((uintptr_t)dst%32)==0)&&(((uintptr_t)src%32)==0)) {
 	pcilib_memcpy4k_avx(dst, src, size);
     } else
 	memcpy(dst, src, size);

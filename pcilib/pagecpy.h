@@ -20,7 +20,7 @@ extern "C" {
  * @param[in] size - size of memory region in bytes.
  * @return - `dst` or NULL on error
  */
-void pcilib_pagecpy(void *dst, void *src, size_t size);
+void pcilib_pagecpy(void *dst, const void *src, size_t size);
 
 #ifdef __cplusplus
 }
