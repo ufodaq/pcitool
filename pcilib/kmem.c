@@ -276,6 +276,8 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	memcpy(&kbuf->buf.addr, &kbuf->buf.blocks[0], sizeof(pcilib_kmem_addr_t));
     }
 
+    kbuf->buf.type = type;
+    kbuf->buf.use = use;
     kbuf->buf.reused = reused|(persistent?PCILIB_KMEM_REUSE_PERSISTENT:0)|(hardware?PCILIB_KMEM_REUSE_HARDWARE:0);
 
     kbuf->prev = NULL;
@@ -331,15 +333,25 @@ int pcilib_kmem_sync_block(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kmem_s
     kmem_sync_t ks;
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
 
-    ks.dir = dir;
-    ks.handle.handle_id = kbuf->buf.blocks[block].handle_id;
-    ks.handle.pa = kbuf->buf.blocks[block].pa;
-    ret = ioctl(ctx->handle, PCIDRIVER_IOC_KMEM_SYNC, &ks);
-    if (ret) {
-	pcilib_error("PCIDRIVER_IOC_KMEM_SYNC ioctl have failed");
-	return PCILIB_ERROR_FAILED;
+    switch (kbuf->buf.type) {
+      case PCILIB_KMEM_TYPE_DMA_S2C_PAGE:
+      case PCILIB_KMEM_TYPE_DMA_C2S_PAGE:
+      case PCILIB_KMEM_TYPE_REGION_S2C:
+      case PCILIB_KMEM_TYPE_REGION_C2S:
+        ks.dir = dir;
+	ks.handle.handle_id = kbuf->buf.blocks[block].handle_id;
+	ks.handle.pa = kbuf->buf.blocks[block].pa;
+	
+	ret = ioctl(ctx->handle, PCIDRIVER_IOC_KMEM_SYNC, &ks);
+	if (ret) {
+	    pcilib_error("PCIDRIVER_IOC_KMEM_SYNC ioctl have failed");
+	    return PCILIB_ERROR_FAILED;
+	}
+	break;
+      default:
+	;
     }
-    
+
     return 0;
 }
 

@@ -65,12 +65,12 @@ typedef enum {
 typedef struct {
     int handle_id;
     pcilib_kmem_reuse_state_t reused;
-    
+
     uintptr_t pa;
 //    uintptr_t va;
     void *ua;
     size_t size;
-    
+
     size_t alignment_offset;
     size_t mmap_offset;
 } pcilib_kmem_addr_t;
@@ -83,6 +83,8 @@ typedef struct {
 typedef struct {
     pcilib_kmem_addr_t addr;
     
+    pcilib_kmem_type_t type;
+    pcilib_kmem_use_t use;
     pcilib_kmem_reuse_state_t reused;
 
     size_t n_blocks;

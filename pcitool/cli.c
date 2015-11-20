@@ -2547,7 +2547,7 @@ int ListKMEM(pcilib_t *handle, const char *device) {
 		printf("Locks              ");
 		break;
 	      case PCILIB_KMEM_USE_USER:
-	        printf("User %04x         ", uses[i].use&0xFFFF);
+	        printf("User %04x          ", uses[i].use&0xFFFF);
 	        break;
 	      default:
 		printf ("                   ");
