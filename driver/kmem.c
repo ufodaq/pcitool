@@ -53,23 +53,27 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 		} else {
 		    if (kmem_handle->type != kmem_entry->type) {
 		    	mod_info("Invalid type of reusable kmem_entry, currently: %lu, but requested: %lu\n", kmem_entry->type, kmem_handle->type);
+		    	kmem_handle->type = kmem_entry->type;
 			return -EINVAL;
 		    }
 
 		    if (((kmem_handle->type&PCILIB_KMEM_TYPE_MASK) == PCILIB_KMEM_TYPE_PAGE)&&(kmem_handle->size == 0)) {
-			    kmem_handle->size = kmem_entry->size;
+			kmem_handle->size = kmem_entry->size;
 		    } else if (kmem_handle->size != kmem_entry->size) {
 			mod_info("Invalid size of reusable kmem_entry, currently: %lu, but requested: %lu\n", kmem_entry->size, kmem_handle->size);
+			kmem_handle->size = kmem_entry->size;
 			return -EINVAL;
 		    }
-		    
+
 		    if (kmem_handle->align != kmem_entry->align) {
 			mod_info("Invalid alignment of reusable kmem_entry, currently: %lu, but requested: %lu\n", kmem_entry->align, kmem_handle->align);
+			kmem_handle->align = kmem_entry->align;
 			return -EINVAL;
 		    }
 
 		    if (((kmem_entry->mode&KMEM_MODE_EXCLUSIVE)?1:0) != ((flags&KMEM_FLAG_EXCLUSIVE)?1:0)) {
 			mod_info("Invalid mode of reusable kmem_entry\n");
+			kmem_handle->flags = (kmem_entry->mode&KMEM_MODE_EXCLUSIVE)?KMEM_FLAG_EXCLUSIVE:0;
 			return -EINVAL;
 		    }
 		}

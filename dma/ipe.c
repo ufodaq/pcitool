@@ -110,6 +110,24 @@ void  dma_ipe_free(pcilib_dma_context_t *vctx) {
 }
 
 
+static void dma_ipe_disable(ipe_dma_t *ctx) {
+	    // Disable DMA
+    WR(IPEDMA_REG_CONTROL, 0x0);
+    usleep(IPEDMA_RESET_DELAY);
+	
+	    // Reset DMA engine
+    WR(IPEDMA_REG_RESET, 0x1);
+    usleep(IPEDMA_RESET_DELAY);
+    WR(IPEDMA_REG_RESET, 0x0);
+    usleep(IPEDMA_RESET_DELAY);
+
+        // Reseting configured DMA pages
+    if (ctx->version < 3) {
+	WR(IPEDMA_REG2_PAGE_COUNT, 0);
+    }
+    usleep(IPEDMA_RESET_DELAY);
+}
+
 int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma_flags_t flags) {
     int err;
     int mask = 32;
@@ -169,10 +187,10 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     } else
 	ctx->page_size = IPEDMA_PAGE_SIZE;
 
-    if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "dma_pages", &value))
-	ctx->dma_pages = value;
+    if ((!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "dma_pages", &value))&&(value > 0))
+	ctx->ring_size = value;
     else
-	ctx->dma_pages = IPEDMA_DMA_PAGES;
+	ctx->ring_size = IPEDMA_DMA_PAGES;
 
     if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "ipedma_flags", &value))
 	ctx->dma_flags = value;
@@ -191,35 +209,56 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
     kflags = PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_EXCLUSIVE|PCILIB_KMEM_FLAG_HARDWARE|(ctx->preserve?PCILIB_KMEM_FLAG_PERSISTENT:0);
     pcilib_kmem_handle_t *desc = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, IPEDMA_DESCRIPTOR_SIZE, IPEDMA_DESCRIPTOR_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, 0x00), kflags);
-    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_DMA_C2S_PAGE, IPEDMA_DMA_PAGES, ctx->page_size, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, 0x00), kflags);
+    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_DMA_C2S_PAGE, ctx->ring_size, ctx->page_size, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, 0x00), kflags);
 
     if (!desc||!pages) {
-	if (pages) pcilib_free_kernel_memory(ctx->dmactx.pcilib, pages, 0);
-	if (desc) pcilib_free_kernel_memory(ctx->dmactx.pcilib, desc, 0);
+	if (pages) pcilib_free_kernel_memory(ctx->dmactx.pcilib, pages, KMEM_FLAG_REUSE);
+	if (desc) pcilib_free_kernel_memory(ctx->dmactx.pcilib, desc, KMEM_FLAG_REUSE);
+	printf("%lu\n", IPEDMA_DESCRIPTOR_SIZE);
+	pcilib_error("Can't allocate required kernel memory for IPEDMA engine (%lu pages of %lu bytes + %lu byte descriptor)", ctx->ring_size, ctx->page_size, (unsigned long)IPEDMA_DESCRIPTOR_SIZE);
 	return PCILIB_ERROR_MEMORY;
     }
     reuse_desc = pcilib_kmem_is_reused(ctx->dmactx.pcilib, desc);
     reuse_pages = pcilib_kmem_is_reused(ctx->dmactx.pcilib, pages);
 
-    if (reuse_desc == reuse_pages) {
-	if (reuse_desc & PCILIB_KMEM_REUSE_PARTIAL) pcilib_warning("Inconsistent DMA buffers are found (only part of required buffers is available), reinitializing...");
-	else if (reuse_desc & PCILIB_KMEM_REUSE_REUSED) {
-	    if ((reuse_desc & PCILIB_KMEM_REUSE_PERSISTENT) == 0) pcilib_warning("Lost DMA buffers are found (non-persistent mode), reinitializing...");
-	    else if ((reuse_desc & PCILIB_KMEM_REUSE_HARDWARE) == 0) pcilib_warning("Lost DMA buffers are found (missing HW reference), reinitializing...");
-	    else {
-		if (ctx->streaming)
-		    preserve = 1;
-		else {
-		    RD(IPEDMA_REG2_PAGE_COUNT, value);
+    if ((reuse_pages & PCILIB_KMEM_REUSE_PARTIAL)||(reuse_desc & PCILIB_KMEM_REUSE_PARTIAL)) {
+	dma_ipe_disable(ctx);
 
-		    if (value != IPEDMA_DMA_PAGES) 
-			pcilib_warning("Inconsistent DMA buffers are found (Number of allocated buffers (%lu) does not match current request (%lu)), reinitializing...", value + 1, IPEDMA_DMA_PAGES);
-		    else 
-			preserve = 1;
-		} 
-	    }
+	pcilib_free_kernel_memory(ctx->dmactx.pcilib, pages, KMEM_FLAG_REUSE);
+	pcilib_free_kernel_memory(ctx->dmactx.pcilib, desc, KMEM_FLAG_REUSE);
+
+	if ((flags&PCILIB_DMA_FLAG_STOP) == 0) {
+	    pcilib_error("Inconsistent DMA buffers are found (buffers are only partially re-used). This is very wrong, please stop DMA engine and correct configuration...");
+	    return PCILIB_ERROR_INVALID_STATE;
 	}
-    } else pcilib_warning("Inconsistent DMA buffers (modes of ring and page buffers does not match), reinitializing....");
+	
+	pcilib_warning("Inconsistent DMA buffers are found (buffers are only partially re-used), reinitializing...");
+	desc = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, IPEDMA_DESCRIPTOR_SIZE, IPEDMA_DESCRIPTOR_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, 0x00), kflags|PCILIB_KMEM_FLAG_MASS);
+	pages = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_DMA_C2S_PAGE, ctx->ring_size, ctx->page_size, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, 0x00), kflags|PCILIB_KMEM_FLAG_MASS);
+
+	if (!desc||!pages) {
+	    if (pages) pcilib_free_kernel_memory(ctx->dmactx.pcilib, pages, KMEM_FLAG_REUSE);
+	    if (desc) pcilib_free_kernel_memory(ctx->dmactx.pcilib, desc, KMEM_FLAG_REUSE);
+	    return PCILIB_ERROR_MEMORY;
+	}
+    } else if (reuse_desc != reuse_pages) {
+	 pcilib_warning("Inconsistent DMA buffers (modes of ring and page buffers does not match), reinitializing....");
+    } else if (reuse_desc & PCILIB_KMEM_REUSE_REUSED) {
+	if ((reuse_desc & PCILIB_KMEM_REUSE_PERSISTENT) == 0) pcilib_warning("Lost DMA buffers are found (non-persistent mode), reinitializing...");
+	else if ((reuse_desc & PCILIB_KMEM_REUSE_HARDWARE) == 0) pcilib_warning("Lost DMA buffers are found (missing HW reference), reinitializing...");
+	else {
+	    if (ctx->streaming)
+		preserve = 1;
+	    else {
+		RD(IPEDMA_REG2_PAGE_COUNT, value);
+
+		if (value != ctx->ring_size) 
+		    pcilib_warning("Inconsistent DMA buffers are found (Number of allocated buffers (%lu) does not match current request (%lu)), reinitializing...", value + 1, IPEDMA_DMA_PAGES);
+		else 
+		    preserve = 1;
+	    } 
+	}
+    }
 
     desc_va = pcilib_kmem_get_ua(ctx->dmactx.pcilib, desc);
     if (ctx->version < 3) {
@@ -242,7 +281,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	RD(ctx->reg_last_read, value);
 	    // Numbered from 1 in FPGA
 # ifdef IPEDMA_BUG_LAST_READ
-	if (value == IPEDMA_DMA_PAGES)
+	if (value == ctx->ring_size)
 	    value = 0;
 # else /* IPEDMA_BUG_LAST_READ */
 	value--;
@@ -251,16 +290,8 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	ctx->last_read = value;
     } else {
 	ctx->reused = 0;
-
-	    // Disable DMA
-	WR(IPEDMA_REG_CONTROL, 0x0);
-	usleep(IPEDMA_RESET_DELAY);
 	
-	    // Reset DMA engine
-	WR(IPEDMA_REG_RESET, 0x1);
-	usleep(IPEDMA_RESET_DELAY);
-	WR(IPEDMA_REG_RESET, 0x0);
-	usleep(IPEDMA_RESET_DELAY);
+	dma_ipe_disable(ctx);
 
 	    // Verify PCIe link status
 	RD(IPEDMA_REG_RESET, value);
@@ -284,9 +315,9 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
 	    // Setting current read position and configuring progress register
 #ifdef IPEDMA_BUG_LAST_READ
-	WR(ctx->reg_last_read, IPEDMA_DMA_PAGES - 1);
+	WR(ctx->reg_last_read, ctx->ring_size - 1);
 #else /* IPEDMA_BUG_LAST_READ */
-	WR(ctx->reg_last_read, IPEDMA_DMA_PAGES);
+	WR(ctx->reg_last_read, ctx->ring_size);
 #endif /* IPEDMA_BUG_LAST_READ */
 
 	if (ctx->version < 3) {
@@ -304,7 +335,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	    // In ring buffer mode, the hardware taking care to preserve an empty buffer to help distinguish between
 	    // completely empty and completely full cases. In streaming mode, it is our responsibility to track this
 	    // information. Therefore, we always keep the last buffer free
-	num_pages = IPEDMA_DMA_PAGES;
+	num_pages = ctx->ring_size;
 	if (ctx->streaming) num_pages--;
 	
 	for (i = 0; i < num_pages; i++) {
@@ -330,15 +361,13 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	    // Enable DMA
 	WR(IPEDMA_REG_CONTROL, 0x1);
 	
-	ctx->last_read = IPEDMA_DMA_PAGES - 1;
+	ctx->last_read = ctx->ring_size - 1;
     }
 
     ctx->last_read_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, pages, ctx->last_read);
 
     ctx->desc = desc;
     ctx->pages = pages;
-
-    ctx->ring_size = IPEDMA_DMA_PAGES;
 
     return 0;
 }
@@ -364,22 +393,7 @@ int dma_ipe_stop(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dma
 
 	ctx->started  = 0;
 
-	    // Disable DMA
-	WR(IPEDMA_REG_CONTROL, 0);
-	usleep(IPEDMA_RESET_DELAY);
-	
-	    // Reset DMA engine
-	WR(IPEDMA_REG_RESET, 0x1);
-	usleep(IPEDMA_RESET_DELAY);
-	WR(IPEDMA_REG_RESET, 0x0);
-	usleep(IPEDMA_RESET_DELAY);
-
-	    // Reseting configured DMA pages
-	if (ctx->version < 3) {
-	    WR(IPEDMA_REG2_PAGE_COUNT, 0);
-	}
-
-	usleep(IPEDMA_RESET_DELAY);
+	dma_ipe_disable(ctx);
     }
 
 	// Clean buffers
@@ -633,7 +647,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	    size_t last_free;
 		// We always keep 1 buffer free to distinguish between completely full and empty cases
 	    if (cur_read) last_free = cur_read - 1;
-	    else last_free = IPEDMA_DMA_PAGES - 1;
+	    else last_free = ctx->ring_size - 1;
 
 	    uintptr_t buf_ba = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, last_free);
 	    if (ctx->version < 3) {
@@ -651,7 +665,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
 	    // Numbered from 1
 #ifdef IPEDMA_BUG_LAST_READ
-	WR(ctx->reg_last_read, cur_read?cur_read:IPEDMA_DMA_PAGES);
+	WR(ctx->reg_last_read, cur_read?cur_read:ctx->ring_size);
 #else /* IPEDMA_BUG_LAST_READ */
 	WR(ctx->reg_last_read, cur_read + 1);
 #endif /* IPEDMA_BUG_LAST_READ */

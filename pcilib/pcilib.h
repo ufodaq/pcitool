@@ -86,7 +86,8 @@ typedef enum {
     PCILIB_DMA_FLAG_WAIT = 2,			/**< wait completion of write operation / wait for data during read operation */
     PCILIB_DMA_FLAG_MULTIPACKET = 4,		/**< read multiple packets */
     PCILIB_DMA_FLAG_PERSISTENT = 8,		/**< do not stop DMA engine on application termination / permanently close DMA engine on dma_stop */
-    PCILIB_DMA_FLAG_IGNORE_ERRORS = 16		/**< do not crash on errors, but return appropriate error codes */
+    PCILIB_DMA_FLAG_IGNORE_ERRORS = 16,		/**< do not crash on errors, but return appropriate error codes */
+    PCILIB_DMA_FLAG_STOP = 32			/**< indicates that we actually calling pcilib_dma_start to stop persistent DMA engine */
 } pcilib_dma_flags_t;
 
 typedef enum {

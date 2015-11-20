@@ -2333,7 +2333,7 @@ int StartStopDMA(pcilib_t *handle,  const pcilib_model_description_t *model_info
         if (start) Error("DMA engine should be specified");
 
 	for (dmaid = 0; dma_info->engines[dmaid].addr_bits; dmaid++) {
-	    err = pcilib_start_dma(handle, dmaid, 0);
+	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_STOP);
 	    if (err) Error("Error starting DMA Engine (%s %i)", ((dma_info->engines[dmaid].direction == PCILIB_DMA_FROM_DEVICE)?"C2S":"S2C"), dma_info->engines[dmaid].addr);
 	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
 	    if (err) Error("Error stopping DMA Engine (%s %i)", ((dma_info->engines[dmaid].direction == PCILIB_DMA_FROM_DEVICE)?"C2S":"S2C"), dma_info->engines[dmaid].addr);
@@ -2350,7 +2350,7 @@ int StartStopDMA(pcilib_t *handle,  const pcilib_model_description_t *model_info
 	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
     	    if (err) Error("Error starting DMA engine (C2S %lu)", dma);
 	} else {
-	    err = pcilib_start_dma(handle, dmaid, 0);
+	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_STOP);
     	    if (err) Error("Error starting DMA engine (C2S %lu)", dma);
 	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
     	    if (err) Error("Error stopping DMA engine (C2S %lu)", dma);
@@ -2365,7 +2365,7 @@ int StartStopDMA(pcilib_t *handle,  const pcilib_model_description_t *model_info
 	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
     	    if (err) Error("Error starting DMA engine (S2C %lu)", dma);
 	} else {
-	    err = pcilib_start_dma(handle, dmaid, 0);
+	    err = pcilib_start_dma(handle, dmaid, PCILIB_DMA_FLAG_STOP);
     	    if (err) Error("Error starting DMA engine (S2C %lu)", dma);
 	    err = pcilib_stop_dma(handle, dmaid, PCILIB_DMA_FLAG_PERSISTENT);
     	    if (err) Error("Error stopping DMA engine (S2C %lu)", dma);

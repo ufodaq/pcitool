@@ -181,15 +181,13 @@ static int ioctl_pci_info(pcidriver_privdata_t *privdata, unsigned long arg)
  */
 static int ioctl_kmem_alloc(pcidriver_privdata_t *privdata, unsigned long arg)
 {
-	int ret;
+	int err, ret;
+
 	READ_FROM_USER(kmem_handle_t, khandle);
-
-	if ((ret = pcidriver_kmem_alloc(privdata, &khandle)) != 0)
-		return ret;
-
+	err = pcidriver_kmem_alloc(privdata, &khandle);
 	WRITE_TO_USER(kmem_handle_t, khandle);
 
-	return 0;
+	return err;
 }
 
 /**
