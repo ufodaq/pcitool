@@ -84,9 +84,11 @@ static const pcilib_register_description_t ipe_dma_registers[] = {
     {0x0004, 	0, 	32, 	IPEDMA_DMA_TIMEOUT, 	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_timeout",	"Default DMA timeout"},
     {0x0008, 	0, 	32, 	IPEDMA_DMA_PAGES,	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_pages",	"Number of buffers in DMA page ring"},
     {0x000C, 	0, 	32, 	IPEDMA_PAGE_SIZE,	0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_page_size",	"Size of a page in DMA page ring (multiple of 4K)"},
-    {0x0010, 	0, 	32, 	0,			0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "ipedma_flags",	"DMA Control Register"},
-    {0x0010, 	0, 	1, 	0,			0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS,	PCILIB_REGISTER_BANK_DMACONF, "ipedma_nosync",	"Do not synchronize DMA pages"},
-    {0x0010, 	1, 	1, 	0,			0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS,	PCILIB_REGISTER_BANK_DMACONF, "ipedma_nosleep",	"Do not sleep while there is no data"},
+    {0x0010, 	0, 	32, 	0,			0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_region_low",	"Low bits of static DMA I/O region"},
+    {0x0014, 	0, 	32, 	0,			0x00000000,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "dma_region_hi",	"High bits of static DMA I/O region"},
+    {0x0020, 	0, 	32, 	0,			0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_STANDARD, PCILIB_REGISTER_BANK_DMACONF, "ipedma_flags",	"DMA Control Register"},
+    {0x0020, 	0, 	1, 	0,			0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS,	PCILIB_REGISTER_BANK_DMACONF, "ipedma_nosync",	"Do not synchronize DMA pages"},
+    {0x0020, 	1, 	1, 	0,			0xFFFFFFFF,	PCILIB_REGISTER_RW  , PCILIB_REGISTER_BITS,	PCILIB_REGISTER_BANK_DMACONF, "ipedma_nosleep",	"Do not sleep while there is no data"},
     {0,		0,	0,	0,	0x00000000,	0,                                           0,                        0, NULL, 			NULL}
 };
 #endif /* _PCILIB_EXPORT_C */

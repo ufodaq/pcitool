@@ -135,6 +135,9 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
     ipe_dma_t *ctx = (ipe_dma_t*)vctx;
 
+    pcilib_kmem_handle_t *desc = NULL;
+    pcilib_kmem_handle_t *pages = NULL;
+
 #ifndef IPEDMA_TLP_SIZE
     const pcilib_pcie_link_info_t *link_info;
 #endif /* ! IPEDMA_TLP_SIZE */
@@ -148,6 +151,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
     pcilib_register_value_t value;
 
+    uintptr_t dma_region = 0;
     int tlp_size;
     uint32_t address64;
 
@@ -166,8 +170,10 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	link_info = pcilib_get_pcie_link_info(vctx->pcilib);
 	if (link_info) {
 	    tlp_size = 1<<link_info->payload;
+# ifdef IPEDMA_MAX_TLP_SIZE
 	    if (tlp_size > IPEDMA_MAX_TLP_SIZE)
 		tlp_size = IPEDMA_MAX_TLP_SIZE;
+# endif /* IPEDMA_MAX_TLP_SIZE */
 	} else tlp_size = 128;
 #endif /* IPEDMA_TLP_SIZE */
 
@@ -192,6 +198,12 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     else
 	ctx->ring_size = IPEDMA_DMA_PAGES;
 
+    if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "dma_region_low", &value)) {
+	dma_region = value;
+	if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "dma_region_low", &value)) 
+	    dma_region |= ((uintptr_t)value)<<32;
+    }
+
     if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "ipedma_flags", &value))
 	ctx->dma_flags = value;
     else
@@ -208,13 +220,16 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 #endif /* IPEDMA_CONFIGURE_DMA_MASK */
 
     kflags = PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_EXCLUSIVE|PCILIB_KMEM_FLAG_HARDWARE|(ctx->preserve?PCILIB_KMEM_FLAG_PERSISTENT:0);
-    pcilib_kmem_handle_t *desc = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, IPEDMA_DESCRIPTOR_SIZE, IPEDMA_DESCRIPTOR_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, 0x00), kflags);
-    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_DMA_C2S_PAGE, ctx->ring_size, ctx->page_size, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, 0x00), kflags);
+
+    desc = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, IPEDMA_DESCRIPTOR_SIZE, IPEDMA_DESCRIPTOR_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, 0x00), kflags);
+    if (dma_region)
+	pages = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_REGION_C2S, ctx->ring_size, ctx->page_size, dma_region, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, 0x00), kflags);
+    else
+	pages = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_DMA_C2S_PAGE, ctx->ring_size, ctx->page_size, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, 0x00), kflags);
 
     if (!desc||!pages) {
 	if (pages) pcilib_free_kernel_memory(ctx->dmactx.pcilib, pages, KMEM_FLAG_REUSE);
 	if (desc) pcilib_free_kernel_memory(ctx->dmactx.pcilib, desc, KMEM_FLAG_REUSE);
-	printf("%lu\n", IPEDMA_DESCRIPTOR_SIZE);
 	pcilib_error("Can't allocate required kernel memory for IPEDMA engine (%lu pages of %lu bytes + %lu byte descriptor)", ctx->ring_size, ctx->page_size, (unsigned long)IPEDMA_DESCRIPTOR_SIZE);
 	return PCILIB_ERROR_MEMORY;
     }
@@ -227,7 +242,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	pcilib_free_kernel_memory(ctx->dmactx.pcilib, pages, KMEM_FLAG_REUSE);
 	pcilib_free_kernel_memory(ctx->dmactx.pcilib, desc, KMEM_FLAG_REUSE);
 
-	if ((flags&PCILIB_DMA_FLAG_STOP) == 0) {
+	if (((flags&PCILIB_DMA_FLAG_STOP) == 0)||(dma_region)) {
 	    pcilib_error("Inconsistent DMA buffers are found (buffers are only partially re-used). This is very wrong, please stop DMA engine and correct configuration...");
 	    return PCILIB_ERROR_INVALID_STATE;
 	}
