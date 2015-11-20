@@ -56,7 +56,7 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 			return -EINVAL;
 		    }
 
-		    if ((kmem_handle->type&PCILIB_KMEM_TYPE_MASK) == PCILIB_KMEM_TYPE_PAGE) {
+		    if (((kmem_handle->type&PCILIB_KMEM_TYPE_MASK) == PCILIB_KMEM_TYPE_PAGE)&&(kmem_handle->size == 0)) {
 			    kmem_handle->size = kmem_entry->size;
 		    } else if (kmem_handle->size != kmem_entry->size) {
 			mod_info("Invalid size of reusable kmem_entry, currently: %lu, but requested: %lu\n", kmem_entry->size, kmem_handle->size);
@@ -151,10 +151,12 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 		kmem_handle->size = PAGE_SIZE;
 	    else if (kmem_handle->size%PAGE_SIZE)
 		goto kmem_alloc_mem_fail;
+	    else 
+		flags |= __GFP_COMP;
 	
 	    retptr = (void*)__get_free_pages(flags, get_order(kmem_handle->size));
 	    kmem_entry->dma_handle = 0;
-	    
+
 	    if (retptr) {
 	        if (kmem_entry->type == PCILIB_KMEM_TYPE_DMA_S2C_PAGE) {
 		    kmem_entry->direction = PCI_DMA_TODEVICE;

@@ -74,10 +74,11 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 
     if ((dma != PCILIB_DMA_ENGINE_INVALID)&&(dma > 1)) return -1.;
 
-    if (size%IPEDMA_PAGE_SIZE) size = (1 + size / IPEDMA_PAGE_SIZE) * IPEDMA_PAGE_SIZE;
-
     err = dma_ipe_start(vctx, 0, PCILIB_DMA_FLAGS_DEFAULT);
     if (err) return err;
+
+    if (size%ctx->page_size) size = (1 + size / ctx->page_size) * ctx->page_size;
+
 
     if (getenv("PCILIB_BENCHMARK_HARDWARE"))
 	read_dma = dma_ipe_skim_dma_custom;
@@ -102,9 +103,9 @@ double dma_ipe_benchmark(pcilib_dma_context_t *vctx, pcilib_dma_engine_addr_t dm
 	pcilib_calc_deadline(&start, ctx->dma_timeout * IPEDMA_DMA_PAGES);
 
 #ifdef IPEDMA_BUG_LAST_READ
-	dma_buffer_space = (IPEDMA_DMA_PAGES - 2) * IPEDMA_PAGE_SIZE;
+	dma_buffer_space = (IPEDMA_DMA_PAGES - 2) * ctx->page_size;
 #else /* IPEDMA_BUG_LAST_READ */
-	dma_buffer_space = (IPEDMA_DMA_PAGES - 1) * IPEDMA_PAGE_SIZE;
+	dma_buffer_space = (IPEDMA_DMA_PAGES - 1) * ctx->page_size;
 #endif /* IPEDMA_BUG_LAST_READ */
 
 	// Allocate memory and prepare data

@@ -95,12 +95,11 @@ struct ipe_dma_s {
     uint32_t dma_flags;			/**< Various operation flags, see IPEDMA_FLAG_* */
     size_t dma_timeout;			/**< DMA timeout,IPEDMA_DMA_TIMEOUT is used by default */
     size_t dma_pages;			/**< Number of DMA pages in ring buffer to allocate */
-    size_t dma_page_size;		/**< Size of a single DMA page */
 
     pcilib_kmem_handle_t *desc;		/**< in-memory status descriptor written by DMA engine upon operation progess */
     pcilib_kmem_handle_t *pages;	/**< collection of memory-locked pages for DMA operation */
 
-    size_t ring_size, page_size;
+    size_t ring_size, page_size;	/**< Number of pages in ring buffer and the size of a single DMA page */
     size_t last_read, last_written;
     uintptr_t last_read_addr;
 

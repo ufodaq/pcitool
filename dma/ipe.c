@@ -142,15 +142,32 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
     if (ctx->pages) return 0;
 
+#ifdef IPEDMA_TLP_SIZE	
+	tlp_size = IPEDMA_TLP_SIZE;
+#else /* IPEDMA_TLP_SIZE */
+	link_info = pcilib_get_pcie_link_info(vctx->pcilib);
+	if (link_info) {
+	    tlp_size = 1<<link_info->payload;
+	    if (tlp_size > IPEDMA_MAX_TLP_SIZE)
+		tlp_size = IPEDMA_MAX_TLP_SIZE;
+	} else tlp_size = 128;
+#endif /* IPEDMA_TLP_SIZE */
+
     if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "dma_timeout", &value))
 	ctx->dma_timeout = value;
     else 
 	ctx->dma_timeout = IPEDMA_DMA_TIMEOUT;
 
-    if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "dma_page_size", &value))
-	ctx->dma_page_size = value;
-    else
-	ctx->dma_page_size = IPEDMA_PAGE_SIZE;
+    if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "dma_page_size", &value)) {
+	if (value % IPEDMA_PAGE_SIZE) {
+	    pcilib_error("Invalid DMA page size (%lu) is configured", value);
+	    return PCILIB_ERROR_INVALID_ARGUMENT;
+	}
+	//if ((value)&&((value / (tlp_size * IPEDMA_CORES)) > ...seems no limit...)) { ... fail ... }
+
+	ctx->page_size = value;
+    } else
+	ctx->page_size = IPEDMA_PAGE_SIZE;
 
     if (!pcilib_read_register(ctx->dmactx.pcilib, "dmaconf", "dma_pages", &value))
 	ctx->dma_pages = value;
@@ -174,7 +191,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
     kflags = PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_EXCLUSIVE|PCILIB_KMEM_FLAG_HARDWARE|(ctx->preserve?PCILIB_KMEM_FLAG_PERSISTENT:0);
     pcilib_kmem_handle_t *desc = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_CONSISTENT, 1, IPEDMA_DESCRIPTOR_SIZE, IPEDMA_DESCRIPTOR_ALIGNMENT, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_RING, 0x00), kflags);
-    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_DMA_C2S_PAGE, IPEDMA_DMA_PAGES, 0, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, 0x00), kflags);
+    pcilib_kmem_handle_t *pages = pcilib_alloc_kernel_memory(ctx->dmactx.pcilib, PCILIB_KMEM_TYPE_DMA_C2S_PAGE, IPEDMA_DMA_PAGES, ctx->page_size, 0, PCILIB_KMEM_USE(PCILIB_KMEM_USE_DMA_PAGES, 0x00), kflags);
 
     if (!desc||!pages) {
 	if (pages) pcilib_free_kernel_memory(ctx->dmactx.pcilib, pages, 0);
@@ -210,6 +227,11 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
     }  else {
 	last_written_addr_ptr = desc_va + 2 * sizeof(uint32_t);
+    }
+
+	// get page size if default size was used
+    if (!ctx->page_size) {
+	ctx->page_size = pcilib_kmem_get_block_size(ctx->dmactx.pcilib, pages, 0);
     }
 
     if (preserve) {
@@ -249,18 +271,8 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	if (ctx->mode64) address64 = 0x8000 | (0<<24);
 	else address64 = 0;
 
-#ifdef IPEDMA_TLP_SIZE	
-	tlp_size = IPEDMA_TLP_SIZE;
-#else /* IPEDMA_TLP_SIZE */
-	link_info = pcilib_get_pcie_link_info(vctx->pcilib);
-	if (link_info) {
-	    tlp_size = 1<<link_info->payload;
-	    if (tlp_size > IPEDMA_MAX_TLP_SIZE)
-		tlp_size = IPEDMA_MAX_TLP_SIZE;
-	} else tlp_size = 128;
-#endif /* IPEDMA_TLP_SIZE */
         WR(IPEDMA_REG_TLP_SIZE,  address64 | (tlp_size>>2));
-        WR(IPEDMA_REG_TLP_COUNT, IPEDMA_PAGE_SIZE / (tlp_size * IPEDMA_CORES));
+        WR(IPEDMA_REG_TLP_COUNT, ctx->page_size / (tlp_size * IPEDMA_CORES));
 
 	    // Setting progress register threshold
 	WR(IPEDMA_REG_UPDATE_THRESHOLD, IPEDMA_DMA_PROGRESS_THRESHOLD);
@@ -325,7 +337,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 
     ctx->desc = desc;
     ctx->pages = pages;
-    ctx->page_size = pcilib_kmem_get_block_size(ctx->dmactx.pcilib, pages, 0);
+
     ctx->ring_size = IPEDMA_DMA_PAGES;
 
     return 0;
