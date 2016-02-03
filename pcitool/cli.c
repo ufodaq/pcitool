@@ -1385,7 +1385,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
 int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, const char *reg, const char *view, const char *unit, const char *attr) {
     int i;
     int err;
-    const char *format;
+    const char *format;    
 
     pcilib_register_bank_t bank_id;
     pcilib_register_bank_addr_t bank_addr = 0;
