@@ -164,6 +164,8 @@
 #include <linux/interrupt.h>
 #include <linux/wait.h>
 
+#include "../pcilib/version.h"
+
 /* Configuration for the driver (what should be compiled in, module name, etc...) */
 #include "config.h"
 
@@ -189,6 +191,8 @@
 #include "umem.h"
 
 #include "ioctl.h"
+
+#include "build.h"
 
 /*************************************************************************/
 /* Module device table associated with this driver */
@@ -240,7 +244,12 @@ static int __init pcidriver_init(void)
 		goto init_pcireg_fail;
 	}
 
-	mod_info("Module loaded\n");
+	mod_info("pcidriver %u.%u.%u loaded\n", PCILIB_VERSION_GET_MAJOR(PCILIB_VERSION), PCILIB_VERSION_GET_MINOR(PCILIB_VERSION), PCILIB_VERSION_GET_MICRO(PCILIB_VERSION));
+	mod_info("%s\n", PCIDRIVER_BUILD);
+	mod_info("%s\n", PCIDRIVER_REVISION);
+	if (strlen(PCIDRIVER_CHANGES)) {
+	    mod_info("Extra changes - %s\n", PCIDRIVER_CHANGES);
+	}
 
 	return 0;
 

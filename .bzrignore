@@ -32,3 +32,4 @@ version.h
 Doxyfile
 html
 pcilib/build.h
+build.h

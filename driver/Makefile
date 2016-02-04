@@ -29,6 +29,17 @@ default:
 	else \
 	    CC=$(CC) ;\
 	fi ;\
+	build_revision=`bzr revno` ;\
+	build_author=`bzr log -r$$build_revision | grep committer | cut -c 12-` ;\
+	build_path=`pwd` ;\
+	build_branch=`bzr nick` ;\
+	build_lastmod=`find . -type f -name '*.[ch]' -printf '%TY/%Tm/%Td %TH:%TM:%TS  %p\n' | grep -E -v 'build.h|mod.c' | sort -n  | tail -n 1 | cut -d ' ' -f 1-2 | cut -d '.' -f 1` ;\
+	build_changes=`bzr status -SV | cut -c 5- | tr \\\n " "` ;\
+	build_user=`whoami` ;\
+	build_date=`date "+%Y/%m/%d %H:%M:%S"` ;\
+	build="Built at $$build_date by $$build_user" ;\
+	revision="Revision $$build_revision from $$build_branch by $$build_author at $$build_path, last modification from $$build_lastmod" ;\
+	echo -e "#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES \"$$build_changes\"\\n" > build.h ;\
 	$(MAKE) $(CFLAGS) -C $(KERNELDIR) M=$(PWD) CC=$$CC modules
 
 install:

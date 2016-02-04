@@ -23,7 +23,7 @@ if (${_retcode} EQUAL 0)
 endif (${_retcode} EQUAL 0)
 
 execute_process(
-    COMMAND find ${CMAKE_SOURCE_DIR} -type f -name *.[ch] -printf "%TY/%Tm/%Td %TH:%TM:%TS  %p\n"
+    COMMAND find ${CMAKE_SOURCE_DIR} -type f -name "*.[ch]" -printf "%TY/%Tm/%Td %TH:%TM:%TS  %p\n"
     COMMAND sort -n
     COMMAND grep -E -v "build.h|config.h|CMakeFiles|./apps"
     COMMAND tail -n 1
