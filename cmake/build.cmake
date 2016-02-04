@@ -57,11 +57,10 @@ if (BAZAAR_FOUND)
 	)
 
 	if (${_retcode} EQUAL 0)
-	    set(_last_output ${_output})
 	    string(REGEX REPLACE "^(.*\n)?committer: ([^\n]+).*"
-                    "\\2" PCILIB_REVISION_AUTHOR "${_last_output}" )
+                    "\\2" PCILIB_REVISION_AUTHOR "${_output}" )
 	    string(REGEX REPLACE "^(.*\n)?branch nick: ([^\n]+).*"
-                    "\\2" PCILIB_REVISION_BRANCH "${_last_output}" )
+                    "\\2" PCILIB_REVISION_BRANCH "${_output}" )
 	endif (${_retcode} EQUAL 0)
     endif (${_retcode} EQUAL 0)
 
@@ -75,7 +74,7 @@ if (BAZAAR_FOUND)
     )
 
     if (${_retcode} EQUAL 0)
-	string(REGEX REPLACE "\n+" ";" PCILIB_REVISION_MODIFICATIONS ${_output})
+	string(REGEX REPLACE "\n+" ";" PCILIB_REVISION_MODIFICATIONS "${_output}")
 #	set(PCILIB_REVISION_MODIFICATIONS ${_output})
     endif (${_retcode} EQUAL 0)
 endif(BAZAAR_FOUND)
