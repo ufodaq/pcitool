@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.6)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
+list(APPEND CMAKE_MODULE_PATH "${PCILIB_SOURCE_DIR}/cmake/")
 
 find_package(BAZAAR QUIET)
 
@@ -23,7 +23,7 @@ if (${_retcode} EQUAL 0)
 endif (${_retcode} EQUAL 0)
 
 execute_process(
-    COMMAND find ${CMAKE_SOURCE_DIR} -type f -name "*.[ch]" -printf "%TY/%Tm/%Td %TH:%TM:%TS  %p\n"
+    COMMAND find ${PCILIB_SOURCE_DIR} -type f -name "*.[ch]" -printf "%TY/%Tm/%Td %TH:%TM:%TS  %p\n"
     COMMAND sort -n
     COMMAND grep -E -v "build.h|config.h|CMakeFiles|./apps"
     COMMAND tail -n 1
@@ -40,7 +40,7 @@ endif (${_retcode} EQUAL 0)
 
 if (BAZAAR_FOUND)
     execute_process(
-	COMMAND ${BAZAAR_EXECUTABLE} revno --tree ${CMAKE_SOURCE_DIR}
+	COMMAND ${BAZAAR_EXECUTABLE} revno --tree ${PCILIB_SOURCE_DIR}
 	RESULT_VARIABLE _retcode
 	OUTPUT_VARIABLE _output
 	OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -50,24 +50,25 @@ if (BAZAAR_FOUND)
 	set(PCILIB_REVISION ${_output})
 
 	execute_process(
-	    COMMAND ${BAZAAR_EXECUTABLE} log -r${PCILIB_REVISION} ${CMAKE_SOURCE_DIR}
+	    COMMAND ${BAZAAR_EXECUTABLE} log -r${PCILIB_REVISION} ${PCILIB_SOURCE_DIR}
 	    RESULT_VARIABLE _retcode
 	    OUTPUT_VARIABLE _output
 	    OUTPUT_STRIP_TRAILING_WHITESPACE
 	)
 
 	if (${_retcode} EQUAL 0)
+	    set(_last_output ${_output})
 	    string(REGEX REPLACE "^(.*\n)?committer: ([^\n]+).*"
-                    "\\2" PCILIB_REVISION_AUTHOR "${_output}" )
+                    "\\2" PCILIB_REVISION_AUTHOR "${_last_output}" )
 	    string(REGEX REPLACE "^(.*\n)?branch nick: ([^\n]+).*"
-                    "\\2" PCILIB_REVISION_BRANCH "${_output}" )
+                    "\\2" PCILIB_REVISION_BRANCH "${_last_output}" )
 	endif (${_retcode} EQUAL 0)
     endif (${_retcode} EQUAL 0)
 
     execute_process(
 	COMMAND ${BAZAAR_EXECUTABLE} status -SV
 	COMMAND cut -c 5-
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	WORKING_DIRECTORY ${PCILIB_SOURCE_DIR}
 	RESULT_VARIABLE _retcode
 	OUTPUT_VARIABLE _output
 	OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -79,4 +80,4 @@ if (BAZAAR_FOUND)
     endif (${_retcode} EQUAL 0)
 endif(BAZAAR_FOUND)
 
-configure_file(${CMAKE_SOURCE_DIR}/pcilib/build.h.in ${CMAKE_BINARY_DIR}/pcilib/build.h)
+configure_file(${PCILIB_SOURCE_DIR}/pcilib/build.h.in ${PCILIB_BINARY_DIR}/pcilib/build.h)
