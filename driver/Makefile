@@ -20,8 +20,8 @@ default:
 		echo "No compiler of $$GCC_MAJOR series is installed" ;\
 		exit 1 ;\
 	    fi ;\
-	    GCC_VERSION=`$$CC --version | head -n 1 | tr ' ' '\n' | grep -e "[0-9]\+\.[0-9]" | head -n 1` ;\
-	    if [ $$KERNEL_GCC_VERSION != $$GCC_VERSION ]; then \
+	    GCC_VERSION=`$$CC --version | head -n 1 | tr ' ' '\n' | grep -e "[0-9]\+\.[0-9]" | tail -n 1` ;\
+	    if [ $$KERNEL_GCC_VERSION != $$GCC_VERSION -a -z "$$RELAXED_GCC_CHECK" ]; then \
 		echo "The $$GCC_VERSION of $$GCC_MAJOR series is installed" ;\
 		exit 1 ;\
 	    fi ;\
