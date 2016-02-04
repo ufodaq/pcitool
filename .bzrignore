@@ -31,3 +31,4 @@ pcitool/pci
 version.h
 Doxyfile
 html
+pcilib/build.h

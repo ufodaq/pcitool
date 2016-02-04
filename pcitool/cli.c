@@ -31,18 +31,19 @@
 
 #include "pcitool/sysinfo.h"
 #include "pcitool/formaters.h"
+#include "pcitool/buildinfo.h"
 
 #include "views/transform.h"
 #include "views/enum.h"
-#include "pci.h"
-#include "plugin.h"
-#include "config.h"
-#include "tools.h"
-#include "kmem.h"
-#include "error.h"
-#include "debug.h"
-#include "model.h"
-#include "locking.h"
+#include "pcilib/pci.h"
+#include "pcilib/plugin.h"
+#include "pcilib/config.h"
+#include "pcilib/tools.h"
+#include "pcilib/kmem.h"
+#include "pcilib/error.h"
+#include "pcilib/debug.h"
+#include "pcilib/model.h"
+#include "pcilib/locking.h"
 
 /* defines */
 #define MAX_KBUF 14
@@ -895,6 +896,8 @@ void Version(pcilib_t *handle, const pcilib_model_description_t *model_info) {
 	    PCILIB_VERSION_GET_MICRO(version)
 	);
     }
+
+    BuildInfo();
 }
 
 void Info(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *target) {

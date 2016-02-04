@@ -59,7 +59,16 @@ add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -fno-omit-frame-pointer
 #add_definitions("-fPIC --std=c99 -Wall -O2")
 
 include(cmake/version.cmake)
+
 VERSION_TO_VARS(${PCILIB_VERSION} PCILIB_VERSION_MAJOR PCILIB_VERSION_MINOR PCILIB_VERSION_MICRO)
+
+add_custom_target(build)
+add_custom_command(TARGET build
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/build.cmake
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_source_files_properties(${CMAKE_BINARY_DIR}/pcilib/build.h PROPERTIES GENERATED TRUE)
+
 
 set(TARNAME "pcitool")
 set(PACKAGE_VERSION ${PCILIB_VERSION})
