@@ -35,7 +35,7 @@ SET(ENV{PKG_CONFIG_PATH} "${LIB_INSTALL_DIR}/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
-find_package(PythonLibs REQUIRED)
+find_package(PythonLibs 2.7 REQUIRED)
 
 set(EXTRA_SYSTEM_LIBS -lrt)
 
@@ -91,6 +91,10 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcitool.pc.in ${CMAKE_CURRENT_BI
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/config.h)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/version.h)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/docs/Doxyfile)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/pci
+	 DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
+	 FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ
+	 GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
 install(FILES 
     ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc

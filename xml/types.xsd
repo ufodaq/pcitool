@@ -74,6 +74,17 @@
         </xsd:extension>
     </xsd:complexContent>
   </xsd:complexType>
+  
+  <xsd:complexType name="pcilib_script_view_t">
+    <xsd:complexContent>
+        <xsd:extension base="pcilib_view_t">
+          <xsd:attribute name="path" type="xsd:string" />
+          <xsd:attribute name="register" type="xsd:string" />
+          <xsd:attribute name="script" type="xsd:string" />
+          <!-- xsd 1.1 <xsd:assert test="(@path and not(@name)) or (not(@path) and @name)"/> -->
+        </xsd:extension>
+    </xsd:complexContent>
+  </xsd:complexType>
 
   <xsd:complexType name="pcilib_enum_view_t">
     <xsd:complexContent>

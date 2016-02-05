@@ -5,7 +5,6 @@
 #include <string.h>
 #include <strings.h>
 
-
 #include "pci.h"
 #include "debug.h"
 #include "pcilib.h"

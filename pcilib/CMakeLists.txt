@@ -24,7 +24,6 @@ SET(CMAKE_SWIG_FLAGS "")
 SET_SOURCE_FILES_PROPERTIES(pcipywrap.i PROPERTIES SWIG_FLAGS "-includeall")
 SWIG_ADD_MODULE(pcipywrap python pcipywrap.i pcipywrap.c pci.c datacpy.c memcpy.c pagecpy.c cpu.c timing.c export.c value.c bar.c fifo.c model.c bank.c register.c view.c unit.c property.c xml.c py.c kmem.c irq.c locking.c lock.c dma.c event.c plugin.c tools.c error.c debug.c env.c)
 SWIG_LINK_LIBRARIES(pcipywrap ${PYTHON_LIBRARIES} dma protocols views ${CMAKE_THREAD_LIBS_INIT} ${UFODECODE_LIBRARIES} ${CMAKE_DL_LIBS} ${EXTRA_SYSTEM_LIBS} ${LIBXML2_LIBRARIES})
-#wrapping end
 
 install(TARGETS pcilib
     LIBRARY DESTINATION lib${LIB_SUFFIX}

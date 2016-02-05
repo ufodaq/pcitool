@@ -1,6 +1,5 @@
 %module pcipywrap
-/*extern void* __ctx;*/
-extern void __initCtx(void* ctx);
-extern void __createCtxInstance(const char *fpga_device, const char *model);
-extern int read_register(const char *bank, const char *regname, void *value);
-extern int ReadRegister(const char *reg);
+
+extern PyObject* read_register(const char *regname, const char *bank = NULL);
+extern PyObject* __createPcilibInstance(const char *fpga_device, const char *model = NULL);
+extern void __setPcilib(PyObject* addr);

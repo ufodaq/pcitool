@@ -42,17 +42,19 @@
 #include "view.h"
 #include "views/enum.h"
 #include "views/transform.h"
+#include "views/script.h"
 
 
 #define BANKS_PATH ((xmlChar*)"/model/bank")					/**< path to complete nodes of banks */
 #define REGISTERS_PATH ((xmlChar*)"./register")		 			/**< all standard registers nodes */
 #define BIT_REGISTERS_PATH ((xmlChar*)"./field") 				/**< all bits registers nodes */
 #define REGISTER_VIEWS_PATH ((xmlChar*)"./view") 				/**< supported register & field views */
-#define TRANSFORM_VIEWS_PATH ((xmlChar*)"/model/transform")			/**< path to complete nodes of views */
+#define TRANSFORM_VIEWS_PATH ((xmlChar*)"/model/transform")		/**< path to complete nodes of views */
+#define SCRIPT_VIEWS_PATH ((xmlChar*)"/model/script")			/**< path to complete nodes of views */
 #define ENUM_VIEWS_PATH ((xmlChar*)"/model/enum")	 			/**< path to complete nodes of views */
 #define ENUM_ELEMENTS_PATH ((xmlChar*)"./name") 				/**< all elements in the enum */
 #define UNITS_PATH ((xmlChar*)"/model/unit")	 				/**< path to complete nodes of units */
-#define UNIT_TRANSFORMS_PATH ((xmlChar*)"./transform") 				/**< all transforms of the unit */
+#define UNIT_TRANSFORMS_PATH ((xmlChar*)"./transform") 			/**< all transforms of the unit */
 
 
 
@@ -543,6 +545,51 @@ static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDoc
     return 0;
 }
 
+static int pcilib_xml_create_script_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
+    int err;
+    xmlAttrPtr cur;
+    const char *value, *name;
+    pcilib_view_context_t *view_ctx;
+
+    pcilib_access_mode_t mode = 0;
+    pcilib_script_view_description_t desc = {{0}};
+
+    desc.base.api = &pcilib_script_view_api;
+    desc.base.type = PCILIB_TYPE_DOUBLE;
+    desc.base.mode = PCILIB_ACCESS_RW;
+    desc.py_script_module = NULL;
+    desc.script_name = NULL;
+
+    err = pcilib_xml_parse_view(ctx, xpath, doc, node, (pcilib_view_description_t*)&desc);
+    if (err) return err;
+
+    for (cur = node->properties; cur != NULL; cur = cur->next) {
+        if (!cur->children) continue;
+        if (!xmlNodeIsText(cur->children)) continue;
+
+        name = (char*)cur->name;
+        value = (char*)cur->children->content;
+        if (!value) continue;
+
+        if (!strcasecmp(name, "script")) {
+			//write script name to struct
+			desc.script_name = malloc(strlen(value));
+			sprintf(desc.script_name, "%s", value);
+			//set read access
+			mode |= PCILIB_ACCESS_R;
+            }
+    }
+    
+    desc.base.mode &= mode;
+
+    err = pcilib_add_views_custom(ctx, 1, (pcilib_view_description_t*)&desc, &view_ctx);
+    if (err) return err;
+
+    view_ctx->xml = node;
+    return 0;
+}
+
+
 static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
     int err;
     xmlAttrPtr cur;
@@ -822,14 +869,16 @@ static int pcilib_xml_create_unit(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
  */
 static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathContextPtr xpath) {
     int err;
-    xmlXPathObjectPtr bank_nodes = NULL, transform_nodes = NULL, enum_nodes = NULL, unit_nodes = NULL;
+    xmlXPathObjectPtr bank_nodes = NULL, transform_nodes = NULL, enum_nodes = NULL, unit_nodes = NULL, script_nodes = NULL;
     xmlNodeSetPtr nodeset;
     int i;
 
     bank_nodes = xmlXPathEvalExpression(BANKS_PATH, xpath);
     if (bank_nodes) transform_nodes = xmlXPathEvalExpression(TRANSFORM_VIEWS_PATH, xpath);
-    if (transform_nodes) enum_nodes = xmlXPathEvalExpression(ENUM_VIEWS_PATH, xpath);
+    if (transform_nodes) script_nodes = xmlXPathEvalExpression(SCRIPT_VIEWS_PATH, xpath);
+    if (script_nodes) enum_nodes = xmlXPathEvalExpression(ENUM_VIEWS_PATH, xpath);
     if (enum_nodes) unit_nodes = xmlXPathEvalExpression(UNITS_PATH, xpath);
+    
 
     if (!unit_nodes) {
 	const unsigned char *expr = (enum_nodes?UNITS_PATH:(transform_nodes?ENUM_VIEWS_PATH:(bank_nodes?TRANSFORM_VIEWS_PATH:BANKS_PATH)));
@@ -848,6 +897,14 @@ static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathCon
         for(i=0; i < nodeset->nodeNr; i++) {
             err = pcilib_xml_create_unit(ctx, xpath, doc, nodeset->nodeTab[i]);
 	    if (err) pcilib_error("Error (%i) creating unit", err);
+        }
+    }
+    
+    nodeset = script_nodes->nodesetval;
+    if(!xmlXPathNodeSetIsEmpty(nodeset)) {
+        for(i=0; i < nodeset->nodeNr; i++) {
+			err = pcilib_xml_create_script_view(ctx, xpath, doc, nodeset->nodeTab[i]);
+	    if (err) pcilib_error("Error (%i) creating script transform", err);
         }
     }
 
