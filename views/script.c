@@ -4,17 +4,15 @@
 #include <stdlib.h>
 
 #include "pci.h"
+#include "pcipywrap.h"
 #include "error.h"
 
 #include "model.h"
 #include "script.h"
 
-static int pcilib_script_view_read(pcilib_t *ctx, pcilib_view_context_t *view_ctx, pcilib_register_value_t regval, pcilib_value_t *val) {
-	
+static int pcilib_script_view_module_init(pcilib_t *ctx, pcilib_script_view_description_t *v)
+{
 	int err;
-
-    const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
-    pcilib_script_view_description_t *v = (pcilib_script_view_description_t*)(model_info->views[view_ctx->view]);
 	
 	//Initialize python script, if it has not initialized already.
 	if(!v->py_script_module)
@@ -103,6 +101,19 @@ static int pcilib_script_view_read(pcilib_t *ctx, pcilib_view_context_t *view_ct
                                NULL);
 	}
 	
+	return 0;
+}
+
+static int pcilib_script_view_read(pcilib_t *ctx, pcilib_view_context_t *view_ctx, pcilib_register_value_t regval, pcilib_value_t *val) {
+	
+	int err;
+
+    const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+    pcilib_script_view_description_t *v = (pcilib_script_view_description_t*)(model_info->views[view_ctx->view]);
+	
+	err = pcilib_script_view_module_init(ctx, v);
+	if(err)
+		return err;
 	
 	PyObject *ret = PyObject_CallMethod(v->py_script_module, "read_from_register", "()");
 	if (!ret) 
@@ -112,21 +123,8 @@ static int pcilib_script_view_read(pcilib_t *ctx, pcilib_view_context_t *view_ct
 	   return PCILIB_ERROR_FAILED;
 	}
 	
-	if(PyInt_Check(ret))
-	{
-		err = pcilib_set_value_from_int(ctx, val, PyInt_AsLong(ret));
-	}
-	else
-		if(PyFloat_Check(ret))
-			err = pcilib_set_value_from_float(ctx, val, PyFloat_AsDouble(ret));
-		else
-			if(PyString_Check(ret))
-				err = pcilib_set_value_from_static_string(ctx, val, PyString_AsString(ret));
-				else
-				{
-					pcilib_error("Invalid return type in read_from_register() method. Return type should be int, float or string.");
-					return PCILIB_ERROR_NOTSUPPORTED;
-				}
+	err = pcilib_convert_pyobject_to_val(ctx, ret, val);
+	
 	if(err)
 	{
 		pcilib_error("Failed to convert python script return value to internal type: %i", err);
@@ -135,7 +133,58 @@ static int pcilib_script_view_read(pcilib_t *ctx, pcilib_view_context_t *view_ct
     return 0;
 }
 
- 
+static int pcilib_script_view_write(pcilib_t *ctx, pcilib_view_context_t *view_ctx, pcilib_register_value_t *regval, pcilib_value_t *val) {
+	
+	int err;
+
+    const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
+    pcilib_script_view_description_t *v = (pcilib_script_view_description_t*)(model_info->views[view_ctx->view]);
+	
+	err = pcilib_script_view_module_init(ctx, v);
+	if(err)
+		return err;
+		
+	PyObject *input = pcilib_convert_val_to_pyobject(ctx, val, printf);
+	if(!input)
+	{
+	   printf("Failed to convert input value to Python object");
+	   PyErr_Print();
+	   return PCILIB_ERROR_FAILED;
+	}
+	
+	PyObject *ret = PyObject_CallMethodObjArgs(v->py_script_module,
+											   PyUnicode_FromString("write_to_register"),
+											   input,
+											   NULL);
+	if (!ret) 
+	{
+	   printf("Python script error: ");
+	   PyErr_Print();
+	   return PCILIB_ERROR_FAILED;
+	}
+	
+	//convert output value back to pcilib_value_t
+	//no need because it wont be used later, and the script return could be none
+	/*
+	err = pcilib_convert_pyobject_to_val(ctx, ret, val);
+	if(err)
+	{
+		pcilib_error("failed to convert script write_to_register function return value to internal type: %i", err);
+		return err;
+	}
+	
+	uint64_t output = pcilib_get_value_as_register_value(ctx, val, &err);
+	if(err)
+	{
+		pcilib_error("failed to convert value to register value (%i)", err);
+		return err;
+	}
+	regval[0] = output;
+	*/
+
+    return 0;
+}
+
 void pcilib_script_view_free_description (pcilib_t *ctx, pcilib_view_description_t *view)
 {
 	pcilib_script_view_description_t *v = (pcilib_script_view_description_t*)(view);
@@ -154,4 +203,4 @@ void pcilib_script_view_free_description (pcilib_t *ctx, pcilib_view_description
 }
 
 const pcilib_view_api_description_t pcilib_script_view_api =
-  { PCILIB_VERSION, sizeof(pcilib_script_view_description_t), NULL, NULL, pcilib_script_view_free_description, pcilib_script_view_read, NULL};
+  { PCILIB_VERSION, sizeof(pcilib_script_view_description_t), NULL, NULL, pcilib_script_view_free_description, pcilib_script_view_read, pcilib_script_view_write};

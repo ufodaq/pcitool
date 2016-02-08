@@ -50,7 +50,6 @@
 #define BIT_REGISTERS_PATH ((xmlChar*)"./field") 				/**< all bits registers nodes */
 #define REGISTER_VIEWS_PATH ((xmlChar*)"./view") 				/**< supported register & field views */
 #define TRANSFORM_VIEWS_PATH ((xmlChar*)"/model/transform")		/**< path to complete nodes of views */
-#define SCRIPT_VIEWS_PATH ((xmlChar*)"/model/script")			/**< path to complete nodes of views */
 #define ENUM_VIEWS_PATH ((xmlChar*)"/model/enum")	 			/**< path to complete nodes of views */
 #define ENUM_ELEMENTS_PATH ((xmlChar*)"./name") 				/**< all elements in the enum */
 #define UNITS_PATH ((xmlChar*)"/model/unit")	 				/**< path to complete nodes of units */
@@ -575,8 +574,9 @@ static int pcilib_xml_create_script_view(pcilib_t *ctx, xmlXPathContextPtr xpath
 			//write script name to struct
 			desc.script_name = malloc(strlen(value));
 			sprintf(desc.script_name, "%s", value);
-			//set read access
+			//set read write access
 			mode |= PCILIB_ACCESS_R;
+			mode |= PCILIB_ACCESS_W;
             }
     }
     
@@ -588,7 +588,6 @@ static int pcilib_xml_create_script_view(pcilib_t *ctx, xmlXPathContextPtr xpath
     view_ctx->xml = node;
     return 0;
 }
-
 
 static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
     int err;
@@ -642,6 +641,46 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
 
     view_ctx->xml = node;
     return 0;
+}
+
+static int pcilib_xml_create_script_or_transform_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
+    int err;
+    xmlAttrPtr cur;
+    const char *name;
+
+    int has_read_from_register = 0;
+    int has_write_to_register = 0;
+    int has_script = 0;
+
+    //getting transform name in case of error
+    pcilib_view_description_t desc = {0};
+    err = pcilib_xml_parse_view(ctx, xpath, doc, node, &desc);
+
+    for (cur = node->properties; cur != NULL; cur = cur->next) {
+        if (!cur->children) continue;
+        if (!xmlNodeIsText(cur->children)) continue;
+
+        name = (char*)cur->name;
+
+        if (!strcasecmp(name, "read_from_register"))
+            has_read_from_register = 1;
+        if (!strcasecmp(name, "write_to_register"))
+            has_write_to_register = 1;
+        if (!strcasecmp(name, "script"))
+            has_script = 1;
+    }
+
+    if (has_script && (has_read_from_register || has_write_to_register)) {
+        pcilib_error("Invalid transform group attributes specified in XML property (%s)."
+                     "Transform could not contains both script and read_from_register"
+                     " or write_to_register attributes at same time.", desc.name);
+        return PCILIB_ERROR_INVALID_DATA;
+    }
+
+    if(has_script)
+        return pcilib_xml_create_script_view(ctx, xpath, doc, node);
+    else
+        return pcilib_xml_create_transform_view(ctx, xpath, doc, node);
 }
 
 
@@ -869,14 +908,13 @@ static int pcilib_xml_create_unit(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
  */
 static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathContextPtr xpath) {
     int err;
-    xmlXPathObjectPtr bank_nodes = NULL, transform_nodes = NULL, enum_nodes = NULL, unit_nodes = NULL, script_nodes = NULL;
+    xmlXPathObjectPtr bank_nodes = NULL, transform_nodes = NULL, enum_nodes = NULL, unit_nodes = NULL;
     xmlNodeSetPtr nodeset;
     int i;
 
     bank_nodes = xmlXPathEvalExpression(BANKS_PATH, xpath);
     if (bank_nodes) transform_nodes = xmlXPathEvalExpression(TRANSFORM_VIEWS_PATH, xpath);
-    if (transform_nodes) script_nodes = xmlXPathEvalExpression(SCRIPT_VIEWS_PATH, xpath);
-    if (script_nodes) enum_nodes = xmlXPathEvalExpression(ENUM_VIEWS_PATH, xpath);
+    if (transform_nodes) enum_nodes = xmlXPathEvalExpression(ENUM_VIEWS_PATH, xpath);
     if (enum_nodes) unit_nodes = xmlXPathEvalExpression(UNITS_PATH, xpath);
     
 
@@ -899,19 +937,11 @@ static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathCon
 	    if (err) pcilib_error("Error (%i) creating unit", err);
         }
     }
-    
-    nodeset = script_nodes->nodesetval;
-    if(!xmlXPathNodeSetIsEmpty(nodeset)) {
-        for(i=0; i < nodeset->nodeNr; i++) {
-			err = pcilib_xml_create_script_view(ctx, xpath, doc, nodeset->nodeTab[i]);
-	    if (err) pcilib_error("Error (%i) creating script transform", err);
-        }
-    }
 
     nodeset = transform_nodes->nodesetval;
     if (!xmlXPathNodeSetIsEmpty(nodeset)) {
         for(i=0; i < nodeset->nodeNr; i++) {
-            err = pcilib_xml_create_transform_view(ctx, xpath, doc, nodeset->nodeTab[i]);
+            err = pcilib_xml_create_script_or_transform_view(ctx, xpath, doc, nodeset->nodeTab[i]);
 	    if (err) pcilib_error("Error (%i) creating register transform", err);
         }
     }

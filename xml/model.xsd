@@ -7,7 +7,6 @@
       <xsd:choice minOccurs="1" maxOccurs="unbounded">
         <xsd:element name="bank" type="pcilib_bank_t" minOccurs="0" maxOccurs="unbounded" />
         <xsd:element name="transform" type="pcilib_transform_view_t" minOccurs="0" maxOccurs="unbounded" />
-        <xsd:element name="script" type="pcilib_script_view_t" minOccurs="0" maxOccurs="unbounded" />
         <xsd:element name="enum" type="pcilib_enum_view_t" minOccurs="0" maxOccurs="unbounded" />
         <xsd:element name="unit" type="pcilib_unit_t" minOccurs="0" maxOccurs="unbounded" />
       </xsd:choice>
