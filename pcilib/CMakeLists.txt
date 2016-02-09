@@ -14,7 +14,6 @@ target_link_libraries(pcilib dma protocols views ${CMAKE_THREAD_LIBS_INIT} ${UFO
 add_dependencies(pcilib dma protocols views)
 
 #Creating python wrapping
-FIND_PACKAGE(SWIG REQUIRED)
 INCLUDE(${SWIG_USE_FILE})
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})

@@ -9,7 +9,8 @@
 	  register="test_prop2"
 	  unit="C"
 	  script="test_prop2.py"
-	  description="test python script #1"/>
+	  description="test python script #1"
+	  no_set_check="1"/>
   <transform path="/test/prop3"
 	  register="test_prop3"
 	  unit="C"

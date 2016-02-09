@@ -492,6 +492,8 @@ static int pcilib_xml_create_bank(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node, pcilib_view_description_t *desc) {
     xmlAttrPtr cur;
     const char *value, *name;
+    
+    int register_no_chk = 0;
 
     for (cur = node->properties; cur != NULL; cur = cur->next) {
         if (!cur->children) continue;
@@ -539,7 +541,15 @@ static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDoc
                 return PCILIB_ERROR_INVALID_DATA;
             }
         }
-    }
+		else if (!strcasecmp(name, "no_set_check")) {
+			if (!strcasecmp(value, "1"))
+				register_no_chk = 1;
+		}
+	}
+	if(register_no_chk)
+	{
+		desc->mode |= PCILIB_REGISTER_NO_CHK;
+	}
 
     return 0;
 }
@@ -550,7 +560,7 @@ static int pcilib_xml_create_script_view(pcilib_t *ctx, xmlXPathContextPtr xpath
     const char *value, *name;
     pcilib_view_context_t *view_ctx;
 
-    pcilib_access_mode_t mode = 0;
+    pcilib_access_mode_t mode = PCILIB_REGISTER_NO_CHK;
     pcilib_script_view_description_t desc = {{0}};
 
     desc.base.api = &pcilib_script_view_api;
@@ -595,7 +605,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
     const char *value, *name;
     pcilib_view_context_t *view_ctx;
 
-    pcilib_access_mode_t mode = 0;
+    pcilib_access_mode_t mode = PCILIB_REGISTER_NO_CHK;
     pcilib_transform_view_description_t desc = {{0}};
 
     desc.base.api = &pcilib_transform_view_api;

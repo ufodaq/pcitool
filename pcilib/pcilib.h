@@ -54,6 +54,7 @@ typedef enum {
     PCILIB_REGISTER_RW1C = 5,
     PCILIB_REGISTER_W1I = 8,			/**< writting 1 inversts the bit, writting 0 keeps the value */
     PCILIB_REGISTER_RW1I = 9,
+    PCILIB_REGISTER_NO_CHK = 16		/**< dont check register value after set*/
 } pcilib_register_mode_t;
 
 typedef enum {

@@ -1702,10 +1702,12 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
         if ((model_info->registers[regid].mode&PCILIB_REGISTER_RW) == PCILIB_REGISTER_RW) {
             const char *format = (val.format?val.format:"%u");
 	    
+	    
 	    err = pcilib_read_register(handle, bank, reg, &verify);
 	    if (err) Error("Error reading back register %s for verification\n", reg);
-    
-	    if (verify != value) {
+		
+	    if (!((model_info->registers[regid].mode&PCILIB_REGISTER_NO_CHK) ==  PCILIB_REGISTER_NO_CHK) && 
+	        verify != value) {
 	        Error("Failed to write register %s: %lu is written and %lu is read back", reg, value, verify);
 	    } else {
 	        printf("%s = ", reg);

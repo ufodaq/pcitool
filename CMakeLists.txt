@@ -36,6 +36,7 @@ SET(ENV{PKG_CONFIG_PATH} "${LIB_INSTALL_DIR}/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 find_package(PythonLibs 2.7 REQUIRED)
+find_package(SWIG REQUIRED)
 
 set(EXTRA_SYSTEM_LIBS -lrt)
 
