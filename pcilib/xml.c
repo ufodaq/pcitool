@@ -554,53 +554,6 @@ static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDoc
     return 0;
 }
 
-static int pcilib_xml_create_script_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
-    int err;
-    xmlAttrPtr cur;
-    const char *value, *name;
-    pcilib_view_context_t *view_ctx;
-    
-
-    pcilib_access_mode_t mode = 0;
-    pcilib_transform_view_description_t desc = {{0}};
-
-    desc.base.api = &pcilib_transform_view_api;
-    desc.base.type = PCILIB_TYPE_DOUBLE;
-    desc.base.mode = PCILIB_ACCESS_RW;
-    desc.script = NULL;
-
-    err = pcilib_xml_parse_view(ctx, xpath, doc, node, (pcilib_view_description_t*)&desc);
-    if (err) return err;
-
-    for (cur = node->properties; cur != NULL; cur = cur->next) {
-        if (!cur->children) continue;
-        if (!xmlNodeIsText(cur->children)) continue;
-
-        name = (char*)cur->name;
-        value = (char*)cur->children->content;
-        if (!value) continue;
-
-        if (!strcasecmp(name, "script")) 
-        {
-			//write script name to struct
-			char* script_name = malloc(strlen(value));
-			sprintf(script_name, "%s", value);
-			
-			err = pcilib_init_py_script(ctx, script_name, &(desc.script), &mode);
-			if(err) return err;
-			mode |= PCILIB_REGISTER_NO_CHK;
-        }
-    }
-    
-    desc.base.mode &= mode;
-
-    err = pcilib_add_views_custom(ctx, 1, (pcilib_view_description_t*)&desc, &view_ctx);
-    if (err) return err;
-
-    view_ctx->xml = node;
-    return 0;
-}
-
 static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
     int err;
     xmlAttrPtr cur;

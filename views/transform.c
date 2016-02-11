@@ -53,7 +53,7 @@ static int pcilib_transform_view_write(pcilib_t *ctx, pcilib_view_context_t *vie
 		return err;
 	}
 	else
-		pcilib_script_write(ctx, v->script, val);
+		return pcilib_script_write(ctx, v->script, (pcilib_value_t *)val);
 }
 
 void pcilib_transform_view_free_description (pcilib_t *ctx, pcilib_view_description_t *view)

@@ -44,6 +44,7 @@ char* make_str(const char* msg, ...)
     va_start(vl, msg);
 	char *buf = vmake_str(msg, vl);
 	va_end(vl);
+	return buf;
 }
 
 /*!
@@ -276,12 +277,12 @@ PyObject* set_property(const char *prop, PyObject* val)
 
 void add_pcilib_value_to_dict(PyObject* dict, pcilib_value_t* val, const char *name)
 {
-    PyObject *py_val = pcilib_convert_val_to_pyobject(__ctx, val);
+    PyObject *py_val = (PyObject*)pcilib_convert_val_to_pyobject(__ctx, val);
 
 	if(py_val)
 		PyDict_SetItem(dict,
                        PyString_FromString(name),
-                       val);
+                       py_val);
 	else
 		PyDict_SetItem(dict,
                        PyString_FromString("defvalue"),
@@ -407,13 +408,22 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_register_info_t listI
     PyDict_SetItem(pylistItem,
                    PyString_FromString("mode"),
                    modes);
-    add_pcilib_value_to_dict(pylistItem, &listItem.defvalue, "defvalue");
+                   
+    pcilib_value_t defval = {0};
+    pcilib_set_value_from_register_value(__ctx, &defval, listItem.defvalue);
+    add_pcilib_value_to_dict(pylistItem, &defval, "defvalue");
 
     if(listItem.range)
     {
+		pcilib_value_t minval = {0};
+		pcilib_set_value_from_register_value(__ctx, &minval, listItem.range->min);
+		
+		pcilib_value_t maxval = {0};
+		pcilib_set_value_from_register_value(__ctx, &maxval, listItem.range->max);
+		
         PyObject* range = PyDict_New();
-        add_pcilib_value_to_dict(range, &(listItem.range->min), "min");
-        add_pcilib_value_to_dict(range, &(listItem.range->max), "max");
+        add_pcilib_value_to_dict(range, &minval, "min");
+        add_pcilib_value_to_dict(range, &maxval, "max");
         PyDict_SetItem(pylistItem,
                        PyString_FromString("range"),
                        range);
@@ -426,10 +436,19 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_register_info_t listI
         for (int j = 0; listItem.values[j].name; j++)
         {
             PyObject* valuesItem = PyDict_New();
+            
+            pcilib_value_t val = {0};
+			pcilib_set_value_from_register_value(__ctx, &val, listItem.values[j].value);
 
-            add_pcilib_value_to_dict(valuesItem, &(listItem.values[j].value), "value");
-            add_pcilib_value_to_dict(valuesItem, &(listItem.values[j].min), "min");
-            add_pcilib_value_to_dict(valuesItem, &(listItem.values[j].max), "max");
+			pcilib_value_t min = {0};
+			pcilib_set_value_from_register_value(__ctx, &min, listItem.values[j].min);
+		
+			pcilib_value_t max = {0};
+			pcilib_set_value_from_register_value(__ctx, &max, listItem.values[j].max);
+            
+            add_pcilib_value_to_dict(valuesItem, &val, "value");
+            add_pcilib_value_to_dict(valuesItem, &min, "min");
+            add_pcilib_value_to_dict(valuesItem, &max, "max");
 
             if(listItem.values[j].name)
                 PyDict_SetItem(valuesItem,
@@ -510,7 +529,7 @@ PyObject* get_property_info(const char* branch)
 
     PyObject* pyList = PyList_New(0);
 
-    for(int i = 0; i < list[i].path; i++)
+    for(int i = 0; list[i].path; i++)
     {
         //serialize item attributes
         PyObject* pylistItem = pcilib_convert_property_info_to_pyobject(list[i]);

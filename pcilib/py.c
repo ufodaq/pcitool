@@ -269,9 +269,7 @@ int pcilib_convert_pyobject_to_val(pcilib_t* ctx, void* pyObjVal, pcilib_value_t
 }
 
 int pcilib_init_py_script(pcilib_t *ctx, char* module_name, pcilib_script_t **module, pcilib_access_mode_t *mode)
-{
-	int err;
-	
+{	
 	//Initialize python script, if it has not initialized already.
 	if(!module_name)
 	{
@@ -389,6 +387,8 @@ int pcilib_free_py_script(pcilib_script_t *module)
 			module->py_script_module = NULL;
 		}
 	}
+	
+	return 0;
 }
 
 int pcilib_script_read(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *val)
@@ -415,9 +415,7 @@ int pcilib_script_read(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *v
 }
 
 int pcilib_script_write(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *val)
-{
-	int err;
-		
+{	
     PyObject *input = pcilib_convert_val_to_pyobject(ctx, val);
 	if(!input)
 	{
