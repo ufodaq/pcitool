@@ -293,15 +293,15 @@ int pcilib_init_py_script(pcilib_t *ctx, char* module_name, pcilib_script_t **mo
 	char* pcipywrap_path;
 	if(app_dir)
 	{
-		pcipywrap_path = malloc(strlen(app_dir) + strlen("/pcilib"));
+		pcipywrap_path = malloc(strlen(app_dir) + strlen("/pywrap"));
 		if (!pcipywrap_path) return PCILIB_ERROR_MEMORY;
-		sprintf(pcipywrap_path, "%s/%s", "/pcilib", ctx->model);
+		sprintf(pcipywrap_path, "%s/%s", "/pywrap", ctx->model);
 	}
 	else
 	{
-		pcipywrap_path = malloc(strlen("./pcilib"));
+		pcipywrap_path = malloc(strlen("./pywrap"));
 		if (!pcipywrap_path) return PCILIB_ERROR_MEMORY;
-		sprintf(pcipywrap_path, "%s", "./pcilib");
+		sprintf(pcipywrap_path, "%s", "./pywrap");
 
 	}
 	

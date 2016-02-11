@@ -493,7 +493,7 @@ static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDoc
     xmlAttrPtr cur;
     const char *value, *name;
     
-    int register_no_chk = 0;
+    int register_incosistent = 0;
 
     for (cur = node->properties; cur != NULL; cur = cur->next) {
         if (!cur->children) continue;
@@ -541,14 +541,17 @@ static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDoc
                 return PCILIB_ERROR_INVALID_DATA;
             }
         }
-		else if (!strcasecmp(name, "no_set_check")) {
-			if (!strcasecmp(value, "1"))
-				register_no_chk = 1;
+		else if (!strcasecmp(name, "write_verification")) {
+			if (!strcasecmp(value, "0"))
+			{
+				register_incosistent = 1;
+			}
 		}
 	}
-	if(register_no_chk)
+	
+	if(register_incosistent)
 	{
-		desc->mode |= PCILIB_REGISTER_NO_CHK;
+		desc->mode |= PCILIB_REGISTER_INCONSISTENT;
 	}
 
     return 0;
@@ -560,7 +563,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
     const char *value, *name;
     pcilib_view_context_t *view_ctx;
 
-    pcilib_access_mode_t mode = PCILIB_REGISTER_NO_CHK;
+    pcilib_access_mode_t mode = PCILIB_REGISTER_INCONSISTENT;
     pcilib_transform_view_description_t desc = {{0}};
 
     desc.base.api = &pcilib_transform_view_api;
@@ -603,7 +606,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
 			
 			err = pcilib_init_py_script(ctx, script_name, &(desc.script), &mode);
 			if(err) return err;
-			mode |= PCILIB_REGISTER_NO_CHK;
+			mode |= PCILIB_REGISTER_INCONSISTENT;
 			break;
         }
     }

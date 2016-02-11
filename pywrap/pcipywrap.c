@@ -341,7 +341,7 @@ PyObject * pcilib_convert_property_info_to_pyobject(pcilib_property_info_t listI
         PyList_Append(modes, PyString_FromString("W"));
     if((listItem.mode & PCILIB_ACCESS_RW ) == PCILIB_REGISTER_RW)
         PyList_Append(modes, PyString_FromString("RW"));
-    if((listItem.mode & PCILIB_REGISTER_NO_CHK) == PCILIB_REGISTER_NO_CHK)
+    if((listItem.mode & PCILIB_REGISTER_INCONSISTENT) == PCILIB_REGISTER_INCONSISTENT)
         PyList_Append(modes, PyString_FromString("NO_CHK"));
 
     PyDict_SetItem(pylistItem,
@@ -402,7 +402,7 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_register_info_t listI
         PyList_Append(modes, PyString_FromString("W1I"));
     if((listItem.mode & PCILIB_REGISTER_RW1I) == PCILIB_REGISTER_RW1I)
         PyList_Append(modes, PyString_FromString("RW1I"));
-    if((listItem.mode & PCILIB_REGISTER_NO_CHK) == PCILIB_REGISTER_NO_CHK)
+    if((listItem.mode & PCILIB_REGISTER_INCONSISTENT) == PCILIB_REGISTER_INCONSISTENT)
         PyList_Append(modes, PyString_FromString("NO_CHK"));
 
     PyDict_SetItem(pylistItem,
@@ -471,7 +471,7 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_register_info_t listI
     return pylistItem;
 }
 
-PyObject* get_register_list(const char *bank)
+PyObject* get_registers_list(const char *bank)
 {
 	if(!__ctx)
 	{

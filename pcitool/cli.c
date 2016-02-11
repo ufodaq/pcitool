@@ -1706,7 +1706,7 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
 	    err = pcilib_read_register(handle, bank, reg, &verify);
 	    if (err) Error("Error reading back register %s for verification\n", reg);
 		
-	    if (!((model_info->registers[regid].mode&PCILIB_REGISTER_NO_CHK) ==  PCILIB_REGISTER_NO_CHK) && 
+	    if (!((model_info->registers[regid].mode&PCILIB_REGISTER_INCONSISTENT) ==  PCILIB_REGISTER_INCONSISTENT) && 
 	        verify != value) {
 	        Error("Failed to write register %s: %lu is written and %lu is read back", reg, value, verify);
 	    } else {
