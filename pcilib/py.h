@@ -20,6 +20,26 @@ int pcilib_free_py_script(pcilib_script_t *module);
 int pcilib_script_read(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *val);
 int pcilib_script_write(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *val);
 
+
+/*!
+ * \brief Converts pcilib_value_t to PyObject.
+ * \param ctx pointer to pcilib_t context
+ * \param val pointer to pcilib_value_t to convert
+ * \return PyObject, containing value. NULL with error message, sended to errstream.
+ */
+void* pcilib_convert_val_to_pyobject(pcilib_t* ctx, pcilib_value_t *val);
+
+
+/*!
+ * \brief Converts PyObject to pcilib_value_t.
+ * \param ctx pcilib context
+ * \param pyVal python object, containing value
+ * \param val initialized polymorphic value
+ * \return 0 on success or memory error
+ */
+int pcilib_convert_pyobject_to_val(pcilib_t* ctx, void* pyVal, pcilib_value_t *val);
+
+
 #ifdef __cplusplus
 }
 #endif

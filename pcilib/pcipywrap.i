@@ -1,5 +1,8 @@
 %module pcipywrap
 
+%init %{
+	init_pcipywrap_module();
+%}
 
 extern PyObject* createPcilibInstance(const char *fpga_device, const char *model = NULL);
 extern PyObject* setPcilib(PyObject* addr);

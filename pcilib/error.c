@@ -76,3 +76,14 @@ int pcilib_set_logger(pcilib_log_priority_t min_prio, pcilib_logger_t logger, vo
 
     return 0;
 }
+
+pcilib_logger_t pcilib_get_logger() {
+    return pcilib_logger;
+}
+pcilib_log_priority_t pcilib_get_logger_min_prio() {
+	return pcilib_logger_min_prio;
+}
+void* pcilib_get_logger_argument() {
+	return pcilib_logger_argument;
+}
+

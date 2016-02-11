@@ -263,6 +263,21 @@ extern "C" {
  */
 int pcilib_set_logger(pcilib_log_priority_t min_prio, pcilib_logger_t logger, void *arg);
 
+/**
+ * Gets current logger function.
+ */
+pcilib_logger_t pcilib_get_logger();
+
+/**
+ * Gets current logger min priority.
+ */
+pcilib_log_priority_t pcilib_get_logger_min_prio();
+
+/**
+ * Gets current logger argument.
+ */
+void* pcilib_get_logger_argument();
+
 /** public_api_global
  * @}
  */

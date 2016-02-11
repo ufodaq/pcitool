@@ -196,6 +196,77 @@ int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *va
     return pcilib_set_value_from_float(ctx, value, PyFloat_AsDouble(obj));
 }
 
+void* pcilib_convert_val_to_pyobject(pcilib_t* ctx, pcilib_value_t *val)
+{
+	int err;
+	
+	switch(val->type)
+	{
+		case PCILIB_TYPE_INVALID:
+                pcilib_error("Invalid register output type (PCILIB_TYPE_INVALID)");
+			return NULL;
+			
+		case PCILIB_TYPE_STRING:
+                pcilib_error("Invalid register output type (PCILIB_TYPE_STRING)");
+			return NULL;
+		
+		case PCILIB_TYPE_LONG:
+		{
+			long ret;
+			ret = pcilib_get_value_as_int(ctx, val, &err);
+			
+			if(err)
+			{
+                    pcilib_error("Failed: pcilib_get_value_as_int (%i)", err);
+				return NULL;
+			}
+			return (PyObject*)PyInt_FromLong((long) ret);
+		}
+		
+		case PCILIB_TYPE_DOUBLE:
+		{
+			double ret;
+			ret = pcilib_get_value_as_float(ctx, val, &err);
+			
+			if(err)
+			{
+                    pcilib_error("Failed: pcilib_get_value_as_int (%i)", err);
+				return NULL;
+			}
+			return (PyObject*)PyFloat_FromDouble((double) ret);
+		}
+		
+		default:
+                pcilib_error("Invalid register output type (unknown)");
+			return NULL;
+	}
+}
+
+int pcilib_convert_pyobject_to_val(pcilib_t* ctx, void* pyObjVal, pcilib_value_t *val)
+{
+	PyObject* pyVal = pyObjVal;
+	int err;
+	
+    if(PyInt_Check(pyVal))
+    {
+        err = pcilib_set_value_from_int(ctx, val, PyInt_AsLong(pyVal));
+    }
+    else
+        if(PyFloat_Check(pyVal))
+            err = pcilib_set_value_from_float(ctx, val, PyFloat_AsDouble(pyVal));
+        else
+            if(PyString_Check(pyVal))
+                err = pcilib_set_value_from_static_string(ctx, val, PyString_AsString(pyVal));
+                else
+                {
+                    pcilib_error("Invalid input. Input type should be int, float or string.");
+                    return PCILIB_ERROR_NOTSUPPORTED;
+                }
+    if(err)
+        return err;
+        
+    return 0;
+}
 
 int pcilib_init_py_script(pcilib_t *ctx, char* module_name, pcilib_script_t **module, pcilib_access_mode_t *mode)
 {
@@ -347,7 +418,7 @@ int pcilib_script_write(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *
 {
 	int err;
 		
-	PyObject *input = pcilib_convert_val_to_pyobject(ctx, val, printf);
+    PyObject *input = pcilib_convert_val_to_pyobject(ctx, val);
 	if(!input)
 	{
 	   printf("Failed to convert input value to Python object");
