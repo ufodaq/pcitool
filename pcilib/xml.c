@@ -42,7 +42,7 @@
 #include "view.h"
 #include "views/enum.h"
 #include "views/transform.h"
-#include "views/script.h"
+#include "py.h"
 
 
 #define BANKS_PATH ((xmlChar*)"/model/bank")					/**< path to complete nodes of banks */
@@ -559,15 +559,15 @@ static int pcilib_xml_create_script_view(pcilib_t *ctx, xmlXPathContextPtr xpath
     xmlAttrPtr cur;
     const char *value, *name;
     pcilib_view_context_t *view_ctx;
+    
 
-    pcilib_access_mode_t mode = PCILIB_REGISTER_NO_CHK;
-    pcilib_script_view_description_t desc = {{0}};
+    pcilib_access_mode_t mode = 0;
+    pcilib_transform_view_description_t desc = {{0}};
 
-    desc.base.api = &pcilib_script_view_api;
+    desc.base.api = &pcilib_transform_view_api;
     desc.base.type = PCILIB_TYPE_DOUBLE;
     desc.base.mode = PCILIB_ACCESS_RW;
-    desc.py_script_module = NULL;
-    desc.script_name = NULL;
+    desc.script = NULL;
 
     err = pcilib_xml_parse_view(ctx, xpath, doc, node, (pcilib_view_description_t*)&desc);
     if (err) return err;
@@ -580,14 +580,16 @@ static int pcilib_xml_create_script_view(pcilib_t *ctx, xmlXPathContextPtr xpath
         value = (char*)cur->children->content;
         if (!value) continue;
 
-        if (!strcasecmp(name, "script")) {
+        if (!strcasecmp(name, "script")) 
+        {
 			//write script name to struct
-			desc.script_name = malloc(strlen(value));
-			sprintf(desc.script_name, "%s", value);
-			//set read write access
-			mode |= PCILIB_ACCESS_R;
-			mode |= PCILIB_ACCESS_W;
-            }
+			char* script_name = malloc(strlen(value));
+			sprintf(script_name, "%s", value);
+			
+			err = pcilib_init_py_script(ctx, script_name, &(desc.script), &mode);
+			if(err) return err;
+			mode |= PCILIB_REGISTER_NO_CHK;
+        }
     }
     
     desc.base.mode &= mode;
@@ -611,6 +613,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
     desc.base.api = &pcilib_transform_view_api;
     desc.base.type = PCILIB_TYPE_DOUBLE;
     desc.base.mode = PCILIB_ACCESS_RW;
+    desc.script = NULL;
 
     err = pcilib_xml_parse_view(ctx, xpath, doc, node, (pcilib_view_description_t*)&desc);
     if (err) return err;
@@ -641,7 +644,15 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
             }
             desc.write_to_reg = value;
             if ((value)&&(*value)) mode |= PCILIB_ACCESS_W;
-        } 
+        } else if (!strcasecmp(name, "script")) {
+			char* script_name = malloc(strlen(value));
+			sprintf(script_name, "%s", value);
+			
+			err = pcilib_init_py_script(ctx, script_name, &(desc.script), &mode);
+			if(err) return err;
+			mode |= PCILIB_REGISTER_NO_CHK;
+			break;
+        }
     }
 
     desc.base.mode &= mode;
@@ -654,6 +665,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
 }
 
 static int pcilib_xml_create_script_or_transform_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
+    /*
     int err;
     xmlAttrPtr cur;
     const char *name;
@@ -688,9 +700,11 @@ static int pcilib_xml_create_script_or_transform_view(pcilib_t *ctx, xmlXPathCon
     }
 
     if(has_script)
+    
         return pcilib_xml_create_script_view(ctx, xpath, doc, node);
     else
-        return pcilib_xml_create_transform_view(ctx, xpath, doc, node);
+    */
+       return pcilib_xml_create_transform_view(ctx, xpath, doc, node);
 }
 
 

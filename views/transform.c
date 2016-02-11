@@ -12,34 +12,58 @@
 
 
 static int pcilib_transform_view_read(pcilib_t *ctx, pcilib_view_context_t *view_ctx, pcilib_register_value_t regval, pcilib_value_t *val) {
-    int err;
-
     const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
     pcilib_transform_view_description_t *v = (pcilib_transform_view_description_t*)(model_info->views[view_ctx->view]);
 
-    err = pcilib_set_value_from_register_value(ctx, val, regval);
-    if (err) return err;
+	if(v->script)
+	{
+		return pcilib_script_read(ctx, v->script, val);
+	}
+	else
+	{
+		int err;
+		
+		err = pcilib_set_value_from_register_value(ctx, val, regval);
+		if (err) return err;
 
-    return  pcilib_py_eval_string(ctx, v->read_from_reg, val);
+		return  pcilib_py_eval_string(ctx, v->read_from_reg, val);
+	}
 }
 
 static int pcilib_transform_view_write(pcilib_t *ctx, pcilib_view_context_t *view_ctx, pcilib_register_value_t *regval, const pcilib_value_t *val) {
-    int err = 0;
-    pcilib_value_t val_copy = {0};
+    
+    
 
     const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
     pcilib_transform_view_description_t *v = (pcilib_transform_view_description_t*)(model_info->views[view_ctx->view]);
 
-    err = pcilib_copy_value(ctx, &val_copy, val);
-    if (err) return err;
 
-    err = pcilib_py_eval_string(ctx, v->write_to_reg, &val_copy);
-    if (err) return err;
+	if(!v->script)
+	{
+		int err = 0;
+		
+		pcilib_value_t val_copy = {0};
+		err = pcilib_copy_value(ctx, &val_copy, val);
+		if (err) return err;
 
-    *regval = pcilib_get_value_as_register_value(ctx, &val_copy, &err);
-    return err;
+		err = pcilib_py_eval_string(ctx, v->write_to_reg, &val_copy);
+		if (err) return err;
+
+		*regval = pcilib_get_value_as_register_value(ctx, &val_copy, &err);
+		return err;
+	}
+	else
+		pcilib_script_write(ctx, v->script, val);
+}
+
+void pcilib_transform_view_free_description (pcilib_t *ctx, pcilib_view_description_t *view)
+{
+	pcilib_transform_view_description_t *v = (pcilib_transform_view_description_t*)(view);
+	
+	if(v->script)
+		pcilib_free_py_script(v->script);
 }
 
 
 const pcilib_view_api_description_t pcilib_transform_view_api =
-  { PCILIB_VERSION, sizeof(pcilib_transform_view_description_t), NULL, NULL, NULL, pcilib_transform_view_read,  pcilib_transform_view_write };
+  { PCILIB_VERSION, sizeof(pcilib_transform_view_description_t), NULL, NULL, pcilib_transform_view_free_description, pcilib_transform_view_read,  pcilib_transform_view_write };
