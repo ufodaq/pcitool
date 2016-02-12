@@ -70,7 +70,7 @@ int pcilib_add_views_custom(pcilib_t *ctx, size_t n, const pcilib_view_descripti
         }
 
         if (v->api->init) 
-            view_ctx = v->api->init(ctx);
+            view_ctx = v->api->init(ctx, v);
         else {
             view_ctx = (pcilib_view_context_t*)malloc(sizeof(pcilib_view_context_t));
             if (view_ctx) memset(view_ctx, 0, sizeof(pcilib_view_context_t));

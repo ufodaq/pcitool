@@ -192,12 +192,14 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    return NULL;
 	}
 	
+	
 	xmlerr = pcilib_init_xml(ctx, ctx->model);
 	if ((xmlerr)&&(xmlerr != PCILIB_ERROR_NOTFOUND)) {
 	    pcilib_error("Error (%i) initializing XML subsystem for model %s", xmlerr, ctx->model);
 	    pcilib_close(ctx);
 	    return NULL;
 	}
+	
 
 	    // We have found neither standard model nor XML
 	if ((err)&&(xmlerr)) {
@@ -219,7 +221,6 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    pcilib_close(ctx);
 	    return NULL;
 	}
-	
 	err = pcilib_init_event_engine(ctx);
 	if (err) {
 	    pcilib_error("Error (%i) initializing event engine\n", err);

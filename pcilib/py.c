@@ -244,11 +244,11 @@ void* pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *val)
 	switch(val->type)
 	{
 		case PCILIB_TYPE_INVALID:
-                pcilib_error("Invalid register output type (PCILIB_TYPE_INVALID)");
+            pcilib_warning("Invalid register output type (PCILIB_TYPE_INVALID)");
 			return NULL;
 			
 		case PCILIB_TYPE_STRING:
-                pcilib_error("Invalid register output type (PCILIB_TYPE_STRING)");
+            pcilib_warning("Invalid register output type (PCILIB_TYPE_STRING)");
 			return NULL;
 		
 		case PCILIB_TYPE_LONG:
@@ -258,7 +258,7 @@ void* pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *val)
 			
 			if(err)
 			{
-                    pcilib_error("Failed: pcilib_get_value_as_int (%i)", err);
+                pcilib_error("Failed: pcilib_get_value_as_int (%i)", err);
 				return NULL;
 			}
 			return (PyObject*)PyInt_FromLong((long) ret);
@@ -271,14 +271,14 @@ void* pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *val)
 			
 			if(err)
 			{
-                    pcilib_error("Failed: pcilib_get_value_as_int (%i)", err);
+                pcilib_error("Failed: pcilib_get_value_as_int (%i)", err);
 				return NULL;
 			}
 			return (PyObject*)PyFloat_FromDouble((double) ret);
 		}
 		
 		default:
-                pcilib_error("Invalid register output type (unknown)");
+                pcilib_warning("Invalid register output type (unknown)");
 			return NULL;
 	}
 }
@@ -360,7 +360,7 @@ int pcilib_py_init_script(pcilib_t *ctx, char* module_name, pcilib_access_mode_t
 	   //setting pcilib_t instance                 
 	   PyObject_CallMethodObjArgs(pcipywrap_module,
                                PyUnicode_FromString("set_pcilib"),
-							   PyByteArray_FromStringAndSize((const char*)&ctx, sizeof(pcilib_t*)),
+                               PyCObject_FromVoidPtr(ctx, NULL),
 							   NULL);
 	}
 	

@@ -9,6 +9,7 @@
 #include "model.h"
 #include "transform.h"
 #include "py.h"
+#include "error.h"
 
 
 static int pcilib_transform_view_read(pcilib_t *ctx, pcilib_view_context_t *view_ctx, pcilib_register_value_t regval, pcilib_value_t *val) {
@@ -57,6 +58,34 @@ void pcilib_transform_view_free_description (pcilib_t *ctx, pcilib_view_descript
 		pcilib_py_free_script(v->module);
 }
 
+pcilib_view_context_t * pcilib_transform_view_init(pcilib_t *ctx, const pcilib_view_description_t *desc)
+{
+	pcilib_transform_view_description_t *v_desc = (pcilib_transform_view_description_t*)desc;
+	
+	if(v_desc->module)
+	{	
+		pcilib_access_mode_t mode = 0;
+		
+		int err = pcilib_py_init_script(ctx, v_desc->module, &mode);
+		if(err)
+		{
+			pcilib_error("Failed init script module (%s) - error %i", v_desc->module, err);
+			return NULL;
+		} 
+		
+		v_desc->base.mode |= PCILIB_REGISTER_RW;
+		mode |= PCILIB_REGISTER_INCONSISTENT;
+		v_desc->base.mode &= mode;
+	}
+	
+	pcilib_view_context_t *view_ctx;
+	view_ctx = (pcilib_view_context_t*)malloc(sizeof(pcilib_view_context_t));
+    if (view_ctx) memset(view_ctx, 0, sizeof(pcilib_view_context_t));
+    
+    return view_ctx;
+}
+
+
 
 const pcilib_view_api_description_t pcilib_transform_view_api =
-  { PCILIB_VERSION, sizeof(pcilib_transform_view_description_t), NULL, NULL, pcilib_transform_view_free_description, pcilib_transform_view_read,  pcilib_transform_view_write };
+  { PCILIB_VERSION, sizeof(pcilib_transform_view_description_t), pcilib_transform_view_init, NULL, pcilib_transform_view_free_description, pcilib_transform_view_read,  pcilib_transform_view_write };

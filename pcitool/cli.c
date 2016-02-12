@@ -1716,8 +1716,6 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
 					printf("\n");
 				}
 			}
-			else
-				printf("%s is written\n ", reg);
         } else {
             printf("%s is written\n ", reg);
         }

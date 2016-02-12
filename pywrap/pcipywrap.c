@@ -8,6 +8,8 @@
  */
 pcilib_t* __ctx = 0;
 
+char* full_log = NULL;
+
 /*!
  * \brief Wraping for vsnprintf function, that saves string to char*
  * \return saved from vsnprintf string
@@ -52,23 +54,51 @@ char* make_str(const char* msg, ...)
  */
 void pcilib_print_error_to_py(void *arg, const char *file, int line, 
 							  pcilib_log_priority_t prio, const char *msg,
-							  va_list va) {
-    char* buf_raw_msg = vmake_str(msg, va);
-    char* buf_wrapped_message = make_str("%s [%s:%d]\n", buf_raw_msg, file, line);
+							  va_list va) {							  
+	//wrap error message with file and line number
+	char* buf_raw_msg = vmake_str(msg, va);
+	char* buf_wrapped_message = make_str("%s [%s:%d]\n", buf_raw_msg, file, line);
+	
+	if(prio == PCILIB_LOG_ERROR)
+	{
+		if(!full_log)
+			full_log = make_str("");
     
-    printf("%s", buf_wrapped_message);
-    PyErr_SetString(PyExc_Exception, buf_wrapped_message);
-    
-    free(buf_wrapped_message);
-    free(buf_raw_msg);
+		if(strlen(buf_wrapped_message) >= 2 &&
+		   buf_wrapped_message[0] == '#' &&
+		   buf_wrapped_message[1] == 'E')
+		{
+			char* wrapped_exeption = make_str("%sprogramm error log:\n%s", &(buf_wrapped_message[2]), full_log);
+			free(full_log);
+			full_log = NULL;
+			
+			PyErr_SetString(PyExc_Exception, wrapped_exeption);
+			free(wrapped_exeption);
+		}
+		else
+		{
+			//copy received message to log
+			char* buf = full_log;
+			char* buf_start = buf;
+			full_log = make_str("%s%s", buf, buf_wrapped_message);
+			free(buf);
+		}
+	}
+	else
+		printf(buf_wrapped_message);
+		
+	free(buf_wrapped_message);
+	free(buf_raw_msg);
 }
 
 /*!
- * \brief Inits pcipywrap module at importing
+ * \brief Redirect pcilib standart log stream to exeption text.
+ * Logger will accumulate errors untill get message, starts with "#E".
+ * After that, logger will write last error, and all accumulated errors
+ * to Python exeption text
  */
-void init_pcipywrap_module()
+void __redirect_logs_to_exeption()
 {
-	printf("init_pcipywrap_module\n");
 	pcilib_set_logger(pcilib_get_logger_min_prio(), 
 					  pcilib_print_error_to_py,
 					  pcilib_get_logger_argument());
@@ -78,17 +108,19 @@ void init_pcipywrap_module()
  * \brief Wraps for pcilib_open function.
  * \param[in] fpga_device path to the device file [/dev/fpga0]
  * \param[in] model specifies the model of hardware, autodetected if NULL is passed
- * \return Pointer to pcilib_t, created by pcilib_open, serialized to bytearray; NULL with exeption text, if failed.
+ * \return Pointer to pcilib_t, created by pcilib_open; NULL with exeption text, if failed.
  */
 PyObject* create_pcilib_instance(const char *fpga_device, const char *model)
 {
 	//opening device
     pcilib_t* ctx = pcilib_open(fpga_device, model);
     if(!ctx)
+    {
+		pcilib_error("#E Failed pcilib_open(%s, %s)", fpga_device, model);
 		return NULL;
+	}
 	
-    //serializing object
-    return PyByteArray_FromStringAndSize((const char*)&ctx, sizeof(pcilib_t*));
+	return PyCObject_FromVoidPtr((void*)ctx, NULL);
 }
 
 /*!
@@ -114,23 +146,18 @@ PyObject* get_curr_pcilib_instance()
 
 /*!
  * \brief Sets pcilib context to wraper.
- * \param[in] addr Pointer to pcilib_t, serialized to bytearray
+ * \param[in] addr Pointer to pcilib_t, serialized to PyCObject
  * \return 1, serialized to PyObject or NULL with exeption text, if failed.
  */
 PyObject* set_pcilib(PyObject* addr)
 {
-	if(!PyByteArray_Check(addr))
+	if(!PyCObject_Check(addr))
 	{
-        pcilib_error("Incorrect addr type. Only bytearray is allowed");
+        pcilib_error("#E Incorrect addr type. Only PyCObject is allowed");
 		return NULL;
 	}
 	
-	//deserializing adress
-	char* pAddr = PyByteArray_AsString(addr);
-	
-	//hard copy context adress
-	for(int i = 0; i < sizeof(pcilib_t*) + 10; i++)
-		((char*)&__ctx)[i] = pAddr[i];
+	__ctx = (pcilib_t*)PyCObject_AsVoidPtr(addr);
 	
 	return PyInt_FromLong((long)1);
 }
@@ -146,7 +173,7 @@ PyObject* read_register(const char *regname, const char *bank)
 {
 	if(!__ctx)
 	{
-        pcilib_error("pcilib_t handler not initialized");
+        pcilib_error("#E pcilib_t handler not initialized");
 		return NULL;
 	}
 
@@ -157,11 +184,17 @@ PyObject* read_register(const char *regname, const char *bank)
 	
 	err = pcilib_read_register(__ctx, bank, regname, &reg_value);
 	if(err)
+	{
+		pcilib_error("#E Failed pcilib_read_register");
 		return NULL;
+	}
 	
 	err = pcilib_set_value_from_register_value(__ctx, &val, reg_value);
 	if(err)
+	{
+		pcilib_error("#E Failed pcilib_set_value_from_register_value");
 		return NULL;
+	}
 
     return pcilib_get_value_as_pyobject(__ctx, &val);
 }
@@ -187,15 +220,24 @@ PyObject* write_register(PyObject* val, const char *regname, const char *bank)
 	int err; 
 	err = pcilib_set_value_from_pyobject(__ctx, val, &val_internal);
 	if(err)
+	{
+		pcilib_error("#E Failed pcilib_set_value_from_pyobject");
 		return NULL;
+	}
 	
 	reg_value = pcilib_get_value_as_register_value(__ctx, &val_internal, &err);
 	if(err)
+	{
+		pcilib_error("#E Failed pcilib_set_value_from_pyobject, (error %i)", err);
 		return NULL;
+	}
 	
 	err = pcilib_write_register(__ctx, bank, regname, reg_value);
 	if(err)
+	{
+		pcilib_error("#E Failed pcilib_set_value_from_pyobject, (error %i)", err);
 		return NULL;
+	}
     return PyInt_FromLong((long)1);
 }
 
@@ -208,7 +250,7 @@ PyObject* get_property(const char *prop)
 {
 	if(!__ctx)
 	{
-        pcilib_error("pcilib_t handler not initialized");
+        pcilib_error("#E pcilib_t handler not initialized");
 		return NULL;
 	}
 	
@@ -218,7 +260,10 @@ PyObject* get_property(const char *prop)
 	err  = pcilib_get_property(__ctx, prop, &val);
 	
 	if(err)
+	{
+		pcilib_error("#E Failed pcilib_get_property, (error %i)", err);
 		return NULL;
+	}
 	
     return pcilib_get_value_as_pyobject(__ctx, &val);
 }
@@ -235,19 +280,24 @@ PyObject* set_property(PyObject* val, const char *prop)
 	
 	if(!__ctx)
 	{
-        pcilib_error("pcilib_t handler not initialized");
+        pcilib_error("#E pcilib_t handler not initialized");
 		return NULL;
 	}
 	
 	pcilib_value_t val_internal = {0};
 	err = pcilib_set_value_from_pyobject(__ctx, val, &val_internal);
 	if(err)
+	{
+		pcilib_error("#E pcilib_set_value_from_pyobject, (error %i)", err);
 		return NULL;
+	}
 	
 	err  = pcilib_set_property(__ctx, prop, &val_internal);
-	
 	if(err)
+	{
+		pcilib_error("#E pcilib_set_property, (error %i)", err);
 		return NULL;
+	}
 	
 	return PyInt_FromLong((long)1);
 }
@@ -452,7 +502,7 @@ PyObject* get_registers_list(const char *bank)
 {
 	if(!__ctx)
 	{
-        pcilib_error("pcilib_t handler not initialized");
+        pcilib_error("#E pcilib_t handler not initialized");
 		return NULL;
 	}
 	
@@ -475,7 +525,7 @@ PyObject* get_register_info(const char* reg,const char *bank)
 {
     if(!__ctx)
     {
-        pcilib_error("pcilib_t handler not initialized");
+        pcilib_error("#E pcilib_t handler not initialized");
         return NULL;
     }
 
@@ -497,7 +547,7 @@ PyObject* get_property_info(const char* branch)
 {
     if(!__ctx)
     {
-        pcilib_error("pcilib_t handler not initialized");
+        pcilib_error("#E pcilib_t handler not initialized");
         return NULL;
     }
 

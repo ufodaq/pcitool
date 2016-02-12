@@ -373,6 +373,9 @@ if __name__ == '__main__':
    if not 'LD_LIBRARY_PATH' in os.environ: 
       os.environ['LD_LIBRARY_PATH'] = os.environ["APP_PATH"] + "/pcilib"
    
+   #redirect logs to exeption
+   pcipywrap.__redirect_logs_to_exeption()
+   
    pcilib_server = BaseHTTPServer.HTTPServer
    httpd = pcilib_server((HOST_NAME, PORT_NUMBER), PcilibServerHandler)
    print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)

@@ -602,14 +602,9 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
         } else if (!strcasecmp(name, "script")) {
 			desc.module = malloc(strlen(value));
 			sprintf(desc.module, "%s", value);
-			
-			err = pcilib_py_init_script(ctx, desc.module, &mode);
-			if(err) return err;
-			mode |= PCILIB_REGISTER_INCONSISTENT;
 			break;
         }
     }
-
     desc.base.mode &= mode;
 
     err = pcilib_add_views_custom(ctx, 1, (pcilib_view_description_t*)&desc, &view_ctx);

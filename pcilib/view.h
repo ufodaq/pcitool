@@ -19,7 +19,7 @@ typedef enum {
 typedef struct {
     pcilib_version_t version;                                                                                                           /**< Version */
     size_t description_size;                                                                                                            /**< The actual size of the description */
-    pcilib_view_context_t *(*init)(pcilib_t *ctx);                                                                                      /**< Optional function which should allocated context used by read/write functions */
+    pcilib_view_context_t *(*init)(pcilib_t *ctx, const pcilib_view_description_t *desc);                                               /**< Optional function which should allocated context used by read/write functions */
     void (*free)(pcilib_t *ctx, pcilib_view_context_t *view);                                                                           /**< Optional function which should clean context */
     void (*free_description)(pcilib_t *ctx, pcilib_view_description_t *view);                                                           /**< Optional function which shoud clean required parts of the extended description if non-static memory was used to initialize it */
     int (*read_from_reg)(pcilib_t *ctx, pcilib_view_context_t *view, pcilib_register_value_t regval, pcilib_value_t *val);              /**< Function which computes view value based on the passed the register value (view-based properties should not use register value) */
