@@ -4,7 +4,7 @@
 
 /*!
  * \brief Global pointer to pcilib_t context.
- * Used by setPcilib and read_register.
+ * Used by set_pcilib and read_register.
  */
 pcilib_t* __ctx = 0;
 
@@ -68,6 +68,7 @@ void pcilib_print_error_to_py(void *arg, const char *file, int line,
  */
 void init_pcipywrap_module()
 {
+	printf("init_pcipywrap_module\n");
 	pcilib_set_logger(pcilib_get_logger_min_prio(), 
 					  pcilib_print_error_to_py,
 					  pcilib_get_logger_argument());
@@ -79,7 +80,7 @@ void init_pcipywrap_module()
  * \param[in] model specifies the model of hardware, autodetected if NULL is passed
  * \return Pointer to pcilib_t, created by pcilib_open, serialized to bytearray; NULL with exeption text, if failed.
  */
-PyObject* createPcilibInstance(const char *fpga_device, const char *model)
+PyObject* create_pcilib_instance(const char *fpga_device, const char *model)
 {
 	//opening device
     pcilib_t* ctx = pcilib_open(fpga_device, model);
@@ -93,7 +94,7 @@ PyObject* createPcilibInstance(const char *fpga_device, const char *model)
 /*!
  * \brief Closes current pciliv instance, if its open.
  */
-void closeCurrentPcilibInstance()
+void close_curr_pcilib_instance()
 {
     if(__ctx)
     {
@@ -106,7 +107,7 @@ void closeCurrentPcilibInstance()
  * \brief Returns current opened pcilib_t instatnce
  * \return Pointer to pcilib_t, serialized to bytearray
  */
-PyObject* getCurrentPcilibInstance()
+PyObject* get_curr_pcilib_instance()
 {
     return PyByteArray_FromStringAndSize((const char*)&__ctx, sizeof(pcilib_t*));
 }
@@ -116,7 +117,7 @@ PyObject* getCurrentPcilibInstance()
  * \param[in] addr Pointer to pcilib_t, serialized to bytearray
  * \return 1, serialized to PyObject or NULL with exeption text, if failed.
  */
-PyObject* setPcilib(PyObject* addr)
+PyObject* set_pcilib(PyObject* addr)
 {
 	if(!PyByteArray_Check(addr))
 	{
@@ -156,19 +157,13 @@ PyObject* read_register(const char *regname, const char *bank)
 	
 	err = pcilib_read_register(__ctx, bank, regname, &reg_value);
 	if(err)
-	{
-        pcilib_error("Failed: pcilib_read_register (%i)", err);
 		return NULL;
-	}
 	
 	err = pcilib_set_value_from_register_value(__ctx, &val, reg_value);
 	if(err)
-	{
-        pcilib_error("Failed: pcilib_set_value_from_register_value (%i)", err);
 		return NULL;
-	}
 
-    return pcilib_convert_val_to_pyobject(__ctx, &val);
+    return pcilib_get_value_as_pyobject(__ctx, &val);
 }
 
 /*!
@@ -190,26 +185,17 @@ PyObject* write_register(PyObject* val, const char *regname, const char *bank)
     pcilib_register_value_t reg_value;
 	
 	int err; 
-	err = pcilib_convert_pyobject_to_val(__ctx, val, &val_internal);
+	err = pcilib_set_value_from_pyobject(__ctx, val, &val_internal);
 	if(err)
-	{
-        pcilib_error("Failed pcilib_convert_pyobject_to_val (%i)", err);
 		return NULL;
-	}
 	
 	reg_value = pcilib_get_value_as_register_value(__ctx, &val_internal, &err);
 	if(err)
-	{
-        pcilib_error("Failed: pcilib_get_value_as_register_value (%i)", err);
 		return NULL;
-	}
 	
 	err = pcilib_write_register(__ctx, bank, regname, reg_value);
 	if(err)
-	{
-        pcilib_error("Failed: pcilib_write_register (%i)", err);
 		return NULL;
-	}
     return PyInt_FromLong((long)1);
 }
 
@@ -232,12 +218,9 @@ PyObject* get_property(const char *prop)
 	err  = pcilib_get_property(__ctx, prop, &val);
 	
 	if(err)
-	{
-            pcilib_error("Failed pcilib_get_property (%i)", err);
-			return NULL;
-	}
+		return NULL;
 	
-    return pcilib_convert_val_to_pyobject(__ctx, &val);
+    return pcilib_get_value_as_pyobject(__ctx, &val);
 }
 
 /*!
@@ -246,7 +229,7 @@ PyObject* get_property(const char *prop)
  * \param[in] val Property value, that needs to be set. Can be int, float or string.
  * \return 1, serialized to PyObject or NULL with exeption text, if failed.
  */
-PyObject* set_property(const char *prop, PyObject* val)
+PyObject* set_property(PyObject* val, const char *prop)
 {
 	int err;
 	
@@ -257,27 +240,21 @@ PyObject* set_property(const char *prop, PyObject* val)
 	}
 	
 	pcilib_value_t val_internal = {0};
-	err = pcilib_convert_pyobject_to_val(__ctx, val, &val_internal);
+	err = pcilib_set_value_from_pyobject(__ctx, val, &val_internal);
 	if(err)
-	{
-        pcilib_error("Failed pcilib_convert_pyobject_to_val (%i)", err);
 		return NULL;
-	}
 	
 	err  = pcilib_set_property(__ctx, prop, &val_internal);
 	
 	if(err)
-	{
-        pcilib_error("Failed pcilib_get_property (%i)", err);
 		return NULL;
-	}
 	
 	return PyInt_FromLong((long)1);
 }
 
 void add_pcilib_value_to_dict(PyObject* dict, pcilib_value_t* val, const char *name)
 {
-    PyObject *py_val = (PyObject*)pcilib_convert_val_to_pyobject(__ctx, val);
+    PyObject *py_val = (PyObject*)pcilib_get_value_as_pyobject(__ctx, val);
 
 	if(py_val)
 		PyDict_SetItem(dict,
@@ -506,7 +483,6 @@ PyObject* get_register_info(const char* reg,const char *bank)
 
 	if(!info)
 	{
-        pcilib_error("Failed pcilib_get_register_info");
         return NULL;
 	}
 

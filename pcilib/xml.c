@@ -569,7 +569,6 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
     desc.base.api = &pcilib_transform_view_api;
     desc.base.type = PCILIB_TYPE_DOUBLE;
     desc.base.mode = PCILIB_ACCESS_RW;
-    desc.script = NULL;
 
     err = pcilib_xml_parse_view(ctx, xpath, doc, node, (pcilib_view_description_t*)&desc);
     if (err) return err;
@@ -601,10 +600,10 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
             desc.write_to_reg = value;
             if ((value)&&(*value)) mode |= PCILIB_ACCESS_W;
         } else if (!strcasecmp(name, "script")) {
-			char* script_name = malloc(strlen(value));
-			sprintf(script_name, "%s", value);
+			desc.module = malloc(strlen(value));
+			sprintf(desc.module, "%s", value);
 			
-			err = pcilib_init_py_script(ctx, script_name, &(desc.script), &mode);
+			err = pcilib_py_init_script(ctx, desc.module, &mode);
 			if(err) return err;
 			mode |= PCILIB_REGISTER_INCONSISTENT;
 			break;
@@ -619,50 +618,6 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
     view_ctx->xml = node;
     return 0;
 }
-
-static int pcilib_xml_create_script_or_transform_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node) {
-    /*
-    int err;
-    xmlAttrPtr cur;
-    const char *name;
-
-    int has_read_from_register = 0;
-    int has_write_to_register = 0;
-    int has_script = 0;
-
-    //getting transform name in case of error
-    pcilib_view_description_t desc = {0};
-    err = pcilib_xml_parse_view(ctx, xpath, doc, node, &desc);
-
-    for (cur = node->properties; cur != NULL; cur = cur->next) {
-        if (!cur->children) continue;
-        if (!xmlNodeIsText(cur->children)) continue;
-
-        name = (char*)cur->name;
-
-        if (!strcasecmp(name, "read_from_register"))
-            has_read_from_register = 1;
-        if (!strcasecmp(name, "write_to_register"))
-            has_write_to_register = 1;
-        if (!strcasecmp(name, "script"))
-            has_script = 1;
-    }
-
-    if (has_script && (has_read_from_register || has_write_to_register)) {
-        pcilib_error("Invalid transform group attributes specified in XML property (%s)."
-                     "Transform could not contains both script and read_from_register"
-                     " or write_to_register attributes at same time.", desc.name);
-        return PCILIB_ERROR_INVALID_DATA;
-    }
-
-    if(has_script)
-    
-        return pcilib_xml_create_script_view(ctx, xpath, doc, node);
-    else
-    */
-       return pcilib_xml_create_transform_view(ctx, xpath, doc, node);
-}
-
 
 static int pcilib_xml_parse_value_name(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node, pcilib_register_value_name_t *desc) {
     xmlAttr *cur;
@@ -921,7 +876,7 @@ static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathCon
     nodeset = transform_nodes->nodesetval;
     if (!xmlXPathNodeSetIsEmpty(nodeset)) {
         for(i=0; i < nodeset->nodeNr; i++) {
-            err = pcilib_xml_create_script_or_transform_view(ctx, xpath, doc, nodeset->nodeTab[i]);
+            err = pcilib_xml_create_transform_view(ctx, xpath, doc, nodeset->nodeTab[i]);
 	    if (err) pcilib_error("Error (%i) creating register transform", err);
         }
     }

@@ -3,7 +3,7 @@ project(pcitool)
 set(PCILIB_VERSION "0.2.5")
 set(PCILIB_ABI_VERSION "2")
 
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 2.8)
 #set(PKG_CONFIG_USE_CMAKE_PREFIX_PATH true)
 #set(CMAKE_PREFIX_PATH ${CMAKE_SYSTEM_PREFIX_PATH})
 
@@ -89,14 +89,18 @@ set_target_properties(pcilib PROPERTIES
     SOVERSION ${PCILIB_ABI_VERSION}
 )
 
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/xml DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcitool.pc.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/config.h)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/version.h)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/docs/Doxyfile)
+
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/pci
 	 DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
 	 FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ
 	 GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+	 
 
 install(FILES 
     ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc

@@ -1703,17 +1703,21 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
             const char *format = (val.format?val.format:"%u");
 	    
 	    
-	    err = pcilib_read_register(handle, bank, reg, &verify);
-	    if (err) Error("Error reading back register %s for verification\n", reg);
-		
-	    if (!((model_info->registers[regid].mode&PCILIB_REGISTER_INCONSISTENT) ==  PCILIB_REGISTER_INCONSISTENT) && 
-	        verify != value) {
-	        Error("Failed to write register %s: %lu is written and %lu is read back", reg, value, verify);
-	    } else {
-	        printf("%s = ", reg);
-	        printf(format, verify);
-	        printf("\n");
-	    }
+			if(!((model_info->registers[regid].mode&PCILIB_REGISTER_INCONSISTENT) ==  PCILIB_REGISTER_INCONSISTENT))
+			{
+				err = pcilib_read_register(handle, bank, reg, &verify);
+				if (err) Error("Error reading back register %s for verification\n", reg);
+				
+				if ( verify != value) {
+					Error("Failed to write register %s: %lu is written and %lu is read back", reg, value, verify);
+				} else {
+					printf("%s = ", reg);
+					printf(format, verify);
+					printf("\n");
+				}
+			}
+			else
+				printf("%s is written\n ", reg);
         } else {
             printf("%s is written\n ", reg);
         }

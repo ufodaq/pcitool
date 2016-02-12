@@ -11,24 +11,37 @@
 #include "py.h"
 #include "error.h"
 
+
+
 struct pcilib_py_s {
     PyObject *main_module;
     PyObject *global_dict;
+    int py_initialized_inside; ///< Flag, shows that Py_Initialize has been called inside class
 };
 
-struct pcilib_script_s {
+typedef struct pcilib_script_s {
+	char* script_name;
     PyObject *py_script_module;	/**< PyModule object, contains script enviroment */
 	PyObject *dict;
-	char* script_name;
-};
+	pcilib_access_mode_t mode;
+	
+	UT_hash_handle hh;
+} pcilib_script_s;
+
+struct pcilib_script_s *scripts = NULL;
 
 int pcilib_init_py(pcilib_t *ctx) {
     ctx->py = (pcilib_py_t*)malloc(sizeof(pcilib_py_t));
     if (!ctx->py) return PCILIB_ERROR_MEMORY;
 
     if(!Py_IsInitialized())
+    {
         Py_Initialize();
-
+        ctx->py->py_initialized_inside = 1;
+	}
+	else
+		ctx->py->py_initialized_inside = 0;
+		
     ctx->py->main_module = PyImport_AddModule("__parser__");
     if (!ctx->py->main_module)
         return PCILIB_ERROR_FAILED;
@@ -36,17 +49,45 @@ int pcilib_init_py(pcilib_t *ctx) {
     ctx->py->global_dict = PyModule_GetDict(ctx->py->main_module);
     if (!ctx->py->global_dict)
         return PCILIB_ERROR_FAILED;
-
+	
+	
+	//create path string, where the model scripts should be
+	static int model_dir_added = 0;
+	if(!model_dir_added)
+	{
+		char* model_dir = getenv("PCILIB_MODEL_DIR");
+		char* model_path = malloc(strlen(model_dir) + strlen(ctx->model) + 2);
+		if (!model_path) return PCILIB_ERROR_MEMORY;
+		sprintf(model_path, "%s/%s", model_dir, ctx->model);
+		//add path to python
+		PyObject* path = PySys_GetObject("path");
+		if(PyList_Append(path, PyString_FromString(model_path)) == -1)
+		{
+			pcilib_error("Cant set PCILIB_MODEL_DIR library path to python.");
+			free(model_path);
+			return PCILIB_ERROR_FAILED;
+		}
+		free(model_path);
+		model_dir_added = 1;
+	}
     return 0;
 }
 
 void pcilib_free_py(pcilib_t *ctx) {
-    if (ctx->py) {
+	
+	int py_initialized_inside = 0;
+	
+    if (ctx->py) {		
+		if(ctx->py->py_initialized_inside)
+			py_initialized_inside = 1;
+		
         // Dict and module references are borrowed
         free(ctx->py);
         ctx->py = NULL;
     }
-    //Py_Finalize();
+    
+    if(py_initialized_inside)
+		Py_Finalize();
 }
 
 /*
@@ -196,7 +237,7 @@ int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *va
     return pcilib_set_value_from_float(ctx, value, PyFloat_AsDouble(obj));
 }
 
-void* pcilib_convert_val_to_pyobject(pcilib_t* ctx, pcilib_value_t *val)
+void* pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *val)
 {
 	int err;
 	
@@ -242,7 +283,7 @@ void* pcilib_convert_val_to_pyobject(pcilib_t* ctx, pcilib_value_t *val)
 	}
 }
 
-int pcilib_convert_pyobject_to_val(pcilib_t* ctx, void* pyObjVal, pcilib_value_t *val)
+int pcilib_set_value_from_pyobject(pcilib_t* ctx, void* pyObjVal, pcilib_value_t *val)
 {
 	PyObject* pyVal = pyObjVal;
 	int err;
@@ -268,61 +309,30 @@ int pcilib_convert_pyobject_to_val(pcilib_t* ctx, void* pyObjVal, pcilib_value_t
     return 0;
 }
 
-int pcilib_init_py_script(pcilib_t *ctx, char* module_name, pcilib_script_t **module, pcilib_access_mode_t *mode)
+int pcilib_py_init_script(pcilib_t *ctx, char* module_name, pcilib_access_mode_t *mode)
 {	
-	//Initialize python script, if it has not initialized already.
-	if(!module_name)
-	{
-		pcilib_error("Invalid script name specified in XML property (NULL)");
-		return PCILIB_ERROR_INVALID_DATA;
-	}
-	
-	//create path string to scripts
-	char* model_dir = getenv("PCILIB_MODEL_DIR");
-	char* model_path = malloc(strlen(model_dir) + strlen(ctx->model) + 2);
-	if (!model_path) return PCILIB_ERROR_MEMORY;
-	sprintf(model_path, "%s/%s", model_dir, ctx->model);
-	
-	//set model path to python
-	PySys_SetPath(model_path);
-	free(model_path);
-	model_path = NULL;
-	
-	//create path string to pcipywrap library
-	char* app_dir = getenv("APP_PATH");
-	char* pcipywrap_path;
-	if(app_dir)
-	{
-		pcipywrap_path = malloc(strlen(app_dir) + strlen("/pywrap"));
-		if (!pcipywrap_path) return PCILIB_ERROR_MEMORY;
-		sprintf(pcipywrap_path, "%s/%s", "/pywrap", ctx->model);
-	}
-	else
-	{
-		pcipywrap_path = malloc(strlen("./pywrap"));
-		if (!pcipywrap_path) return PCILIB_ERROR_MEMORY;
-		sprintf(pcipywrap_path, "%s", "./pywrap");
-
-	}
-	
-	//set pcipywrap library path to python
-	PyObject* path = PySys_GetObject("path");
-	if(PyList_Append(path, PyString_FromString(pcipywrap_path)) == -1)
-	{
-		pcilib_error("Cant set pcipywrap library path to python.");
-		return PCILIB_ERROR_FAILED;
-	}
-	free(pcipywrap_path);
-	pcipywrap_path = NULL;
-	
-	
 	//extract module name from script name
 	char* py_module_name = strtok(module_name, ".");
-	
 	if(!py_module_name)
 	{
 		pcilib_error("Invalid script name specified in XML property (%s)."
 					 " Seems like name doesnt contains extension", module_name);
+		return PCILIB_ERROR_INVALID_DATA;
+	}
+	
+	pcilib_script_s* module = NULL;
+	HASH_FIND_STR( scripts, module_name, module);
+	if(module)
+	{
+		pcilib_warning("Python module %s is already in hash. Skip init step", module_name);
+		mode[0] = module->mode;
+		return 0;
+	}
+	
+	//Initialize python module
+	if(!module_name)
+	{
+		pcilib_error("Invalid script name specified in XML property (NULL)");
 		return PCILIB_ERROR_INVALID_DATA;
 	}
 	
@@ -335,7 +345,6 @@ int pcilib_init_py_script(pcilib_t *ctx, char* module_name, pcilib_script_t **mo
 		PyErr_Print();
 		return PCILIB_ERROR_INVALID_DATA;
 	}
-
 
 	//Initializing pcipywrap module if script use it
 	PyObject* dict = PyModule_GetDict(py_script_module);
@@ -350,16 +359,18 @@ int pcilib_init_py_script(pcilib_t *ctx, char* module_name, pcilib_script_t **mo
 	   
 	   //setting pcilib_t instance                 
 	   PyObject_CallMethodObjArgs(pcipywrap_module,
-							   PyUnicode_FromString("setPcilib"),
+                               PyUnicode_FromString("set_pcilib"),
 							   PyByteArray_FromStringAndSize((const char*)&ctx, sizeof(pcilib_t*)),
 							   NULL);
 	}
 	
 	//Success. Create struct and initialize values
-	module[0] = (pcilib_script_t*)malloc(sizeof(pcilib_script_t));
-	module[0]->py_script_module = py_script_module;
-	module[0]->script_name = module_name;
-	module[0]->dict = dict;
+	module = malloc(sizeof(pcilib_script_s));
+	module->py_script_module = py_script_module;
+	module->script_name = malloc(strlen(module_name));
+	sprintf(module->script_name, "%s", module_name);
+	module->dict = dict;
+
 	
 	//Setting correct mode
 	mode[0] = 0;
@@ -367,32 +378,52 @@ int pcilib_init_py_script(pcilib_t *ctx, char* module_name, pcilib_script_t **mo
 		mode[0] |= PCILIB_ACCESS_R;	
 	if(PyDict_Contains(dict, PyString_FromString("write_to_register")))
 		mode[0] |= PCILIB_ACCESS_W;
+		
+	module->mode = mode[0];
+	HASH_ADD_STR( scripts, script_name, module);
 	
 	return 0;
 }
 
-int pcilib_free_py_script(pcilib_script_t *module)
+int pcilib_py_free_script(char* module_name)
 {
-	if(module)
+	pcilib_script_s *module;
+	HASH_FIND_STR(scripts, module_name, module);
+	
+	if(!module)
 	{
-		if(module->script_name)
-		{
-			free(module->script_name);
-			module->script_name = NULL;
-		}
-		
-		if(module->py_script_module)
-		{
-			//PyObject_Free(module->py_script_module);
-			module->py_script_module = NULL;
-		}
+		//For some reason it will crash if uncomment. printf same warning is ok
+		//pcilib_warning("Cant find Python module %s in hash. Seems it has already deleted.", module_name);
+		return 0;
 	}
 	
+	if(module->script_name)
+	{
+		free(module->script_name);
+		module->script_name = NULL;
+	}
+		
+	if(module->py_script_module)
+	{
+		//PyObject_Free(module->py_script_module);
+		module->py_script_module = NULL;
+	}
+	
+	HASH_DEL(scripts, module);
+	free(module);
 	return 0;
 }
 
-int pcilib_script_read(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *val)
+int pcilib_script_read(pcilib_t *ctx, char* module_name, pcilib_value_t *val)
 {
+	pcilib_script_s *module;
+	HASH_FIND_STR(scripts, module_name, module);
+	
+	if(!module)
+	{
+		pcilib_error("Failed to find script module (%s) in hash", module_name);
+		return PCILIB_ERROR_NOTFOUND;
+	}
 	
 	int err;
 	
@@ -404,7 +435,7 @@ int pcilib_script_read(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *v
 	   return PCILIB_ERROR_FAILED;
 	}
 	
-	err = pcilib_convert_pyobject_to_val(ctx, ret, val);
+    err = pcilib_set_value_from_pyobject(ctx, ret, val);
 	
 	if(err)
 	{
@@ -414,9 +445,18 @@ int pcilib_script_read(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *v
     return 0;
 }
 
-int pcilib_script_write(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *val)
+int pcilib_script_write(pcilib_t *ctx, char* module_name, pcilib_value_t *val)
 {	
-    PyObject *input = pcilib_convert_val_to_pyobject(ctx, val);
+	pcilib_script_s *module;
+	HASH_FIND_STR(scripts, module_name, module);
+	
+	if(!module)
+	{
+		pcilib_error("Failed to find script module (%s) in hash", module_name);
+		return PCILIB_ERROR_NOTFOUND;
+	}
+	
+    PyObject *input = pcilib_get_value_as_pyobject(ctx, val);
 	if(!input)
 	{
 	   printf("Failed to convert input value to Python object");

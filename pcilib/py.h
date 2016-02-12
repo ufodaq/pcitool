@@ -4,7 +4,6 @@
 #include "pcilib.h"
 
 typedef struct pcilib_py_s pcilib_py_t;
-typedef struct pcilib_script_s pcilib_script_t;
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,10 +14,10 @@ int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *va
 void pcilib_free_py(pcilib_t *ctx);
 
 
-int pcilib_init_py_script(pcilib_t *ctx, char* module_name, pcilib_script_t **module, pcilib_access_mode_t *mode);
-int pcilib_free_py_script(pcilib_script_t *module);
-int pcilib_script_read(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *val);
-int pcilib_script_write(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *val);
+int pcilib_py_init_script(pcilib_t *ctx, char* module_name, pcilib_access_mode_t *mode);
+int pcilib_py_free_script(char* module_name);
+int pcilib_script_read(pcilib_t *ctx, char* module_name, pcilib_value_t *val);
+int pcilib_script_write(pcilib_t *ctx, char* module_name, pcilib_value_t *val);
 
 
 /*!
@@ -27,7 +26,7 @@ int pcilib_script_write(pcilib_t *ctx, pcilib_script_t *module, pcilib_value_t *
  * \param val pointer to pcilib_value_t to convert
  * \return PyObject, containing value. NULL with error message, sended to errstream.
  */
-void* pcilib_convert_val_to_pyobject(pcilib_t* ctx, pcilib_value_t *val);
+void* pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *val);
 
 
 /*!
@@ -37,7 +36,7 @@ void* pcilib_convert_val_to_pyobject(pcilib_t* ctx, pcilib_value_t *val);
  * \param val initialized polymorphic value
  * \return 0 on success or memory error
  */
-int pcilib_convert_pyobject_to_val(pcilib_t* ctx, void* pyVal, pcilib_value_t *val);
+int pcilib_set_value_from_pyobject(pcilib_t* ctx, void* pyVal, pcilib_value_t *val);
 
 
 #ifdef __cplusplus
