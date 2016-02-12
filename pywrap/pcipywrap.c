@@ -79,7 +79,6 @@ void pcilib_print_error_to_py(void *arg, const char *file, int line,
 		{
 			//copy received message to log
 			char* buf = full_log;
-			char* buf_start = buf;
 			full_log = make_str("%s%s", buf, buf_wrapped_message);
 			free(buf);
 		}
@@ -105,6 +104,16 @@ void __redirect_logs_to_exeption()
 }
 
 /*!
+ * Destructor for pcilib_t
+ */
+void close_pcilib_instance(void *ctx)
+{
+	if(ctx == __ctx)
+		__ctx = NULL;
+	pcilib_close(ctx);
+}
+
+/*!
  * \brief Wraps for pcilib_open function.
  * \param[in] fpga_device path to the device file [/dev/fpga0]
  * \param[in] model specifies the model of hardware, autodetected if NULL is passed
@@ -120,7 +129,7 @@ PyObject* create_pcilib_instance(const char *fpga_device, const char *model)
 		return NULL;
 	}
 	
-	return PyCObject_FromVoidPtr((void*)ctx, NULL);
+	return PyCObject_FromVoidPtr((void*)ctx, close_pcilib_instance);
 }
 
 /*!
