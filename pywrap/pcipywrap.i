@@ -16,4 +16,4 @@ extern PyObject* set_property(PyObject* val, const char *prop);
 extern PyObject* get_registers_list(const char *bank = NULL);
 extern PyObject* get_register_info(const char* reg,const char *bank = NULL);
 
-extern PyObject* get_property_info(const char* branch = NULL);
+extern PyObject* get_property_list(const char* branch = NULL);

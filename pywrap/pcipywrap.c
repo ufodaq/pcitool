@@ -578,7 +578,7 @@ PyObject* get_register_info(const char* reg,const char *bank)
     return py_info;
 }
 
-PyObject* get_property_info(const char* branch)
+PyObject* get_property_list(const char* branch)
 {
     if(!__ctx)
     {

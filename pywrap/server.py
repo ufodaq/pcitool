@@ -4,7 +4,7 @@ import pcipywrap
 import json
 import BaseHTTPServer
 import sys
-import getopt
+from optparse import OptionParser
 
 class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 	
@@ -23,33 +23,33 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
          command = data['command']
          if(command == 'help'):
             s.help(data)
-                     
-         elif(command == 'open'):
-            #check required arguments
-            if not 'device' in data:
-               s.error('message doesnt contains "device" field, '
-                       'which is required for "open" command', data)
-               return
-            #parse command arguments and convert them to string
-            device = str(data.get('device', None))
-            model = data.get('model', None)
-            if not model is None:
-				model = str(model)
             
-            try:
-               s.openPcilibInstance(device, model)
-            except Exception as e:
-               s.error(str(e), data) 
-               return
-		
-            #Success! Create and send reply
-            s.send_response(200)
-            s.send_header('content-type', 'application/json')
-            s.end_headers()
-            out = dict()
-            out['status'] = 'ok'
-            s.wrapMessageAndSend(out, data)
-                   
+         #elif(command == 'open'):
+         #   #check required arguments
+         #   if not 'device' in data:
+         #      s.error('message doesnt contains "device" field, '
+         #              'which is required for "open" command', data)
+         #      return
+         #   #parse command arguments and convert them to string
+         #   device = str(data.get('device', None))
+         #   model = data.get('model', None)
+         #   if not model is None:
+			#	model = str(model)
+         #   
+         #   try:
+         #      s.openPcilibInstance(device, model)
+         #   except Exception as e:
+         #      s.error(str(e), data) 
+         #     return
+		   #
+         #   #Success! Create and send reply
+         #   s.send_response(200)
+         #   s.send_header('content-type', 'application/json')
+         #   s.end_headers()
+         #   out = dict()
+         #   out['status'] = 'ok'
+         #   s.wrapMessageAndSend(out, data)
+            
          elif(command == 'get_registers_list'):
             #parse command arguments and convert them to string
             bank = data.get('bank', None)
@@ -101,7 +101,7 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             out['register'] = register
             s.wrapMessageAndSend(out, data)
 		 
-         elif(command == 'get_property_info'):   
+         elif(command == 'get_property_list'):   
             #parse command arguments and convert them to string
             branch = data.get('branch', None)
             if not branch is None:
@@ -109,7 +109,7 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             
             properties = dict()
             try:
-               properties = pcipywrap.get_property_info(branch)
+               properties = pcipywrap.get_property_list(branch)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -294,7 +294,7 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       '      bank:        - if set, only register within the specified bank will be returned\n'
       '\n'
       
-      '  command: get_property_info - Returns the list of properties available under the specified path.\n'
+      '  command: get_property_list - Returns the list of properties available under the specified path.\n'
       '    optional fields\n'
       '     branch:        - Path. If not set, will return the top-level properties\n'
       '\n'
@@ -344,21 +344,25 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
          message['received_message'] = received_message
       s.wfile.write(json.dumps(message))
 
-
 if __name__ == '__main__':
    
-   HOST_NAME = '' # !!!REMEMBER TO CHANGE THIS!!!
-   PORT_NUMBER = 12412 # Maybe set this to 9000.
+   #parce command line options
+   parser = OptionParser()
+   parser.add_option("-p", "--port",  action="store",
+                     type="int", dest="port", default=9000,
+                     help="Set server port (8888)")
+   parser.add_option("-d", "--device",  action="store",
+                     type="string", dest="device", default=str('/dev/fpga0'),
+                     help="FPGA device (/dev/fpga0)")                     
+   parser.add_option("-m", "--model",  action="store",
+                     type="string", dest="model", default=None,
+                     help="Memory model (autodetected)")
+   opts = parser.parse_args()[0]
    
-   try:
-      opts, args = getopt.getopt(sys.argv[1:], "", [])
-      #opts, args = getopt.getopt(sys.argv[1:], "hop:v", ["help", "output="])
-      #print opts, args
-   except getopt.GetoptError as err:
-      # print help information and exit:
-      print str(err) # will print something like "option -a not recognized"
-      #usage()
-      sys.exit(2)
+   HOST_NAME = ''
+   PORT_NUMBER = opts.port
+   MODEL = opts.model
+   DEVICE = opts.device
    
    #Set enviroment variables, if it not setted already
    if not 'APP_PATH' in os.environ:
@@ -373,9 +377,12 @@ if __name__ == '__main__':
    if not 'LD_LIBRARY_PATH' in os.environ: 
       os.environ['LD_LIBRARY_PATH'] = os.environ["APP_PATH"] + "/pcilib"
    
-   #redirect logs to exeption
+   #create pcilib instance and redirect logs to exeption
+   lib = pcipywrap.create_pcilib_instance(opts.device, opts.model)
+   pcipywrap.set_pcilib(lib)
    pcipywrap.__redirect_logs_to_exeption()
    
+   #start server
    pcilib_server = BaseHTTPServer.HTTPServer
    httpd = pcilib_server((HOST_NAME, PORT_NUMBER), PcilibServerHandler)
    print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)
