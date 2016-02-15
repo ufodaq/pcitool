@@ -108,9 +108,8 @@ void __redirect_logs_to_exeption()
  */
 void close_pcilib_instance(void *ctx)
 {
-	if(ctx == __ctx)
-		__ctx = NULL;
-	pcilib_close(ctx);
+	if(ctx != __ctx)
+		pcilib_close(ctx);
 }
 
 /*!
@@ -223,16 +222,20 @@ PyObject* write_register(PyObject* val, const char *regname, const char *bank)
 		return NULL;
 	}
 	
+	
 	pcilib_value_t val_internal = {0};
     pcilib_register_value_t reg_value;
 	
 	int err; 
+	
 	err = pcilib_set_value_from_pyobject(__ctx, val, &val_internal);
+	
 	if(err)
 	{
 		pcilib_error("#E Failed pcilib_set_value_from_pyobject");
 		return NULL;
 	}
+	
 	
 	reg_value = pcilib_get_value_as_register_value(__ctx, &val_internal, &err);
 	if(err)
@@ -242,11 +245,13 @@ PyObject* write_register(PyObject* val, const char *regname, const char *bank)
 	}
 	
 	err = pcilib_write_register(__ctx, bank, regname, reg_value);
+	
 	if(err)
 	{
 		pcilib_error("#E Failed pcilib_set_value_from_pyobject, (error %i)", err);
 		return NULL;
 	}
+	
     return PyInt_FromLong((long)1);
 }
 
@@ -311,18 +316,39 @@ PyObject* set_property(PyObject* val, const char *prop)
 	return PyInt_FromLong((long)1);
 }
 
+/*!
+ * \brief Wrap for PyDict_SetItem, with decrease reference counting after set.
+ */
+void pcilib_pydict_set_item(PyObject* dict, PyObject* name, PyObject* value)
+{
+    PyDict_SetItem(dict,
+                   name,
+                   value);
+    Py_XDECREF(name);
+    Py_XDECREF(value);
+}
+
+/*!
+ * \brief Wrap for PyList_Append, with decrease reference counting after append.
+ */
+void pcilib_pylist_append(PyObject* list, PyObject* value)
+{
+    PyList_Append(list, value);
+    Py_XDECREF(value);
+}
+
 void add_pcilib_value_to_dict(PyObject* dict, pcilib_value_t* val, const char *name)
 {
     PyObject *py_val = (PyObject*)pcilib_get_value_as_pyobject(__ctx, val);
 
 	if(py_val)
-		PyDict_SetItem(dict,
-                       PyString_FromString(name),
-                       py_val);
+        pcilib_pydict_set_item(dict,
+                              PyString_FromString(name),
+                              py_val);
 	else
-		PyDict_SetItem(dict,
-                       PyString_FromString("defvalue"),
-                       PyString_FromString("invalid"));
+        pcilib_pydict_set_item(dict,
+                              PyString_FromString("defvalue"),
+                              PyString_FromString("invalid"));
 }
 
 PyObject * pcilib_convert_property_info_to_pyobject(pcilib_property_info_t listItem)
@@ -330,17 +356,17 @@ PyObject * pcilib_convert_property_info_to_pyobject(pcilib_property_info_t listI
     PyObject* pylistItem = PyDict_New();
 
     if(listItem.name)
-        PyDict_SetItem(pylistItem,
+        pcilib_pydict_set_item(pylistItem,
                    PyString_FromString("name"),
                    PyString_FromString(listItem.name));
 
     if(listItem.description)
-        PyDict_SetItem(pylistItem,
+        pcilib_pydict_set_item(pylistItem,
                    PyString_FromString("description"),
                    PyString_FromString(listItem.description));
 
    if(listItem.path)
-        PyDict_SetItem(pylistItem,
+        pcilib_pydict_set_item(pylistItem,
                    PyString_FromString("path"),
                    PyString_FromString(listItem.path));
 
@@ -363,7 +389,7 @@ PyObject * pcilib_convert_property_info_to_pyobject(pcilib_property_info_t listI
         default:
              break;
     }
-    PyDict_SetItem(pylistItem,
+    pcilib_pydict_set_item(pylistItem,
                PyString_FromString("type"),
                PyString_FromString(type));
 
@@ -372,15 +398,15 @@ PyObject * pcilib_convert_property_info_to_pyobject(pcilib_property_info_t listI
     PyObject* modes = PyList_New(0);
 
     if((listItem.mode & PCILIB_ACCESS_R ) == PCILIB_REGISTER_R)
-        PyList_Append(modes, PyString_FromString("R"));
+        pcilib_pylist_append(modes, PyString_FromString("R"));
     if((listItem.mode & PCILIB_ACCESS_W ) == PCILIB_REGISTER_W)
-        PyList_Append(modes, PyString_FromString("W"));
+        pcilib_pylist_append(modes, PyString_FromString("W"));
     if((listItem.mode & PCILIB_ACCESS_RW ) == PCILIB_REGISTER_RW)
-        PyList_Append(modes, PyString_FromString("RW"));
+        pcilib_pylist_append(modes, PyString_FromString("RW"));
     if((listItem.mode & PCILIB_REGISTER_INCONSISTENT) == PCILIB_REGISTER_INCONSISTENT)
-        PyList_Append(modes, PyString_FromString("NO_CHK"));
+        pcilib_pylist_append(modes, PyString_FromString("NO_CHK"));
 
-    PyDict_SetItem(pylistItem,
+    pcilib_pydict_set_item(pylistItem,
                    PyString_FromString("mode"),
                    modes);
 
@@ -388,14 +414,14 @@ PyObject * pcilib_convert_property_info_to_pyobject(pcilib_property_info_t listI
     PyObject* flags = PyList_New(0);
 
     if((listItem.flags & PCILIB_LIST_FLAG_CHILDS ) == PCILIB_LIST_FLAG_CHILDS)
-        PyList_Append(flags, PyString_FromString("childs"));
+        pcilib_pylist_append(flags, PyString_FromString("childs"));
 
-    PyDict_SetItem(pylistItem,
+    pcilib_pydict_set_item(pylistItem,
                    PyString_FromString("flags"),
                    flags);
 
     if(listItem.unit)
-         PyDict_SetItem(pylistItem,
+         pcilib_pydict_set_item(pylistItem,
                     PyString_FromString("unit"),
                     PyString_FromString(listItem.unit));
 
@@ -407,44 +433,44 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_register_info_t listI
     PyObject* pylistItem = PyDict_New();
 
     if(listItem.name)
-        PyDict_SetItem(pylistItem,
-                   PyString_FromString("name"),
-                   PyString_FromString(listItem.name));
+        pcilib_pydict_set_item(pylistItem,
+		                      PyString_FromString("name"),
+		                      PyString_FromString(listItem.name));
 
     if(listItem.description)
-        PyDict_SetItem(pylistItem,
-                   PyString_FromString("description"),
-                   PyString_FromString(listItem.description));
+        pcilib_pydict_set_item(pylistItem,
+                              PyString_FromString("description"),
+                              PyString_FromString(listItem.description));
 
    if(listItem.bank)
-        PyDict_SetItem(pylistItem,
-                   PyString_FromString("bank"),
-                   PyString_FromString(listItem.bank));
+        pcilib_pydict_set_item(pylistItem,
+                              PyString_FromString("bank"),
+                              PyString_FromString(listItem.bank));
 
     //serialize modes
     PyObject* modes = PyList_New(0);
 
     if((listItem.mode & PCILIB_REGISTER_R) == PCILIB_REGISTER_R)
-        PyList_Append(modes, PyString_FromString("R"));
+        pcilib_pylist_append(modes, PyString_FromString("R"));
     if((listItem.mode & PCILIB_REGISTER_W) == PCILIB_REGISTER_W)
-        PyList_Append(modes, PyString_FromString("W"));
+        pcilib_pylist_append(modes, PyString_FromString("W"));
     if((listItem.mode & PCILIB_REGISTER_RW) == PCILIB_REGISTER_RW)
-        PyList_Append(modes, PyString_FromString("RW"));
+        pcilib_pylist_append(modes, PyString_FromString("RW"));
     if((listItem.mode & PCILIB_REGISTER_W1C) == PCILIB_REGISTER_W1C)
-        PyList_Append(modes, PyString_FromString("W1C"));
+        pcilib_pylist_append(modes, PyString_FromString("W1C"));
     if((listItem.mode & PCILIB_REGISTER_RW1C) == PCILIB_REGISTER_RW1C)
-        PyList_Append(modes, PyString_FromString("RW1C"));
+        pcilib_pylist_append(modes, PyString_FromString("RW1C"));
     if((listItem.mode & PCILIB_REGISTER_W1I) == PCILIB_REGISTER_W1I)
-        PyList_Append(modes, PyString_FromString("W1I"));
+        pcilib_pylist_append(modes, PyString_FromString("W1I"));
     if((listItem.mode & PCILIB_REGISTER_RW1I) == PCILIB_REGISTER_RW1I)
-        PyList_Append(modes, PyString_FromString("RW1I"));
+        pcilib_pylist_append(modes, PyString_FromString("RW1I"));
     if((listItem.mode & PCILIB_REGISTER_INCONSISTENT) == PCILIB_REGISTER_INCONSISTENT)
-        PyList_Append(modes, PyString_FromString("NO_CHK"));
+        pcilib_pylist_append(modes, PyString_FromString("NO_CHK"));
 
-    PyDict_SetItem(pylistItem,
-                   PyString_FromString("mode"),
-                   modes);
-                   
+    pcilib_pydict_set_item(pylistItem,
+						  PyString_FromString("mode"),
+                          modes);
+                  
     pcilib_value_t defval = {0};
     pcilib_set_value_from_register_value(__ctx, &defval, listItem.defvalue);
     add_pcilib_value_to_dict(pylistItem, &defval, "defvalue");
@@ -460,9 +486,9 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_register_info_t listI
         PyObject* range = PyDict_New();
         add_pcilib_value_to_dict(range, &minval, "min");
         add_pcilib_value_to_dict(range, &maxval, "max");
-        PyDict_SetItem(pylistItem,
-                       PyString_FromString("range"),
-                       range);
+        pcilib_pydict_set_item(pylistItem,
+                              PyString_FromString("range"),
+                              range);
     }
 
     if(listItem.values)
@@ -487,21 +513,21 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_register_info_t listI
             add_pcilib_value_to_dict(valuesItem, &max, "max");
 
             if(listItem.values[j].name)
-                PyDict_SetItem(valuesItem,
-                           PyString_FromString("name"),
-                           PyString_FromString(listItem.values[j].name));
+                pcilib_pydict_set_item(valuesItem,
+									  PyString_FromString("name"),
+									  PyString_FromString(listItem.values[j].name));
 
             if(listItem.values[j].description)
-                PyDict_SetItem(valuesItem,
-                           PyString_FromString("name"),
-                           PyString_FromString(listItem.values[j].description));
+                pcilib_pydict_set_item(valuesItem,
+									  PyString_FromString("name"),
+									  PyString_FromString(listItem.values[j].description));
 
-            PyList_Append(values, valuesItem);
+            pcilib_pylist_append(values, valuesItem);
         }
 
-        PyDict_SetItem(pylistItem,
-                       PyString_FromString("values"),
-                       values);
+        pcilib_pydict_set_item(pylistItem,
+                              PyString_FromString("values"),
+                              values);
     }
 
     return pylistItem;
@@ -522,7 +548,7 @@ PyObject* get_registers_list(const char *bank)
     {
 		//serialize item attributes
         PyObject* pylistItem = pcilib_convert_register_info_to_pyobject(list[i]);
-        PyList_Append(pyList, pylistItem);
+        pcilib_pylist_append(pyList, pylistItem);
     }
     
     pcilib_free_register_info(__ctx, list);
@@ -568,7 +594,7 @@ PyObject* get_property_info(const char* branch)
     {
         //serialize item attributes
         PyObject* pylistItem = pcilib_convert_property_info_to_pyobject(list[i]);
-        PyList_Append(pyList, pylistItem);
+        pcilib_pylist_append(pyList, pylistItem);
     }
 
     pcilib_free_property_info(__ctx, list);

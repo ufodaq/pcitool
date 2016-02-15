@@ -105,7 +105,7 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             #parse command arguments and convert them to string
             branch = data.get('branch', None)
             if not branch is None:
-				branch = str(bank)
+               branch = str(branch)
             
             properties = dict()
             try:

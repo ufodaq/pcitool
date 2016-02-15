@@ -427,7 +427,9 @@ int pcilib_script_read(pcilib_t *ctx, char* module_name, pcilib_value_t *val)
 	
 	int err;
 	
+	PyGILState_STATE gstate = PyGILState_Ensure();
 	PyObject *ret = PyObject_CallMethod(module->py_script_module, "read_from_register", "()");
+	PyGILState_Release(gstate);
 	if (!ret) 
 	{
 	   printf("Python script error: ");
@@ -436,6 +438,7 @@ int pcilib_script_read(pcilib_t *ctx, char* module_name, pcilib_value_t *val)
 	}
 	
     err = pcilib_set_value_from_pyobject(ctx, ret, val);
+    Py_XDECREF(ret);
 	
 	if(err)
 	{
@@ -463,17 +466,26 @@ int pcilib_script_write(pcilib_t *ctx, char* module_name, pcilib_value_t *val)
 	   PyErr_Print();
 	   return PCILIB_ERROR_FAILED;
 	}
+	PyObject *func_name = PyUnicode_FromString("write_to_register");
 	
-	PyObject *ret = PyObject_CallMethodObjArgs(module->py_script_module,
-											   PyUnicode_FromString("write_to_register"),
+    PyGILState_STATE gstate = PyGILState_Ensure();
+   	PyObject *ret = PyObject_CallMethodObjArgs(module->py_script_module,
+											   func_name,
 											   input,
 											   NULL);
+    PyGILState_Release(gstate);
+    
 	if (!ret) 
 	{
 	   printf("Python script error: ");
 	   PyErr_Print();
 	   return PCILIB_ERROR_FAILED;
 	}
+	
+	//release objects
+	Py_XDECREF(func_name);
+	Py_XDECREF(ret);
+	Py_XDECREF(input);
 
     return 0;
 }
