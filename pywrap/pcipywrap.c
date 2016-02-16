@@ -127,7 +127,6 @@ PyObject* create_pcilib_instance(const char *fpga_device, const char *model)
 		pcilib_error("#E Failed pcilib_open(%s, %s)", fpga_device, model);
 		return NULL;
 	}
-	
 	return PyCObject_FromVoidPtr((void*)ctx, close_pcilib_instance);
 }
 
@@ -204,7 +203,7 @@ PyObject* read_register(const char *regname, const char *bank)
 		return NULL;
 	}
 
-    return pcilib_get_value_as_pyobject(__ctx, &val);
+    return pcilib_get_value_as_pyobject(__ctx, &val, NULL);
 }
 
 /*!
@@ -228,7 +227,7 @@ PyObject* write_register(PyObject* val, const char *regname, const char *bank)
 	
 	int err; 
 	
-	err = pcilib_set_value_from_pyobject(__ctx, val, &val_internal);
+    err = pcilib_set_value_from_pyobject(__ctx, &val_internal, val);
 	
 	if(err)
 	{
@@ -279,7 +278,7 @@ PyObject* get_property(const char *prop)
 		return NULL;
 	}
 	
-    return pcilib_get_value_as_pyobject(__ctx, &val);
+    return pcilib_get_value_as_pyobject(__ctx, &val, NULL);
 }
 
 /*!
@@ -299,7 +298,7 @@ PyObject* set_property(PyObject* val, const char *prop)
 	}
 	
 	pcilib_value_t val_internal = {0};
-	err = pcilib_set_value_from_pyobject(__ctx, val, &val_internal);
+    err = pcilib_set_value_from_pyobject(__ctx, &val_internal, val);
 	if(err)
 	{
 		pcilib_error("#E pcilib_set_value_from_pyobject, (error %i)", err);
@@ -339,7 +338,7 @@ void pcilib_pylist_append(PyObject* list, PyObject* value)
 
 void add_pcilib_value_to_dict(PyObject* dict, pcilib_value_t* val, const char *name)
 {
-    PyObject *py_val = (PyObject*)pcilib_get_value_as_pyobject(__ctx, val);
+    PyObject *py_val = (PyObject*)pcilib_get_value_as_pyobject(__ctx, val, NULL);
 
 	if(py_val)
         pcilib_pydict_set_item(dict,

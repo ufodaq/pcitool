@@ -306,8 +306,6 @@ void pcilib_close(pcilib_t *ctx) {
 
 	if (ctx->event_plugin)
 	    pcilib_plugin_close(ctx->event_plugin);
-	
-        pcilib_free_py(ctx);
 
 	if (ctx->locks.kmem)
 	    pcilib_free_locking(ctx);
@@ -349,6 +347,8 @@ void pcilib_close(pcilib_t *ctx) {
 
 	if (ctx->registers)
 	    free(ctx->registers);
+	    
+	pcilib_free_py(ctx);
 	
 	if (ctx->model)
 	    free(ctx->model);

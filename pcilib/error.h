@@ -40,6 +40,20 @@ extern "C" {
 void pcilib_log_message(const char *file, int line, pcilib_log_flags_t flags, pcilib_log_priority_t prio, const char *msg, ...);
 void pcilib_log_vmessage(const char *file, int line, pcilib_log_flags_t flags, pcilib_log_priority_t prio, const char *msg, va_list va);
 
+/**
+ * Gets current logger function.
+ */
+pcilib_logger_t pcilib_get_logger();
+
+/**
+ * Gets current logger min priority.
+ */
+pcilib_log_priority_t pcilib_get_logger_min_prio();
+
+/**
+ * Gets current logger argument.
+ */
+void* pcilib_get_logger_argument();
 
 #ifdef __cplusplus
 }

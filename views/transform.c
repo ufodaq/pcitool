@@ -22,7 +22,8 @@ static int pcilib_transform_view_read(pcilib_t *ctx, pcilib_view_context_t *view
 	if (err) return err;
 
 	if(v->module)
-		return pcilib_script_read(ctx, v->module, val);
+		return err = pcilib_script_run_func(ctx, v->module,
+		                                    "read_from_register", val);
 	else
 		return  pcilib_py_eval_string(ctx, v->read_from_reg, val);
 }
@@ -40,7 +41,8 @@ static int pcilib_transform_view_write(pcilib_t *ctx, pcilib_view_context_t *vie
 
 
 	if(v->module)
-		err = pcilib_script_write(ctx, v->module, &val_copy);
+		err = pcilib_script_run_func(ctx, v->module,
+		                             "write_to_register", &val_copy);
 	else
 		err = pcilib_py_eval_string(ctx, v->write_to_reg, &val_copy);
 		
@@ -55,7 +57,7 @@ void pcilib_transform_view_free_description (pcilib_t *ctx, pcilib_view_descript
 	pcilib_transform_view_description_t *v = (pcilib_transform_view_description_t*)(view);
 	
 	if(v->module)
-		pcilib_py_free_script(v->module);
+        pcilib_py_free_script(ctx, v->module);
 }
 
 pcilib_view_context_t * pcilib_transform_view_init(pcilib_t *ctx, const pcilib_view_description_t *desc)

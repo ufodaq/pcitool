@@ -11,24 +11,20 @@
 #include "py.h"
 #include "error.h"
 
-
-
-struct pcilib_py_s {
-    PyObject *main_module;
-    PyObject *global_dict;
-    int py_initialized_inside; ///< Flag, shows that Py_Initialize has been called inside class
-};
-
 typedef struct pcilib_script_s {
-	char* script_name;
-    PyObject *py_script_module;	/**< PyModule object, contains script enviroment */
-	PyObject *dict;
+	char* name;
+    PyObject *module;	/**< PyModule object, contains script enviroment */
 	pcilib_access_mode_t mode;
 	
 	UT_hash_handle hh;
 } pcilib_script_s;
 
-struct pcilib_script_s *scripts = NULL;
+struct pcilib_py_s {
+    PyObject *main_module;
+    PyObject *global_dict;
+    int py_initialized_inside; ///< Flag, shows that Py_Initialize has been called inside class
+    struct pcilib_script_s *scripts;
+};
 
 int pcilib_init_py(pcilib_t *ctx) {
     ctx->py = (pcilib_py_t*)malloc(sizeof(pcilib_py_t));
@@ -37,6 +33,12 @@ int pcilib_init_py(pcilib_t *ctx) {
     if(!Py_IsInitialized())
     {
         Py_Initialize();
+        
+        //Since python is being initializing from c programm, it needs
+        //to initialize threads to works properly with c threads
+        PyEval_InitThreads();
+        PyEval_ReleaseLock();
+        
         ctx->py->py_initialized_inside = 1;
 	}
 	else
@@ -70,6 +72,8 @@ int pcilib_init_py(pcilib_t *ctx) {
 		free(model_path);
 		model_dir_added = 1;
 	}
+	
+	ctx->py->scripts = NULL;
     return 0;
 }
 
@@ -237,53 +241,60 @@ int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *va
     return pcilib_set_value_from_float(ctx, value, PyFloat_AsDouble(obj));
 }
 
-void* pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *val)
-{
+pcilib_py_object* pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *val, int *ret)
+{	
 	int err;
 	
 	switch(val->type)
 	{
 		case PCILIB_TYPE_INVALID:
-            pcilib_warning("Invalid register output type (PCILIB_TYPE_INVALID)");
+            pcilib_error("Invalid register output type (PCILIB_TYPE_INVALID)");
+			if (ret) *ret = PCILIB_ERROR_NOTSUPPORTED;
 			return NULL;
 			
 		case PCILIB_TYPE_STRING:
-            pcilib_warning("Invalid register output type (PCILIB_TYPE_STRING)");
+            pcilib_error("Invalid register output type (PCILIB_TYPE_STRING)");
+            if (ret) *ret = PCILIB_ERROR_NOTSUPPORTED;
 			return NULL;
 		
 		case PCILIB_TYPE_LONG:
 		{
-			long ret;
-			ret = pcilib_get_value_as_int(ctx, val, &err);
+			long ret_val;
+			ret_val = pcilib_get_value_as_int(ctx, val, &err);
 			
 			if(err)
 			{
-                pcilib_error("Failed: pcilib_get_value_as_int (%i)", err);
+                if (ret) *ret = err;
 				return NULL;
 			}
-			return (PyObject*)PyInt_FromLong((long) ret);
+			
+			if (ret) *ret = 0;
+			return (PyObject*)PyInt_FromLong((long) ret_val);
 		}
 		
 		case PCILIB_TYPE_DOUBLE:
 		{
-			double ret;
-			ret = pcilib_get_value_as_float(ctx, val, &err);
+			double ret_val;
+			ret_val = pcilib_get_value_as_float(ctx, val, &err);
 			
 			if(err)
 			{
-                pcilib_error("Failed: pcilib_get_value_as_int (%i)", err);
+                if (ret) *ret = err;
 				return NULL;
 			}
-			return (PyObject*)PyFloat_FromDouble((double) ret);
+			
+			if (ret) *ret = 0;
+			return (PyObject*)PyFloat_FromDouble((double) ret_val);
 		}
 		
 		default:
-                pcilib_warning("Invalid register output type (unknown)");
+			if (ret) *ret = PCILIB_ERROR_NOTSUPPORTED;
+            pcilib_error("Invalid register output type (unknown)");
 			return NULL;
 	}
 }
 
-int pcilib_set_value_from_pyobject(pcilib_t* ctx, void* pyObjVal, pcilib_value_t *val)
+int pcilib_set_value_from_pyobject(pcilib_t* ctx, pcilib_value_t *val, pcilib_py_object* pyObjVal)
 {
 	PyObject* pyVal = pyObjVal;
 	int err;
@@ -321,7 +332,7 @@ int pcilib_py_init_script(pcilib_t *ctx, char* module_name, pcilib_access_mode_t
 	}
 	
 	pcilib_script_s* module = NULL;
-	HASH_FIND_STR( scripts, module_name, module);
+	HASH_FIND_STR( ctx->py->scripts, module_name, module);
 	if(module)
 	{
 		pcilib_warning("Python module %s is already in hash. Skip init step", module_name);
@@ -366,10 +377,16 @@ int pcilib_py_init_script(pcilib_t *ctx, char* module_name, pcilib_access_mode_t
 	
 	//Success. Create struct and initialize values
 	module = malloc(sizeof(pcilib_script_s));
-	module->py_script_module = py_script_module;
-	module->script_name = malloc(strlen(module_name));
-	sprintf(module->script_name, "%s", module_name);
-	module->dict = dict;
+	if (!module)
+		return PCILIB_ERROR_MEMORY;
+	module->module = py_script_module;
+	module->name = strdup(module_name);
+	if(!(module->name))
+	{
+		free(module);
+		return PCILIB_ERROR_MEMORY;
+	}
+	sprintf(module->name, "%s", module_name);
 
 	
 	//Setting correct mode
@@ -380,15 +397,15 @@ int pcilib_py_init_script(pcilib_t *ctx, char* module_name, pcilib_access_mode_t
 		mode[0] |= PCILIB_ACCESS_W;
 		
 	module->mode = mode[0];
-	HASH_ADD_STR( scripts, script_name, module);
+	HASH_ADD_STR( ctx->py->scripts, name, module);
 	
 	return 0;
 }
 
-int pcilib_py_free_script(char* module_name)
+int pcilib_py_free_script(pcilib_t *ctx,char* module_name)
 {
 	pcilib_script_s *module;
-	HASH_FIND_STR(scripts, module_name, module);
+	HASH_FIND_STR(ctx->py->scripts, module_name, module);
 	
 	if(!module)
 	{
@@ -397,84 +414,51 @@ int pcilib_py_free_script(char* module_name)
 		return 0;
 	}
 	
-	if(module->script_name)
+	if(module->name)
 	{
-		free(module->script_name);
-		module->script_name = NULL;
+		free(module->name);
+		module->name = NULL;
 	}
 		
-	if(module->py_script_module)
+	if(module->module)
 	{
-		//PyObject_Free(module->py_script_module);
-		module->py_script_module = NULL;
+		module->module = NULL;
 	}
 	
-	HASH_DEL(scripts, module);
+	HASH_DEL(ctx->py->scripts, module);
 	free(module);
 	return 0;
 }
 
-int pcilib_script_read(pcilib_t *ctx, char* module_name, pcilib_value_t *val)
-{
+int pcilib_script_run_func(pcilib_t *ctx, char* module_name,
+                           const char* func_name,  pcilib_value_t *val)
+{	
+	int err;
 	pcilib_script_s *module;
-	HASH_FIND_STR(scripts, module_name, module);
-	
+	HASH_FIND_STR(ctx->py->scripts, module_name, module);
 	if(!module)
 	{
 		pcilib_error("Failed to find script module (%s) in hash", module_name);
 		return PCILIB_ERROR_NOTFOUND;
 	}
-	
-	int err;
 	
 	PyGILState_STATE gstate = PyGILState_Ensure();
-	PyObject *ret = PyObject_CallMethod(module->py_script_module, "read_from_register", "()");
-	PyGILState_Release(gstate);
-	if (!ret) 
-	{
-	   printf("Python script error: ");
-	   PyErr_Print();
-	   return PCILIB_ERROR_FAILED;
-	}
-	
-    err = pcilib_set_value_from_pyobject(ctx, ret, val);
-    Py_XDECREF(ret);
-	
-	if(err)
-	{
-		pcilib_error("Failed to convert python script return value to internal type: %i", err);
-		return err;
-	}
-    return 0;
-}
-
-int pcilib_script_write(pcilib_t *ctx, char* module_name, pcilib_value_t *val)
-{	
-	pcilib_script_s *module;
-	HASH_FIND_STR(scripts, module_name, module);
-	
-	if(!module)
-	{
-		pcilib_error("Failed to find script module (%s) in hash", module_name);
-		return PCILIB_ERROR_NOTFOUND;
-	}
-	
-    PyObject *input = pcilib_get_value_as_pyobject(ctx, val);
-	if(!input)
-	{
-	   printf("Failed to convert input value to Python object");
-	   PyErr_Print();
-	   return PCILIB_ERROR_FAILED;
-	}
-	PyObject *func_name = PyUnicode_FromString("write_to_register");
-	
-    PyGILState_STATE gstate = PyGILState_Ensure();
-   	PyObject *ret = PyObject_CallMethodObjArgs(module->py_script_module,
-											   func_name,
+    PyObject *input = pcilib_get_value_as_pyobject(ctx, val, &err);
+    if(err)
+       return err;
+       
+	PyObject *py_func_name = PyUnicode_FromString(func_name);
+   	PyObject *ret = PyObject_CallMethodObjArgs(module->module,
+											   py_func_name,
 											   input,
 											   NULL);
-    PyGILState_Release(gstate);
     
+    
+
+    Py_XDECREF(py_func_name);
+	Py_XDECREF(input);
+	PyGILState_Release(gstate);
+	
 	if (!ret) 
 	{
 	   printf("Python script error: ");
@@ -482,10 +466,16 @@ int pcilib_script_write(pcilib_t *ctx, char* module_name, pcilib_value_t *val)
 	   return PCILIB_ERROR_FAILED;
 	}
 	
-	//release objects
-	Py_XDECREF(func_name);
-	Py_XDECREF(ret);
-	Py_XDECREF(input);
-
+	if(ret != Py_None)
+	{
+        err = pcilib_set_value_from_pyobject(ctx, val, ret);
+		Py_XDECREF(ret);
+	
+		if(err)
+		{
+			pcilib_error("Failed to convert python script return value to internal type: %i", err);
+			return err;
+		}
+	}
     return 0;
 }
