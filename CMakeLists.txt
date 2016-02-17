@@ -8,7 +8,7 @@ cmake_minimum_required(VERSION 2.8)
 #set(CMAKE_PREFIX_PATH ${CMAKE_SYSTEM_PREFIX_PATH})
 
 set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library")
-set(BUILD_PYTHON_MODULES FALSE CACHE BOOL "Build pcilib python modules") 
+set(BUILD_PYTHON_MODULES TRUE CACHE BOOL "Build pcilib python modules") 
 
 #list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 

@@ -1,11 +1,5 @@
 #include "pcipywrap.h"
 
-/*!
- * \brief Global pointer to pcilib_t context.
- * Used by set_pcilib and read_register.
- */
-pcilib_t* __ctx = 0;
-
 char* full_log = NULL;
 
 /*!
@@ -33,6 +27,7 @@ char* vmake_str(const char* msg, va_list vl)
 	
 	return buf;
 }
+
 
 /*!
  * \brief Wraping for vsnprintf function, that saves string to char*
@@ -106,175 +101,6 @@ void __redirect_logs_to_exeption()
 }
 
 /*!
- * Destructor for pcilib_t
- */
-void close_pcilib_instance(void *ctx)
-{
-	if(ctx != __ctx)
-		pcilib_close(ctx);
-}
-
-PyObject* create_pcilib_instance(const char *fpga_device, const char *model)
-{
-	//opening device
-    pcilib_t* ctx = pcilib_open(fpga_device, model);
-    if(!ctx)
-    {
-		set_python_exception("Failed pcilib_open(%s, %s)", fpga_device, model);
-		return NULL;
-	}
-	return PyCObject_FromVoidPtr((void*)ctx, close_pcilib_instance);
-}
-
-void close_curr_pcilib_instance()
-{
-    if(__ctx)
-    {
-        pcilib_close(__ctx);
-        __ctx = NULL;
-    }
-}
-
-PyObject* get_curr_pcilib_instance()
-{
-    return PyByteArray_FromStringAndSize((const char*)&__ctx, sizeof(pcilib_t*));
-}
-
-PyObject* set_pcilib(PyObject* addr)
-{
-	if(!PyCObject_Check(addr))
-	{
-        set_python_exception("Incorrect addr type. Only PyCObject is allowed");
-		return NULL;
-	}
-	
-	__ctx = (pcilib_t*)PyCObject_AsVoidPtr(addr);
-	
-	return PyInt_FromLong((long)1);
-}
-
-PyObject* read_register(const char *regname, const char *bank)
-{
-	if(!__ctx)
-	{
-        set_python_exception("pcilib_t handler not initialized");
-		return NULL;
-	}
-
-	pcilib_value_t val = {0};
-    pcilib_register_value_t reg_value;
-	
-	int err; 
-	
-	err = pcilib_read_register(__ctx, bank, regname, &reg_value);
-	if(err)
-	{
-		set_python_exception("Failed pcilib_read_register");
-		return NULL;
-	}
-	
-	err = pcilib_set_value_from_register_value(__ctx, &val, reg_value);
-	if(err)
-	{
-		set_python_exception("Failed pcilib_set_value_from_register_value");
-		return NULL;
-	}
-
-    return pcilib_get_value_as_pyobject(__ctx, &val, NULL);
-}
-
-PyObject* write_register(PyObject* val, const char *regname, const char *bank)
-{
-	if(!__ctx)
-	{
-        pcilib_error("pcilib_t handler not initialized");
-		return NULL;
-	}
-	
-	
-	pcilib_value_t val_internal = {0};
-    pcilib_register_value_t reg_value;
-	
-	int err; 
-	
-    err = pcilib_set_value_from_pyobject(__ctx, &val_internal, val);
-	
-	if(err)
-	{
-		set_python_exception("Failed pcilib_set_value_from_pyobject");
-		return NULL;
-	}
-	
-	
-	reg_value = pcilib_get_value_as_register_value(__ctx, &val_internal, &err);
-	if(err)
-	{
-		set_python_exception("Failed pcilib_set_value_from_pyobject, (error %i)", err);
-		return NULL;
-	}
-	
-	err = pcilib_write_register(__ctx, bank, regname, reg_value);
-	
-	if(err)
-	{
-		set_python_exception("Failed pcilib_set_value_from_pyobject, (error %i)", err);
-		return NULL;
-	}
-	
-    return PyInt_FromLong((long)1);
-}
-
-PyObject* get_property(const char *prop)
-{
-	if(!__ctx)
-	{
-        set_python_exception("pcilib_t handler not initialized");
-		return NULL;
-	}
-	
-	int err;
-	pcilib_value_t val = {0};
-	
-	err  = pcilib_get_property(__ctx, prop, &val);
-	
-	if(err)
-	{
-		set_python_exception("Failed pcilib_get_property, (error %i)", err);
-		return NULL;
-	}
-	
-    return pcilib_get_value_as_pyobject(__ctx, &val, NULL);
-}
-
-PyObject* set_property(PyObject* val, const char *prop)
-{
-	int err;
-	
-	if(!__ctx)
-	{
-        set_python_exception("pcilib_t handler not initialized");
-		return NULL;
-	}
-	
-	pcilib_value_t val_internal = {0};
-    err = pcilib_set_value_from_pyobject(__ctx, &val_internal, val);
-	if(err)
-	{
-		set_python_exception("pcilib_set_value_from_pyobject, (error %i)", err);
-		return NULL;
-	}
-	
-	err  = pcilib_set_property(__ctx, prop, &val_internal);
-	if(err)
-	{
-		set_python_exception("pcilib_set_property, (error %i)", err);
-		return NULL;
-	}
-	
-	return PyInt_FromLong((long)1);
-}
-
-/*!
  * \brief Wrap for PyDict_SetItem, with decrease reference counting after set.
  */
 void pcilib_pydict_set_item(PyObject* dict, PyObject* name, PyObject* value)
@@ -295,9 +121,9 @@ void pcilib_pylist_append(PyObject* list, PyObject* value)
     Py_XDECREF(value);
 }
 
-void add_pcilib_value_to_dict(PyObject* dict, pcilib_value_t* val, const char *name)
+void add_pcilib_value_to_dict(pcilib_t* ctx, PyObject* dict, pcilib_value_t* val, const char *name)
 {
-    PyObject *py_val = (PyObject*)pcilib_get_value_as_pyobject(__ctx, val, NULL);
+    PyObject *py_val = (PyObject*)pcilib_get_value_as_pyobject(ctx, val, NULL);
 
 	if(py_val)
         pcilib_pydict_set_item(dict,
@@ -309,7 +135,7 @@ void add_pcilib_value_to_dict(PyObject* dict, pcilib_value_t* val, const char *n
                               PyString_FromString("invalid"));
 }
 
-PyObject * pcilib_convert_property_info_to_pyobject(pcilib_property_info_t listItem)
+PyObject * pcilib_convert_property_info_to_pyobject(pcilib_t* ctx, pcilib_property_info_t listItem)
 {
     PyObject* pylistItem = PyDict_New();
 
@@ -386,7 +212,7 @@ PyObject * pcilib_convert_property_info_to_pyobject(pcilib_property_info_t listI
     return pylistItem;
 }
 
-PyObject * pcilib_convert_register_info_to_pyobject(pcilib_register_info_t listItem)
+PyObject * pcilib_convert_register_info_to_pyobject(pcilib_t* ctx, pcilib_register_info_t listItem)
 {
     PyObject* pylistItem = PyDict_New();
 
@@ -430,20 +256,20 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_register_info_t listI
                           modes);
                   
     pcilib_value_t defval = {0};
-    pcilib_set_value_from_register_value(__ctx, &defval, listItem.defvalue);
-    add_pcilib_value_to_dict(pylistItem, &defval, "defvalue");
+    pcilib_set_value_from_register_value(ctx, &defval, listItem.defvalue);
+    add_pcilib_value_to_dict(ctx, pylistItem, &defval, "defvalue");
 
     if(listItem.range)
     {
 		pcilib_value_t minval = {0};
-		pcilib_set_value_from_register_value(__ctx, &minval, listItem.range->min);
-		
+		pcilib_set_value_from_register_value(ctx, &minval, listItem.range->min);
+	
 		pcilib_value_t maxval = {0};
-		pcilib_set_value_from_register_value(__ctx, &maxval, listItem.range->max);
+		pcilib_set_value_from_register_value(ctx, &maxval, listItem.range->max);
 		
         PyObject* range = PyDict_New();
-        add_pcilib_value_to_dict(range, &minval, "min");
-        add_pcilib_value_to_dict(range, &maxval, "max");
+        add_pcilib_value_to_dict(ctx, range, &minval, "min");
+        add_pcilib_value_to_dict(ctx, range, &maxval, "max");
         pcilib_pydict_set_item(pylistItem,
                               PyString_FromString("range"),
                               range);
@@ -458,17 +284,17 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_register_info_t listI
             PyObject* valuesItem = PyDict_New();
             
             pcilib_value_t val = {0};
-			pcilib_set_value_from_register_value(__ctx, &val, listItem.values[j].value);
+			pcilib_set_value_from_register_value(ctx, &val, listItem.values[j].value);
 
 			pcilib_value_t min = {0};
-			pcilib_set_value_from_register_value(__ctx, &min, listItem.values[j].min);
+			pcilib_set_value_from_register_value(ctx, &min, listItem.values[j].min);
 		
 			pcilib_value_t max = {0};
-			pcilib_set_value_from_register_value(__ctx, &max, listItem.values[j].max);
+			pcilib_set_value_from_register_value(ctx, &max, listItem.values[j].max);
             
-            add_pcilib_value_to_dict(valuesItem, &val, "value");
-            add_pcilib_value_to_dict(valuesItem, &min, "min");
-            add_pcilib_value_to_dict(valuesItem, &max, "max");
+            add_pcilib_value_to_dict(ctx, valuesItem, &val, "value");
+            add_pcilib_value_to_dict(ctx, valuesItem, &min, "min");
+            add_pcilib_value_to_dict(ctx, valuesItem, &max, "max");
 
             if(listItem.values[j].name)
                 pcilib_pydict_set_item(valuesItem,
@@ -491,71 +317,187 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_register_info_t listI
     return pylistItem;
 }
 
-PyObject* get_registers_list(const char *bank)
+Pcipywrap *new_Pcipywrap(const char* fpga_device, const char* model)
 {
-	if(!__ctx)
+	//opening device
+    pcilib_t* ctx = pcilib_open(fpga_device, model);
+    if(!ctx)
+    {
+		set_python_exception("Failed pcilib_open(%s, %s)", fpga_device, model);
+		return NULL;
+	}
+	Pcipywrap *self;
+	self = (Pcipywrap *) malloc(sizeof(Pcipywrap));
+	self->shared = 0;
+	self->ctx = ctx;
+	return self;
+}
+
+Pcipywrap *create_Pcipywrap(PyObject* ctx)
+{
+	if(!PyCObject_Check(ctx))
 	{
-        set_python_exception("pcilib_t handler not initialized");
+        set_python_exception("Incorrect ctx type. Only PyCObject is allowed");
 		return NULL;
 	}
 	
-	pcilib_register_info_t *list = pcilib_get_register_list(__ctx, bank, PCILIB_LIST_FLAGS_DEFAULT);
+	Pcipywrap *self;
+	self = (Pcipywrap *) malloc(sizeof(Pcipywrap));
+	self->shared = 1;
+	self->ctx = PyCObject_AsVoidPtr(ctx);
+	return self;
+}
+
+void delete_Pcipywrap(Pcipywrap *self) {	
+	if(!self->shared)
+		pcilib_close(self->ctx);
+		
+	free(self);
+}
+
+PyObject* Pcipywrap_read_register(Pcipywrap *self, const char *regname, const char *bank)
+{
+	pcilib_value_t val = {0};
+    pcilib_register_value_t reg_value;
+	
+	int err; 
+	
+	err = pcilib_read_register(self->ctx, bank, regname, &reg_value);
+	if(err)
+	{
+		set_python_exception("Failed pcilib_read_register");
+		return NULL;
+	}
+	
+	err = pcilib_set_value_from_register_value(self->ctx, &val, reg_value);
+	if(err)
+	{
+		set_python_exception("Failed pcilib_set_value_from_register_value");
+		return NULL;
+	}
+
+    return pcilib_get_value_as_pyobject(self->ctx, &val, NULL);
+}
+
+PyObject* Pcipywrap_write_register(Pcipywrap *self, PyObject* val, const char *regname, const char *bank)
+{
+	pcilib_value_t val_internal = {0};
+    pcilib_register_value_t reg_value;
+	
+	int err; 
+	
+    err = pcilib_set_value_from_pyobject(self->ctx, &val_internal, val);
+	
+	if(err)
+	{
+		set_python_exception("Failed pcilib_set_value_from_pyobject");
+		return NULL;
+	}
+	
+	
+	reg_value = pcilib_get_value_as_register_value(self->ctx, &val_internal, &err);
+	if(err)
+	{
+		set_python_exception("Failed pcilib_set_value_from_pyobject, (error %i)", err);
+		return NULL;
+	}
+	
+	err = pcilib_write_register(self->ctx, bank, regname, reg_value);
+	
+	if(err)
+	{
+		set_python_exception("Failed pcilib_set_value_from_pyobject, (error %i)", err);
+		return NULL;
+	}
+	
+    return PyInt_FromLong((long)1);
+}
+
+PyObject* Pcipywrap_get_property(Pcipywrap *self, const char *prop)
+{	
+	int err;
+	pcilib_value_t val = {0};
+	
+	err  = pcilib_get_property(self->ctx, prop, &val);
+	
+	if(err)
+	{
+		set_python_exception("Failed pcilib_get_property, (error %i)", err);
+		return NULL;
+	}
+	
+    return pcilib_get_value_as_pyobject(self->ctx, &val, NULL);
+}
+
+PyObject* Pcipywrap_set_property(Pcipywrap *self, PyObject* val, const char *prop)
+{
+	int err;
+	
+	pcilib_value_t val_internal = {0};
+    err = pcilib_set_value_from_pyobject(self->ctx, &val_internal, val);
+	if(err)
+	{
+		set_python_exception("pcilib_set_value_from_pyobject, (error %i)", err);
+		return NULL;
+	}
+	
+	err  = pcilib_set_property(self->ctx, prop, &val_internal);
+	if(err)
+	{
+		set_python_exception("pcilib_set_property, (error %i)", err);
+		return NULL;
+	}
+	
+	return PyInt_FromLong((long)1);
+}
+
+PyObject* Pcipywrap_get_registers_list(Pcipywrap *self, const char *bank)
+{
+	pcilib_register_info_t *list = pcilib_get_register_list(self->ctx, bank, PCILIB_LIST_FLAGS_DEFAULT);
 	
 	PyObject* pyList = PyList_New(0);
-    for(int i = 0; i < __ctx->num_reg; i++)
+    for(int i = 0; i < ((pcilib_t*)self->ctx)->num_reg; i++)
     {
 		//serialize item attributes
-        PyObject* pylistItem = pcilib_convert_register_info_to_pyobject(list[i]);
+        PyObject* pylistItem = pcilib_convert_register_info_to_pyobject(self->ctx, list[i]);
         pcilib_pylist_append(pyList, pylistItem);
     }
     
-    pcilib_free_register_info(__ctx, list);
+    pcilib_free_register_info(self->ctx, list);
 	
 	return pyList;
 }
 
-PyObject* get_register_info(const char* reg,const char *bank)
+PyObject* Pcipywrap_get_register_info(Pcipywrap *self, const char* reg,const char *bank)
 {
-    if(!__ctx)
-    {
-        set_python_exception("pcilib_t handler not initialized");
-        return NULL;
-    }
-
-    pcilib_register_info_t *info = pcilib_get_register_info(__ctx, bank, reg, PCILIB_LIST_FLAGS_DEFAULT);
+    pcilib_register_info_t *info = pcilib_get_register_info(self->ctx, bank, reg, PCILIB_LIST_FLAGS_DEFAULT);
 
 	if(!info)
 	{
         return NULL;
 	}
 
-    PyObject* py_info = pcilib_convert_register_info_to_pyobject(info[0]);
+    PyObject* py_info = pcilib_convert_register_info_to_pyobject(self->ctx, info[0]);
 
-    pcilib_free_register_info(__ctx, info);
+    pcilib_free_register_info(self->ctx, info);
 
     return py_info;
 }
 
-PyObject* get_property_list(const char* branch)
+PyObject* Pcipywrap_get_property_list(Pcipywrap *self, const char* branch)
 {
-    if(!__ctx)
-    {
-        set_python_exception("pcilib_t handler not initialized");
-        return NULL;
-    }
-
-    pcilib_property_info_t *list = pcilib_get_property_list(__ctx, branch, PCILIB_LIST_FLAGS_DEFAULT);
+    pcilib_property_info_t *list = pcilib_get_property_list(self->ctx, branch, PCILIB_LIST_FLAGS_DEFAULT);
 
     PyObject* pyList = PyList_New(0);
 
     for(int i = 0; list[i].path; i++)
     {
         //serialize item attributes
-        PyObject* pylistItem = pcilib_convert_property_info_to_pyobject(list[i]);
+        PyObject* pylistItem = pcilib_convert_property_info_to_pyobject(self->ctx, list[i]);
         pcilib_pylist_append(pyList, pylistItem);
     }
 
-    pcilib_free_property_info(__ctx, list);
+    pcilib_free_property_info(self->ctx, list);
 
     return pyList;
 }

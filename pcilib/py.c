@@ -23,6 +23,7 @@ typedef struct pcilib_script_s {
 struct pcilib_py_s {
     PyObject *main_module;
     PyObject *global_dict;
+    PyObject *pcilib_pywrap;
     int py_initialized_inside; ///< Flag, shows that Py_Initialize has been called inside class
     struct pcilib_script_s *scripts;
 };
@@ -54,9 +55,30 @@ int pcilib_init_py(pcilib_t *ctx) {
     ctx->py->global_dict = PyModule_GetDict(ctx->py->main_module);
     if (!ctx->py->global_dict)
         return PCILIB_ERROR_FAILED;
+
+
+
+    PyObject* py_script_module = PyImport_ImportModule("pcipywrap");
+	if(!py_script_module)
+	{
+		printf("Error in import python module: ");
+		PyErr_Print();
+		return PCILIB_ERROR_FAILED;
+	}
 	
+	PyObject* mod_name = PyString_FromString("Pcipywrap");
+	ctx->py->pcilib_pywrap = PyObject_CallMethodObjArgs(py_script_module,
+																  mod_name,
+																  PyCObject_FromVoidPtr(ctx, NULL),
+																  NULL);
+	Py_XDECREF(mod_name);
 	
-	
+	if(!ctx->py->pcilib_pywrap)
+	{
+		printf("Error in import python module: ");
+		PyErr_Print();
+        return PCILIB_ERROR_FAILED;
+	}
 	
 	ctx->py->scripts = NULL;
 #endif
@@ -381,24 +403,6 @@ int pcilib_py_init_script(pcilib_t *ctx, const char* module_name)
 		return PCILIB_ERROR_INVALID_DATA;
 	}
 	free(py_module_name);
-
-	//Initializing pcipywrap module if script use it
-	PyObject* dict = PyModule_GetDict(py_script_module);
-	if(PyDict_Contains(dict, PyString_FromString("pcipywrap")))
-	{
-		PyObject* pcipywrap_module = PyDict_GetItemString(dict, "pcipywrap");
-		if(!pcipywrap_module)
-		{
-			pcilib_error("Cant extract pcipywrap module from script dictionary");
-			return PCILIB_ERROR_FAILED;
-		}
-	   
-	   //setting pcilib_t instance                 
-	   PyObject_CallMethodObjArgs(pcipywrap_module,
-                               PyUnicode_FromString("set_pcilib"),
-                               PyCObject_FromVoidPtr(ctx, NULL),
-							   NULL);
-	}
 	
 	//Success. Create struct and initialize values
 	module = malloc(sizeof(pcilib_script_s));
@@ -482,10 +486,9 @@ int pcilib_script_run_func(pcilib_t *ctx, const char* module_name,
 	PyObject *py_func_name = PyUnicode_FromString(func_name);
    	PyObject *ret = PyObject_CallMethodObjArgs(module->module,
 											   py_func_name,
+											   ctx->py->pcilib_pywrap,
 											   input,
 											   NULL);
-    
-    
 
     Py_XDECREF(py_func_name);
 	Py_XDECREF(input);

@@ -7,7 +7,10 @@ import sys
 from optparse import OptionParser
 
 class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-	
+   def __init__(s, pcilib, *args):
+      s.pcilib = pcilib
+      BaseHTTPServer.BaseHTTPRequestHandler.__init__(s, *args)
+   
    def do_HEAD(s):
       s.send_response(200)
       s.send_header('content-type', 'application/json')
@@ -58,7 +61,7 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
             registers = dict()
             try:
-               registers = pcipywrap.get_registers_list(bank)
+               registers = s.pcilib.get_registers_list(bank)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -87,7 +90,7 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             
             register = dict()
             try:
-               register = pcipywrap.get_register_info(reg, bank)
+               register = s.pcilib.get_register_info(reg, bank)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -109,7 +112,7 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             
             properties = dict()
             try:
-               properties = pcipywrap.get_property_list(branch)
+               properties = s.pcilib.get_property_list(branch)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -138,7 +141,7 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             
             value = 0
             try:
-               value = pcipywrap.read_register(reg, bank)
+               value = s.pcilib.read_register(reg, bank)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -172,7 +175,7 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 				   bank = str(bank)
             
             try:
-               pcipywrap.write_register(value, reg, bank)
+               s.pcilib.write_register(value, reg, bank)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -197,7 +200,7 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             
             value = 0
             try:
-               value = pcipywrap.get_property(prop)
+               value = s.pcilib.get_property(prop)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -228,7 +231,7 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             value = str(data.get('value', None))
             
             try:
-               pcipywrap.set_property(value, prop)
+               s.pcilib.set_property(value, prop)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -255,10 +258,7 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       
    """open device context """
    def openPcilibInstance(s, device, model):
-      pcipywrap.close_curr_pcilib_instance()
-      
-      lib = pcipywrap.create_pcilib_instance(device, model)
-      pcipywrap.set_pcilib(lib)
+      s.pcilib = pcipywrap.create_pcilib_instance(device, model)
          
    """Send help message"""
    def help(s, received_message = None):
@@ -350,7 +350,7 @@ if __name__ == '__main__':
    parser = OptionParser()
    parser.add_option("-p", "--port",  action="store",
                      type="int", dest="port", default=9000,
-                     help="Set server port (8888)")
+                     help="Set server port (9000)")
    parser.add_option("-d", "--device",  action="store",
                      type="string", dest="device", default=str('/dev/fpga0'),
                      help="FPGA device (/dev/fpga0)")                     
@@ -377,14 +377,19 @@ if __name__ == '__main__':
    if not 'LD_LIBRARY_PATH' in os.environ: 
       os.environ['LD_LIBRARY_PATH'] = os.environ["APP_PATH"] + "/pcilib"
    
-   #create pcilib instance and redirect logs to exeption
-   lib = pcipywrap.create_pcilib_instance(opts.device, opts.model)
-   pcipywrap.set_pcilib(lib)
+   #redirect logs to exeption
    pcipywrap.__redirect_logs_to_exeption()
    
    #start server
    pcilib_server = BaseHTTPServer.HTTPServer
-   httpd = pcilib_server((HOST_NAME, PORT_NUMBER), PcilibServerHandler)
+   
+   #pass Pcipywrap to to server handler
+   lib = pcipywrap.Pcipywrap(DEVICE, MODEL)
+   def handler(*args):
+      PcilibServerHandler(lib, *args)
+   
+   httpd = pcilib_server((HOST_NAME, PORT_NUMBER), handler)
+   
    print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)
    try:
       httpd.serve_forever()
