@@ -7,6 +7,10 @@ link_directories(
     ${CMAKE_BINARY_DIR}/pcilib
 )
 
+find_package (Threads)
+add_executable(test_multithread test_multithread.c)
+target_link_libraries (test_multithread pcilib ${CMAKE_THREAD_LIBS_INIT})
+
 add_executable(xilinx xilinx.c)
 target_link_libraries(xilinx pcilib rt)
 

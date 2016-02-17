@@ -19,3 +19,4 @@ SWIG_ADD_MODULE(pcipywrap python pcipywrap.i pcipywrap.c)
 SWIG_LINK_LIBRARIES(pcipywrap ${PYTHON_LIBRARIES} pcilib)
 
 configure_file(server.py server.py)
+configure_file(test_pcipywrap.py test_pcipywrap.py)

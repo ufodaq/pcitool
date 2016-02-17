@@ -347,6 +347,7 @@ int pcilib_set_value_from_pyobject(pcilib_t* ctx, pcilib_value_t *val, pcilib_py
 	PyObject* pyVal = pyObjVal;
 	int err;
 	
+	PyGILState_STATE gstate = PyGILState_Ensure();
     if(PyInt_Check(pyVal))
     {
         err = pcilib_set_value_from_int(ctx, val, PyInt_AsLong(pyVal));
@@ -359,9 +360,11 @@ int pcilib_set_value_from_pyobject(pcilib_t* ctx, pcilib_value_t *val, pcilib_py
                 err = pcilib_set_value_from_static_string(ctx, val, PyString_AsString(pyVal));
                 else
                 {
+					PyGILState_Release(gstate);
                     pcilib_error("Invalid input. Input type should be int, float or string.");
                     return PCILIB_ERROR_NOTSUPPORTED;
                 }
+    PyGILState_Release(gstate);
     if(err)
         return err;
         
