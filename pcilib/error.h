@@ -48,12 +48,12 @@ pcilib_logger_t pcilib_get_logger();
 /**
  * Gets current logger min priority.
  */
-pcilib_log_priority_t pcilib_get_logger_min_prio();
+pcilib_log_priority_t pcilib_get_log_level();
 
 /**
  * Gets current logger argument.
  */
-void* pcilib_get_logger_argument();
+void* pcilib_get_logger_context();
 
 #ifdef __cplusplus
 }

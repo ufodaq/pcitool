@@ -11,14 +11,19 @@ extern "C" {
 #endif
 
 int pcilib_init_py(pcilib_t *ctx);
+int pcilib_py_add_script_dir(pcilib_t *ctx);
 int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *value);
 void pcilib_free_py(pcilib_t *ctx);
 
 
-int pcilib_py_init_script(pcilib_t *ctx, char* module_name, pcilib_access_mode_t *mode);
-int pcilib_py_free_script(pcilib_t *ctx,char* module_name);
-int pcilib_script_run_func(pcilib_t *ctx, char* module_name,
+int pcilib_py_init_script(pcilib_t *ctx, const char* module_name);
+int pcilib_py_free_script(pcilib_t *ctx, const char* module_name);
+int pcilib_script_run_func(pcilib_t *ctx, const char* module_name,
                            const char* func_name,  pcilib_value_t *val);
+                           
+int pcilib_py_get_transform_script_properties(pcilib_t *ctx,
+                                              const char* module_name,
+                                              pcilib_access_mode_t *mode);
 
 /*!
  * \brief Converts pcilib_value_t to PyObject.

@@ -1,4 +1,6 @@
+#ifdef BUILD_PYTHON_MODULES
 #include <Python.h>
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,11 +13,10 @@
 #include "py.h"
 #include "error.h"
 
+#ifdef BUILD_PYTHON_MODULES
 typedef struct pcilib_script_s {
-	char* name;
-    PyObject *module;	/**< PyModule object, contains script enviroment */
-	pcilib_access_mode_t mode;
-	
+	const char* name;
+    PyObject *module;	/**< PyModule object, contains script enviroment */	
 	UT_hash_handle hh;
 } pcilib_script_s;
 
@@ -25,8 +26,10 @@ struct pcilib_py_s {
     int py_initialized_inside; ///< Flag, shows that Py_Initialize has been called inside class
     struct pcilib_script_s *scripts;
 };
+#endif
 
 int pcilib_init_py(pcilib_t *ctx) {
+#ifdef BUILD_PYTHON_MODULES
     ctx->py = (pcilib_py_t*)malloc(sizeof(pcilib_py_t));
     if (!ctx->py) return PCILIB_ERROR_MEMORY;
 
@@ -53,6 +56,16 @@ int pcilib_init_py(pcilib_t *ctx) {
         return PCILIB_ERROR_FAILED;
 	
 	
+	
+	
+	ctx->py->scripts = NULL;
+#endif
+    return 0;
+}
+
+int pcilib_py_add_script_dir(pcilib_t *ctx)
+{
+#ifdef BUILD_PYTHON_MODULES
 	//create path string, where the model scripts should be
 	static int model_dir_added = 0;
 	if(!model_dir_added)
@@ -72,13 +85,12 @@ int pcilib_init_py(pcilib_t *ctx) {
 		free(model_path);
 		model_dir_added = 1;
 	}
-	
-	ctx->py->scripts = NULL;
-    return 0;
+#endif
+	return 0;
 }
 
 void pcilib_free_py(pcilib_t *ctx) {
-	
+#ifdef BUILD_PYTHON_MODULES
 	int py_initialized_inside = 0;
 	
     if (ctx->py) {		
@@ -92,6 +104,7 @@ void pcilib_free_py(pcilib_t *ctx) {
     
     if(py_initialized_inside)
 		Py_Finalize();
+#endif
 }
 
 /*
@@ -110,7 +123,7 @@ static int pcilib_py_realloc_string(pcilib_t *ctx, size_t required, size_t *size
     return 0;
 }
 */
-
+#ifdef BUILD_PYTHON_MODULES
 static char *pcilib_py_parse_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *value) {
     int i;
     int err = 0;
@@ -216,8 +229,10 @@ static char *pcilib_py_parse_string(pcilib_t *ctx, const char *codestr, pcilib_v
 
     return dst;
 }
+#endif
 
 int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *value) {
+#ifdef BUILD_PYTHON_MODULES
     PyGILState_STATE gstate;
     char *code;
     PyObject* obj;
@@ -239,10 +254,15 @@ int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *va
 
     pcilib_debug(VIEWS, "Evaluating a Python string \'%s\' to %lf=\'%s\'", codestr, PyFloat_AsDouble(obj), code);
     return pcilib_set_value_from_float(ctx, value, PyFloat_AsDouble(obj));
+#else
+	pcilib_error("Current build not support python.");
+    return PCILIB_ERROR_NOTAVAILABLE;
+#endif
 }
 
 pcilib_py_object* pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *val, int *ret)
-{	
+{
+#ifdef BUILD_PYTHON_MODULES	
 	int err;
 	
 	switch(val->type)
@@ -292,10 +312,16 @@ pcilib_py_object* pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *va
             pcilib_error("Invalid register output type (unknown)");
 			return NULL;
 	}
+#else
+	pcilib_error("Current build not support python.");
+    if (ret) *ret = PCILIB_ERROR_NOTAVAILABLE;
+	return NULL;
+#endif
 }
 
 int pcilib_set_value_from_pyobject(pcilib_t* ctx, pcilib_value_t *val, pcilib_py_object* pyObjVal)
 {
+#ifdef BUILD_PYTHON_MODULES
 	PyObject* pyVal = pyObjVal;
 	int err;
 	
@@ -318,12 +344,18 @@ int pcilib_set_value_from_pyobject(pcilib_t* ctx, pcilib_value_t *val, pcilib_py
         return err;
         
     return 0;
+#else
+	pcilib_error("Current build not support python.");
+    return PCILIB_ERROR_NOTAVAILABLE;
+#endif
 }
 
-int pcilib_py_init_script(pcilib_t *ctx, char* module_name, pcilib_access_mode_t *mode)
-{	
+int pcilib_py_init_script(pcilib_t *ctx, const char* module_name)
+{
+#ifdef BUILD_PYTHON_MODULES
 	//extract module name from script name
-	char* py_module_name = strtok(module_name, ".");
+	char* py_module_name = strdup(module_name);
+	py_module_name = strtok(py_module_name, ".");
 	if(!py_module_name)
 	{
 		pcilib_error("Invalid script name specified in XML property (%s)."
@@ -336,26 +368,19 @@ int pcilib_py_init_script(pcilib_t *ctx, char* module_name, pcilib_access_mode_t
 	if(module)
 	{
 		pcilib_warning("Python module %s is already in hash. Skip init step", module_name);
-		mode[0] = module->mode;
 		return 0;
-	}
-	
-	//Initialize python module
-	if(!module_name)
-	{
-		pcilib_error("Invalid script name specified in XML property (NULL)");
-		return PCILIB_ERROR_INVALID_DATA;
 	}
 	
 	//import python script
 	PyObject* py_script_module = PyImport_ImportModule(py_module_name);
-	
 	if(!py_script_module)
 	{
 		printf("Error in import python module: ");
 		PyErr_Print();
+		free(py_module_name);
 		return PCILIB_ERROR_INVALID_DATA;
 	}
+	free(py_module_name);
 
 	//Initializing pcipywrap module if script use it
 	PyObject* dict = PyModule_GetDict(py_script_module);
@@ -380,44 +405,49 @@ int pcilib_py_init_script(pcilib_t *ctx, char* module_name, pcilib_access_mode_t
 	if (!module)
 		return PCILIB_ERROR_MEMORY;
 	module->module = py_script_module;
-	module->name = strdup(module_name);
-	if(!(module->name))
-	{
-		free(module);
-		return PCILIB_ERROR_MEMORY;
-	}
-	sprintf(module->name, "%s", module_name);
+	module->name = module_name;
+	HASH_ADD_STR( ctx->py->scripts, name, module);
+#endif
+	return 0;
+}
 
+int pcilib_py_get_transform_script_properties(pcilib_t *ctx, const char* module_name,
+pcilib_access_mode_t *mode)
+{
+#ifdef BUILD_PYTHON_MODULES
+	pcilib_script_s *module;
 	
+	HASH_FIND_STR(ctx->py->scripts, module_name, module);
+	if(!module)
+	{
+		pcilib_error("Failed to find script module (%s) in hash", module_name);
+		return PCILIB_ERROR_NOTFOUND;
+	}
+	
+	PyObject* dict = PyModule_GetDict(module->module);
 	//Setting correct mode
 	mode[0] = 0;
 	if(PyDict_Contains(dict, PyString_FromString("read_from_register")))
 		mode[0] |= PCILIB_ACCESS_R;	
 	if(PyDict_Contains(dict, PyString_FromString("write_to_register")))
-		mode[0] |= PCILIB_ACCESS_W;
-		
-	module->mode = mode[0];
-	HASH_ADD_STR( ctx->py->scripts, name, module);
-	
+		mode[0] |= PCILIB_ACCESS_W;	
 	return 0;
+#else
+	mode[0] = PCILIB_ACCESS_RW;
+	return 0;
+#endif
 }
 
-int pcilib_py_free_script(pcilib_t *ctx,char* module_name)
+int pcilib_py_free_script(pcilib_t *ctx, const char* module_name)
 {
+#ifdef BUILD_PYTHON_MODULES
 	pcilib_script_s *module;
 	HASH_FIND_STR(ctx->py->scripts, module_name, module);
 	
 	if(!module)
 	{
-		//For some reason it will crash if uncomment. printf same warning is ok
-		//pcilib_warning("Cant find Python module %s in hash. Seems it has already deleted.", module_name);
+		pcilib_warning("Cant find Python module %s in hash. Seems it has already deleted.", module_name);
 		return 0;
-	}
-	
-	if(module->name)
-	{
-		free(module->name);
-		module->name = NULL;
 	}
 		
 	if(module->module)
@@ -427,12 +457,14 @@ int pcilib_py_free_script(pcilib_t *ctx,char* module_name)
 	
 	HASH_DEL(ctx->py->scripts, module);
 	free(module);
+#endif
 	return 0;
 }
 
-int pcilib_script_run_func(pcilib_t *ctx, char* module_name,
+int pcilib_script_run_func(pcilib_t *ctx, const char* module_name,
                            const char* func_name,  pcilib_value_t *val)
-{	
+{
+#ifdef BUILD_PYTHON_MODULES
 	int err;
 	pcilib_script_s *module;
 	HASH_FIND_STR(ctx->py->scripts, module_name, module);
@@ -478,4 +510,8 @@ int pcilib_script_run_func(pcilib_t *ctx, char* module_name,
 		}
 	}
     return 0;
+#else
+	pcilib_error("Current build not support python.");
+    return PCILIB_ERROR_NOTAVAILABLE;
+#endif
 }

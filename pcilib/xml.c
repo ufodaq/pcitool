@@ -600,8 +600,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
             desc.write_to_reg = value;
             if ((value)&&(*value)) mode |= PCILIB_ACCESS_W;
         } else if (!strcasecmp(name, "script")) {
-			desc.module = strdup(value);
-			sprintf(desc.module, "%s", value);
+			desc.module = value;
 			break;
         }
     }

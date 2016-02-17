@@ -9,7 +9,7 @@ typedef struct {
     pcilib_view_description_t base;
     const char *read_from_reg;			/**< Formula explaining how to convert the register value to the view value */
     const char *write_to_reg;			/**< Formula explaining how to convert from the view value to the register value */
-	char *module; /**< Python script module name (without extension) */
+	const char *module; /**< Python script module name (without extension) */
 } pcilib_transform_view_description_t;
 
 #ifndef _PCILIB_VIEW_TRANSFORM_C

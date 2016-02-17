@@ -7,7 +7,8 @@ cmake_minimum_required(VERSION 2.8)
 #set(PKG_CONFIG_USE_CMAKE_PREFIX_PATH true)
 #set(CMAKE_PREFIX_PATH ${CMAKE_SYSTEM_PREFIX_PATH})
 
-set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library") 
+set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library")
+set(BUILD_PYTHON_MODULES FALSE CACHE BOOL "Build pcilib python modules") 
 
 #list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -35,8 +36,12 @@ SET(ENV{PKG_CONFIG_PATH} "${LIB_INSTALL_DIR}/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
-find_package(PythonLibs 2.7 REQUIRED)
-find_package(SWIG REQUIRED)
+
+if (BUILD_PYTHON_MODULES)
+	find_package(PythonLibs 2.7 REQUIRED)
+	find_package(SWIG REQUIRED)
+	add_definitions(-DBUILD_PYTHON_MODULES)
+endif (BUILD_PYTHON_MODULES)
 
 set(EXTRA_SYSTEM_LIBS -lrt)
 
@@ -79,10 +84,13 @@ add_subdirectory(dma)
 add_subdirectory(protocols)
 add_subdirectory(views)
 add_subdirectory(pcilib)
-add_subdirectory(pywrap)
 add_subdirectory(pcitool)
 add_subdirectory(apps)
 add_subdirectory(xml)
+
+if (BUILD_PYTHON_MODULES)
+	add_subdirectory(pywrap)
+endif (BUILD_PYTHON_MODULES)
 
 set_target_properties(pcilib PROPERTIES
     VERSION ${PCILIB_VERSION}

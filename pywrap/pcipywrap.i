@@ -1,5 +1,9 @@
 %module pcipywrap
 
+%{
+#include "pcipywrap.h"
+%}
+
 extern void __redirect_logs_to_exeption();
 
 extern PyObject* create_pcilib_instance(const char *fpga_device, const char *model = NULL);

@@ -144,6 +144,13 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    pcilib_close(ctx);
 	    return NULL;
 	}
+	
+	err = pcilib_init_py(ctx);
+	if (err) {
+	    pcilib_error("Error (%i) initializing python subsystem", err);
+	    pcilib_close(ctx);
+	    return NULL;
+	}
 
 	ctx->alloc_reg = PCILIB_DEFAULT_REGISTER_SPACE;
 	ctx->alloc_views = PCILIB_DEFAULT_VIEW_SPACE;
@@ -185,9 +192,9 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	if (!ctx->model)
 	    ctx->model = strdup(model?model:"pci");
 	    
-	err = pcilib_init_py(ctx);
+	err = pcilib_py_add_script_dir(ctx);
 	if (err) {
-	    pcilib_error("Error (%i) initializing python subsystem", err);
+	    pcilib_error("Error (%i) add script path to python path", err);
 	    pcilib_close(ctx);
 	    return NULL;
 	}

@@ -68,12 +68,21 @@ pcilib_view_context_t * pcilib_transform_view_init(pcilib_t *ctx, const pcilib_v
 	{	
 		pcilib_access_mode_t mode = 0;
 		
-		int err = pcilib_py_init_script(ctx, v_desc->module, &mode);
+		int err = pcilib_py_init_script(ctx, v_desc->module);
 		if(err)
 		{
-			pcilib_error("Failed init script module (%s) - error %i", v_desc->module, err);
+			pcilib_error("Failed init script module (%s) - error %i",
+			             v_desc->module, err);
 			return NULL;
-		} 
+		}
+		err = pcilib_py_get_transform_script_properties(ctx, v_desc->module,
+                                                        &mode);
+        if(err)
+		{
+			pcilib_error("Failed get transform script properties (%s) - error %i",
+			             v_desc->module, err);
+			return NULL;
+		}                                               
 		
 		v_desc->base.mode |= PCILIB_REGISTER_RW;
 		mode |= PCILIB_REGISTER_INCONSISTENT;
@@ -86,8 +95,6 @@ pcilib_view_context_t * pcilib_transform_view_init(pcilib_t *ctx, const pcilib_v
     
     return view_ctx;
 }
-
-
 
 const pcilib_view_api_description_t pcilib_transform_view_api =
   { PCILIB_VERSION, sizeof(pcilib_transform_view_description_t), pcilib_transform_view_init, NULL, pcilib_transform_view_free_description, pcilib_transform_view_read,  pcilib_transform_view_write };

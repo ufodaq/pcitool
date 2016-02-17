@@ -80,10 +80,10 @@ int pcilib_set_logger(pcilib_log_priority_t min_prio, pcilib_logger_t logger, vo
 pcilib_logger_t pcilib_get_logger() {
     return pcilib_logger;
 }
-pcilib_log_priority_t pcilib_get_logger_min_prio() {
+pcilib_log_priority_t pcilib_get_log_level() {
 	return pcilib_logger_min_prio;
 }
-void* pcilib_get_logger_argument() {
+void* pcilib_get_logger_context() {
 	return pcilib_logger_argument;
 }
 
