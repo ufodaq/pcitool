@@ -21,6 +21,10 @@ install(FILES pcilib.h
     DESTINATION include
 )
 
-install(FILES bar.h kmem.h locking.h lock.h bank.h register.h xml.h dma.h event.h model.h error.h debug.h env.h tools.h timing.h cpu.h datacpy.h pagecpy.h memcpy.h export.h version.h view.h unit.h
+install(FILES bar.h kmem.h locking.h lock.h bank.h register.h xml.h dma.h event.h model.h error.h debug.h env.h tools.h timing.h cpu.h datacpy.h pagecpy.h memcpy.h export.h view.h unit.h
+    DESTINATION include/pcilib
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/version.h
     DESTINATION include/pcilib
 )
