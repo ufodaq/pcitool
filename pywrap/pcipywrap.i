@@ -8,7 +8,7 @@ extern void __redirect_logs_to_exeption();
 
 typedef struct {
 	%extend {
-		Pcipywrap(const char* fpga_device = NULL, const char* model = NULL);
+		Pcipywrap(const char* fpga_device = "/dev/fpga0", const char* model = NULL);
 		Pcipywrap(PyObject* ctx){return create_Pcipywrap(ctx);}
 		~Pcipywrap();
 	

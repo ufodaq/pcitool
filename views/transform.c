@@ -11,7 +11,6 @@
 #include "py.h"
 #include "error.h"
 
-
 static int pcilib_transform_view_read(pcilib_t *ctx, pcilib_view_context_t *view_ctx, pcilib_register_value_t regval, pcilib_value_t *val) {
     const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
     pcilib_transform_view_description_t *v = (pcilib_transform_view_description_t*)(model_info->views[view_ctx->view]);
@@ -58,6 +57,8 @@ void pcilib_transform_view_free_description (pcilib_t *ctx, pcilib_view_descript
 	
 	if(v->module)
         pcilib_py_free_script(ctx, v->module);
+        
+    free(v);
 }
 
 pcilib_view_context_t * pcilib_transform_view_init(pcilib_t *ctx, const pcilib_view_description_t *desc)

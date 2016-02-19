@@ -3,7 +3,6 @@
 #endif
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -67,11 +66,13 @@ int pcilib_init_py(pcilib_t *ctx) {
 	}
 	
 	PyObject* mod_name = PyString_FromString("Pcipywrap");
+	PyObject* py_ctx = PyCObject_FromVoidPtr(ctx, NULL);
 	ctx->py->pcilib_pywrap = PyObject_CallMethodObjArgs(py_script_module,
 																  mod_name,
-																  PyCObject_FromVoidPtr(ctx, NULL),
+																  py_ctx,
 																  NULL);
 	Py_XDECREF(mod_name);
+	Py_XDECREF(py_ctx);
 	
 	if(!ctx->py->pcilib_pywrap)
 	{
@@ -93,17 +94,25 @@ int pcilib_py_add_script_dir(pcilib_t *ctx)
 	if(!model_dir_added)
 	{
 		char* model_dir = getenv("PCILIB_MODEL_DIR");
+        if(!model_dir)
+        {
+            pcilib_error("Enviroment variable PCILIB_MODEL_DIR not set.");
+            return PCILIB_ERROR_NOTINITIALIZED;
+        }
 		char* model_path = malloc(strlen(model_dir) + strlen(ctx->model) + 2);
 		if (!model_path) return PCILIB_ERROR_MEMORY;
 		sprintf(model_path, "%s/%s", model_dir, ctx->model);
 		//add path to python
 		PyObject* path = PySys_GetObject("path");
-		if(PyList_Append(path, PyString_FromString(model_path)) == -1)
+		PyObject* py_model_path = PyString_FromString(model_path);
+		if(PyList_Append(path, py_model_path) == -1)
 		{
+			Py_XDECREF(py_model_path);
 			pcilib_error("Cant set PCILIB_MODEL_DIR library path to python.");
 			free(model_path);
 			return PCILIB_ERROR_FAILED;
 		}
+		Py_XDECREF(py_model_path);
 		free(model_path);
 		model_dir_added = 1;
 	}
@@ -119,7 +128,8 @@ void pcilib_free_py(pcilib_t *ctx) {
 		if(ctx->py->py_initialized_inside)
 			py_initialized_inside = 1;
 		
-        // Dict and module references are borrowed
+		// Dict and module references are borrowed
+		Py_XDECREF(ctx->py->pcilib_pywrap);        
         free(ctx->py);
         ctx->py = NULL;
     }
@@ -434,10 +444,14 @@ pcilib_access_mode_t *mode)
 	PyObject* dict = PyModule_GetDict(module->module);
 	//Setting correct mode
 	mode[0] = 0;
-	if(PyDict_Contains(dict, PyString_FromString("read_from_register")))
-		mode[0] |= PCILIB_ACCESS_R;	
-	if(PyDict_Contains(dict, PyString_FromString("write_to_register")))
-		mode[0] |= PCILIB_ACCESS_W;	
+	PyObject* py_read_from_register = PyString_FromString("read_from_register");
+	if(PyDict_Contains(dict, py_read_from_register))
+		mode[0] |= PCILIB_ACCESS_R;
+	Py_XDECREF(py_read_from_register);
+	PyObject* py_write_to_register = PyString_FromString("write_to_register");
+	if(PyDict_Contains(dict, py_write_to_register))
+		mode[0] |= PCILIB_ACCESS_W;
+	Py_XDECREF(py_write_to_register);	
 	return 0;
 #else
 	mode[0] = PCILIB_ACCESS_RW;

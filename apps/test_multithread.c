@@ -28,7 +28,7 @@ void *get_prop(void *arg)
 			printf("err pcilib_get_value_as_int\n");
 			return NULL;
 		}
-		printf("reg = %i\n", value);
+		printf("reg = %lu\n", value);
 	}
 	return NULL;
 }
@@ -63,7 +63,7 @@ void *read_reg(void *arg)
 			printf("err pcilib_get_value_as_int\n");
 			return NULL;
 		}
-		printf("reg = %i\n", value);
+		printf("reg = %lu\n", value);
 	}
 	return NULL;
 }
@@ -79,8 +79,6 @@ int main(int argc, char *argv[])
 	int threads = atoi( argv[4] );
 	
 	pcilib_t *ctx = pcilib_open(argv[1], argv[2]);
-	int err;
-		pcilib_value_t val = {0};
 	
 	for(int i = 0; i < threads; i++)
 	{
