@@ -303,7 +303,7 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_t* ctx, pcilib_regist
 
             if(listItem.values[j].description)
                 pcilib_pydict_set_item(valuesItem,
-									  PyString_FromString("name"),
+									  PyString_FromString("description"),
 									  PyString_FromString(listItem.values[j].description));
 
             pcilib_pylist_append(values, valuesItem);

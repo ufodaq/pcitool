@@ -1,0 +1,15 @@
+<!doctype html>
+<title>{% block title %}Device {{ device }}{% endblock %}</title>
+{% block info %}
+   <h1>Device {{ device }} model={{ model }} control page </h1>
+{% endblock %}
+
+{% block content %}
+{% endblock %}
+
+<ul>
+   <li><a href="{{ url_for('get_registers_list') }}">Registers list</li>
+   <li><a href="{{ url_for('get_property_list') }}">Property info</li>
+   <li><a href="{{ url_for('greet') }}">Main page</li>
+</ul>
+

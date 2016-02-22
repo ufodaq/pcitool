@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Register info{% endblock %}
+{% block info %}
+<h1>Register '{{ register.name }}' info</h1>
+{% endblock %}
+
+{% block content %}
+   <script>
+      function write_register()
+      {
+         var value = document.getElementById("set_val_box").value;
+         window.location.href = "{{ url_for('write_register') }}?name={{ register.name }}&"+
+                                'bank={{ register.bank }}&val='+value;
+      };
+   </script>
+
+   <table border="1" style="width:100%">
+      {% if 'description' in register %}
+      <tr>
+         <th> Description </th>
+         <td> {{ register.description }} </td>
+      </tr>
+      {% endif %}
+      <tr>
+         <th> Current value </th>
+         <td> {{ value }} </td>
+      </tr>
+      {% if 'W' in register.mode %}
+         <tr>
+            <th> Set value</th>
+            <td> 
+               <input type="text" name="set_val_box" id="set_val_box" value="" />
+               <input type="button" value="set" onclick="write_register()">
+            </td>
+         </tr>
+      {% endif %}
+      <tr>
+         <th>Bank</th>
+         <td>{{ register.bank }}</td>
+      </tr>
+      <tr>
+         <th>Default value</th>
+         <td>{{ register.defvalue }}</td>
+      </tr>
+      <tr>
+         <th>Mode</th>
+         <td>
+            <ul>
+               {% for m in register.mode %}
+                  <li>{{ m }}</li>
+               {% endfor %}
+            </ul>
+         </td>
+      </tr>
+      {% if 'range' in register %}
+      <tr>
+         <th>
+            Range
+         </th>
+         <td>
+            <table>
+               <tr>
+                  <th> min </th>
+                  <td> {{ register.range.min }} </td>
+               </tr>
+               <tr>
+                  <th> max </th>
+                  <td> {{ register.range.max }} </td>
+               </tr>
+            </table>
+         </td>
+      </tr>
+      {% endif %}
+      {% if 'values' in register %}
+         {% for v in register['values'] %}
+            <tr>
+               {% if 'name' in v %}
+                  <th> {{v.name}} </th>
+               {% endif %}
+               <td>
+                  <table>
+                     {% if 'description' in v %}
+                     <tr>
+                        <th> description </th>
+                        <td> {{ v.description }} </td>
+                     </tr>
+                     {% endif %}
+                     <tr>
+                        <th> min </th>
+                        <td> {{ v.min }} </td>
+                     </tr>
+                     <tr>
+                        <th> max </th>
+                        <td> {{ v.max }} </td>
+                     </tr>
+                     <tr>
+                        <th> value </th>
+                        <td> {{ v.value }} </td>
+                     </tr>
+                  </table>
+               </td>
+            </tr>
+         {% endfor %}
+      {% endif %}
+   </table>
+{% endblock %}
