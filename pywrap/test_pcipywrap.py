@@ -112,7 +112,7 @@ class test_pcipywrap():
          pass
 
 if __name__ == '__main__':
-   lib = test_pcipywrap('/dev/fpga0','test_pywrap', num_threads = 150,
+   lib = test_pcipywrap('/dev/fpga0','test', num_threads = 150,
    write_percentage = 0.1, register = 'test_prop2',server_host = 'http://localhost', server_port = 12412,
    server_message_delay = 0)
    lib.testThreadSafeReadWrite()

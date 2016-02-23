@@ -1,4 +1,9 @@
-#define _GNU_SOURCE
+#include "config.h"
+
+#ifdef HAVE_PYTHON
+# include <Python.h>
+#endif /* HAVE_PYTHON */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,11 +15,6 @@
 #include "pcilib.h"
 #include "py.h"
 #include "error.h"
-#include "config.h"
-
-#ifdef HAVE_PYTHON
-# include <Python.h>
-#endif /* HAVE_PYTHON */
 
 #ifdef HAVE_PYTHON
 typedef struct pcilib_script_s pcilib_script_t;
@@ -40,13 +40,19 @@ void pcilib_log_python_error(const char *file, int line, pcilib_log_flags_t flag
     const char *val = NULL;
 
 #ifdef HAVE_PYTHON
+    PyGILState_STATE gstate;
     PyObject *pytype = NULL;
     PyObject *pyval = NULL;
     PyObject *pytraceback = NULL;
 
-    PyErr_Fetch(&pytype, &pyval, &pytraceback);
-    type = PyString_AsString(pytype);
-    val = PyString_AsString(pyval);
+
+    gstate = PyGILState_Ensure();
+    if (PyErr_Occurred()) {
+	PyErr_Fetch(&pytype, &pyval, &pytraceback);
+	type = PyString_AsString(pytype);
+	val = PyString_AsString(pyval);
+    }
+    PyGILState_Release(gstate);
 #endif /* HAVE_PYTHON */
     
     va_start(va, msg);
@@ -77,9 +83,9 @@ void pcilib_log_python_error(const char *file, int line, pcilib_log_flags_t flag
     va_end(va);
 
 #ifdef HAVE_PYTHON
-    Py_XDECREF(pytype);
-    Py_XDECREF(pyval);
-    Py_XDECREF(pytraceback);
+    if (pytype) Py_XDECREF(pytype);
+    if (pyval) Py_XDECREF(pyval);
+    if (pytraceback) Py_XDECREF(pytraceback);
 #endif /* HAVE_PYTHON */
 }
 

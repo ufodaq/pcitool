@@ -10,13 +10,13 @@
 #include "transform.h"
 #include "py.h"
 #include "error.h"
+#include "pci.h"
 
 static pcilib_view_context_t * pcilib_transform_view_init(pcilib_t *ctx, pcilib_view_t view) {
     int err;
 
     pcilib_view_context_t *view_ctx;
-    const pcilib_model_description_t *model_info = pcilib_get_model_description(ctx);
-    pcilib_transform_view_description_t *v = (pcilib_transform_view_description_t*)(model_info->views[view]);
+    pcilib_transform_view_description_t *v = (pcilib_transform_view_description_t*)(ctx->views[view]);
 
     if(v->script) {	
 	pcilib_access_mode_t mode = 0;

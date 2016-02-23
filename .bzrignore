@@ -36,3 +36,4 @@ build.h
 build
 pcipywrap.py
 pcipywrapPYTHON_wrap.c
+apps/test_multithread
