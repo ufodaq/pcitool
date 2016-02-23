@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -67,6 +68,27 @@ int pcilib_set_value_from_static_string(pcilib_t *ctx, pcilib_value_t *value, co
 
     value->type = PCILIB_TYPE_STRING;
     value->sval = str;
+
+    return 0;
+}
+
+int pcilib_set_value_from_string(pcilib_t *ctx, pcilib_value_t *value, const char *str) {
+    size_t len;
+
+    pcilib_clean_value(ctx, value);
+
+    len = strlen(str) + 1;
+    if (len < sizeof(value->str)) {
+	memcpy(value->str, str, len);
+	value->sval = value->str;
+    } else {
+        value->data = (void*)strdup(str);
+        if (!value->data) return PCILIB_ERROR_MEMORY;
+
+	value->size = strlen(str) + 1;
+	value->sval = value->data;
+    }
+    value->type = PCILIB_TYPE_STRING;
 
     return 0;
 }

@@ -59,6 +59,7 @@
     <xsd:attribute name="unit" type="xsd:string" />
     <xsd:attribute name="type" type="pcilib_data_type_t" />
     <xsd:attribute name="mode" type="pcilib_access_mode_t" />
+    <xsd:attribute name="write_verification" type="bool_t" default="1"/>
     <xsd:attribute name="visible" type="bool_t" default="0" />
     <xsd:attribute name="description" type="xsd:string" />
   </xsd:complexType>
@@ -70,6 +71,7 @@
           <xsd:attribute name="register" type="xsd:string" />
           <xsd:attribute name="read_from_register" type="xsd:string" />
           <xsd:attribute name="write_to_register" type="xsd:string" />
+          <xsd:attribute name="script" type="xsd:string" />
           <!-- xsd 1.1 <xsd:assert test="(@path and not(@name)) or (not(@path) and @name)"/> -->
         </xsd:extension>
     </xsd:complexContent>

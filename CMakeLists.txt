@@ -1,13 +1,14 @@
 project(pcitool)
 
-set(PCILIB_VERSION "0.2.5")
+set(PCILIB_VERSION "0.2.6")
 set(PCILIB_ABI_VERSION "2")
 
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 2.8)
 #set(PKG_CONFIG_USE_CMAKE_PREFIX_PATH true)
 #set(CMAKE_PREFIX_PATH ${CMAKE_SYSTEM_PREFIX_PATH})
 
-set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library") 
+set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library")
+set(DISABLE_PYTHON FALSE CACHE BOOL "Disable python scripting support") 
 
 #list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -35,7 +36,12 @@ SET(ENV{PKG_CONFIG_PATH} "${LIB_INSTALL_DIR}/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
-find_package(PythonLibs REQUIRED)
+
+if (NOT DISABLE_PYTHON)
+    find_package(PythonLibs 2.7 REQUIRED)
+    find_package(SWIG REQUIRED)
+    set(HAVE_PYTHON TRUE)
+endif (NOT DISABLE_PYTHON)
 
 set(EXTRA_SYSTEM_LIBS -lrt)
 
@@ -91,15 +97,28 @@ add_subdirectory(pcitool)
 add_subdirectory(apps)
 add_subdirectory(xml)
 
+if (HAVE_PYTHON)
+    add_subdirectory(pywrap)
+endif (HAVE_PYTHON)
+
 set_target_properties(pcilib PROPERTIES
     VERSION ${PCILIB_VERSION}
     SOVERSION ${PCILIB_ABI_VERSION}
 )
 
+
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcitool.pc.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/config.h)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/version.h)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/docs/Doxyfile)
+
+if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    file(COPY ${CMAKE_SOURCE_DIR}/xml DESTINATION ${CMAKE_BINARY_DIR})
+    file(COPY ${CMAKE_SOURCE_DIR}/pci
+	 DESTINATION ${CMAKE_BINARY_DIR}
+	 FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+    )
+endif(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
 
 install(FILES 
     ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc

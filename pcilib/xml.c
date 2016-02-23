@@ -40,6 +40,7 @@
 #include "xml.h"
 #include "error.h"
 #include "view.h"
+#include "py.h"
 #include "views/enum.h"
 #include "views/transform.h"
 
@@ -48,11 +49,11 @@
 #define REGISTERS_PATH ((xmlChar*)"./register")		 			/**< all standard registers nodes */
 #define BIT_REGISTERS_PATH ((xmlChar*)"./field") 				/**< all bits registers nodes */
 #define REGISTER_VIEWS_PATH ((xmlChar*)"./view") 				/**< supported register & field views */
-#define TRANSFORM_VIEWS_PATH ((xmlChar*)"/model/transform")			/**< path to complete nodes of views */
+#define TRANSFORM_VIEWS_PATH ((xmlChar*)"/model/transform")		/**< path to complete nodes of views */
 #define ENUM_VIEWS_PATH ((xmlChar*)"/model/enum")	 			/**< path to complete nodes of views */
 #define ENUM_ELEMENTS_PATH ((xmlChar*)"./name") 				/**< all elements in the enum */
 #define UNITS_PATH ((xmlChar*)"/model/unit")	 				/**< path to complete nodes of units */
-#define UNIT_TRANSFORMS_PATH ((xmlChar*)"./transform") 				/**< all transforms of the unit */
+#define UNIT_TRANSFORMS_PATH ((xmlChar*)"./transform") 			/**< all transforms of the unit */
 
 
 
@@ -492,6 +493,8 @@ static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDoc
     xmlAttrPtr cur;
     const char *value, *name;
 
+    int inconsistent = (desc->mode & PCILIB_ACCESS_INCONSISTENT);
+
     for (cur = node->properties; cur != NULL; cur = cur->next) {
         if (!cur->children) continue;
         if (!xmlNodeIsText(cur->children)) continue;
@@ -537,8 +540,14 @@ static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDoc
                 pcilib_error("Invalid access mode (%s) is specified in the XML register description", value);
                 return PCILIB_ERROR_INVALID_DATA;
             }
-        }
+        } else if (!strcasecmp(name, "write_verification")) {
+	    if (strcmp(value, "0")) inconsistent = 0;
+	    else inconsistent = 1;
+	}
     }
+	
+    if (inconsistent) desc->mode |= PCILIB_ACCESS_INCONSISTENT;
+    else desc->mode &= ~PCILIB_ACCESS_INCONSISTENT;
 
     return 0;
 }
@@ -585,10 +594,12 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
             }
             desc.write_to_reg = value;
             if ((value)&&(*value)) mode |= PCILIB_ACCESS_W;
-        } 
+        } else if (!strcasecmp(name, "script")) {
+	    desc.script = value;
+	    break;
+        }
     }
-
-    desc.base.mode &= mode;
+    desc.base.mode &= (~PCILIB_ACCESS_RW)|mode;
 
     err = pcilib_add_views_custom(ctx, 1, (pcilib_view_description_t*)&desc, &view_ctx);
     if (err) return err;
@@ -596,7 +607,6 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
     view_ctx->xml = node;
     return 0;
 }
-
 
 static int pcilib_xml_parse_value_name(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node, pcilib_register_value_name_t *desc) {
     xmlAttr *cur;

@@ -69,8 +69,11 @@ int pcilib_add_views_custom(pcilib_t *ctx, size_t n, const pcilib_view_descripti
             return PCILIB_ERROR_MEMORY;
         }
 
+        memcpy(cur, v, v->api->description_size);
+        ctx->views[ctx->num_views + i] = cur;
+
         if (v->api->init) 
-            view_ctx = v->api->init(ctx);
+            view_ctx = v->api->init(ctx, ctx->num_views + i);
         else {
             view_ctx = (pcilib_view_context_t*)malloc(sizeof(pcilib_view_context_t));
             if (view_ctx) memset(view_ctx, 0, sizeof(pcilib_view_context_t));
@@ -83,14 +86,12 @@ int pcilib_add_views_custom(pcilib_t *ctx, size_t n, const pcilib_view_descripti
             return PCILIB_ERROR_FAILED;
         }
 
-        memcpy(cur, v, v->api->description_size);
-        view_ctx->view = ctx->num_views + i;
+	view_ctx->view = ctx->num_views + i;
         view_ctx->name = v->name;
 
-        if (refs) refs[i] = view_ctx;
-
         HASH_ADD_KEYPTR(hh, ctx->view_hash, view_ctx->name, strlen(view_ctx->name), view_ctx);
-        ctx->views[ctx->num_views + i] = cur;
+
+        if (refs) refs[i] = view_ctx;
 
         ptr += v->api->description_size;
     }

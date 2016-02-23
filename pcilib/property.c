@@ -165,7 +165,6 @@ pcilib_property_info_t *pcilib_get_property_list(pcilib_t *ctx, const char *bran
                 continue;
             }
 
-
             dir = (struct dir_hash_s*)malloc(sizeof(struct dir_hash_s));
             if (!dir) {
                 err = PCILIB_ERROR_MEMORY;
@@ -226,6 +225,10 @@ pcilib_property_info_t *pcilib_get_property_list(pcilib_t *ctx, const char *bran
         };
     }
 
+    HASH_ITER(hh, dir_hash, dir, dir_tmp) {
+	HASH_DEL(dir_hash, dir);
+	free(dir);
+    }
     HASH_CLEAR(hh, dir_hash);
 
     memset(&info[pos], 0, sizeof(pcilib_property_info_t));

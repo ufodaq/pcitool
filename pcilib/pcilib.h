@@ -43,7 +43,8 @@ typedef enum {
 typedef enum {
     PCILIB_ACCESS_R = 1,			/**< getting property is allowed */
     PCILIB_ACCESS_W = 2,			/**< setting property is allowed */
-    PCILIB_ACCESS_RW = 3
+    PCILIB_ACCESS_RW = 3,
+    PCILIB_ACCESS_INCONSISTENT = 0x10000	/**< inconsistent access, one will not read that one has written */
 } pcilib_access_mode_t;
 
 typedef enum {
@@ -54,6 +55,7 @@ typedef enum {
     PCILIB_REGISTER_RW1C = 5,
     PCILIB_REGISTER_W1I = 8,			/**< writting 1 inversts the bit, writting 0 keeps the value */
     PCILIB_REGISTER_RW1I = 9,
+    PCILIB_REGISTER_INCONSISTENT = 0x10000	/**< inconsistent register, writting and reading does not match */
 } pcilib_register_mode_t;
 
 typedef enum {
@@ -1254,6 +1256,16 @@ int pcilib_set_value_from_register_value(pcilib_t *ctx, pcilib_value_t *val, pci
  * @return		- 0 on success or memory error
  */
 int pcilib_set_value_from_static_string(pcilib_t *ctx, pcilib_value_t *val, const char *str);
+
+/**
+ * Initializes the polymorphic value from the string. The string is copied.
+ * If `val` already contains the value, cleans it first. Therefore, before first usage the value should be always initialized to 0.
+ * @param[in] ctx	- pcilib context
+ * @param[in,out] val	- initialized polymorphic value
+ * @param[in] str	- initializer
+ * @return		- 0 on success or memory error
+ */
+int pcilib_set_value_from_string(pcilib_t *ctx, pcilib_value_t *value, const char *str);
 
 /**
  * Get the floating point value from the polymorphic type. May inmply impliced type conversion,

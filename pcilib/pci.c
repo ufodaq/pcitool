@@ -191,6 +191,14 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 
 	if (!ctx->model)
 	    ctx->model = strdup(model?model:"pci");
+	    
+	err = pcilib_py_add_script_dir(ctx, NULL);
+	if (err) {
+	    pcilib_error("Error (%i) add script path to python path", err);
+	    pcilib_close(ctx);
+	    return NULL;
+	}
+	
 	
 	xmlerr = pcilib_init_xml(ctx, ctx->model);
 	if ((xmlerr)&&(xmlerr != PCILIB_ERROR_NOTFOUND)) {
@@ -198,6 +206,7 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    pcilib_close(ctx);
 	    return NULL;
 	}
+	
 
 	    // We have found neither standard model nor XML
 	if ((err)&&(xmlerr)) {
@@ -219,7 +228,6 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    pcilib_close(ctx);
 	    return NULL;
 	}
-	
 	err = pcilib_init_event_engine(ctx);
 	if (err) {
 	    pcilib_error("Error (%i) initializing event engine\n", err);
@@ -305,8 +313,6 @@ void pcilib_close(pcilib_t *ctx) {
 
 	if (ctx->event_plugin)
 	    pcilib_plugin_close(ctx->event_plugin);
-	
-        pcilib_free_py(ctx);
 
 	if (ctx->locks.kmem)
 	    pcilib_free_locking(ctx);
@@ -348,11 +354,12 @@ void pcilib_close(pcilib_t *ctx) {
 
 	if (ctx->registers)
 	    free(ctx->registers);
-	
+	    
 	if (ctx->model)
 	    free(ctx->model);
 
 	pcilib_free_xml(ctx);
+	pcilib_free_py(ctx);
 
 	if (ctx->handle >= 0)
 	    close(ctx->handle);

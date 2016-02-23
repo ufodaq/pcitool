@@ -1702,7 +1702,7 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
         err = pcilib_write_register(handle, bank, reg, value);
         if (err) Error("Error writting register %s\n", reg);
 
-        if ((model_info->registers[regid].mode&PCILIB_REGISTER_RW) == PCILIB_REGISTER_RW) {
+        if ((model_info->registers[regid].mode&(PCILIB_REGISTER_RW|PCILIB_REGISTER_INCONSISTENT)) == PCILIB_REGISTER_RW) {
             const char *format = (val.format?val.format:"%u");
 	    
 	    err = pcilib_read_register(handle, bank, reg, &verify);

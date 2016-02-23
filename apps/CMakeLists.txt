@@ -17,3 +17,6 @@ add_executable(compare_to_value compare_to_value.c)
 
 add_executable(heb_strip_bad_values heb_strip_bad_values.c)
 add_executable(check_counter check_counter.c)
+
+add_executable(test_multithread test_multithread.c)
+target_link_libraries (test_multithread pcilib ${CMAKE_THREAD_LIBS_INIT})

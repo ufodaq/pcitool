@@ -33,3 +33,6 @@ Doxyfile
 html
 pcilib/build.h
 build.h
+build
+pcipywrap.py
+pcipywrapPYTHON_wrap.c
