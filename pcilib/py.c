@@ -276,10 +276,12 @@ pcilib_py_object *pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *va
 #ifdef HAVE_PYTHON	
     int err = 0;
     PyObject *res = NULL;
+    PyGILState_STATE gstate;
 
     long ival;
     double fval;
 	
+    gstate = PyGILState_Ensure();
     switch(val->type) {
      case PCILIB_TYPE_LONG:
 	ival = pcilib_get_value_as_int(ctx, val, &err);
@@ -290,9 +292,12 @@ pcilib_py_object *pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *va
 	if (!err) res = (PyObject*)PyFloat_FromDouble(fval);
 	break;	
      default:
-	err = PCILIB_ERROR_NOTSUPPORTED;
+	PyGILState_Release(gstate);
 	pcilib_error("Can't convert pcilib value of type (%lu) to PyObject", val->type);
+	if (ret) *ret = PCILIB_ERROR_NOTSUPPORTED;
+	return NULL;
     }
+    PyGILState_Release(gstate);
 
     if (err) {
 	if (ret) *ret = err;
@@ -314,7 +319,9 @@ int pcilib_set_value_from_pyobject(pcilib_t* ctx, pcilib_value_t *val, pcilib_py
 #ifdef HAVE_PYTHON
     int err = 0;
     PyObject *pyval = (PyObject*)pval;
+    PyGILState_STATE gstate;
 	
+    gstate = PyGILState_Ensure();
     if (PyInt_Check(pyval)) {
         err = pcilib_set_value_from_int(ctx, val, PyInt_AsLong(pyval));
     } else if (PyFloat_Check(pyval)) {
@@ -322,10 +329,12 @@ int pcilib_set_value_from_pyobject(pcilib_t* ctx, pcilib_value_t *val, pcilib_py
     } else if (PyString_Check(pyval)) {
         err = pcilib_set_value_from_string(ctx, val, PyString_AsString(pyval));
     } else {
+        PyGILState_Release(gstate);
         pcilib_error("Can't convert PyObject to polymorphic pcilib value");
-	err = PCILIB_ERROR_NOTSUPPORTED;
+	return PCILIB_ERROR_NOTSUPPORTED;
     }
-    
+    PyGILState_Release(gstate);
+
     return err;
 #else /* HAVE_PYTHON */
     pcilib_error("Python is not supported");
@@ -443,6 +452,8 @@ static char *pcilib_py_parse_string(pcilib_t *ctx, const char *codestr, pcilib_v
 
 int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *value) {
 #ifdef HAVE_PYTHON
+    int err;
+
     PyGILState_STATE gstate;
     char *code;
     PyObject* obj;
@@ -463,7 +474,9 @@ int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *va
     }
 
     pcilib_debug(VIEWS, "Evaluating a Python string \'%s\' to %lf=\'%s\'", codestr, PyFloat_AsDouble(obj), code);
-    return pcilib_set_value_from_float(ctx, value, PyFloat_AsDouble(obj));
+    err = pcilib_set_value_from_float(ctx, value, PyFloat_AsDouble(obj));
+
+    return err;
 #else /* HAVE_PYTHON */
 	pcilib_error("Current build not support python.");
     return PCILIB_ERROR_NOTAVAILABLE;
@@ -489,20 +502,22 @@ int pcilib_py_eval_func(pcilib_t *ctx, const char *script_name, const char *func
 	if (err) return err;
     }
 
+    PyGILState_STATE gstate = PyGILState_Ensure();
+
     pyfunc = PyUnicode_FromString(func_name);
     if (!pyfunc) {
 	if (pyval) Py_XDECREF(pyval);
+	PyGILState_Release(gstate);
 	return PCILIB_ERROR_MEMORY;
     }
 
-    PyGILState_STATE gstate = PyGILState_Ensure();
     pyret = PyObject_CallMethodObjArgs(module->module, pyfunc, ctx->py->pcilib_pywrap, pyval, NULL);
-    PyGILState_Release(gstate);
 
     Py_XDECREF(pyfunc);
     Py_XDECREF(pyval);
 	
     if (!pyret) {
+	PyGILState_Release(gstate);
 	pcilib_python_error("Error executing function (%s) of python script (%s)", func_name, script_name);
 	return PCILIB_ERROR_FAILED;
     }
@@ -511,6 +526,7 @@ int pcilib_py_eval_func(pcilib_t *ctx, const char *script_name, const char *func
 	err = pcilib_set_value_from_pyobject(ctx, val, pyret);
 
     Py_XDECREF(pyret);
+    PyGILState_Release(gstate);
 
     return err;
 #else /* HAVE_PYTHON */
