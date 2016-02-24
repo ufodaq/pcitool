@@ -192,7 +192,7 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	if (!ctx->model)
 	    ctx->model = strdup(model?model:"pci");
 	    
-	err = pcilib_py_add_script_dir(ctx);
+	err = pcilib_py_add_script_dir(ctx, NULL);
 	if (err) {
 	    pcilib_error("Error (%i) add script path to python path", err);
 	    pcilib_close(ctx);
@@ -355,12 +355,11 @@ void pcilib_close(pcilib_t *ctx) {
 	if (ctx->registers)
 	    free(ctx->registers);
 	    
-	pcilib_free_py(ctx);
-	
 	if (ctx->model)
 	    free(ctx->model);
 
 	pcilib_free_xml(ctx);
+	pcilib_free_py(ctx);
 
 	if (ctx->handle >= 0)
 	    close(ctx->handle);

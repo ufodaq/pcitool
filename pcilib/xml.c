@@ -40,9 +40,9 @@
 #include "xml.h"
 #include "error.h"
 #include "view.h"
+#include "py.h"
 #include "views/enum.h"
 #include "views/transform.h"
-#include "py.h"
 
 
 #define BANKS_PATH ((xmlChar*)"/model/bank")					/**< path to complete nodes of banks */
@@ -492,8 +492,8 @@ static int pcilib_xml_create_bank(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDo
 static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDocPtr doc, xmlNodePtr node, pcilib_view_description_t *desc) {
     xmlAttrPtr cur;
     const char *value, *name;
-    
-    int register_incosistent = 0;
+
+    int inconsistent = (desc->mode & PCILIB_ACCESS_INCONSISTENT);
 
     for (cur = node->properties; cur != NULL; cur = cur->next) {
         if (!cur->children) continue;
@@ -540,19 +540,14 @@ static int pcilib_xml_parse_view(pcilib_t *ctx, xmlXPathContextPtr xpath, xmlDoc
                 pcilib_error("Invalid access mode (%s) is specified in the XML register description", value);
                 return PCILIB_ERROR_INVALID_DATA;
             }
-        }
-		else if (!strcasecmp(name, "write_verification")) {
-			if (!strcasecmp(value, "0"))
-			{
-				register_incosistent = 1;
-			}
-		}
+        } else if (!strcasecmp(name, "write_verification")) {
+	    if (strcmp(value, "0")) inconsistent = 0;
+	    else inconsistent = 1;
 	}
+    }
 	
-	if(register_incosistent)
-	{
-		desc->mode |= PCILIB_REGISTER_INCONSISTENT;
-	}
+    if (inconsistent) desc->mode |= PCILIB_ACCESS_INCONSISTENT;
+    else desc->mode &= ~PCILIB_ACCESS_INCONSISTENT;
 
     return 0;
 }
@@ -563,7 +558,7 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
     const char *value, *name;
     pcilib_view_context_t *view_ctx;
 
-    pcilib_access_mode_t mode = PCILIB_REGISTER_INCONSISTENT;
+    pcilib_access_mode_t mode = 0;
     pcilib_transform_view_description_t desc = {{0}};
 
     desc.base.api = &pcilib_transform_view_api;
@@ -600,11 +595,11 @@ static int pcilib_xml_create_transform_view(pcilib_t *ctx, xmlXPathContextPtr xp
             desc.write_to_reg = value;
             if ((value)&&(*value)) mode |= PCILIB_ACCESS_W;
         } else if (!strcasecmp(name, "script")) {
-			desc.module = value;
-			break;
+	    desc.script = value;
+	    break;
         }
     }
-    desc.base.mode &= mode;
+    desc.base.mode &= (~PCILIB_ACCESS_RW)|mode;
 
     err = pcilib_add_views_custom(ctx, 1, (pcilib_view_description_t*)&desc, &view_ctx);
     if (err) return err;
@@ -845,7 +840,6 @@ static int pcilib_xml_process_document(pcilib_t *ctx, xmlDocPtr doc, xmlXPathCon
     if (bank_nodes) transform_nodes = xmlXPathEvalExpression(TRANSFORM_VIEWS_PATH, xpath);
     if (transform_nodes) enum_nodes = xmlXPathEvalExpression(ENUM_VIEWS_PATH, xpath);
     if (enum_nodes) unit_nodes = xmlXPathEvalExpression(UNITS_PATH, xpath);
-    
 
     if (!unit_nodes) {
 	const unsigned char *expr = (enum_nodes?UNITS_PATH:(transform_nodes?ENUM_VIEWS_PATH:(bank_nodes?TRANSFORM_VIEWS_PATH:BANKS_PATH)));

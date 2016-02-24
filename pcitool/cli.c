@@ -31,18 +31,19 @@
 
 #include "pcitool/sysinfo.h"
 #include "pcitool/formaters.h"
+#include "pcitool/buildinfo.h"
 
 #include "views/transform.h"
 #include "views/enum.h"
-#include "pci.h"
-#include "plugin.h"
-#include "config.h"
-#include "tools.h"
-#include "kmem.h"
-#include "error.h"
-#include "debug.h"
-#include "model.h"
-#include "locking.h"
+#include "pcilib/pci.h"
+#include "pcilib/plugin.h"
+#include "pcilib/config.h"
+#include "pcilib/tools.h"
+#include "pcilib/kmem.h"
+#include "pcilib/error.h"
+#include "pcilib/debug.h"
+#include "pcilib/model.h"
+#include "pcilib/locking.h"
 
 /* defines */
 #define MAX_KBUF 14
@@ -895,6 +896,8 @@ void Version(pcilib_t *handle, const pcilib_model_description_t *model_info) {
 	    PCILIB_VERSION_GET_MICRO(version)
 	);
     }
+
+    BuildInfo();
 }
 
 void Info(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *target) {
@@ -1385,7 +1388,7 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
 int ReadRegister(pcilib_t *handle, const pcilib_model_description_t *model_info, const char *bank, const char *reg, const char *view, const char *unit, const char *attr) {
     int i;
     int err;
-    const char *format;    
+    const char *format;
 
     pcilib_register_bank_t bank_id;
     pcilib_register_bank_addr_t bank_addr = 0;
@@ -1699,23 +1702,19 @@ int WriteRegister(pcilib_t *handle, const pcilib_model_description_t *model_info
         err = pcilib_write_register(handle, bank, reg, value);
         if (err) Error("Error writting register %s\n", reg);
 
-        if ((model_info->registers[regid].mode&PCILIB_REGISTER_RW) == PCILIB_REGISTER_RW) {
+        if ((model_info->registers[regid].mode&(PCILIB_REGISTER_RW|PCILIB_REGISTER_INCONSISTENT)) == PCILIB_REGISTER_RW) {
             const char *format = (val.format?val.format:"%u");
 	    
-	    
-			if(!((model_info->registers[regid].mode&PCILIB_REGISTER_INCONSISTENT) ==  PCILIB_REGISTER_INCONSISTENT))
-			{
-				err = pcilib_read_register(handle, bank, reg, &verify);
-				if (err) Error("Error reading back register %s for verification\n", reg);
-				
-				if ( verify != value) {
-					Error("Failed to write register %s: %lu is written and %lu is read back", reg, value, verify);
-				} else {
-					printf("%s = ", reg);
-					printf(format, verify);
-					printf("\n");
-				}
-			}
+	    err = pcilib_read_register(handle, bank, reg, &verify);
+	    if (err) Error("Error reading back register %s for verification\n", reg);
+    
+	    if (verify != value) {
+	        Error("Failed to write register %s: %lu is written and %lu is read back", reg, value, verify);
+	    } else {
+	        printf("%s = ", reg);
+	        printf(format, verify);
+	        printf("\n");
+	    }
         } else {
             printf("%s is written\n ", reg);
         }

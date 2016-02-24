@@ -31,4 +31,9 @@ pcitool/pci
 version.h
 Doxyfile
 html
+pcilib/build.h
+build.h
 build
+pcipywrap.py
+pcipywrapPYTHON_wrap.c
+apps/test_multithread

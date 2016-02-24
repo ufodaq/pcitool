@@ -1,0 +1,5 @@
+#! /bin/bash
+
+APP_PATH=`dirname $0`
+
+PYTHONPATH="$APP_PATH/pywrap:$PYTHONPATH" PCILIB_MODEL_DIR="$APP_PATH/xml" LD_LIBRARY_PATH="$APP_PATH/pcilib" $*

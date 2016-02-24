@@ -11,12 +11,11 @@ High Priority (we would need it for IPE Camera)
  
 Normal Priority (it would make just few things a bit easier)
 ===============
- 1. Support Python-scripts in the views (we need to provide python API to read registers/properties)
- 2. Integrate base streaming model into the pcitool
- 3. Implement pcilib_configure_autotrigger
- 4. Really check the specified min, max values while setting registers
- 5. Provide OR and AND operations on registers in cli
- 6. Support writting a data from a binary file in cli
+ 1. Integrate base streaming model into the pcitool
+ 2. Implement pcilib_configure_autotrigger
+ 3. Really check the specified min, max values while setting registers
+ 4. Provide OR and AND operations on registers in cli
+ 5. Support writting a data from a binary file in cli
 
 Low Priority (only as generalization for other projects)
 ============
@@ -25,6 +24,8 @@ Low Priority (only as generalization for other projects)
  3. Define a syntax for register dependencies / delays (?)
  4. Use pthread_condition_t instead of polling
  5. Support FIFO reads/writes from/to registers
+ 6. OPC UA interface to the registers
+ 7. Generate XML models from SystemRDL descriptions
 
 Performance
 ===========

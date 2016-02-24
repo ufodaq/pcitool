@@ -2,7 +2,4 @@
 
 APP_PATH=`dirname $0`
 
-PYTHONPATH="$PYTHONPATH:$APP_PATH/pywrap" \
-PCILIB_MODEL_DIR="$APP_PATH/xml" \
-LD_LIBRARY_PATH="$APP_PATH/pcilib" \
-$APP_PATH/pcitool/pci $*
+PYTHONPATH="$APP_PATH/pywrap:$PYTHONPATH" PCILIB_MODEL_DIR="$APP_PATH/xml" LD_LIBRARY_PATH="$APP_PATH/pcilib" $APP_PATH/pcitool/pci $*

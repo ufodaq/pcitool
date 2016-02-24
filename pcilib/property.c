@@ -225,11 +225,9 @@ pcilib_property_info_t *pcilib_get_property_list(pcilib_t *ctx, const char *bran
         };
     }
 
-
-    
     HASH_ITER(hh, dir_hash, dir, dir_tmp) {
-		HASH_DEL(dir_hash, dir);
-		free(dir);
+	HASH_DEL(dir_hash, dir);
+	free(dir);
     }
     HASH_CLEAR(hh, dir_hash);
 

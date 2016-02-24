@@ -3,3 +3,4 @@
 #cmakedefine PCILIB_MODEL_DIR "${PCILIB_MODEL_DIR}"
 #cmakedefine PCILIB_DEBUG_DIR "${PCILIB_DEBUG_DIR}"
 #cmakedefine HAVE_STDATOMIC_H @HAVE_STDATOMIC_H@
+#cmakedefine HAVE_PYTHON

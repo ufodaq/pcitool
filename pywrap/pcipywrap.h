@@ -6,8 +6,8 @@
 #include <Python.h>
 
 typedef struct {
-  void* ctx;
-  int shared;
+    void* ctx;
+    int shared;
 } Pcipywrap;
 
 /*!

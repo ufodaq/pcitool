@@ -13,9 +13,9 @@ link_directories(
 )
 
 if (NOT DISABLE_PCITOOL)
-    add_executable(pci cli.c sysinfo.c formaters.c)
-    set(HEADERS ${HEADERS} sysinfo.h formaters.h)
-    add_dependencies(pci pcilib)
+    set(HEADERS ${HEADERS} sysinfo.h formaters.h buildinfo.h)
+    add_executable(pci cli.c sysinfo.c formaters.c buildinfo.c)
+    add_dependencies(pci build pcilib)
     target_link_libraries(pci pcilib ${FASTWRITER_LIBRARIES})
     set_target_properties(pci PROPERTIES
 	LINK_FLAGS "${CMAKE_THREAD_LIBS_INIT} ${EXTRA_SYSTEM_LIBS}"

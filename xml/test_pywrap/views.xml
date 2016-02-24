@@ -1,6 +1,0 @@
-<?xml version="1.0"?>
-<model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <transform name="formuu1" unit="C" read_from_register="(503975./1024000)*$value - 27315./100" write_to_register="($value + 27315./100)*(1024000./503975)" description="formula to get real fpga temperature from the fpga_temperature register in decimal"/>
-  <transform name="formuu2" unit="C1" read_from_register="((1./4)*($value - 1200)) if $freq==0 else ((3./10)*($value - 1000))" write_to_register="4*$value + 1200 if $freq==0 else (10./3)*$value + 1000" description="formula to get real sensor temperature from the sensor_temperature register in decimal"/>
-  <transform name="formuu3" unit="us" read_from_register="($value+(43./100))*129./(40*1000000)if $freq==0 else ($value+(43./100))*129./(48*1000000)" write_to_register="$value/129.*(40*1000000) - 43./100 if $freq==0 else $value/129.*(48*1000000) - 43./100" description="formula to get real exposure time from the cmosis_exp_time register in decimal"/>
-</model>

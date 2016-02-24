@@ -1,8 +1,0 @@
-<?xml version="1.0"?>
-<model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <bank bar="0" size="0x0200" protocol="software_registers" read_address="0x9000" write_address="0x9000" word_size="32" endianess="little" format="0x%lx" name="fpga" description="IPECamera Registers">
-    <register address="0x00" offset="0" size="32" default="0" rwmask="0" mode="RW" name="reg1">
-		<field offset="0" size="16" mode="RW" name="sensor_temperature" min="5" max="15"><view view="formuu1"/><view view="formuu2"/><view view="enumm2"/></field>
-	</register>
-  </bank>
-</model>
