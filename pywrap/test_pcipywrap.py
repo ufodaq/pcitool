@@ -44,6 +44,18 @@ class test_pcipywrap():
       self.server_message_delay = server_message_delay
       self.server_port = server_port
       self.server_host = server_host
+
+   def testLocking(self, message, lock_id = None):
+      url = str(self.server_host + ':' + str(self.server_port))
+      headers = {'content-type': 'application/json'}
+      payload =[{'command': 'lock', 'lock_id': lock_id},
+                {'command': 'try_lock', 'lock_id': lock_id},
+                {'command': 'unlock', 'lock_id': lock_id},
+                {'command': 'lock_global'},
+                {'command': 'unlock_global'},
+                {'command': 'help'}]  
+      r = requests.get(url, data=json.dumps(payload[message]), headers=headers)
+      print json.dumps(r.json(), sort_keys=True, indent=3, separators=(',', ': '))
     
    def testThreadSafeReadWrite(self):
       def threadFunc():
@@ -187,6 +199,38 @@ if __name__ == '__main__':
                        "random commands to server in multi-thread mode"
                        )
    parser.add_option_group(test_group)
+   
+   lock_group = OptionGroup(parser, "Locking test group")
+   
+   lock_group.add_option("--lock",  action="store",
+                       dest="lock_id", default=None, type="string",
+                       help="Lock id."
+                       )
+   lock_group.add_option("--try_lock",  action="store",
+                       dest="try_lock_id", default=None, type="string",
+                       help="Try to lock id."
+                       )
+   lock_group.add_option("--unlock",  action="store",
+                       dest="unlock_id", default=None, type="string",
+                       help="Unlock lock with id."
+                       )
+   lock_group.add_option("--lock_global",  action="store_true",
+                       dest="lock_global", default=False,
+                       help="Global pcilib lock."
+                       )
+   lock_group.add_option("--unlock_global",  action="store_true",
+                       dest="unlock_global", default=False,
+                       help="Global pcilib unlock."
+                       )
+                       
+   lock_group.add_option("--get_server_message",  action="store_true",
+                       dest="get_server_message", default=False,
+                       help="Global pcilib unlock."
+                       )
+                       
+
+   parser.add_option_group(lock_group)
+   
    opts = parser.parse_args()[0]
 
    #create pcilib test instance
@@ -208,4 +252,16 @@ if __name__ == '__main__':
       lib.testMemoryLeak()
    if opts.test_server:
       lib.testServer()
+   if opts.lock_id:
+      lib.testLocking(0, opts.lock_id)  
+   if opts.try_lock_id:
+      lib.testLocking(1, opts.try_lock_id)  
+   if opts.unlock_id:
+      lib.testLocking(2, opts.unlock_id)  
+   if opts.lock_global:
+      lib.testLocking(3)  
+   if opts.unlock_global:
+      lib.testLocking(4)  
+   if(opts.get_server_message):
+      lib.testLocking(5)  
 

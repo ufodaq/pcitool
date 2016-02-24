@@ -2,14 +2,25 @@ import time
 import os
 import pcipywrap
 import json
-import BaseHTTPServer
 import sys
 from optparse import OptionParser
 
-class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-   def __init__(s, pcilib, *args):
-      s.pcilib = pcilib
-      BaseHTTPServer.BaseHTTPRequestHandler.__init__(s, *args)
+from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+from SocketServer import ThreadingMixIn
+import threading
+
+pcilib = None
+
+class MultiThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    pass
+
+class PcilibServerHandler(BaseHTTPRequestHandler):
+   locks = list()
+   lock_global = 0
+   
+   #def __init__(s, pcilib, *args):
+   #   s.pcilib = pcilib
+   #   BaseHTTPRequestHandler.__init__(s, *args)
    
    def do_HEAD(s):
       s.send_response(200)
@@ -26,6 +37,8 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
          command = data['command']
          if(command == 'help'):
             s.help(data)
+            
+            
             
          #elif(command == 'open'):
          #   #check required arguments
@@ -46,12 +59,11 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
          #     return
 		   #
          #   #Success! Create and send reply
-         #   s.send_response(200)
-         #   s.send_header('content-type', 'application/json')
-         #   s.end_headers()
          #   out = dict()
          #   out['status'] = 'ok'
          #   s.wrapMessageAndSend(out, data)
+            
+            
             
          elif(command == 'get_registers_list'):
             #parse command arguments and convert them to string
@@ -61,20 +73,19 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
             registers = dict()
             try:
-               registers = s.pcilib.get_registers_list(bank)
+               registers = pcilib.get_registers_list(bank)
             except Exception as e:
                s.error(str(e), data) 
                return
                
             #Success! Create and send reply
-            s.send_response(200)
-            s.send_header('content-type', 'application/json')
-            s.end_headers()
             out = dict()
             out['status'] = 'ok'
             out['registers'] = registers
             s.wrapMessageAndSend(out, data)
-            
+          
+          
+          
          elif(command == 'get_register_info'):
             #check required arguments
             if not 'reg' in data:
@@ -90,20 +101,16 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             
             register = dict()
             try:
-               register = s.pcilib.get_register_info(reg, bank)
+               register = pcilib.get_register_info(reg, bank)
             except Exception as e:
                s.error(str(e), data) 
                return
 		
             #Success! Create and send reply
-            s.send_response(200)
-            s.send_header('content-type', 'application/json')
-            s.end_headers()
-            out = dict()
-            out['status'] = 'ok'
-            out['register'] = register
-            s.wrapMessageAndSend(out, data)
+            s.wrapMessageAndSend({'status': 'ok', 'register': register}, data)
 		 
+       
+       
          elif(command == 'get_property_list'):   
             #parse command arguments and convert them to string
             branch = data.get('branch', None)
@@ -112,19 +119,18 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             
             properties = dict()
             try:
-               properties = s.pcilib.get_property_list(branch)
+               properties = pcilib.get_property_list(branch)
             except Exception as e:
                s.error(str(e), data) 
                return
             	
             #Success! Create and send reply
-            s.send_response(200)
-            s.send_header('content-type', 'application/json')
-            s.end_headers()
             out = dict()
             out['status'] = 'ok'
             out['properties'] = properties
             s.wrapMessageAndSend(out, data)
+            
+            
             
          elif(command == 'read_register'):
             #check required arguments
@@ -141,19 +147,18 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             
             value = 0
             try:
-               value = s.pcilib.read_register(reg, bank)
+               value = pcilib.read_register(reg, bank)
             except Exception as e:
                s.error(str(e), data) 
                return
             
             #Success! Create and send reply
-            s.send_response(200)
-            s.send_header('content-type', 'application/json')
-            s.end_headers()
             out = dict()
             out['status'] = 'ok'
             out['value'] = value
             s.wrapMessageAndSend(out, data)
+            
+            
             
          elif(command == 'write_register'):
             #check required arguments
@@ -175,18 +180,15 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 				   bank = str(bank)
             
             try:
-               s.pcilib.write_register(value, reg, bank)
+               pcilib.write_register(value, reg, bank)
             except Exception as e:
                s.error(str(e), data) 
                return
             
             #Success! Create and send reply
-            s.send_response(200)
-            s.send_header('content-type', 'application/json')
-            s.end_headers()
-            out = dict()
-            out['status'] = 'ok'
-            s.wrapMessageAndSend(out, data)
+            s.wrapMessageAndSend({'status': 'ok'}, data)
+            
+            
             
          elif(command == 'get_property'):
             #check required arguments
@@ -200,19 +202,18 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             
             value = 0
             try:
-               value = s.pcilib.get_property(prop)
+               value = pcilib.get_property(prop)
             except Exception as e:
                s.error(str(e), data) 
                return
             
             #Success! Create and send reply
-            s.send_response(200)
-            s.send_header('content-type', 'application/json')
-            s.end_headers()
             out = dict()
             out['status'] = 'ok'
             out['value'] = value
             s.wrapMessageAndSend(out, data)
+            
+            
             
          elif(command == 'set_property'):
             #check required arguments
@@ -231,19 +232,126 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             value = str(data.get('value', None))
             
             try:
-               s.pcilib.set_property(value, prop)
+               pcilib.set_property(value, prop)
             except Exception as e:
                s.error(str(e), data) 
                return
             
             #Success! Create and send reply
-            s.send_response(200)
-            s.send_header('content-type', 'application/json')
-            s.end_headers()
-            out = dict()
-            out['status'] = 'ok'
-            s.wrapMessageAndSend(out, data)
+            s.wrapMessageAndSend({'status': 'ok'}, data)
             
+            
+            
+         elif(command == 'lock'):
+            #check required arguments
+            if not 'lock_id' in data:
+               s.error('message doesnt contains "lock_id" field, '
+                       'which is required for "lock" command', data)
+               return
+               
+            #parse command arguments and convert them to string
+            lock_id = str(data.get('lock_id'))
+            
+            #check if lock already setted
+            #if lock_id in PcilibServerHandler.locks:
+            #   s.error('Lock with id: ' + lock_id + 
+            #           'already setted by this server',
+            #           data)
+            #   return
+            
+            try:
+               pcilib.lock(lock_id)
+            except Exception as e:
+               s.error(str(e), data) 
+               return
+               
+            PcilibServerHandler.locks.append(lock_id)
+            
+            #Success! Create and send reply
+            s.wrapMessageAndSend({'status': 'ok'}, data)
+            
+            
+            
+         elif(command == 'try_lock'):
+            #check required arguments
+            if not 'lock_id' in data:
+               s.error('message doesnt contains "lock_id" field, '
+                       'which is required for "try_lock" command', data)
+               return
+               
+            #parse command arguments and convert them to string
+            lock_id = str(data.get('lock_id'))
+            
+            try:
+               pcilib.try_lock(lock_id)
+            except Exception as e:
+               s.error(str(e), data) 
+               return
+            
+            #Success! Create and send reply
+            s.wrapMessageAndSend({'status': 'ok'}, data)
+            
+            
+            
+         elif(command == 'unlock'):
+            #check required arguments
+            #if not 'lock_id' in data:
+            #   s.error('message doesnt contains "lock_id" field, '
+            #           'which is required for "unlock" command', data)
+            #   return
+               
+            #parse command arguments and convert them to string
+            #lock_id = str(data.get('lock_id'))
+            
+            #try:
+            #   pcilib.unlock(lock_id)
+            #except Exception as e:
+            #   s.error(str(e), data) 
+            #   return
+            #
+            #remove lock from locks list
+            #if lock_id in PcilibServerHandler.locks:
+            #   PcilibServerHandler.locks.remove(lock_id)
+            time.sleep(20)
+            #Success! Create and send reply
+            s.wrapMessageAndSend({'status': 'ok'}, data)
+            
+            
+            
+         #elif(command == 'lock_global'):
+         #   #check if global_lock already setted by server
+         #   print 'aaa'
+         #   if PcilibServerHandler.lock_global:
+         #
+         #      s.error('global lock already setted by this server', data)
+         #      return
+         #      
+         #   try:
+         #      pcilib.lock_global()
+         #   except Exception as e:
+         #      s.error(str(e), data)
+         #      return
+         #   
+         #   PcilibServerHandler.lock_global = 1
+         #   
+         #   #Success! Create and send reply
+         #   s.wrapMessageAndSend({'status': 'ok'}, data)
+            
+         
+         
+         #elif(command == 'unlock_global'):
+         #   try:
+         #      pcilib.unlock_global()
+         #   except Exception as e:
+         #      s.error(str(e), data)
+         #      return
+         #   
+         #   PcilibServerHandler.lock_global = 0
+         #   
+         #   #Success! Create and send reply
+         #   s.wrapMessageAndSend({'status': 'ok'}, data)
+         
+         
             	
          else:
 		    s.error('command "' + command + '" undefined', data)
@@ -256,15 +364,12 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       #print str(s.headers['content-type'])
       #print post_data['some']
       
-   """open device context """
-   def openPcilibInstance(s, device, model):
-      s.pcilib = pcipywrap.create_pcilib_instance(device, model)
+   #"""open device context """
+   #def openPcilibInstance(s, device, model):
+   #   pcilib = pcipywrap.create_pcilib_instance(device, model)
          
    """Send help message"""
    def help(s, received_message = None):
-      s.send_response(200)
-      s.send_header('content-type', 'application/json')
-      s.end_headers()
       usage = str('Usage:\n'
       '  Server receive commands via http GET with json packet.\n'
       '  content-type should have value "application/json"\n'
@@ -323,25 +428,44 @@ class PcilibServerHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       '    required fields\n'
       '      prop:        - full name including path\n'
       '      value:       - the property value to write. Should be int, float or string (with number)\n'
+      '\n'
+      
+      '  command: lock - function to acquire a lock, and wait till the lock can be acquire.\n'
+      '    required fields\n'
+      '      lock_id: - lock id\n'
+      '\n'
+      
+      '  command: try_lock - this function will try to take a lock for the mutex pointed by \n'
+      '                    lockfunction to acquire a lock, but that returns immediatly if the\n'
+      '                    lock can\'t be acquired on first try\n'
+      '      lock_id: - lock id\n'
+      '\n'
+      
+      '  command: unlock - this function unlocks the lock.\n'
+      '    required fields\n'
+      '      lock_id: - lock id\n'
+      '\n'
+      
       '\n')
       out = {'status': 'ok', 'usage' : usage}
       s.wrapMessageAndSend(out, received_message)
 
    """Send error message with text description"""     
    def error(s, info, received_message = None):
-      s.send_response(400)
-      s.send_header('content-type', 'application/json')
-      s.end_headers()
       out = dict()
       
       out['status'] = 'error'
       out['description'] = info
       out['note'] = 'send {"command" : "help"} to get help'
-      s.wrapMessageAndSend(out, received_message)
+      s.wrapMessageAndSend(out, received_message, 400)
         
-   def wrapMessageAndSend(s, message, received_message = None):
+   def wrapMessageAndSend(s, message, received_message = None, response = 200):
+      s.send_response(response)
+      s.send_header('content-type', 'application/json')
+      s.end_headers()
       if not received_message is None:
          message['received_message'] = received_message
+      message['thread'] = threading.currentThread().getName()
       s.wfile.write(json.dumps(message))
 
 if __name__ == '__main__':
@@ -364,6 +488,8 @@ if __name__ == '__main__':
    MODEL = opts.model
    DEVICE = opts.device
    
+   
+   
    #Set enviroment variables, if it not setted already
    if not 'APP_PATH' in os.environ:
       APP_PATH = ''
@@ -377,23 +503,37 @@ if __name__ == '__main__':
    if not 'LD_LIBRARY_PATH' in os.environ: 
       os.environ['LD_LIBRARY_PATH'] = os.environ["APP_PATH"] + "/pcilib"
    
+   
+   
    #redirect logs to exeption
    pcipywrap.__redirect_logs_to_exeption()
    
-   #start server
-   pcilib_server = BaseHTTPServer.HTTPServer
-   
    #pass Pcipywrap to to server handler
-   lib = pcipywrap.Pcipywrap(DEVICE, MODEL)
-   def handler(*args):
-      PcilibServerHandler(lib, *args)
+   global pcilib
+   pcilib = pcipywrap.Pcipywrap(DEVICE, MODEL)
+   #def handler(*args):
+   #   PcilibServerHandler(lib, *args)
    
-   httpd = pcilib_server((HOST_NAME, PORT_NUMBER), handler)
+   #start server
+   httpd = MultiThreadedHTTPServer((HOST_NAME, PORT_NUMBER), PcilibServerHandler)
    
    print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)
    try:
       httpd.serve_forever()
    except KeyboardInterrupt:
+      #unlocking global lock
+      if PcilibServerHandler.lock_global:
+         lib.unlock_global()
+         PcilibServerHandler.lock_global = False
+         
+      #delete created locks
+      for lock in PcilibServerHandler.locks:
+         lib.unlock(lock)
+      del PcilibServerHandler.locks[:]
       pass
+      
+      
+      
+      
    httpd.server_close()
    print time.asctime(), "Server Stops - %s:%s" % (HOST_NAME, PORT_NUMBER)

@@ -1,4 +1,5 @@
 #include "pcipywrap.h"
+#include "locking.h"
 
 char* full_log = NULL;
 
@@ -501,3 +502,104 @@ PyObject* Pcipywrap_get_property_list(Pcipywrap *self, const char* branch)
 
     return pyList;
 }
+
+PyObject* Pcipywrap_read_dma(Pcipywrap *self, unsigned char dma, size_t size)
+{
+	int err;
+	void* buf = NULL;
+	size_t real_size;
+	
+	err = pcilib_read_dma(self->ctx, dma, (uintptr_t)NULL, size, buf, &real_size);
+	if(err)
+	{
+		set_python_exception("Failed pcilib_read_dma", err);
+		return NULL;
+	}
+		
+	
+	PyObject* py_buf = PyByteArray_FromStringAndSize((const char*)buf, real_size);
+	if(buf)
+		free(buf);
+		
+	return py_buf;
+}
+
+PyObject* Pcipywrap_lock_global(Pcipywrap *self)
+{
+	int err;
+	
+	err = pcilib_lock_global(self->ctx);
+	if(err)
+	{
+		set_python_exception("Failed pcilib_lock_global");
+		return NULL;
+	}
+
+	return PyInt_FromLong((long)1);
+}
+
+void Pcipywrap_unlock_global(Pcipywrap *self)
+{
+	pcilib_unlock_global(self->ctx);
+	return;
+}
+
+PyObject* Pcipywrap_lock(Pcipywrap *self, const char *lock_id) 
+{   
+   pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
+										  PCILIB_LOCK_FLAG_PERSISTENT,
+										  lock_id);
+    if(!lock)
+	{
+		set_python_exception("Failed pcilib_get_lock");
+		return NULL;
+	}
+	
+   
+	int err = pcilib_lock(lock);
+	if(err)
+	{
+		set_python_exception("Failed pcilib_lock");
+		return NULL;
+	}
+	
+	return PyInt_FromLong((long)1);
+}
+
+PyObject* Pcipywrap_try_lock(Pcipywrap *self, const char *lock_id)
+{
+	pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
+										  PCILIB_LOCK_FLAGS_DEFAULT,
+										  lock_id);
+    if(!lock)
+	{
+		set_python_exception("Failed pcilib_get_lock");
+		return NULL;
+	}
+	
+	int err = pcilib_try_lock(lock);
+	if(err)
+	{
+		set_python_exception("Failed pcilib_try_lock");
+		return NULL;
+	}
+	
+	return PyInt_FromLong((long)1);
+}
+
+PyObject* Pcipywrap_unlock(Pcipywrap *self, const char *lock_id)
+{
+	pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
+										  PCILIB_LOCK_FLAGS_DEFAULT,
+										  lock_id);
+    if(!lock)
+	{
+		set_python_exception("Failed pcilib_get_lock");
+		return NULL;
+	}
+	
+	pcilib_unlock(lock);
+	return PyInt_FromLong((long)1);
+}
+
+

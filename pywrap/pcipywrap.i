@@ -21,5 +21,13 @@ typedef struct {
 		PyObject* get_registers_list(const char *bank = NULL);
 		PyObject* get_register_info(const char* reg,const char *bank = NULL);
 		PyObject* get_property_list(const char* branch = NULL);
+		PyObject* read_dma(unsigned char dma, size_t size);
+		
+		PyObject* lock_global();
+		void unlock_global();
+		
+		PyObject* lock(const char *lock_id);
+		PyObject* try_lock(const char *lock_id);
+		PyObject* unlock(const char *lock_id);
 	}
 } Pcipywrap;

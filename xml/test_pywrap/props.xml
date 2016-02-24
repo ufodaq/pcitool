@@ -16,4 +16,9 @@
 	  unit="C"
 	  script="test_prop3.py"
 	  description="test python script #2"/>
+  <transform path="/test/prop_mt"
+	  register="test_prop_mt"
+	  unit="C"
+	  script="test_prop_mt.py"
+	  description="Example of thread safe python property"/>
 </model>

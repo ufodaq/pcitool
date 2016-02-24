@@ -65,4 +65,22 @@ PyObject* Pcipywrap_get_registers_list(Pcipywrap *self, const char *bank);
 PyObject* Pcipywrap_get_register_info(Pcipywrap *self, const char* reg,const char *bank);
 PyObject* Pcipywrap_get_property_list(Pcipywrap *self, const char* branch);
 
+PyObject* Pcipywrap_read_dma(Pcipywrap *self, unsigned char dma, size_t size);
+
+PyObject* Pcipywrap_lock_global(Pcipywrap *self);
+void Pcipywrap_unlock_global(Pcipywrap *self);
+
+/*!
+ * \brief Wrap for pcilib_lock
+ * \param lock_id lock identificator
+ * \warning This function should be called only under Python standart threading lock.
+ * Otherwise it will stuck with more than 1 threads. See /xml/test_pywrap/test_prop_mt.py
+ * for example.
+ * \return 1, serialized to PyObject or NULL with exeption text, if failed.
+ */
+PyObject* Pcipywrap_lock(Pcipywrap *self, const char *lock_id);
+
+PyObject* Pcipywrap_try_lock(Pcipywrap *self, const char *lock_id);
+PyObject* Pcipywrap_unlock(Pcipywrap *self, const char *lock_id);
+
 #endif /* PCIPYWRAP_H */

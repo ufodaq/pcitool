@@ -1,5 +1,6 @@
 import pcipywrap
 import json
+from optparse import OptionParser
 
 #import flask elements
 from flask import render_template
@@ -7,12 +8,82 @@ from flask import Flask
 from flask import request
 from flask import url_for
 from flask import redirect
+from flask import send_from_directory
 
 app = Flask(__name__)
 pcilib = 0;
 device = '/dev/fpga0'
 model = 'test_pywrap'
 
+# property json api
+@app.route("/property_info_json")
+def get_property_list_json():
+   branch = request.args.get('branch')
+   if not branch is None:
+      branch = str(branch)
+   
+   prop_info = 0
+   try:
+      prop_info = pcilib.get_property_list(branch)
+      return json.dumps(prop_info)
+   except Exception as e:
+      return json.dumps({'error': str(e)})
+
+@app.route('/get_property_json')
+def get_property_json():
+   prop = request.args.get('prop')
+
+   try:
+      val = pcilib.get_property(str(prop))
+      return json.dumps({'value': val})
+   except Exception as e:
+      return json.dumps({'error': str(e)})
+      
+@app.route('/set_property_json')
+def set_property_json():
+   val = request.args.get('val')
+   prop = request.args.get('prop')
+
+   try:
+      pcilib.set_property(float(val), str(prop))
+      return json.dumps({'status': 'ok'})
+   except Exception as e:
+      return json.dumps({'error': str(e)})
+      
+# register json api
+@app.route("/registers_list_json")
+def get_registers_list_json():
+   reg_list = 0
+   try:
+      reg_list = pcilib.get_registers_list()
+      return json.dumps(reg_list)
+   except Exception as e:
+      return json.dumps({'error': str(e)})
+
+@app.route('/read_register_json')
+def read_register_json():
+   name = request.args.get('name')
+   bank = request.args.get('bank')
+   
+   try:
+      value = pcilib.read_register(str(name), str(bank))
+      return json.dumps({'value': value})
+   except Exception as e:
+      return json.dumps({'error': str(e)})
+
+@app.route('/write_register_json')
+def write_register_json():
+   val = request.args.get('val')
+   name = request.args.get('name')
+   bank = request.args.get('bank')
+
+   try:
+      pcilib.write_register(float(val), str(name), str(bank))
+      return json.dumps({'status': 'ok'})
+   except Exception as e:
+      return json.dumps({'error': str(e)})
+
+#html api
 @app.route('/set_property')
 def set_property():
    val = request.args.get('val')
@@ -52,7 +123,6 @@ def get_register_info():
                           register=reg_info,
                           value=value)
                              
-
 @app.route("/registers_list")
 def get_registers_list():
    reg_list = 0
@@ -98,8 +168,30 @@ def greet():
                           device = device,
                           model = model)
 
+@app.route('/<path:path>')
+def send_file(path):
+    return send_from_directory('static', path)
+
 if __name__ == "__main__":
+   #parce command line options
+   parser = OptionParser()
+   parser.add_option("-p", "--port",  action="store",
+                     type="int", dest="port", default=5000,
+                     help="Set server port (5000)")
+   parser.add_option("-d", "--device",  action="store",
+                     type="string", dest="device", default=str('/dev/fpga0'),
+                     help="FPGA device (/dev/fpga0)")                     
+   parser.add_option("-m", "--model",  action="store",
+                     type="string", dest="model", default=None,
+                     help="Memory model (autodetected)")
+   opts = parser.parse_args()[0]
+   
+   HOST_NAME = '0.0.0.0'
+   PORT_NUMBER = opts.port
+   
+   device = opts.device
+   model = opts.model
+   
    pcilib = pcipywrap.Pcipywrap(device, model)
    pcipywrap.__redirect_logs_to_exeption()
-   app.debug = True
-   app.run()
+   app.run(host = HOST_NAME, port = PORT_NUMBER)
