@@ -99,6 +99,7 @@ set_target_properties(pcilib PROPERTIES
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/xml DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/pywrap/templates DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/pywrap)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/pywrap/static DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/pywrap)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pywrap/html_server.py ${CMAKE_CURRENT_BINARY_DIR}/pywrap/html_server.py)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcitool.pc.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc)
