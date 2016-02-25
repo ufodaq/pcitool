@@ -158,8 +158,7 @@ def get_property_list():
    return render_template('property_info.html',
                           value = value,
                           branch = branch,
-                          properties = prop_info,
-                          json = json
+                          properties = prop_info
                          )
                          
 @app.route("/")
@@ -168,12 +167,8 @@ def greet():
                           device = device,
                           model = model)
 
-@app.route('/<path:path>')
-def send_file(path):
-    return send_from_directory('static', path)
-
 if __name__ == "__main__":
-   #parce command line options
+   #parse command line options
    parser = OptionParser()
    parser.add_option("-p", "--port",  action="store",
                      type="int", dest="port", default=5000,
@@ -191,6 +186,8 @@ if __name__ == "__main__":
    
    device = opts.device
    model = opts.model
+   
+   app.debug = True
    
    pcilib = pcipywrap.Pcipywrap(device, model)
    pcipywrap.__redirect_logs_to_exeption()
