@@ -615,6 +615,8 @@ static int pcilib_xml_parse_value_name(pcilib_t *ctx, xmlXPathContextPtr xpath, 
 
     int min_set = 0, max_set = 0;
     pcilib_register_value_t val;
+
+    memset(desc, 0, sizeof(pcilib_register_value_name_t));
     
     for (cur = node->properties; cur != NULL; cur = cur->next) {
         if(!cur->children) continue;

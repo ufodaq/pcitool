@@ -232,6 +232,7 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_t* ctx, pcilib_regist
                                PyString_FromString("bank"),
                                PyString_FromString(listItem.bank));
 
+
     //serialize modes
     PyObject* modes = PyList_New(0);
 
@@ -278,8 +279,9 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_t* ctx, pcilib_regist
 
     if(listItem.values)
     {
-        PyObject* values = PyList_New(0);
 
+        PyObject* values = PyList_New(0);
+      
         for (int j = 0; listItem.values[j].name; j++)
         {
             PyObject* valuesItem = PyDict_New();
@@ -301,12 +303,13 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_t* ctx, pcilib_regist
                 pcilib_pydict_set_item(valuesItem,
                                        PyString_FromString("name"),
                                        PyString_FromString(listItem.values[j].name));
-
             if(listItem.values[j].description)
+            {
                 pcilib_pydict_set_item(valuesItem,
 									            PyString_FromString("description"),
 									            PyString_FromString(listItem.values[j].description));
-
+                           
+            }
             pcilib_pylist_append(values, valuesItem);
         }
 
@@ -316,6 +319,7 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_t* ctx, pcilib_regist
     }
 
     return pylistItem;
+   
 }
 
 Pcipywrap *new_Pcipywrap(const char* fpga_device, const char* model)
@@ -456,11 +460,12 @@ PyObject* Pcipywrap_get_registers_list(Pcipywrap *self, const char *bank)
 {
     pcilib_register_info_t *list = pcilib_get_register_list(self->ctx, bank, PCILIB_LIST_FLAGS_DEFAULT);
     PyObject* pyList = PyList_New(0);
-    for(int i = 0; i < 10/*((pcilib_t*)self->ctx)->num_reg*/; i++)
+    for(int i = 0; i < ((pcilib_t*)self->ctx)->num_reg; i++)
     {
         //serialize item attributes
         PyObject* pylistItem = pcilib_convert_register_info_to_pyobject(self->ctx, list[i]);
         pcilib_pylist_append(pyList, pylistItem);
+        //Py_DECREF(pylistItem);
     }
     pcilib_free_register_info(self->ctx, list);
     return pyList;
@@ -544,7 +549,7 @@ void Pcipywrap_unlock_global(Pcipywrap *self)
 PyObject* Pcipywrap_lock(Pcipywrap *self, const char *lock_id) 
 {   
    pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
-										  PCILIB_LOCK_FLAG_PERSISTENT,
+										  PCILIB_LOCK_FLAGS_DEFAULT,
 										  lock_id);
     if(!lock)
 	{
