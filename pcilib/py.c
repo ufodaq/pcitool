@@ -83,9 +83,9 @@ void pcilib_log_python_error(const char *file, int line, pcilib_log_flags_t flag
     va_end(va);
 
 #ifdef HAVE_PYTHON
-    if (pytype) Py_XDECREF(pytype);
-    if (pyval) Py_XDECREF(pyval);
-    if (pytraceback) Py_XDECREF(pytraceback);
+    if (pytype) Py_DECREF(pytype);
+    if (pyval) Py_DECREF(pyval);
+    if (pytraceback) Py_DECREF(pytraceback);
 #endif /* HAVE_PYTHON */
 }
 
@@ -98,14 +98,13 @@ int pcilib_init_py(pcilib_t *ctx) {
 
     memset(ctx->py, 0, sizeof(pcilib_py_t));
 
-    if(Py_IsInitialized())
-	ctx->py->finalyze = 1;
-    else {
+    if(!Py_IsInitialized()) {
         Py_Initialize();
         
     	    // Since python is being initializing from c programm, it needs to initialize threads to work properly with c threads
         PyEval_InitThreads();
         PyEval_ReleaseLock();
+	ctx->py->finalyze = 1;
     }
 		
     ctx->py->main_module = PyImport_AddModule("__parser__");
@@ -127,7 +126,9 @@ int pcilib_init_py(pcilib_t *ctx) {
     }
 	
     PyObject *mod_name = PyString_FromString("Pcipywrap");
-    ctx->py->pcilib_pywrap = PyObject_CallMethodObjArgs(pywrap, mod_name, PyCObject_FromVoidPtr(ctx, NULL), NULL);
+    PyObject *pyctx = PyCObject_FromVoidPtr(ctx, NULL);
+    ctx->py->pcilib_pywrap = PyObject_CallMethodObjArgs(pywrap, mod_name, pyctx, NULL);
+    Py_XDECREF(pyctx);
     Py_XDECREF(mod_name);
 	
     if (!ctx->py->pcilib_pywrap) {
@@ -141,7 +142,9 @@ int pcilib_init_py(pcilib_t *ctx) {
 
 int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
 #ifdef HAVE_PYTHON
-    PyObject* pypath;
+    int err = 0;
+    PyObject *pypath, *pynewdir;
+    PyObject *pydict, *pystr, *pyret = NULL;
     char *script_dir;
 
     const char *model_dir = getenv("PCILIB_MODEL_DIR");
@@ -163,10 +166,40 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
 	return PCILIB_ERROR_FAILED;
     }
 
-	// Shall we check if the directory already in the path?
-    if(PyList_Append(pypath, PyString_FromString(script_dir)) == -1) {
+    pynewdir = PyString_FromString(script_dir);
+    if (!pynewdir) {
+	pcilib_python_error("Can't create python string");
+	return PCILIB_ERROR_MEMORY;
+    }
+    
+	// Checking if the directory already in the path?
+    pydict = PyDict_New();
+    if (pydict) {
+	pystr = PyString_FromString("cur");
+        if (pystr) {
+	    PyDict_SetItem(pydict, pystr, pynewdir);
+	    Py_DECREF(pystr);
+	}
+
+	pystr = PyString_FromString("path");
+	if (pystr) {
+	    PyDict_SetItem(pydict, pystr, pypath);
+	    Py_DECREF(pystr);
+	}
+
+	pyret = PyRun_String("cur in path", Py_eval_input, ctx->py->global_dict, pydict);
+	Py_DECREF(pydict);
+    } 
+
+    if ((pyret == Py_False)&&(PyList_Append(pypath, pynewdir) == -1))
+	err = PCILIB_ERROR_FAILED;
+
+    if (pyret) Py_DECREF(pyret);
+    Py_DECREF(pynewdir);
+
+    if (err) {
 	pcilib_python_error("Can't add directory (%s) to python path", script_dir);
-	return PCILIB_ERROR_FAILED;
+	return err;
     }
 #endif /* HAVE_PYTHON */
 
@@ -178,18 +211,22 @@ void pcilib_free_py(pcilib_t *ctx) {
     int finalyze = 0;
 	
     if (ctx->py) {		
-	if(ctx->py->finalyze) finalyze = 1;
+	if (ctx->py->finalyze) finalyze = 1;
 
 	if (ctx->py->script_hash) {
 	    pcilib_script_t *script, *script_tmp;
 
 	    HASH_ITER(hh, ctx->py->script_hash, script, script_tmp) {
+		Py_DECREF(script->module);
 		HASH_DEL(ctx->py->script_hash, script);
 		free(script);
 	    }
 	    ctx->py->script_hash = NULL;
 	}
 
+	if (ctx->py->pcilib_pywrap)
+	    Py_DECREF(ctx->py->pcilib_pywrap);
+	
         free(ctx->py);
         ctx->py = NULL;
     }
@@ -258,13 +295,13 @@ int pcilib_py_get_transform_script_properties(pcilib_t *ctx, const char *script_
     pystr = PyString_FromString("read_from_register");
     if (pystr) {
 	if (PyDict_Contains(dict, pystr)) mode |= PCILIB_ACCESS_R;
-	Py_XDECREF(pystr);
+	Py_DECREF(pystr);
     }
 
     pystr = PyString_FromString("write_to_register");
     if (pystr) {
 	if (PyDict_Contains(dict, pystr)) mode |= PCILIB_ACCESS_W;
-	Py_XDECREF(pystr);
+	Py_DECREF(pystr);
     }
 #endif /* HAVE_PYTHON */
 
@@ -470,11 +507,15 @@ int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *va
 
     if (!obj) {
         pcilib_error("Failed to run the Python code: %s", code);
+        free(code);
         return PCILIB_ERROR_FAILED;
     }
 
     pcilib_debug(VIEWS, "Evaluating a Python string \'%s\' to %lf=\'%s\'", codestr, PyFloat_AsDouble(obj), code);
     err = pcilib_set_value_from_float(ctx, value, PyFloat_AsDouble(obj));
+
+    Py_DECREF(obj);
+    free(code);
 
     return err;
 #else /* HAVE_PYTHON */
@@ -506,15 +547,15 @@ int pcilib_py_eval_func(pcilib_t *ctx, const char *script_name, const char *func
 
     pyfunc = PyUnicode_FromString(func_name);
     if (!pyfunc) {
-	if (pyval) Py_XDECREF(pyval);
+	if (pyval) Py_DECREF(pyval);
 	PyGILState_Release(gstate);
 	return PCILIB_ERROR_MEMORY;
     }
 
     pyret = PyObject_CallMethodObjArgs(module->module, pyfunc, ctx->py->pcilib_pywrap, pyval, NULL);
 
-    Py_XDECREF(pyfunc);
-    Py_XDECREF(pyval);
+    Py_DECREF(pyfunc);
+    Py_DECREF(pyval);
 	
     if (!pyret) {
 	PyGILState_Release(gstate);
@@ -525,7 +566,7 @@ int pcilib_py_eval_func(pcilib_t *ctx, const char *script_name, const char *func
     if ((val)&&(pyret != Py_None))
 	err = pcilib_set_value_from_pyobject(ctx, val, pyret);
 
-    Py_XDECREF(pyret);
+    Py_DECREF(pyret);
     PyGILState_Release(gstate);
 
     return err;

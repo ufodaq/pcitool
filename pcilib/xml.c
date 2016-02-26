@@ -615,7 +615,7 @@ static int pcilib_xml_parse_value_name(pcilib_t *ctx, xmlXPathContextPtr xpath, 
 
     int min_set = 0, max_set = 0;
     pcilib_register_value_t val;
-    
+
     for (cur = node->properties; cur != NULL; cur = cur->next) {
         if(!cur->children) continue;
         if(!xmlNodeIsText(cur->children)) continue;
@@ -713,7 +713,7 @@ static int pcilib_xml_create_enum_view(pcilib_t *ctx, xmlXPathContextPtr xpath, 
 	pcilib_error("No names is defined for enum view (%s)", desc.base.name);
 	return PCILIB_ERROR_INVALID_DATA; 
     }
-
+    memset(desc.names, 0, (nodeset->nodeNr + 1) * sizeof(pcilib_register_value_name_t));
 
     for (i = 0; i < nodeset->nodeNr; i++) {
         err = pcilib_xml_parse_value_name(ctx, xpath, doc, nodeset->nodeTab[i], &desc.names[i]);
@@ -723,10 +723,8 @@ static int pcilib_xml_create_enum_view(pcilib_t *ctx, xmlXPathContextPtr xpath, 
 	    return err;
 	}
     }
-    memset(&desc.names[nodeset->nodeNr], 0, sizeof(pcilib_register_value_name_t));
 
     xmlXPathFreeObject(nodes);
-
 
     err = pcilib_add_views_custom(ctx, 1, (pcilib_view_description_t*)&desc, &view_ctx);
     if (err) {

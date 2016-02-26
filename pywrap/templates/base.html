@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>{% block title %}Device {{ device }}{% endblock %}</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+	<link rel="stylesheet" type="text/css" href="codebase/dhtmlx.css"/>
+   <script type=text/javascript src="{{ url_for('static', filename='jquery-2.2.1.js') }}"></script>
+	<script src="codebase/dhtmlx.js"></script>
+   <script src="pcilib_tree.js"></script>
+	<script>
+      var propsTree
+      
+      function checkError(json)
+      {
+         if(json.error)
+            alert('Error:\n' + json.error)
+      }
+      
+      function createPropertyTree(branch, id)
+      {
+         function getPropertyItemsOnLevel(branch, id)
+         {
+            pathToProperties = "{{ url_for('get_property_list_json') }}"
+            completePath = pathToProperties + '?branch=' + branch
+            
+            $.getJSON(completePath, 
+                      function(json) {
+                         checkError(json)
+                         parsePropertyItems(json, branch, id)
+                         });
+         }
+         
+         function parsePropertyItems(json, branch, id)
+         {
+            function updatePropertyValue(id, path)
+            {
+               pathToGetProperty = "{{ url_for('get_property_json') }}"
+               completePath = pathToGetProperty + '?prop=' + path
+               
+               $.getJSON(completePath, function(json){
+                           checkError(json)
+                           propsTree.updateItem(id, 'value: ' + json.value);
+                        })
+            }
+         
+            function writePropertyValue(id, path)
+            {
+               value = window.prompt("Enter new property value");
+               
+               if(value != null)
+               {
+                  pathToGetProperty = "{{ url_for('set_property_json') }}"
+                  completePath = pathToGetProperty + '?prop=' + path +'&val=' + value
+                  
+                  $.getJSON(completePath, 
+                            function(json) {
+                              checkError(json)
+                              updatePropertyValue(id, path)
+                             })
+               }
+               else
+                  updatePropertyValue(id, path)
+            }
+            
+            function setCurrentValueField(id, path, mode)
+            {
+               var propValId = id + 'CurrVal'
+               var func = 0
+               
+               if(mode)
+                  func = function(){writePropertyValue(propValId, path)}
+               else
+                  func = function(){updatePropertyValue(propValId, path)}
+                  
+               propsTree.insertNewItem(id, propValId,
+                                    'value: ', 
+                                    func);
+               
+               updatePropertyValue(propValId, path)
+            }
+            
+            for(var i = 0; i < json.length; i++)
+            {
+               propsTree.insertNewItem(id, json[i].path, json[i].name, 0);
+               
+               if(json[i].flags.indexOf("childs") != -1)
+               {
+                  getPropertyItemsOnLevel(json[i].path, json[i].path)
+               }
+               else
+               {
+                  if(json[i].mode.indexOf("R") != -1)
+                  {
+                     var mode = (json[i].mode.indexOf("W") != -1)
+                     setCurrentValueField(json[i].path, json[i].path, mode)
+                  }
+               }
+               
+               //show aviable info
+               if(json[i].description)
+                  propsTree.insertNewItem(json[i].path, json[i].path + 'Desc',
+                                       'description:\n' + json[i].description, 0);
+               if(json[i].type)
+                  propsTree.insertNewItem(json[i].path, json[i].path + 'Type',
+                                       'type: ' + json[i].type, 0);
+               if(json[i].unit)
+                  propsTree.insertNewItem(json[i].path, json[i].path + 'Unit',
+                                       'unit: ' + json[i].unit, 0);
+                                       
+               if(json[i].mode)
+               {
+                  var modeId = json[i].path + 'Mode'
+                  propsTree.insertNewItem(json[i].path, modeId,
+                                       'mode', 0);
+                  
+                  for(var j = 0; j < json[i].mode.length; j++)
+                     propsTree.insertNewItem(modeId, modeId + j,
+                                       json[i].mode[j], 0);
+                  propsTree.closeItem(modeId)
+               }
+               
+               if(json[i].path)
+                  propsTree.insertNewItem(json[i].path, json[i].path + 'Path',
+                                       'path: ' + json[i].path, 0);
+                                       
+               propsTree.closeItem(json[i].path);
+            }  
+      }
+         
+         getPropertyItemsOnLevel(branch, id)
+      }
+      
+      var regTree
+      function createRegistersList()
+      {
+         function parseJsonRegisterList(json)
+         {
+            checkError(json)
+            
+            function compareRegistersByBank(a,b) 
+            {
+               if (a.bank < b.bank)
+                  return -1;
+               else if (a.bank > b.bank)
+                  return 1;
+               else 
+                  return 0;
+            }
+            
+            if(json.lenght <= 0)
+               return
+            
+            //sort registers by bank
+            json.sort(compareRegistersByBank)
+            
+            //create bank dirs
+            var curBankName = json[0].bank
+            var created = 0
+            for(var i = 0; i < json.length; i++)
+            {
+               //create new bank tab if it has not created already
+               if(json[i].bank != curBankName)
+               {
+                  curBankName = json[i].bank
+                  created = 0
+               }
+               if(!created)
+               {
+                  regTree.insertNewItem(0, json[i].bank, json[i].bank, 0);
+                  created = 1
+               }
+               
+               //insert register info to bank
+               var itemId = json[i].bank + "_" + json[i].name
+               regTree.insertNewItem(json[i].bank, itemId, json[i].name)
+               
+               function updateRegisterValue(id, bank, name)
+               {
+                  pathToGetProperty = "{{ url_for('read_register_json') }}"
+                  completePath = pathToGetProperty + '?bank=' + bank +
+                                 '&name=' + name
+                  
+                  $.getJSON(completePath, function(json){
+                              checkError(json)
+                              regTree.updateItem(id, 'value: ' + json.value);
+                           })
+               }
+         
+
+               function writeRegisterValue(id, bank, name)
+               {
+                  value = window.prompt("Enter new register value");
+                  
+                  if(value != null)
+                  {
+                     pathToGetProperty = "{{ url_for('write_register_json') }}"
+                     completePath = pathToGetProperty + '?bank=' + bank +
+                                    '&name=' + name + '&val=' + value;
+                     
+                     $.getJSON(completePath, 
+                               function(json) {
+                                 checkError(json)
+                                 updateRegisterValue(id, bank, name)
+                                })
+                  }
+                  else
+                     updateRegisterValue(id, bank, name)
+               }
+
+               function setCurrentValueField(id, bank, name, mode)
+               {
+                  var regValId = id + 'CurrVal'
+                  var func = 0
+                  
+                  if(mode)
+                     func = function(){writeRegisterValue(regValId, bank, name)}
+                  else
+                     func = function(){updateRegisterValue(regValId, bank, name)}
+                     
+                  regTree.insertNewItem(id, regValId,
+                                       'value: ', 
+                                       func);
+                  updateRegisterValue(regValId, bank, name)
+               }
+               
+               if(json[i].mode.indexOf("R") != -1)
+               {
+                  var mode = (json[i].mode.indexOf("W") != -1)
+                  setCurrentValueField(itemId, json[i].bank, json[i].name, mode)
+               }
+               
+               //show aviable info
+               if(json[i].description)
+                  regTree.insertNewItem(itemId, itemId + 'Desc',
+                                        'description:\n' + json[i].description, 0);
+               if(json[i].defvalue)
+                  regTree.insertNewItem(itemId, itemId + 'Defvalue',
+                                       'defvalue: ' + json[i].defvalue, 0);
+               
+               if(json[i].mode)
+               {
+                  var modeId = itemId + 'Mode'
+                  regTree.insertNewItem(itemId, modeId,
+                                       'mode', 0);
+                  
+                  for(var j = 0; j < json[i].mode.length; j++)
+                     regTree.insertNewItem(modeId, modeId + j,
+                                       json[i].mode[j], 0);
+                  regTree.closeItem(modeId)
+               }
+               
+               if(json[i].range)
+               {
+                  var rangeId = itemId + 'Range'
+                  regTree.insertNewItem(itemId, rangeId,
+                                       'range', 0);
+                  regTree.insertNewItem(rangeId, rangeId + 'Min',
+                                       'min: ' + json[i].range.min, 0);
+                  regTree.insertNewItem(rangeId, rangeId + 'Max',
+                                       'max: ' + json[i].range.max, 0);
+                  regTree.closeItem(rangeId)
+               }
+               
+               if(json[i].values)
+               {
+                  var valuesId = itemId + 'Values'
+                  regTree.insertNewItem(itemId, valuesId,
+                                       'values', 0);
+                                       
+                  function addValueInfo(valuesId, value)
+                  {
+                     var valueId = valuesId + value.name
+                     regTree.insertNewItem(valuesId, valueId, value.name, 0);
+                     
+                     if(value.description)
+                        regTree.insertNewItem(valueId, valueId + 'Desc',
+                                              'description: ' + value.description, 0);
+                     if(value.value)
+                        regTree.insertNewItem(valueId, valueId + 'Value',
+                                              'value: ' + value.value, 0);
+                     if(value.min)
+                        regTree.insertNewItem(valueId, valueId + 'Min',
+                                              'min: ' + value.min, 0);
+                     if(value.max)
+                        regTree.insertNewItem(valueId, valueId + 'Max',
+                                              'max: ' + value.max, 0);   
+                  }
+                  
+                  for(var j = 0; j < json[i].values.length; j++)
+                  {
+                     addValueInfo(valuesId, json[i].values[j])
+                  }
+                  regTree.closeItem(valuesId)
+               }
+                                       
+               propsTree.closeItem(json[i].path);
+               
+               regTree.closeItem(itemId);
+            }
+         }
+         
+         //get registers json list
+         getRegistersListPath = "{{ url_for('get_registers_list_json') }}" 
+         $.getJSON(getRegistersListPath, parseJsonRegisterList);
+      }
+      
+		function doOnLoad()
+      {
+			propsTree = new dhtmlXTreeObject("treeboxbox_tree","100%","100%",0);
+			propsTree.setImagePath("codebase/imgs/dhxtree_skyblue/");
+         //generating properties list
+         createPropertyTree('', 0)
+         
+			regTree = new dhtmlXTreeObject("treeboxbox_tree2","100%","100%",0,0,0,0,'SELECT')
+			regTree.setImagePath("codebase/imgs/dhxtree_skyblue/");
+         createRegistersList()
+		}
+	</script>
+</head>
+<body onload="doOnLoad()">
+	{% block info %}
+      <h2>Device {{ device }} model={{ model }} control page </h2>
+   {% endblock %}
+   
+   {% block content %}
+   {% endblock %}
+	<table>
+		<tr>
+         <td>
+            <h3>Properties Tree</h3>
+         </td>
+         <td>
+            <h3>Registers Tree</h3>
+         </td>
+		</tr>
+		<tr>
+         <td valign="top">
+				<div id="treeboxbox_tree" style="background-color:#f5f5f5;border :1px solid Silver; overflow:auto;"></div>
+			</td>
+			<td valign="top">
+				<div id="treeboxbox_tree2" style="background-color:#f5f5f5;border :1px solid Silver; overflow:auto;"></div>
+			</td>
+		</tr>
+	</table>
+</body>
+</html>
