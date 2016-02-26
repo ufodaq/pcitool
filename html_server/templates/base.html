@@ -58,6 +58,37 @@
       function createRegistersList() {
          function parseJsonRegisterList(json) {
             
+            function loadRegistersList(bank) {
+               var pathToGetRegisterList = "{{ url_for('get_registers_list') }}"
+               var completePath = pathToGetRegisterList + '?bank=' + bank
+
+               $("#reg_info_place").load(completePath)
+            }
+
+            function loadRegisterInfo(bank, name) {
+               var pathToGetRegister = "{{ url_for('get_register_info') }}"
+               var completePath = pathToGetRegister + '?bank=' + bank +
+                              '&name=' + name
+
+               $("#reg_info_place").load(completePath)
+            }
+
+            function setRegisterField(id, bank, name) {
+               
+               var itemId = bank + "_" + name
+               var func = function(){loadRegisterInfo(bank, name)}
+               
+               regTree.insertNewItem(id, itemId, name, func)
+               regTree.closeAllItems()
+            }
+            
+            function setbankField(bank) {
+               
+               var func = function(){loadRegistersList(bank)}
+               regTree.insertNewItem(0, bank, bank, func);
+               regTree.closeAllItems()
+            }
+            
             checkError(json)
             if(json.lenght <= 0)
                return
@@ -86,28 +117,12 @@
                }
                
                if(!created) {
-                  regTree.insertNewItem(0, json[i].bank, json[i].bank, 0);
+                  setbankField(json[i].bank )
                   created = 1
                }
                
                
                //insert register info to bank
-               function loadRegisterInfo(bank, name) {
-                  var pathToGetProperty = "{{ url_for('get_register_info') }}"
-                  var completePath = pathToGetProperty + '?bank=' + bank +
-                                 '&name=' + name
-               
-                  $("#reg_info_place").load(completePath)
-               }
-               
-               function setRegisterField(id, bank, name) {
-                  
-                  var itemId = bank + "_" + name
-                  var func = function(){loadRegisterInfo(bank, name)}
-                  
-                  regTree.insertNewItem(id, itemId, name, func)
-                  regTree.closeAllItems()
-               }
                
                setRegisterField(json[i].bank, json[i].bank, json[i].name)
             }
@@ -121,12 +136,12 @@
 		function doOnLoad()
       {
 			propsTree = new dhtmlXTreeObject("treeboxbox_tree","100%","100%",0);
-			propsTree.setImagePath("codebase/imgs/dhxtree_skyblue/");
+			propsTree.setImagePath("{{ url_for('static', filename='codebase/imgs/dhxtree_skyblue/') }}");
          //generating properties list
          createPropertyTree('', 0)
          
 			regTree = new dhtmlXTreeObject("treeboxbox_tree2","100%","100%",0,0,0,0,'SELECT')
-			regTree.setImagePath("codebase/imgs/dhxtree_skyblue/");
+			regTree.setImagePath("{{ url_for('static', filename='codebase/imgs/dhxtree_skyblue/') }}");
          createRegistersList()
 		}
 	</script>
@@ -137,7 +152,6 @@
          <h2>Device {{ device }} model={{ model }} control page </h2>
       </div>
    {% endblock %}
-   
    <style>
       .tabs > div, .tabs > input { display: none; }
 

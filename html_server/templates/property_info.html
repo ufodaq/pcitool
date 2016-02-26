@@ -12,14 +12,14 @@
       
       $.getJSON(completePath, function(json){
                   checkError(json)
-                  var valFieldId = "#actVal"+prop.split('/').join("_")
-                  $(valFieldId).text(json.value)
+                  var valFieldId = "#set_val_" + prop.split('/').join("_")
+                  $(valFieldId).val(json.value)
                })
    }
    
    function setProperty(prop)
    {
-      var value = document.getElementById("set_val_" + prop).value;
+      var value = document.getElementById("set_val_" + prop.split('/').join("_")).value;
       if(value == "")
          return
       
@@ -34,7 +34,7 @@
                 })
    };
 </script>
-   
+
 <table class="infoTable">
    <tr class="infoTable">
       <td class="infoTable">Name</td>
@@ -55,23 +55,21 @@
          </td>
          <td class="infoTable">
             <table>
-               <tr>
-                  <td id = "actVal{{ property.path.replace('/', '_') }}" class="infoTable"> 
-                     {{ value }}
-                  </td>
-                  {% if 'R' in property.mode %}
-                  <td> 
-                     <input type="button" value="update" style="width:100%;height:100%" onclick="updateProperty('{{ property.path }}')">
-                  </td>
-                  {% endif %}
-               </tr>
-               {% if 'W' in property.mode %}
+               {% if 'R' in property.mode %}
                   <tr>
                      <td> 
-                           <input type="text" name="set_val_{{ property.path }}" id="set_val_{{ property.path }}" value="" />
+                           <input type="text"
+                                  name="set_val_{{ property.path.replace('/', '_') }}"
+                                  id="set_val_{{ property.path.replace('/', '_') }}"
+                                  value="{{ value[property.path] }}" />
                      </td>
+                     {% if 'W' in property.mode %}
                      <td> 
                            <input type="button" value="set" style="width:100%;height:100%" onclick="setProperty('{{ property.path }}')">
+                     </td>
+                     {% endif %}
+                     <td> 
+                        <input type="button" value="update" style="width:100%;height:100%" onclick="updateProperty('{{ property.path }}')">
                      </td>
                   </tr>
                {% endif %}

@@ -41,6 +41,7 @@ if (NOT DISABLE_PYTHON)
     find_package(PythonLibs 2.7 REQUIRED)
     find_package(SWIG REQUIRED)
     set(HAVE_PYTHON TRUE)
+    include(FindPythonInterp)
 endif (NOT DISABLE_PYTHON)
 
 set(EXTRA_SYSTEM_LIBS -lrt)

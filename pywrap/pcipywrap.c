@@ -458,17 +458,22 @@ PyObject* Pcipywrap_set_property(Pcipywrap *self, PyObject* val, const char *pro
 
 PyObject* Pcipywrap_get_registers_list(Pcipywrap *self, const char *bank)
 {
-    pcilib_register_info_t *list = pcilib_get_register_list(self->ctx, bank, PCILIB_LIST_FLAGS_DEFAULT);
-    PyObject* pyList = PyList_New(0);
-    for(int i = 0; i < ((pcilib_t*)self->ctx)->num_reg; i++)
-    {
-        //serialize item attributes
-        PyObject* pylistItem = pcilib_convert_register_info_to_pyobject(self->ctx, list[i]);
-        pcilib_pylist_append(pyList, pylistItem);
-        //Py_DECREF(pylistItem);
-    }
-    pcilib_free_register_info(self->ctx, list);
-    return pyList;
+   pcilib_register_info_t *list = pcilib_get_register_list(self->ctx, bank, PCILIB_LIST_FLAGS_DEFAULT);
+
+   if(!list) {
+      set_python_exception("pcilib_get_register_list return NULL");
+      return NULL;
+   }
+
+   PyObject* pyList = PyList_New(0);
+   for(int i = 0; list[i].name; i++)
+   {
+      //serialize item attributes
+      PyObject* pylistItem = pcilib_convert_register_info_to_pyobject(self->ctx, list[i]);
+      pcilib_pylist_append(pyList, pylistItem);
+   }
+   pcilib_free_register_info(self->ctx, list);
+   return pyList;
 }
 
 PyObject* Pcipywrap_get_register_info(Pcipywrap *self, const char* reg,const char *bank)
@@ -551,7 +556,7 @@ PyObject* Pcipywrap_lock(Pcipywrap *self, const char *lock_id)
    pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
 										  PCILIB_LOCK_FLAGS_DEFAULT,
 										  lock_id);
-    if(!lock)
+   if(!lock)
 	{
 		set_python_exception("Failed pcilib_get_lock");
 		return NULL;

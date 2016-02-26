@@ -74,7 +74,7 @@ void Pcipywrap_unlock_global(Pcipywrap *self);
  * \brief Wrap for pcilib_lock
  * \param lock_id lock identificator
  * \warning This function should be called only under Python standart threading lock.
- * Otherwise it will stuck with more than 1 threads. See /xml/test_pywrap/test_prop_mt.py
+ * Otherwise it will stuck with more than 1 threads. See /xml/test/test_prop_mt.py
  * for example.
  * \return 1, serialized to PyObject or NULL with exeption text, if failed.
  */

@@ -1,0 +1,42 @@
+{% if standalone %}
+<script src="{{ url_for('static', filename='codebase/dhtmlx.js') }}"></script>
+<script src="{{ url_for('static', filename='check_err.js') }}"></script>
+{% endif %}
+
+<script>
+   /*
+   $("#set_val_box").keyup(function(event){
+    if(event.keyCode == 13){
+        $("#set_val_button").click();
+    }
+   });
+   */
+   
+   function updateRegister(bank, name) {
+      var pathToReadRegister = "{{ url_for('read_register_json') }}"
+      var completePath = pathToReadRegister + '?bank=' + bank +
+                     '&name=' + name
+      
+      $.getJSON(completePath, function(json){
+                  checkError(json)
+                  $("#set_val_box_" + bank + "_" + name).val(json.value)
+               })
+   }
+   
+   function writeRegister(bank, name)
+   {
+      var value = document.getElementById("set_val_box_" + bank + "_" + name).value;
+      if(value == "")
+         return
+      
+      var pathToReadRegister = "{{ url_for('write_register_json') }}"
+      var completePath = pathToReadRegister + '?bank=' + bank +
+                     '&name=' + name + '&val=' + value;
+                        
+      $.getJSON(completePath, 
+                function(json) {
+                   checkError(json)
+                   updateRegister(bank, name)
+                })
+   }; 
+</script> 

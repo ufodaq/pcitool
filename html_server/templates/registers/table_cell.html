@@ -1,0 +1,99 @@
+<tr class="infoTable">
+   {% if 'description' in register %}
+      <td class="infoTable"> {{ register.description }} </td>
+   {% else %}
+      <td class="infoTable">  </td>
+   {% endif %}
+   <td class="infoTable">
+      <table>
+         {% if 'R' in register.mode %}
+         <tr class="infoTable">
+            <td> 
+                  <input type="text"
+                         name="set_val_box_{{ register.bank }}_{{ register.name }}"
+                         id="set_val_box_{{ register.bank }}_{{ register.name }}" 
+                         value="{{ value[register.name] }}" />
+            </td>
+            {% if 'W' in register.mode %}
+            <td> 
+               <input type="button" value="set"
+                      style="width:100%;height:100%" 
+                      onclick="writeRegister('{{ register.bank }}', '{{ register.name }}')">
+            </td>
+            {% endif %}
+            <td> 
+               <input type="button" value="update"
+                      style="width:100%;height:100%"
+                      onclick="updateRegister('{{ register.bank }}', '{{ register.name }}')">
+            </td>
+         </tr>
+         {% endif %}
+      </table>
+   </td>
+   <td class="infoTable">{{ register.defvalue }}</td>
+   <td class="infoTable">{{ register.bank }}</td>
+   <td class="infoTable">
+      <ul>
+      {% for m in register.mode %}
+         {{ m + ';  '}}
+      {% endfor %}
+      </ul>
+   </td>
+   {% if 'range' in register %}
+      <td class="infoTable">
+         <table>
+            <tr class="infoTable">
+               <td class="infoTable"> min </td>
+               <td class="infoTable"> max </td>
+            </tr>
+            <tr class="infoTable">
+               <td class="infoTable"> {{ register.range.min }} </td>
+               <td class="infoTable"> {{ register.range.max }} </td>
+            </tr>
+         </table>
+      </td>
+   {% else %}
+      <td class="infoTable">  </td>
+   {% endif %}
+   {% if 'values' in register %}
+   <td class="infoTable">
+      <table>
+         <tr>
+         {% for v in register['values'] %}
+            <td>
+            <table>
+               {% if 'name' in v %}
+                  <tr class="infoTable">
+                     <td class="infoTable"> Name </td>
+                     <td class="infoTable"> {{v.name}} </td>
+                  </tr>
+               {% endif %}
+               {% if 'description' in v %}
+                  <tr class="infoTable">
+                     <td class="infoTable"> Description </td>
+                     <td class="infoTable"> {{ v.description }} </td>
+                  </tr>
+               {% endif %}
+               <tr class="infoTable">
+                  <td class="infoTable"> Min </td>
+                  <td class="infoTable"> {{ v.min }} </td>
+               </tr>
+               <tr class="infoTable">
+                  <td class="infoTable"> Max </td>
+                  <td class="infoTable"> {{ v.max }} </td>
+               </tr>
+               <tr class="infoTable">
+                  <td class="infoTable"> Value </td>
+                  <td class="infoTable"> {{ v.value }} </td>
+               </tr>
+            </table>
+            </td>
+         {% endfor %}
+         </tr>
+      </table>
+   </td>
+   {% else %}
+      <td class="infoTable">  </td>
+   {% endif %}
+</tr>
+

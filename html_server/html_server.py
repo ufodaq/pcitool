@@ -13,7 +13,7 @@ from flask import send_from_directory
 app = Flask(__name__)
 pcilib = 0;
 device = '/dev/fpga0'
-model = 'test_pywrap'
+model = ''
 
 # property json api
 @app.route("/property_info_json")
@@ -113,10 +113,10 @@ def get_register_info():
    bank = request.args.get('bank')
    
    reg_info = 0
-   value = 0
+   value = dict()
    try:
       reg_info = pcilib.get_register_info(str(name), str(bank))
-      value = pcilib.read_register(str(name), str(bank))
+      value[name] = pcilib.read_register(str(name), str(bank))
    except Exception as e:
       return str(e)
    return render_template('register_info.html',
@@ -125,14 +125,29 @@ def get_register_info():
                              
 @app.route("/registers_list")
 def get_registers_list():
+   bank = request.args.get('bank')
+   if not bank is None:
+      bank = str(bank)
+      
    reg_list = 0
    try:
-      reg_list = pcilib.get_registers_list()
+      reg_list = pcilib.get_registers_list(bank)
    except Exception as e:
       return str(e)
+   
+   value = dict()
+   for reg in reg_list:
+      print reg
+      try:
+         value[reg['name']] = pcilib.read_register(str(reg['name']),
+                                                   str(reg['bank']))
+      except Exception as e:
+         value[reg['name']] = str(e)
 
    return render_template('registers_list.html',
-                          registers=reg_list,
+                          registers = reg_list,
+                          render_template = render_template,
+                          value = value
                          )
 
 @app.route("/property_info")
@@ -147,18 +162,26 @@ def get_property_list():
    except Exception as e:
       return str(e)
    
-   value = -1
+   value = dict()
    if (len(prop_info) == 1) and not ('childs' in (prop_info[0])['flags']):
       try:
          branch = (prop_info[0])['path']
-         value = pcilib.get_property(branch)
+         value[branch] = pcilib.get_property(branch)
       except Exception as e:
-         return str(e)
+         return str(e) 
+   else:
+      for prop in prop_info:
+         try:
+            path = prop['path']
+            value[path] = pcilib.get_property(path)
+         except Exception as e:
+            value[path] = str(e)
 
    return render_template('property_info.html',
                           value = value,
                           branch = branch,
-                          properties = prop_info
+                          properties = prop_info,
+                          json = json
                          )
                          
 @app.route("/")
@@ -186,8 +209,6 @@ if __name__ == "__main__":
    
    device = opts.device
    model = opts.model
-   
-   app.debug = True
    
    pcilib = pcipywrap.Pcipywrap(device, model)
    pcipywrap.__redirect_logs_to_exeption()
