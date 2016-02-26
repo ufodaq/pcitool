@@ -87,10 +87,10 @@ class test_pcipywrap():
             print self.pcilib.get_property_list(self.branch)
             print self.pcilib.get_register_info(self.register)
             print self.pcilib.get_registers_list();
-            print self.pcilib.read_register(self.register)
             print self.pcilib.write_register(val, self.register)
-            print self.pcilib.get_property(self.prop)
+            print self.pcilib.read_register(self.register)
             print self.pcilib.set_property(val, self.prop)
+            print self.pcilib.get_property(self.prop)
       except KeyboardInterrupt:
          print 'testing done'
          pass

@@ -19,26 +19,26 @@ static pcilib_view_context_t * pcilib_transform_view_init(pcilib_t *ctx, pcilib_
     pcilib_transform_view_description_t *v = (pcilib_transform_view_description_t*)(ctx->views[view]);
 
     if(v->script) {	
-      pcilib_access_mode_t mode = 0;
-         
-      err = pcilib_py_load_script(ctx, v->script);
-      if(err) {
-          pcilib_error("Error (%i), loading script %s", err, v->script);
-          return NULL;
-      }
-      
-      err = pcilib_py_get_transform_script_properties(ctx, v->script, &mode);
-           if(err) {
-          pcilib_error("Error (%i) obtaining properties of transform script %s", err, v->script);
-          return NULL;
-      }
+	pcilib_access_mode_t mode = 0;
+		
+	err = pcilib_py_load_script(ctx, v->script);
+	if(err) {
+	    pcilib_error("Error (%i), loading script %s", err, v->script);
+	    return NULL;
+	}
+	
+	err = pcilib_py_get_transform_script_properties(ctx, v->script, &mode);
+        if(err) {
+	    pcilib_error("Error (%i) obtaining properties of transform script %s", err, v->script);
+	    return NULL;
+	}
 
-      if ((v->base.mode&PCILIB_REGISTER_RW) == 0)
-         v->base.mode |= PCILIB_REGISTER_RW;
-      v->base.mode &= (~PCILIB_REGISTER_RW)|mode;
+	if ((v->base.mode&PCILIB_REGISTER_RW) == 0)
+		v->base.mode |= PCILIB_REGISTER_RW;
+	v->base.mode &= (~PCILIB_REGISTER_RW)|mode;
 
-      if (!v->read_from_reg) v->read_from_reg = "read_from_register";
-      if (!v->write_to_reg) v->write_to_reg = "write_to_register";
+	if (!v->read_from_reg) v->read_from_reg = "read_from_register";
+	if (!v->write_to_reg) v->write_to_reg = "write_to_register";
     }
 	
     view_ctx = (pcilib_view_context_t*)malloc(sizeof(pcilib_view_context_t));
@@ -57,9 +57,9 @@ static int pcilib_transform_view_read(pcilib_t *ctx, pcilib_view_context_t *view
     if (err) return err;
 
     if (v->script)
-	   err = pcilib_py_eval_func(ctx, v->script, v->read_from_reg, val);
+	err = pcilib_py_eval_func(ctx, v->script, v->read_from_reg, val);
     else 
-	   err = pcilib_py_eval_string(ctx, v->read_from_reg, val);
+	err = pcilib_py_eval_string(ctx, v->read_from_reg, val);
 
     return err;
 }
@@ -75,9 +75,9 @@ static int pcilib_transform_view_write(pcilib_t *ctx, pcilib_view_context_t *vie
     if (err) return err;
 
     if (v->script)
-	   err = pcilib_py_eval_func(ctx, v->script, v->write_to_reg, &val_copy);
+	err = pcilib_py_eval_func(ctx, v->script, v->write_to_reg, &val_copy);
     else
-	   err = pcilib_py_eval_string(ctx, v->write_to_reg, &val_copy);
+	err = pcilib_py_eval_string(ctx, v->write_to_reg, &val_copy);
 		
     if (err) return err;
 	
