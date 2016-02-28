@@ -17,9 +17,9 @@ set(CMAKE_SWIG_FLAGS "")
 swig_add_module(pcipywrap python pcipywrap.i pcipywrap.c)
 swig_link_libraries(pcipywrap ${PYTHON_LIBRARIES} pcilib)
 
-execute_process ( COMMAND python -c "from distutils.sysconfig import get_python_lib; print get_python_lib()" OUTPUT_VARIABLE PYTHON_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
-install(TARGETS ${SWIG_MODULE_pcipywrap_REAL_NAME} DESTINATION ${PYTHON_SITE_PACKAGES})
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/pcipywrap.py DESTINATION ${PYTHON_SITE_PACKAGES})
+
+install(TARGETS ${SWIG_MODULE_pcipywrap_REAL_NAME} DESTINATION ${PYTHON_INSTALL_DIR})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/pcipywrap.py DESTINATION ${PYTHON_INSTALL_DIR})
 
 if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/server.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
