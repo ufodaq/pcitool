@@ -96,6 +96,9 @@ static int ioctl_mmap_area(pcidriver_privdata_t *privdata, unsigned long arg)
  */
 static int ioctl_pci_config_read_write(pcidriver_privdata_t *privdata, unsigned int cmd, unsigned long arg)
 {
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	return -ENXIO;
+#else /* PCIDRIVER_DUMMY_DEVICE */
 	int ret;
 	READ_FROM_USER(pci_cfg_cmd, pci_cmd);
 
@@ -133,6 +136,7 @@ static int ioctl_pci_config_read_write(pcidriver_privdata_t *privdata, unsigned 
 	WRITE_TO_USER(pci_cfg_cmd, pci_cmd);
 
 	return 0;
+#endif /* PCIDRIVER_DUMMY_DEVICE */
 }
 
 /**
@@ -145,7 +149,14 @@ static int ioctl_pci_config_read_write(pcidriver_privdata_t *privdata, unsigned 
 static int ioctl_pci_info(pcidriver_privdata_t *privdata, unsigned long arg)
 {
 	int ret;
+
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	READ_FROM_USER(pcilib_board_info_t, pci_info);
+	memset(&pci_info, 0, sizeof(pci_info));
+	WRITE_TO_USER(pcilib_board_info_t, pci_info);
+#else /* PCIDRIVER_DUMMY_DEVICE */
 	int bar;
+
 	READ_FROM_USER(pcilib_board_info_t, pci_info);
 
 	pci_info.vendor_id = privdata->pdev->vendor;
@@ -168,6 +179,7 @@ static int ioctl_pci_info(pcidriver_privdata_t *privdata, unsigned long arg)
 	}
 
 	WRITE_TO_USER(pcilib_board_info_t, pci_info);
+#endif /* PCIDRIVER_DUMMY_DEVICE */
 
 	return 0;
 }
@@ -443,12 +455,16 @@ static int ioctl_device_state(pcidriver_privdata_t *privdata, unsigned long arg)
 	int ret;
 	pcilib_device_state_t info;
 
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	memset(&info, 0, sizeof(info));
+#else /* PCIDRIVER_DUMMY_DEVICE */
 	info = (pcilib_device_state_t) {
 	    .iommu = iommu_present(privdata->pdev->dev.bus),
 	    .mps = pcidriver_pcie_get_mps(privdata->pdev),
 	    .readrq = pcie_get_readrq(privdata->pdev),
 	    .dma_mask = privdata->pdev->dma_mask
 	};
+#endif /* PCIDRIVER_DUMMY_DEVICE */
 
 
 	WRITE_TO_USER(pcilib_device_state_t, info);
@@ -466,6 +482,7 @@ static int ioctl_device_state(pcidriver_privdata_t *privdata, unsigned long arg)
  */
 static int ioctl_set_dma_mask(pcidriver_privdata_t *privdata, unsigned long arg)
 {
+#ifndef PCIDRIVER_DUMMY_DEVICE
 	int err;
 
 	if ((arg < 24) || (arg > 64))
@@ -476,6 +493,7 @@ static int ioctl_set_dma_mask(pcidriver_privdata_t *privdata, unsigned long arg)
 	    printk(KERN_ERR "pci_set_dma_mask(%lu) failed\n", arg);
 	    return err;
 	}
+#endif /* ! PCIDRIVER_DUMMY_DEVICE */
 	
 	return 0;
 }
@@ -489,6 +507,7 @@ static int ioctl_set_dma_mask(pcidriver_privdata_t *privdata, unsigned long arg)
  */
 static int ioctl_set_mps(pcidriver_privdata_t *privdata, unsigned long arg)
 {
+#ifndef PCIDRIVER_DUMMY_DEVICE
 	int err;
 
 	if ((arg != 128) && (arg != 256) && (arg != 512))
@@ -499,6 +518,7 @@ static int ioctl_set_mps(pcidriver_privdata_t *privdata, unsigned long arg)
 	    printk(KERN_ERR "pcie_set_mps(%lu) failed\n", arg);
 	    return err;
 	}
+#endif /* ! PCIDRIVER_DUMMY_DEVICE */
 	
 	return 0;
 }

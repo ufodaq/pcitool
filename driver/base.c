@@ -210,6 +210,10 @@ MODULE_LICENSE("GPL v2");
 /* Module class */
 static struct class_compat *pcidriver_class;
 
+#ifdef PCIDRIVER_DUMMY_DEVICE
+pcidriver_privdata_t *pcidriver_privdata = NULL;
+#endif /* PCIDRIVER_DUMMY_DEVICE */
+
 /**
  *
  * Called when loading the driver
@@ -217,7 +221,7 @@ static struct class_compat *pcidriver_class;
  */
 static int __init pcidriver_init(void)
 {
-	int err;
+	int err = 0;
 
 	/* Initialize the device count */
 	atomic_set(&pcidriver_deviceCount, 0);
@@ -239,7 +243,11 @@ static int __init pcidriver_init(void)
 
 	/* Register PCI driver. This function returns the number of devices on some
 	 * systems, therefore check for errors as < 0. */
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	if ((err = pcidriver_probe(NULL, NULL)) < 0) {
+#else /* PCIDRIVER_DUMMY_DEVICE */
 	if ((err = pci_register_driver(&pcidriver_driver)) < 0) {
+#endif /* PCIDRIVER_DUMMY_DEVICE */
 		mod_info("Couldn't register PCI driver. Module not loaded.\n");
 		goto init_pcireg_fail;
 	}
@@ -268,7 +276,12 @@ init_alloc_fail:
  */
 static void pcidriver_exit(void)
 {
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	pcidriver_remove(NULL);
+#else
 	pci_unregister_driver(&pcidriver_driver);
+#endif /* PCIDRIVER_DUMMY_DEVICE */
+
 	unregister_chrdev_region(pcidriver_devt, MAXDEVICES);
 
 	if (pcidriver_class != NULL)
@@ -286,12 +299,14 @@ static void pcidriver_exit(void)
  * Will be registered at module init.
  *
  */
+#ifndef PCIDRIVER_DUMMY_DEVICE
 static struct pci_driver pcidriver_driver = {
 	.name = MODNAME,
 	.id_table = pcidriver_ids,
 	.probe = pcidriver_probe,
 	.remove = pcidriver_remove,
 };
+#endif /* ! PCIDRIVER_DUMMY_DEVICE */
 
 /**
  *
@@ -301,7 +316,7 @@ static struct pci_driver pcidriver_driver = {
  */
 static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	int err;
+	int err = 0;
 	int devno;
 	pcidriver_privdata_t *privdata;
 	int devid;
@@ -311,6 +326,9 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 	 *
 	 * However, there is some difference in the interrupt handling functions.
 	 */
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	mod_info("Emulated device\n");
+#else /* PCIDRIVER_DUMMY_DEVICE */
 	if (id->vendor == PCIE_XILINX_VENDOR_ID) {
 	    if (id->device == PCIE_ML605_DEVICE_ID) {
 		mod_info("Found ML605 board at %s\n", dev_name(&pdev->dev));
@@ -323,7 +341,7 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 	    }
 	} else {
 	    /* It is something else */
-	    mod_info( "Found unknown board (%x:%x) at %s\n", id->vendor, id->device, dev_name(&pdev->dev));
+	    mod_info("Found unknown board (%x:%x) at %s\n", id->vendor, id->device, dev_name(&pdev->dev));
 	}
 
 	/* Enable the device */
@@ -343,7 +361,8 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 
 	/* Set Memory-Write-Invalidate support */
 	if ((err = pci_set_mwi(pdev)) != 0)
-		mod_info("MWI not supported. Continue without enabling MWI.\n");
+	    mod_info("MWI not supported. Continue without enabling MWI.\n");
+#endif /* PCIDRIVER_DUMMY_DEVICE */
 
 	/* Get / Increment the device id */
 	devid = atomic_inc_return(&pcidriver_deviceCount) - 1;
@@ -367,22 +386,31 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 	spin_lock_init(&(privdata->umemlist_lock));
 	atomic_set(&privdata->umem_count, 0);
 
-	pci_set_drvdata( pdev, privdata );
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	pcidriver_privdata = privdata;
+#else /* PCIDRIVER_DUMMY_DEVICE */
+	pci_set_drvdata(pdev, privdata);
 	privdata->pdev = pdev;
+#endif /* PCIDRIVER_DUMMY_DEVICE */
 
 	/* Device add to sysfs */
 	devno = MKDEV(MAJOR(pcidriver_devt), MINOR(pcidriver_devt) + devid);
 	privdata->devno = devno;
-	if (pcidriver_class != NULL) {
-		/* FIXME: some error checking missing here */
-		privdata->class_dev = class_device_create(pcidriver_class, NULL, devno, &(pdev->dev), NODENAMEFMT, MINOR(pcidriver_devt) + devid, privdata);
-		class_set_devdata( privdata->class_dev, privdata );
-		mod_info("Device /dev/%s%d added\n",NODENAME,MINOR(pcidriver_devt) + devid);
-	}
 
+	/* FIXME: some error checking missing here */
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	privdata->class_dev = class_device_create(pcidriver_class, NULL, devno, NULL, NODENAMEFMT, MINOR(pcidriver_devt) + devid, privdata);
+#else /* PCIDRIVER_DUMMY_DEVICE */
+	privdata->class_dev = class_device_create(pcidriver_class, NULL, devno, &(pdev->dev), NODENAMEFMT, MINOR(pcidriver_devt) + devid, privdata);
+#endif /* PCIDRIVER_DUMMY_DEVICE */
+	class_set_devdata( privdata->class_dev, privdata );
+	mod_info("Device /dev/%s%d added\n",NODENAME,MINOR(pcidriver_devt) + devid);
+
+#ifndef PCIDRIVER_DUMMY_DEVICE
 	/* Setup mmaped BARs into kernel space */
 	if ((err = pcidriver_probe_irq(privdata)) != 0)
 		goto probe_irq_probe_fail;
+#endif /* ! PCIDRIVER_DUMMY_DEVICE */
 
 	/* Populate sysfs attributes for the class device */
 	/* TODO: correct errorhandling. ewww. must remove the files in reversed order :-( */
@@ -419,15 +447,19 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 
 probe_device_create_fail:
 probe_cdevadd_fail:
+#ifndef PCIDRIVER_DUMMY_DEVICE
 probe_irq_probe_fail:
 	pcidriver_irq_unmap_bars(privdata);
+#endif /* ! PCIDRIVER_DUMMY_DEVICE */
 	kfree(privdata);
 probe_nomem:
 	atomic_dec(&pcidriver_deviceCount);
 probe_maxdevices_fail:
+#ifndef PCIDRIVER_DUMMY_DEVICE
 probe_dma_fail:
 	pci_disable_device(pdev);
 probe_pcien_fail:
+#endif /* ! PCIDRIVER_DUMMY_DEVICE */
  	return err;
 }
 
@@ -440,8 +472,13 @@ static void __devexit pcidriver_remove(struct pci_dev *pdev)
 {
 	pcidriver_privdata_t *privdata;
 
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	privdata = pcidriver_privdata;
+	pcidriver_privdata = NULL;
+#else /* PCIDRIVER_DUMMY_DEVICE */
 	/* Get private data from the device */
 	privdata = pci_get_drvdata(pdev);
+#endif /* PCIDRIVER_DUMMY_DEVICE */
 
 	/* Removing sysfs attributes from class device */
 	#define sysfs_attr(name) do { \
@@ -465,9 +502,11 @@ static void __devexit pcidriver_remove(struct pci_dev *pdev)
 	/* Free all allocated kmem buffers before leaving */
 	pcidriver_kmem_free_all( privdata );
 
-#ifdef ENABLE_IRQ
+#ifndef PCIDRIVER_DUMMY_DEVICE
+# ifdef ENABLE_IRQ
 	pcidriver_remove_irq(privdata);
-#endif
+# endif
+#endif /* ! PCIDRIVER_DUMMY_DEVICE */
 
 	/* Removing Character device */
 	cdev_del(&(privdata->cdev));
@@ -478,10 +517,14 @@ static void __devexit pcidriver_remove(struct pci_dev *pdev)
 	/* Releasing privdata */
 	kfree(privdata);
 
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	mod_info("Device at " NODENAMEFMT " removed\n", 0);
+#else /* PCIDRIVER_DUMMY_DEVICE */
 	/* Disabling PCI device */
 	pci_disable_device(pdev);
-
 	mod_info("Device at %s removed\n", dev_name(&pdev->dev));
+#endif /* PCIDRIVER_DUMMY_DEVICE */
+
 }
 
 /*************************************************************************/
@@ -613,12 +656,16 @@ int pcidriver_mmap(struct file *filp, struct vm_area_struct *vma)
 /* Internal driver functions */
 int pcidriver_mmap_pci(pcidriver_privdata_t *privdata, struct vm_area_struct *vmap, int bar)
 {
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	return -ENXIO;
+#else /* PCIDRIVER_DUMMY_DEVICE */
 	int ret = 0;
 	unsigned long bar_addr;
 	unsigned long bar_length, vma_size;
 	unsigned long bar_flags;
 
 	mod_info_dbg("Entering mmap_pci\n");
+
 
 	/* Get info of the BAR to be mapped */
 	bar_addr = pci_resource_start(privdata->pdev, bar);
@@ -680,4 +727,5 @@ int pcidriver_mmap_pci(pcidriver_privdata_t *privdata, struct vm_area_struct *vm
 	}
 
 	return 0;	/* success */
+#endif /* PCIDRIVER_DUMMY_DEVICE */
 }

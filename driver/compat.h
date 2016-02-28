@@ -10,6 +10,12 @@
 #ifndef _COMPAT_H
 #define _COMPAT_H
 
+/*
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,0,0)
+# error "Linux 3.0 and latter are supported"
+#endif
+*/
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0)
 # define __devinit
 # define __devexit

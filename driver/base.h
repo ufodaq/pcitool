@@ -17,7 +17,9 @@ int pcidriver_open(struct inode *inode, struct file *filp );
 int pcidriver_release(struct inode *inode, struct file *filp);
 
 /* prototypes for device operations */
+#ifndef PCIDRIVER_DUMMY_DEVICE
 static struct pci_driver pcidriver_driver;
+#endif /* ! PCIDRIVER_DUMMY_DEVICE */
 static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_device_id *id);
 static void __devexit pcidriver_remove(struct pci_dev *pdev);
 
