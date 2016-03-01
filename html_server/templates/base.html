@@ -5,6 +5,7 @@
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
 	<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
 	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='codebase/dhtmlx.css') }}"/>
+   <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='base.css') }}"/>
    <script type=text/javascript src="{{ url_for('static', filename='jquery-2.2.1.js') }}"></script>
 	<script src="{{ url_for('static', filename='codebase/dhtmlx.js') }}"></script>
    <script src="{{ url_for('static', filename='check_err.js') }}"></script>
@@ -13,8 +14,8 @@
       function createPropertyTree(branch, id) {
          
          function getPropertyItemsOnLevel(branch, id) {
-            pathToProperties = "{{ url_for('get_property_list_json') }}"
-            completePath = pathToProperties + '?branch=' + branch
+            var pathToProperties = "{{ url_for('process_json_command', command = 'get_property_list') }}"
+            var completePath = pathToProperties + '?branch=' + branch
             
             $.getJSON(completePath, 
                       function(json) {
@@ -24,6 +25,9 @@
          }
          
          function parsePropertyItems(json, branch, id) {
+            
+            checkError(json)
+            json = json.properties
             
             function loadPropertyInfo(branch) {
                
@@ -57,6 +61,8 @@
       var regTree
       function createRegistersList() {
          function parseJsonRegisterList(json) {
+            checkError(json)
+            json = json.registers
             
             function loadRegistersList(bank) {
                var pathToGetRegisterList = "{{ url_for('get_registers_list') }}"
@@ -129,7 +135,7 @@
          }
          
          //get registers json list
-         getRegistersListPath = "{{ url_for('get_registers_list_json') }}" 
+         var getRegistersListPath = "{{ url_for('process_json_command', command = 'get_registers_list') }}" 
          $.getJSON(getRegistersListPath, parseJsonRegisterList);
       }
       
@@ -152,54 +158,6 @@
          <h2>Device {{ device }} model={{ model }} control page </h2>
       </div>
    {% endblock %}
-   <style>
-      .tabs > div, .tabs > input { display: none; }
-
-      .tabs label {
-               padding: 5px;
-               border: 1px solid #aaa;
-               line-height: 28px;
-               cursor: pointer;
-               position: relative;
-               bottom: 1px;
-               background: #fff;
-            }
-            
-      .tabs input[type="radio"]:checked + label { border-bottom: 2px solid #fff; }
-
-      .tabs > input:nth-of-type(1):checked ~ div:nth-of-type(1),
-      .tabs > input:nth-of-type(2):checked ~ div:nth-of-type(2) {
-                                                      display: block; 
-                                                      padding: 5px; 
-                                                      border: 
-                                                      1px solid #aaa;
-                                                   }
-      .tree {
-               height: 85vh;
-               padding: 5px;
-               border: 1px solid #aaa;
-               line-height: 28px;
-               cursor: pointer;
-               position: relative;
-               bottom: 1px;
-               background: #fff;
-               overflow:auto;
-            }
-            
-      .infoTable {
-               padding: 2px;
-               
-               border: 1px solid #aaa;
-               line-height: 28px;
-               cursor: pointer;
-               position: relative;
-               background: #fff;
-               overflow:auto;
-               bottom: 1px;
-               
-               text-align: left;
-            }
-   </style>
    
    <div class="tabs">
       <input type="radio" name="current" checked="checked" id="props_id"/>
@@ -229,5 +187,8 @@
    </div>
    {% block content %}
    {% endblock %}
+    <div class="block1" >
+      <a href="{{ url_for('process_json_command', command='help') }}">Json API usage</a>
+    </div>
 </body>
 </html>

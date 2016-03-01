@@ -13,9 +13,9 @@
    */
    
    function updateRegister(bank, name) {
-      var pathToReadRegister = "{{ url_for('read_register_json') }}"
+      var pathToReadRegister = "{{ url_for('process_json_command', command = 'read_register') }}"
       var completePath = pathToReadRegister + '?bank=' + bank +
-                     '&name=' + name
+                     '&reg=' + name
       
       $.getJSON(completePath, function(json){
                   checkError(json)
@@ -29,9 +29,9 @@
       if(value == "")
          return
       
-      var pathToReadRegister = "{{ url_for('write_register_json') }}"
+      var pathToReadRegister = "{{ url_for('process_json_command', command = 'write_register') }}"
       var completePath = pathToReadRegister + '?bank=' + bank +
-                     '&name=' + name + '&val=' + value;
+                     '&reg=' + name + '&value=' + value;
                         
       $.getJSON(completePath, 
                 function(json) {

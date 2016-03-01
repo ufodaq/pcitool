@@ -7,8 +7,12 @@ import time
 import json
 from optparse import OptionParser
 
-from multiprocessing import Process, current_process
+from multiprocessing import Process
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+from SocketServer import ThreadingMixIn
+
+class MultiThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    pass
 
 class PcilibServerHandler(BaseHTTPRequestHandler):
    
@@ -22,6 +26,12 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
       s.end_headers()
       
    def do_GET(s):
+      #run request in separate process
+      p = Process(target=s.do_GET_worker, args=())
+      p.start()
+      p.join()
+      
+   def do_GET_worker(s):
       length = int(s.headers['Content-Length'])
       
       #deserialize input data
@@ -289,7 +299,6 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
             lock_id = str(data.get('lock_id'))
             
             try:
-               print 'unlocking ' + lock_id
                s.pcilib.unlock(lock_id)
             except Exception as e:
                s.error(str(e), data) 
@@ -297,6 +306,48 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
 
             #Success! Create and send reply
             s.wrapMessageAndSend({'status': 'ok'}, data)
+            
+            
+            
+         elif(command == 'get_scripts_list'):
+            scripts = list()
+            try:
+               scripts = s.pcilib.get_scripts_list()
+            except Exception as e:
+               s.error(str(e), data) 
+               return
+
+            #Success! Create and send reply
+            s.wrapMessageAndSend({'status': 'ok', 'scripts': scripts}, data)
+         
+         
+         
+         elif(command == 'run_script'):
+            #check required arguments
+            if not 'script_name' in data:
+               s.error('message doesnt contains "script_name" field, '
+                       'which is required for "run_script" command', data)
+               return
+            #parse command arguments and convert them to string
+            script_name = str(data.get('script_name'))
+            value = data.get('value', None)
+            
+            out = None
+            try:
+               out = s.pcilib.run_script(script_name, value)
+            except Exception as e:
+               s.error(str(e), data) 
+               return
+
+            #Success! Create and send reply
+            if(type(out) == bytearray):
+               s.send_response(200)
+               s.send_header('content-disposition', 'inline; filename=value')
+               s.send_header('content-type', 'application/octet-stream')
+               s.end_headers()
+               s.wfile.write(out)
+            else:
+               s.wrapMessageAndSend({'status': 'ok', 'value': out}, data)
             
             
             
@@ -324,17 +375,14 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
          #   s.wrapMessageAndSend({'status': 'ok'}, data)
          
          
-            	
          else:
 		    s.error('command "' + command + '" undefined', data)
 		    return
       else:
 		  s.error('message doesnt contains "command" field, which is required', data)
 		  return
-		  
-       
-      #print str(s.headers['content-type'])
-      #print post_data['some']
+        
+        
       
    #open device context 
    #def openPcilibInstance(s, device, model):
@@ -418,9 +466,22 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
       '      lock_id: - lock id\n'
       '\n'
       
+      '  command: get_scripts_list - Get aviable scripts with description\n'
+      '\n'
+      
+      '  command: run_script - Run specified script\n'
+      '    required fields\n'
+      '      script_name: - script name (with extension)\n'
+      '      value: - input value in json format\n'
+      '\n'
+      
       '\n')
-      out = {'status': 'ok', 'usage' : usage}
-      s.wrapMessageAndSend(out, received_message)
+      
+      #send help as plain text
+      s.send_response(200)
+      s.send_header('content-type', 'text/plain')
+      s.end_headers()
+      s.wfile.write(usage)
 
    #Send error message with text description    
    def error(s, info, received_message = None):
@@ -439,19 +500,15 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
          message['received_message'] = received_message
       s.wfile.write(json.dumps(message))
 
-def serve_forever(server):
-   try:
-      server.serve_forever()
-   except KeyboardInterrupt:
-      pass
-        
-def runpool(server, number_of_processes):
-    # create child processes to act as workers
-    for i in range(number_of_processes-1):
-        Process(target=serve_forever, args=(server,)).start()
-
-    # main process also acts as a worker
-    serve_forever(server)
+class ApiServer(MultiThreadedHTTPServer):
+   def __init__(self, device='/dev/fpga0', model=None, adress=('0.0.0.0', 9000)):
+      #redirect logs to exeption
+      pcipywrap.redirect_logs_to_exeption()
+      #pass Pcipywrap to to server handler
+      self.lib = pcipywrap.Pcipywrap(device, model)
+      def handler(*args):
+         PcilibServerHandler(self.lib, *args)
+      MultiThreadedHTTPServer.__init__(self, adress, handler)
 
 if __name__ == '__main__':
    
@@ -466,51 +523,24 @@ if __name__ == '__main__':
    parser.add_option("-m", "--model",  action="store",
                      type="string", dest="model", default=None,
                      help="Memory model (autodetected)")
-   parser.add_option("-n", "--number_processes",  action="store",
-                     type="int", dest="processes", default=4,
-                     help="Number of processes, used by server (4)")
+
    opts = parser.parse_args()[0]
    
-   HOST_NAME = ''
+   HOST_NAME = '0.0.0.0'
    PORT_NUMBER = opts.port
    MODEL = opts.model
    DEVICE = opts.device
    
-   
-   
-   #Set enviroment variables, if it not setted already
-   if not 'APP_PATH' in os.environ:
-      APP_PATH = ''
-      file_dir = os.path.dirname(os.path.abspath(__file__))
-      APP_PATH = str(os.path.abspath(file_dir + '/../..'))
-      os.environ["APP_PATH"] = APP_PATH
-
-   if not 'PCILIB_MODEL_DIR' in os.environ:   
-      os.environ['PCILIB_MODEL_DIR'] = os.environ["APP_PATH"] + "/xml"
-      
-   if not 'LD_LIBRARY_PATH' in os.environ: 
-      os.environ['LD_LIBRARY_PATH'] = os.environ["APP_PATH"] + "/pcilib"
-   
-   
-   
-   #redirect logs to exeption
-   pcipywrap.__redirect_logs_to_exeption()
-   
-   #pass Pcipywrap to to server handler
-   global pcilib
-   lib = pcipywrap.Pcipywrap(DEVICE, MODEL)
-   def handler(*args):
-      PcilibServerHandler(lib, *args)
-   
    #start server
-   httpd = HTTPServer((HOST_NAME, PORT_NUMBER), handler)
-   runpool(httpd, opts.processes)
+   httpd = ApiServer(DEVICE, MODEL, (HOST_NAME, PORT_NUMBER))
    
    print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)
-   #try:
-   #   httpd.serve_forever()
-   #except KeyboardInterrupt:
-   #   pass
+   
+   try:
+      httpd.serve_forever()
+   except KeyboardInterrupt:
+      pass
       
    httpd.server_close()
+   
    print time.asctime(), "Server Stops - %s:%s" % (HOST_NAME, PORT_NUMBER)

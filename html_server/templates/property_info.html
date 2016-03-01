@@ -7,7 +7,7 @@
 
 <script>
    function updateProperty(prop) {
-      var pathToGetProperty = "{{ url_for('get_property_json') }}"
+      var pathToGetProperty = "{{ url_for('process_json_command', command = 'get_property') }}"
       var completePath = pathToGetProperty + '?prop=' + prop
       
       $.getJSON(completePath, function(json){
@@ -23,9 +23,9 @@
       if(value == "")
          return
       
-      var pathToGetProperty = "{{ url_for('set_property_json') }}"
+      var pathToGetProperty = "{{ url_for('process_json_command', command = 'set_property') }}"
       var completePath = pathToGetProperty + '?prop=' + prop +
-                     '&val=' + value;
+                     '&value=' + value;
                         
       $.getJSON(completePath, 
                 function(json) {

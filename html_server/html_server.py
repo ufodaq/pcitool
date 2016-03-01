@@ -1,6 +1,10 @@
-import pcipywrap
 import json
-from optparse import OptionParser
+
+from optparse import OptionParser, OptionGroup
+from multiprocessing import Process
+
+import requests
+from api_server import ApiServer
 
 #import flask elements
 from flask import render_template
@@ -9,140 +13,107 @@ from flask import request
 from flask import url_for
 from flask import redirect
 from flask import send_from_directory
+from flask import make_response
 
 app = Flask(__name__)
-pcilib = 0;
-device = '/dev/fpga0'
-model = ''
+api_server_port = 9000
+api_server_host = '0.0.0.0'
 
-# property json api
-@app.route("/property_info_json")
-def get_property_list_json():
-   branch = request.args.get('branch')
-   if not branch is None:
-      branch = str(branch)
+@app.route("/json/<command>")
+def process_json_command(command):
+   headers = {'content-type': 'application/json'}
+   message = {'command': command}
    
-   prop_info = 0
-   try:
-      prop_info = pcilib.get_property_list(branch)
-      return json.dumps(prop_info)
-   except Exception as e:
-      return json.dumps({'error': str(e)})
-
-@app.route('/get_property_json')
-def get_property_json():
-   prop = request.args.get('prop')
-
-   try:
-      val = pcilib.get_property(str(prop))
-      return json.dumps({'value': val})
-   except Exception as e:
-      return json.dumps({'error': str(e)})
+   for arg in request.args:
+      message[arg] = request.args[arg]
       
-@app.route('/set_property_json')
-def set_property_json():
-   val = request.args.get('val')
-   prop = request.args.get('prop')
-
+   r = 0;
    try:
-      pcilib.set_property(float(val), str(prop))
-      return json.dumps({'status': 'ok'})
+      r = requests.get('http://' + api_server_host + ':' + str(api_server_port),
+                       data=json.dumps(message),
+                       headers=headers)
    except Exception as e:
-      return json.dumps({'error': str(e)})
-      
-# register json api
-@app.route("/registers_list_json")
-def get_registers_list_json():
-   reg_list = 0
-   try:
-      reg_list = pcilib.get_registers_list()
-      return json.dumps(reg_list)
-   except Exception as e:
-      return json.dumps({'error': str(e)})
-
-@app.route('/read_register_json')
-def read_register_json():
-   name = request.args.get('name')
-   bank = request.args.get('bank')
+      return str(json.dumps({'status':'error', 'description': e}))
    
-   try:
-      value = pcilib.read_register(str(name), str(bank))
-      return json.dumps({'value': value})
-   except Exception as e:
-      return json.dumps({'error': str(e)})
-
-@app.route('/write_register_json')
-def write_register_json():
-   val = request.args.get('val')
-   name = request.args.get('name')
-   bank = request.args.get('bank')
-
-   try:
-      pcilib.write_register(float(val), str(name), str(bank))
-      return json.dumps({'status': 'ok'})
-   except Exception as e:
-      return json.dumps({'error': str(e)})
+   #application/octet-stream
+   response = make_response(r.content)
+   for header in r.headers:
+      response.headers[header] = r.headers[header]
+      
+   return response
 
 #html api
-@app.route('/set_property')
-def set_property():
-   val = request.args.get('val')
-   prop = request.args.get('prop')
-
-   try:
-      pcilib.set_property(float(val), str(prop))
-      return redirect(url_for('get_property_list', branch=prop))
-   except Exception as e:
-      return str(e)
-   
-@app.route('/write_register')
-def write_register():
-   val = request.args.get('val')
-   name = request.args.get('name')
-   bank = request.args.get('bank')
-
-   try:
-      pcilib.write_register(float(val), str(name), str(bank))
-      return redirect(url_for('get_register_info', name=name, bank=bank))
-   except Exception as e:
-      return str(e)
-
 @app.route('/register_info')
 def get_register_info():
+   #get parameters
    name = request.args.get('name')
    bank = request.args.get('bank')
    
+   #load register info
    reg_info = 0
    value = dict()
    try:
-      reg_info = pcilib.get_register_info(str(name), str(bank))
-      value[name] = pcilib.read_register(str(name), str(bank))
+      r = requests.get(url_for('process_json_command', 
+                               command = 'get_register_info',
+                               bank = bank,
+                               reg = name, _external = True))
+      if(r.json().get('status') == 'error'):
+         return 'Error: ' + r.json()['description']
+         
+      reg_info = r.json()['register']
+      
+      #get register value
+      r = requests.get(url_for('process_json_command', 
+                               command = 'read_register',
+                               bank = bank,
+                               reg = name, _external = True))
+      if(r.json().get('status') == 'error'):
+         return 'Error: ' + r.json()['description']
+         
+      value[name] = r.json()['value']
    except Exception as e:
       return str(e)
+   
    return render_template('register_info.html',
                           register=reg_info,
                           value=value)
                              
 @app.route("/registers_list")
 def get_registers_list():
+   #get parameters
    bank = request.args.get('bank')
    if not bank is None:
       bank = str(bank)
-      
-   reg_list = 0
+   
+   #load registers list
+   reg_list = []
    try:
-      reg_list = pcilib.get_registers_list(bank)
+      r = requests.get(url_for('process_json_command', 
+                               command = 'get_registers_list',
+                               bank = bank, _external = True))
+      if(r.json().get('status') == 'error'):
+         return 'Error: ' + r.json()['description']
+      reg_list = r.json()['registers']
    except Exception as e:
       return str(e)
    
+   #get register values
    value = dict()
    for reg in reg_list:
       try:
-         value[reg['name']] = pcilib.read_register(str(reg['name']),
-                                                   str(reg['bank']))
+         r = requests.get(url_for('process_json_command', 
+                                  command = 'read_register',
+                                  bank = str(reg['bank']), 
+                                  reg = str(reg['name']), _external = True))
+         if(r.json().get('status') == 'error'):
+            value[reg['name']] = 'Error: ' + r.json()['description']
+         else:
+            value[reg['name']] = r.json()['value']
+         
       except Exception as e:
-         value[reg['name']] = str(e)
+         value[reg['name']] = 'Error: ' + str(e)
 
+   #render result
    return render_template('registers_list.html',
                           registers = reg_list,
                           render_template = render_template,
@@ -151,30 +122,40 @@ def get_registers_list():
 
 @app.route("/property_info")
 def get_property_list():
+   #get parameters
    branch = request.args.get('branch')
    if not branch is None:
       branch = str(branch)
    
-   prop_info = 0
+   #get properties info
+   prop_info = 0  
    try:
-      prop_info = pcilib.get_property_list(branch)
+      r = requests.get(url_for('process_json_command', 
+                               command = 'get_property_list',
+                               branch = branch, _external = True))
+                               
+      if(r.json().get('status') == 'error'):
+         return 'Error: ' + r.json()['description']
+         
+      prop_info = r.json()['properties']
+      
    except Exception as e:
       return str(e)
    
    value = dict()
-   if (len(prop_info) == 1) and not ('childs' in (prop_info[0])['flags']):
+   for prop in prop_info:
       try:
-         branch = (prop_info[0])['path']
-         value[branch] = pcilib.get_property(branch)
+         path = prop['path']
+         r = requests.get(url_for('process_json_command', 
+                                  command = 'get_property',
+                                  prop = path, _external = True))
+         if(r.json().get('status') == 'error'):
+            value[path] = 'Error: ' + r.json()['description']
+         else:   
+            value[path] = r.json()['value']
+            
       except Exception as e:
-         return str(e) 
-   else:
-      for prop in prop_info:
-         try:
-            path = prop['path']
-            value[path] = pcilib.get_property(path)
-         except Exception as e:
-            value[path] = str(e)
+         value[path] = str(e)
 
    return render_template('property_info.html',
                           value = value,
@@ -195,12 +176,32 @@ if __name__ == "__main__":
    parser.add_option("-p", "--port",  action="store",
                      type="int", dest="port", default=5000,
                      help="Set server port (5000)")
-   parser.add_option("-d", "--device",  action="store",
-                     type="string", dest="device", default=str('/dev/fpga0'),
-                     help="FPGA device (/dev/fpga0)")                     
-   parser.add_option("-m", "--model",  action="store",
-                     type="string", dest="model", default=None,
-                     help="Memory model (autodetected)")
+                     
+   pcilib_group = OptionGroup(parser, "Api server",
+                              "Api server options group")
+   pcilib_group.add_option("-e", "--external",  action="store_true",
+                           dest="external_api_server", 
+                           default=False,
+                           help="Dont start own api server. Use external"
+                                " server instead");                     
+   pcilib_group.add_option("--api-server-host", action="store",
+                           type="string", dest="api_server_host",
+                           default='0.0.0.0',
+                           help="Api server ip adress (0.0.0.0)")
+   pcilib_group.add_option("--api-server-port", action="store",
+                           type="int", dest="api_server_port",
+                           default=9000,
+                           help="Api server port (9000)")
+   pcilib_group.add_option("-d", "--device",  action="store",
+                           type="string", dest="device", 
+                           default=str('/dev/fpga0'),
+                           help="FPGA device (/dev/fpga0)")
+   pcilib_group.add_option("-m", "--model",  action="store",
+                           type="string", dest="model", default=None,
+                           help="Memory model (autodetected)")
+                       
+   parser.add_option_group(pcilib_group)
+                     
    opts = parser.parse_args()[0]
    
    HOST_NAME = '0.0.0.0'
@@ -209,6 +210,22 @@ if __name__ == "__main__":
    device = opts.device
    model = opts.model
    
-   pcilib = pcipywrap.Pcipywrap(device, model)
-   pcipywrap.__redirect_logs_to_exeption()
-   app.run(host = HOST_NAME, port = PORT_NUMBER, threaded=True)
+   #start api server in separate process
+   api_server_host = opts.api_server_host
+   api_server_port = opts.api_server_port
+   if(not opts.external_api_server):
+      api_server = ApiServer(device, model, (api_server_host, api_server_port))
+      def serve_forever(server):
+         try:
+            server.serve_forever()
+         except KeyboardInterrupt:
+            pass
+      
+      Process(target=serve_forever, args=(api_server,)).start()
+   
+   #start Flask html server
+   app.run(host = HOST_NAME, 
+           port = PORT_NUMBER,
+           threaded=True,
+           #debug=True
+         )

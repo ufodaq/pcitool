@@ -28,7 +28,7 @@ typedef struct {
  * After that, logger will write last error, and all accumulated errors
  * to Python exeption text
  */
-void __redirect_logs_to_exeption();
+void redirect_logs_to_exeption();
 
 /*!
  * \brief Wraps for pcilib_open function.

@@ -4,7 +4,7 @@
 #include "pcipywrap.h"
 %}
 
-extern void __redirect_logs_to_exeption();
+extern void redirect_logs_to_exeption();
 
 typedef struct {
 	%extend {

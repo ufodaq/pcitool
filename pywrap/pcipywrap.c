@@ -97,7 +97,7 @@ void set_python_exception(const char* msg, ...)
 }
 
 
-void __redirect_logs_to_exeption()
+void redirect_logs_to_exeption()
 {
     pcilib_set_logger(pcilib_get_log_level(),
                       pcilib_print_error_to_py,

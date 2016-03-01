@@ -1,4 +1,4 @@
 function checkError(json) {
-   if(json.error)
-      alert('Error: ' + json.error)
+   if(json.status === 'error')
+      alert('Error: ' + json.description)
 } 
