@@ -1291,9 +1291,11 @@ int ReadData(pcilib_t *handle, ACCESS_MODE mode, FLAGS flags, pcilib_dma_engine_
 	    
 	    size = 2048; bytes = 0;
 	    do {
-		size *= 2;
-		buf = realloc(buf, size);
-		if (!buf) Error("Allocation of %zu bytes of memory has failed", size);
+		if ((size - bytes) < 4096) {
+		    size *= 2;
+		    buf = realloc(buf, size);
+		    if (!buf) Error("Allocation of %zu bytes of memory has failed", size);
+		}
 	        err = pcilib_read_dma_custom(handle, dmaid, addr, size - bytes, dma_flags, timeout, buf + bytes, &ret);
 		bytes += ret;
 		
