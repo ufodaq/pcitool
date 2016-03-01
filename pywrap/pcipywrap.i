@@ -29,5 +29,8 @@ typedef struct {
 		PyObject* lock(const char *lock_id);
 		PyObject* try_lock(const char *lock_id);
 		PyObject* unlock(const char *lock_id);
+      
+      PyObject* get_scripts_list();
+      PyObject* run_script(const char* script_name, PyObject* value);
 	}
 } Pcipywrap;

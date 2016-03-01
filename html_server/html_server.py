@@ -137,7 +137,6 @@ def get_registers_list():
    
    value = dict()
    for reg in reg_list:
-      print reg
       try:
          value[reg['name']] = pcilib.read_register(str(reg['name']),
                                                    str(reg['bank']))
@@ -212,4 +211,4 @@ if __name__ == "__main__":
    
    pcilib = pcipywrap.Pcipywrap(device, model)
    pcipywrap.__redirect_logs_to_exeption()
-   app.run(host = HOST_NAME, port = PORT_NUMBER)
+   app.run(host = HOST_NAME, port = PORT_NUMBER, threaded=True)

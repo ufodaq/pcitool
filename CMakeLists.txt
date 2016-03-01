@@ -38,7 +38,7 @@ find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
 if (NOT DISABLE_PYTHON)
-    find_package(PythonLibs 2.7 REQUIRED)
+    find_package(PythonLibs 2 REQUIRED)
     find_package(SWIG REQUIRED)
     set(HAVE_PYTHON TRUE)
     include(FindPythonInterp)
@@ -123,6 +123,8 @@ if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
    DESTINATION ${CMAKE_BINARY_DIR}
    FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
    )
+   
+   configure_file(${CMAKE_SOURCE_DIR}/pcilib/version.h.in ${CMAKE_SOURCE_DIR}/pcilib/version.h)
 endif(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
 
 install(FILES 

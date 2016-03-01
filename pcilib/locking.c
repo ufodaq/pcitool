@@ -102,118 +102,117 @@ pcilib_lock_t *pcilib_get_lock_by_id(pcilib_t *ctx, pcilib_lock_id_t id) {
 }
 
 pcilib_lock_t *pcilib_get_lock(pcilib_t *ctx, pcilib_lock_flags_t flags, const char  *lock_id, ...) {
-    pcilib_lock_id_t i;
-    int err, ret;
+   pcilib_lock_id_t i;
+   int err, ret;
 
-    pcilib_lock_t *lock;
-    char buffer[PCILIB_LOCK_SIZE];
+   pcilib_lock_t *lock;
+   char buffer[PCILIB_LOCK_SIZE];
 
-	/* we construct the complete lock_id given the parameters of the function*/
-    va_list pa;
-    va_start(pa, lock_id);
-    ret = vsnprintf(buffer, PCILIB_LOCK_SIZE, lock_id, pa);
-    va_end(pa);
+   /* we construct the complete lock_id given the parameters of the function*/
+   va_list pa;
+   va_start(pa, lock_id);
+   ret = vsnprintf(buffer, PCILIB_LOCK_SIZE, lock_id, pa);
+   va_end(pa);
 
-    if (ret < 0) {
-	pcilib_error("Failed to construct the lock id, probably arguments does not match the format string (%s)...", lock_id);
-	return NULL;
-    }
-	
-	
-	/* we iterate through locks to see if there is one already with the same name*/	
-	// Would be nice to have hash here
-    for (i = 0; i < PCILIB_MAX_LOCKS; i++) {
-	lock = pcilib_get_lock_by_id(ctx, i);
+   if (ret < 0) {
+      pcilib_error("Failed to construct the lock id, probably arguments does not match the format string (%s)...", lock_id);
+      return NULL;
+   }
 
-        const char *name = pcilib_lock_get_name(lock);
-	if (!name) break;
-	
-	if (!strcmp(buffer, name)) {
-	    if ((pcilib_lock_get_flags(lock)&PCILIB_LOCK_FLAG_PERSISTENT) != (flags&PCILIB_LOCK_FLAG_PERSISTENT)) {
-		if (flags&PCILIB_LOCK_FLAG_PERSISTENT)
-		    pcilib_error("Requesting persistent lock (%s), but requested lock is already existing and is robust", name);
-		else
-		    pcilib_error("Requesting robust lock (%s), but requested lock is already existing and is persistent", name);
-		return NULL;
-	    }
+
+   /* we iterate through locks to see if there is one already with the same name*/	
+   // Would be nice to have hash here
+   for (i = 0; i < PCILIB_MAX_LOCKS; i++) {
+      lock = pcilib_get_lock_by_id(ctx, i);
+
+      const char *name = pcilib_lock_get_name(lock);
+      if (!name) break;
+
+      if (!strcmp(buffer, name)) {
+         if ((pcilib_lock_get_flags(lock)&PCILIB_LOCK_FLAG_PERSISTENT) != (flags&PCILIB_LOCK_FLAG_PERSISTENT)) {
+            if (flags&PCILIB_LOCK_FLAG_PERSISTENT)
+               pcilib_error("Requesting persistent lock (%s), but requested lock is already existing and is robust", name);
+            else
+               pcilib_error("Requesting robust lock (%s), but requested lock is already existing and is persistent", name);
+            return NULL;
+         }
 
 #ifndef HAVE_STDATOMIC_H
-	    if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0) {
-		err = pcilib_lock(ctx->locks.locking);
-		if (err) {
-		    pcilib_error("Error (%i) obtaining global lock", err);
-		    return NULL;
-		}
-	    }
+         if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0) {
+            err = pcilib_lock(ctx->locks.locking);
+            if (err) {
+               pcilib_error("Error (%i) obtaining global lock", err);
+               return NULL;
+            }
+         }
 #endif /* ! HAVE_STDATOMIC_H */
-	/* if yes, we increment its ref variable*/
-	    pcilib_lock_ref(lock);
-#ifndef HAVE_STDATOMIC_H
-	    if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
-		pcilib_unlock(ctx->locks.locking);
-#endif /* ! HAVE_STDATOMIC_H */
+         /* if yes, we increment its ref variable*/
+         pcilib_lock_ref(lock);
+         #ifndef HAVE_STDATOMIC_H
+         if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
+            pcilib_unlock(ctx->locks.locking);
+         #endif /* ! HAVE_STDATOMIC_H */
+         return lock;
+      }
+   }
 
-	    return lock;
-	}
-    }
+   if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0) {
+      err = pcilib_lock(ctx->locks.locking);
+      if (err) {
+         pcilib_error("Error (%i) obtaining global lock", err);
+         return NULL;
+      }
+   }
 
-    if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0) {
-	err = pcilib_lock(ctx->locks.locking);
-	if (err) {
-	    pcilib_error("Error (%i) obtaining global lock", err);
-	    return NULL;
-	}
-    }
+   // Make sure it was not allocated meanwhile
+   for (; i < PCILIB_MAX_LOCKS; i++) {
+      lock = pcilib_get_lock_by_id(ctx, i);
 
-	// Make sure it was not allocated meanwhile
-    for (; i < PCILIB_MAX_LOCKS; i++) {
-	lock = pcilib_get_lock_by_id(ctx, i);
+      const char *name = pcilib_lock_get_name(lock);
+      if (!name) break;
 
-        const char *name = pcilib_lock_get_name(lock);
-	if (!name) break;
+      if (!strcmp(buffer, name)) {
+         if ((pcilib_lock_get_flags(lock)&PCILIB_LOCK_FLAG_PERSISTENT) != (flags&PCILIB_LOCK_FLAG_PERSISTENT)) {
+            if (flags&PCILIB_LOCK_FLAG_PERSISTENT)
+               pcilib_error("Requesting persistent lock (%s), but requested lock is already existing and is robust", name);
+            else
+               pcilib_error("Requesting robust lock (%s), but requested lock is already existing and is persistent", name);
 
-	if (!strcmp(buffer, name)) {
-	    if ((pcilib_lock_get_flags(lock)&PCILIB_LOCK_FLAG_PERSISTENT) != (flags&PCILIB_LOCK_FLAG_PERSISTENT)) {
-		if (flags&PCILIB_LOCK_FLAG_PERSISTENT)
-		    pcilib_error("Requesting persistent lock (%s), but requested lock is already existing and is robust", name);
-		else
-		    pcilib_error("Requesting robust lock (%s), but requested lock is already existing and is persistent", name);
-		
-		if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
-		    pcilib_unlock(ctx->locks.locking);
-		return NULL;
-	    }
+            if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
+               pcilib_unlock(ctx->locks.locking);
+            return NULL;
+         }
 
-	    pcilib_lock_ref(lock);
-	    if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
-		pcilib_unlock(ctx->locks.locking);
-	    return lock;
-	}
-    }
+         pcilib_lock_ref(lock);
+         if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
+            pcilib_unlock(ctx->locks.locking);
+         return lock;
+      }
+   }
 
-    if (i == PCILIB_MAX_LOCKS) {
-	if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
-	    pcilib_unlock(ctx->locks.locking);
-	pcilib_error("Failed to create lock (%s), only %u locks is supported", buffer, PCILIB_MAX_LOCKS);
-	return NULL;
-    }
+   if (i == PCILIB_MAX_LOCKS) {
+      if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
+         pcilib_unlock(ctx->locks.locking);
+      pcilib_error("Failed to create lock (%s), only %u locks is supported", buffer, PCILIB_MAX_LOCKS);
+      return NULL;
+   }
 
-	/* if the lock did not exist before, then we create it*/
-    err = pcilib_init_lock(lock, flags, buffer);
-    
-    if (err) {
-	pcilib_error("Lock initialization failed with error %i", err);
+   /* if the lock did not exist before, then we create it*/
+   err = pcilib_init_lock(lock, flags, buffer);
 
-	if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
-	    pcilib_unlock(ctx->locks.locking);
-	
-	return NULL;
-    }
-    
-    if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
-	pcilib_unlock(ctx->locks.locking);
+   if (err) {
+      pcilib_error("Lock initialization failed with error %i", err);
 
-    return lock;
+      if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
+         pcilib_unlock(ctx->locks.locking);
+
+      return NULL;
+   }
+
+   if ((flags&PCILIB_LOCK_FLAG_UNLOCKED)==0)
+      pcilib_unlock(ctx->locks.locking);
+
+   return lock;
 }
 
 void pcilib_return_lock(pcilib_t *ctx, pcilib_lock_flags_t flags, pcilib_lock_t *lock) {

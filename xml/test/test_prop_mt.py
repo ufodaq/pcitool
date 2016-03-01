@@ -4,15 +4,15 @@ lock = threading.Lock()
 
 def read_from_register(ctx, value):
    with lock:
-      ctx.lock('lock5')
+      ctx.lock('lock12')
       
       cur = read_from_register.counter
       read_from_register.counter += 1
-      for i in range (0, 5):
+      for i in range (0, 60):
          time.sleep(0.1)
          print cur
       out = ctx.get_property('/test/prop3') / 2
-      ctx.unlock('lock5')
+      ctx.unlock('lock12')
       
       return out
       

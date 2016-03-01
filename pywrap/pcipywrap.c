@@ -1,6 +1,9 @@
 #include "pcipywrap.h"
 #include "locking.h"
 
+#include <dirent.h>
+#include <strings.h>
+
 char* full_log = NULL;
 
 /*!
@@ -101,27 +104,6 @@ void __redirect_logs_to_exeption()
                       pcilib_get_logger_context());
 }
 
-/*!
- * \brief Wrap for PyDict_SetItem, with decrease reference counting after set.
- */
-void pcilib_pydict_set_item(PyObject* dict, PyObject* name, PyObject* value)
-{
-    PyDict_SetItem(dict,
-                   name,
-                   value);
-    Py_XDECREF(name);
-    Py_XDECREF(value);
-}
-
-/*!
- * \brief Wrap for PyList_Append, with decrease reference counting after append.
- */
-void pcilib_pylist_append(PyObject* list, PyObject* value)
-{
-    PyList_Append(list, value);
-    Py_XDECREF(value);
-}
-
 void add_pcilib_value_to_dict(pcilib_t* ctx, PyObject* dict, pcilib_value_t* val, const char *name)
 {
     PyObject *py_val = (PyObject*)pcilib_get_value_as_pyobject(ctx, val, NULL);
@@ -215,126 +197,198 @@ PyObject * pcilib_convert_property_info_to_pyobject(pcilib_t* ctx, pcilib_proper
 
 PyObject * pcilib_convert_register_info_to_pyobject(pcilib_t* ctx, pcilib_register_info_t listItem)
 {
-    PyObject* pylistItem = PyDict_New();
+   PyObject* pylistItem = PyDict_New();
 
-    if(listItem.name)
-        pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("name"),
-                               PyString_FromString(listItem.name));
+   if(listItem.name)
+     pcilib_pydict_set_item(pylistItem,
+                            PyString_FromString("name"),
+                            PyString_FromString(listItem.name));
 
-    if(listItem.description)
-        pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("description"),
-                               PyString_FromString(listItem.description));
+   if(listItem.description)
+     pcilib_pydict_set_item(pylistItem,
+                            PyString_FromString("description"),
+                            PyString_FromString(listItem.description));
 
-    if(listItem.bank)
-        pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("bank"),
-                               PyString_FromString(listItem.bank));
+   if(listItem.bank)
+     pcilib_pydict_set_item(pylistItem,
+                            PyString_FromString("bank"),
+                            PyString_FromString(listItem.bank));
 
 
-    //serialize modes
-    PyObject* modes = PyList_New(0);
+   //serialize modes
+   PyObject* modes = PyList_New(0);
 
-    if((listItem.mode & PCILIB_REGISTER_R) == PCILIB_REGISTER_R)
-        pcilib_pylist_append(modes, PyString_FromString("R"));
-    if((listItem.mode & PCILIB_REGISTER_W) == PCILIB_REGISTER_W)
-        pcilib_pylist_append(modes, PyString_FromString("W"));
-    if((listItem.mode & PCILIB_REGISTER_RW) == PCILIB_REGISTER_RW)
-        pcilib_pylist_append(modes, PyString_FromString("RW"));
-    if((listItem.mode & PCILIB_REGISTER_W1C) == PCILIB_REGISTER_W1C)
-        pcilib_pylist_append(modes, PyString_FromString("W1C"));
-    if((listItem.mode & PCILIB_REGISTER_RW1C) == PCILIB_REGISTER_RW1C)
-        pcilib_pylist_append(modes, PyString_FromString("RW1C"));
-    if((listItem.mode & PCILIB_REGISTER_W1I) == PCILIB_REGISTER_W1I)
-        pcilib_pylist_append(modes, PyString_FromString("W1I"));
-    if((listItem.mode & PCILIB_REGISTER_RW1I) == PCILIB_REGISTER_RW1I)
-        pcilib_pylist_append(modes, PyString_FromString("RW1I"));
-    if((listItem.mode & PCILIB_REGISTER_INCONSISTENT) == PCILIB_REGISTER_INCONSISTENT)
-        pcilib_pylist_append(modes, PyString_FromString("NO_CHK"));
+   if((listItem.mode & PCILIB_REGISTER_R) == PCILIB_REGISTER_R)
+     pcilib_pylist_append(modes, PyString_FromString("R"));
+   if((listItem.mode & PCILIB_REGISTER_W) == PCILIB_REGISTER_W)
+     pcilib_pylist_append(modes, PyString_FromString("W"));
+   if((listItem.mode & PCILIB_REGISTER_RW) == PCILIB_REGISTER_RW)
+     pcilib_pylist_append(modes, PyString_FromString("RW"));
+   if((listItem.mode & PCILIB_REGISTER_W1C) == PCILIB_REGISTER_W1C)
+     pcilib_pylist_append(modes, PyString_FromString("W1C"));
+   if((listItem.mode & PCILIB_REGISTER_RW1C) == PCILIB_REGISTER_RW1C)
+     pcilib_pylist_append(modes, PyString_FromString("RW1C"));
+   if((listItem.mode & PCILIB_REGISTER_W1I) == PCILIB_REGISTER_W1I)
+     pcilib_pylist_append(modes, PyString_FromString("W1I"));
+   if((listItem.mode & PCILIB_REGISTER_RW1I) == PCILIB_REGISTER_RW1I)
+     pcilib_pylist_append(modes, PyString_FromString("RW1I"));
+   if((listItem.mode & PCILIB_REGISTER_INCONSISTENT) == PCILIB_REGISTER_INCONSISTENT)
+     pcilib_pylist_append(modes, PyString_FromString("NO_CHK"));
 
-    pcilib_pydict_set_item(pylistItem,
-                           PyString_FromString("mode"),
-                           modes);
+   pcilib_pydict_set_item(pylistItem,
+                        PyString_FromString("mode"),
+                        modes);
 
-    pcilib_value_t defval = {0};
-    pcilib_set_value_from_register_value(ctx, &defval, listItem.defvalue);
-    add_pcilib_value_to_dict(ctx, pylistItem, &defval, "defvalue");
+   pcilib_value_t defval = {0};
+   pcilib_set_value_from_register_value(ctx, &defval, listItem.defvalue);
+   add_pcilib_value_to_dict(ctx, pylistItem, &defval, "defvalue");
 
-    if(listItem.range)
-    {
-        pcilib_value_t minval = {0};
-        pcilib_set_value_from_register_value(ctx, &minval, listItem.range->min);
+   if(listItem.range)
+   {
+     pcilib_value_t minval = {0};
+     pcilib_set_value_from_register_value(ctx, &minval, listItem.range->min);
 
-        pcilib_value_t maxval = {0};
-        pcilib_set_value_from_register_value(ctx, &maxval, listItem.range->max);
+     pcilib_value_t maxval = {0};
+     pcilib_set_value_from_register_value(ctx, &maxval, listItem.range->max);
 
-        PyObject* range = PyDict_New();
-        add_pcilib_value_to_dict(ctx, range, &minval, "min");
-        add_pcilib_value_to_dict(ctx, range, &maxval, "max");
-        pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("range"),
-                               range);
-    }
+     PyObject* range = PyDict_New();
+     add_pcilib_value_to_dict(ctx, range, &minval, "min");
+     add_pcilib_value_to_dict(ctx, range, &maxval, "max");
+     pcilib_pydict_set_item(pylistItem,
+                            PyString_FromString("range"),
+                            range);
+   }
 
-    if(listItem.values)
-    {
+   if(listItem.values)
+   {
 
-        PyObject* values = PyList_New(0);
+     PyObject* values = PyList_New(0);
 
-        for (int j = 0; listItem.values[j].name; j++)
-        {
-            PyObject* valuesItem = PyDict_New();
+     for (int j = 0; listItem.values[j].name; j++)
+     {
+         PyObject* valuesItem = PyDict_New();
 
-            pcilib_value_t val = {0};
-            pcilib_set_value_from_register_value(ctx, &val, listItem.values[j].value);
+         pcilib_value_t val = {0};
+         pcilib_set_value_from_register_value(ctx, &val, listItem.values[j].value);
 
-            pcilib_value_t min = {0};
-            pcilib_set_value_from_register_value(ctx, &min, listItem.values[j].min);
+         pcilib_value_t min = {0};
+         pcilib_set_value_from_register_value(ctx, &min, listItem.values[j].min);
 
-            pcilib_value_t max = {0};
-            pcilib_set_value_from_register_value(ctx, &max, listItem.values[j].max);
+         pcilib_value_t max = {0};
+         pcilib_set_value_from_register_value(ctx, &max, listItem.values[j].max);
 
-            add_pcilib_value_to_dict(ctx, valuesItem, &val, "value");
-            add_pcilib_value_to_dict(ctx, valuesItem, &min, "min");
-            add_pcilib_value_to_dict(ctx, valuesItem, &max, "max");
+         add_pcilib_value_to_dict(ctx, valuesItem, &val, "value");
+         add_pcilib_value_to_dict(ctx, valuesItem, &min, "min");
+         add_pcilib_value_to_dict(ctx, valuesItem, &max, "max");
 
-            if(listItem.values[j].name)
-                pcilib_pydict_set_item(valuesItem,
-                                       PyString_FromString("name"),
-                                       PyString_FromString(listItem.values[j].name));
-            if(listItem.values[j].description)
-            {
-                pcilib_pydict_set_item(valuesItem,
-                                       PyString_FromString("description"),
-                                       PyString_FromString(listItem.values[j].description));
+         if(listItem.values[j].name)
+             pcilib_pydict_set_item(valuesItem,
+                                    PyString_FromString("name"),
+                                    PyString_FromString(listItem.values[j].name));
+         if(listItem.values[j].description)
+         {
+             pcilib_pydict_set_item(valuesItem,
+                                    PyString_FromString("description"),
+                                    PyString_FromString(listItem.values[j].description));
 
-            }
-            pcilib_pylist_append(values, valuesItem);
-        }
+         }
+         pcilib_pylist_append(values, valuesItem);
+     }
 
-        pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("values"),
-                               values);
-    }
+     pcilib_pydict_set_item(pylistItem,
+                            PyString_FromString("values"),
+                            values);
+   }
 
-    return pylistItem;
-
+   return pylistItem;
 }
+
 
 Pcipywrap *new_Pcipywrap(const char* fpga_device, const char* model)
 {
     //opening device
     pcilib_t* ctx = pcilib_open(fpga_device, model);
-    if(!ctx)
-    {
+    if(!ctx) {
         set_python_exception("Failed pcilib_open(%s, %s)", fpga_device, model);
         return NULL;
     }
+    
     Pcipywrap *self;
     self = (Pcipywrap *) malloc(sizeof(Pcipywrap));
+    if(!self) {
+        pcilib_close(ctx);
+        return (Pcipywrap *)PyExc_MemoryError;
+    }  
     self->shared = 0;
     self->ctx = ctx;
+    self->py = NULL;
+    self->names = NULL;
+    self->names_size = 0;
+
+    
+    //processing pcilib scrips
+    const char *scripts_dir = getenv("PCILIB_SCRIPTS_DIR");
+    if(scripts_dir) {
+      int err = 0;
+
+      self->py = pcilib_init_py_ctx(ctx->py, &err);
+      if(err) {
+         delete_Pcipywrap(self);
+         set_python_exception("Failed pcilib_py_s_clone (%i)", err);
+         return NULL;
+      }
+      
+      //add scripts directory to Python path
+      err = pcilib_py_ctx_add_script_dir(self->py, scripts_dir);
+      if(err) {
+         delete_Pcipywrap(self);
+         set_python_exception("Failed pcilib_py_add_dir (%i)", err);
+         return NULL;
+      }
+      
+      //load scripts in PCILIB_SCRIPTS_DIR
+      self->names = malloc(++(self->names_size) * sizeof(char*));
+      self->names[self->names_size - 1] = NULL;
+      
+      DIR *dir;
+      struct dirent *script_path;
+      dir = opendir(scripts_dir);
+      if (dir) {
+         while ((script_path = readdir(dir)) != NULL) {
+
+            char *py = strrchr(script_path->d_name, '.');
+            if ((!py)||(strcasecmp(py, ".py"))) {
+               continue;
+            }
+
+            char *name = malloc(strlen(script_path->d_name));
+            if(!name) {
+               delete_Pcipywrap(self);
+               return (Pcipywrap *)PyExc_MemoryError;
+            }
+            
+            strcpy(name, script_path->d_name);
+
+            err = pcilib_py_ctx_load_script(self->py, name);
+
+            if(err) {
+               delete_Pcipywrap(self);
+               set_python_exception("pcilib_py_ctx_load_script (%i)", err);
+               return NULL;
+            }
+            
+            self->names = realloc(self->names, ++(self->names_size));
+            if(!self->names) {
+               delete_Pcipywrap(self);
+               return (Pcipywrap *)PyExc_MemoryError;
+            }
+            self->names[self->names_size - 1] = NULL;
+            self->names[self->names_size - 2] = name;
+         }
+         closedir(dir);
+      }
+    }
+    
     return self;
 }
 
@@ -350,14 +404,27 @@ Pcipywrap *create_Pcipywrap(PyObject* ctx)
     self = (Pcipywrap *) malloc(sizeof(Pcipywrap));
     self->shared = 1;
     self->ctx = PyCObject_AsVoidPtr(ctx);
+    self->py = NULL;
+    self->names = NULL;
+    self->names_size = 0;
     return self;
 }
 
 void delete_Pcipywrap(Pcipywrap *self) {
-    if(!self->shared)
-        pcilib_close(self->ctx);
+   if(!self->shared)
+     pcilib_close(self->ctx);
+     
+   pcilib_free_py_ctx(self->py);
 
-    free(self);
+   if(self->names) {
+      for(int i = 0; self->names[i]; i++)
+         free(self->names[i]);
+      free(self->names);
+      self->names = NULL;
+      self->names_size = 0;
+   }
+    
+   free(self);
 }
 
 PyObject* Pcipywrap_read_register(Pcipywrap *self, const char *regname, const char *bank)
@@ -464,7 +531,7 @@ PyObject* Pcipywrap_get_registers_list(Pcipywrap *self, const char *bank)
       set_python_exception("pcilib_get_register_list return NULL");
       return NULL;
    }
-
+      
    PyObject* pyList = PyList_New(0);
    for(int i = 0; list[i].name; i++)
    {
@@ -554,7 +621,7 @@ void Pcipywrap_unlock_global(Pcipywrap *self)
 PyObject* Pcipywrap_lock(Pcipywrap *self, const char *lock_id)
 {
     pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
-                                          PCILIB_LOCK_FLAGS_DEFAULT,
+                                          PCILIB_LOCK_FLAG_PERSISTENT,
                                           lock_id);
     if(!lock)
     {
@@ -576,7 +643,7 @@ PyObject* Pcipywrap_lock(Pcipywrap *self, const char *lock_id)
 PyObject* Pcipywrap_try_lock(Pcipywrap *self, const char *lock_id)
 {
     pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
-                                          PCILIB_LOCK_FLAGS_DEFAULT,
+                                          PCILIB_LOCK_FLAG_PERSISTENT,
                                           lock_id);
     if(!lock)
     {
@@ -597,7 +664,7 @@ PyObject* Pcipywrap_try_lock(Pcipywrap *self, const char *lock_id)
 PyObject* Pcipywrap_unlock(Pcipywrap *self, const char *lock_id)
 {
     pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
-                                          PCILIB_LOCK_FLAGS_DEFAULT,
+                                          PCILIB_LOCK_FLAG_PERSISTENT,
                                           lock_id);
     if(!lock)
     {
@@ -609,4 +676,20 @@ PyObject* Pcipywrap_unlock(Pcipywrap *self, const char *lock_id)
     return PyInt_FromLong((long)1);
 }
 
+PyObject* Pcipywrap_get_scripts_list(Pcipywrap *self)
+{
+   return pcilib_py_ctx_get_scripts_info(self->py);
+}
 
+PyObject* Pcipywrap_run_script(Pcipywrap *self, const char* script_name, PyObject* value)
+{
+   int err = 0;
+   PyObject* value_out = pcilib_py_ctx_eval_func(self->py, script_name, "run", value, &err);
+   
+   if(err) {
+    set_python_exception("Failed pcilib_py_ctx_eval_func (%i)", err);
+     return NULL;
+   }
+   
+   return value_out;
+}

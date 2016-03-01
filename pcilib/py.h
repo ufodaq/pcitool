@@ -118,6 +118,32 @@ int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *va
  */
 int pcilib_py_eval_func(pcilib_t *ctx, const char *script, const char *func, pcilib_value_t *val);
 
+
+/** Clone pcilib_py_t content without scripts hash
+ *  @param[in] in	- pcilib_py_t content to clone
+ *  @param[out] err - error
+ *  @return 		- NULL or cloned pcilib_py_t content pointer on success
+ */
+pcilib_py_t* pcilib_init_py_ctx(pcilib_py_t* in, int *err);
+pcilib_py_object* pcilib_py_ctx_eval_func(pcilib_py_t *ctx_py,
+                                          const char *script_name,
+                                          const char *func_name, 
+                                          pcilib_py_object *pyval, 
+                                          int *err);
+int pcilib_py_ctx_add_script_dir(pcilib_py_t *ctx_py, const char *dir);
+void pcilib_free_py_ctx(pcilib_py_t *ctx_py);
+int pcilib_py_ctx_load_script(pcilib_py_t *ctx_py, const char *script_name);
+pcilib_py_object *pcilib_py_ctx_get_scripts_info(pcilib_py_t *ctx_py);
+
+/*!
+ * \brief Wrap for PyDict_SetItem, with decrease reference counting after set.
+ */
+void pcilib_pydict_set_item(pcilib_py_object* dict, pcilib_py_object* name, pcilib_py_object* value);
+
+/*!
+ * \brief Wrap for PyList_Append, with decrease reference counting after append.
+ */
+void pcilib_pylist_append(pcilib_py_object* list, pcilib_py_object* value);
 #ifdef __cplusplus
 }
 #endif

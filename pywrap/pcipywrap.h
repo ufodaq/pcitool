@@ -5,10 +5,22 @@
 #include "error.h"
 #include <Python.h>
 
+#include "config.h"
+#include "py.h"
+
+#include "pci.h"
+#include "pcilib.h"
+
+
 typedef struct {
+    char** names;
+    int names_size;
+   
     void* ctx;
+    struct pcilib_py_s *py;
     int shared;
 } Pcipywrap;
+
 
 /*!
  * \brief Redirect pcilib standart log stream to exeption text.
@@ -82,5 +94,8 @@ PyObject* Pcipywrap_lock(Pcipywrap *self, const char *lock_id);
 
 PyObject* Pcipywrap_try_lock(Pcipywrap *self, const char *lock_id);
 PyObject* Pcipywrap_unlock(Pcipywrap *self, const char *lock_id);
+
+PyObject* Pcipywrap_get_scripts_list(Pcipywrap *self);
+PyObject* Pcipywrap_run_script(Pcipywrap *self, const char* script_name, PyObject* value);
 
 #endif /* PCIPYWRAP_H */

@@ -1,26 +1,20 @@
-import time
 import os
-import pcipywrap
-import json
 import sys
+
+import pcipywrap
+
+import time
+import json
 from optparse import OptionParser
 
+from multiprocessing import Process, current_process
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
-from SocketServer import ThreadingMixIn
-import threading
-
-pcilib = None
-
-class MultiThreadedHTTPServer(ThreadingMixIn, HTTPServer):
-    pass
 
 class PcilibServerHandler(BaseHTTPRequestHandler):
-   locks = list()
-   lock_global = 0
    
-   #def __init__(s, pcilib, *args):
-   #   s.pcilib = pcilib
-   #   BaseHTTPRequestHandler.__init__(s, *args)
+   def __init__(s, pcilib, *args):
+      s.pcilib = pcilib
+      BaseHTTPRequestHandler.__init__(s, *args)
    
    def do_HEAD(s):
       s.send_response(200)
@@ -73,7 +67,7 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
 
             registers = dict()
             try:
-               registers = pcilib.get_registers_list(bank)
+               registers = s.pcilib.get_registers_list(bank)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -101,7 +95,7 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
             
             register = dict()
             try:
-               register = pcilib.get_register_info(reg, bank)
+               register = s.pcilib.get_register_info(reg, bank)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -119,7 +113,7 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
             
             properties = dict()
             try:
-               properties = pcilib.get_property_list(branch)
+               properties = s.pcilib.get_property_list(branch)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -147,7 +141,7 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
             
             value = 0
             try:
-               value = pcilib.read_register(reg, bank)
+               value = s.pcilib.read_register(reg, bank)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -180,7 +174,7 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
 				   bank = str(bank)
             
             try:
-               pcilib.write_register(value, reg, bank)
+               s.pcilib.write_register(value, reg, bank)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -202,7 +196,7 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
             
             value = 0
             try:
-               value = pcilib.get_property(prop)
+               value = s.pcilib.get_property(prop)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -232,7 +226,7 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
             value = str(data.get('value', None))
             
             try:
-               pcilib.set_property(value, prop)
+               s.pcilib.set_property(value, prop)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -252,20 +246,11 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
             #parse command arguments and convert them to string
             lock_id = str(data.get('lock_id'))
             
-            #check if lock already setted
-            #if lock_id in PcilibServerHandler.locks:
-            #   s.error('Lock with id: ' + lock_id + 
-            #           'already setted by this server',
-            #           data)
-            #   return
-            
             try:
-               pcilib.lock(lock_id)
+               s.pcilib.lock(lock_id)
             except Exception as e:
                s.error(str(e), data) 
                return
-               
-            PcilibServerHandler.locks.append(lock_id)
             
             #Success! Create and send reply
             s.wrapMessageAndSend({'status': 'ok'}, data)
@@ -283,7 +268,7 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
             lock_id = str(data.get('lock_id'))
             
             try:
-               pcilib.try_lock(lock_id)
+               s.pcilib.try_lock(lock_id)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -295,24 +280,21 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
             
          elif(command == 'unlock'):
             #check required arguments
-            #if not 'lock_id' in data:
-            #   s.error('message doesnt contains "lock_id" field, '
-            #           'which is required for "unlock" command', data)
-            #   return
+            if not 'lock_id' in data:
+               s.error('message doesnt contains "lock_id" field, '
+                       'which is required for "unlock" command', data)
+               return
                
             #parse command arguments and convert them to string
-            #lock_id = str(data.get('lock_id'))
+            lock_id = str(data.get('lock_id'))
             
-            #try:
-            #   pcilib.unlock(lock_id)
-            #except Exception as e:
-            #   s.error(str(e), data) 
-            #   return
-            #
-            #remove lock from locks list
-            #if lock_id in PcilibServerHandler.locks:
-            #   PcilibServerHandler.locks.remove(lock_id)
-            time.sleep(20)
+            try:
+               print 'unlocking ' + lock_id
+               s.pcilib.unlock(lock_id)
+            except Exception as e:
+               s.error(str(e), data) 
+               return
+
             #Success! Create and send reply
             s.wrapMessageAndSend({'status': 'ok'}, data)
             
@@ -320,19 +302,11 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
             
          #elif(command == 'lock_global'):
          #   #check if global_lock already setted by server
-         #   print 'aaa'
-         #   if PcilibServerHandler.lock_global:
-         #
-         #      s.error('global lock already setted by this server', data)
-         #      return
-         #      
          #   try:
-         #      pcilib.lock_global()
+         #      s.pcilib.lock_global()
          #   except Exception as e:
          #      s.error(str(e), data)
          #      return
-         #   
-         #   PcilibServerHandler.lock_global = 1
          #   
          #   #Success! Create and send reply
          #   s.wrapMessageAndSend({'status': 'ok'}, data)
@@ -341,12 +315,10 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
          
          #elif(command == 'unlock_global'):
          #   try:
-         #      pcilib.unlock_global()
+         #      s.pcilib.unlock_global()
          #   except Exception as e:
          #      s.error(str(e), data)
          #      return
-         #   
-         #   PcilibServerHandler.lock_global = 0
          #   
          #   #Success! Create and send reply
          #   s.wrapMessageAndSend({'status': 'ok'}, data)
@@ -364,11 +336,11 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
       #print str(s.headers['content-type'])
       #print post_data['some']
       
-   #"""open device context """
+   #open device context 
    #def openPcilibInstance(s, device, model):
-   #   pcilib = pcipywrap.create_pcilib_instance(device, model)
+   #   s.pcilib = pcipywrap.create_pcilib_instance(device, model)
          
-   """Send help message"""
+   #Send help message
    def help(s, received_message = None):
       usage = str('Usage:\n'
       '  Server receive commands via http GET with json packet.\n'
@@ -450,7 +422,7 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
       out = {'status': 'ok', 'usage' : usage}
       s.wrapMessageAndSend(out, received_message)
 
-   """Send error message with text description"""     
+   #Send error message with text description    
    def error(s, info, received_message = None):
       out = dict()
       
@@ -465,8 +437,21 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
       s.end_headers()
       if not received_message is None:
          message['received_message'] = received_message
-      message['thread'] = threading.currentThread().getName()
       s.wfile.write(json.dumps(message))
+
+def serve_forever(server):
+   try:
+      server.serve_forever()
+   except KeyboardInterrupt:
+      pass
+        
+def runpool(server, number_of_processes):
+    # create child processes to act as workers
+    for i in range(number_of_processes-1):
+        Process(target=serve_forever, args=(server,)).start()
+
+    # main process also acts as a worker
+    serve_forever(server)
 
 if __name__ == '__main__':
    
@@ -481,6 +466,9 @@ if __name__ == '__main__':
    parser.add_option("-m", "--model",  action="store",
                      type="string", dest="model", default=None,
                      help="Memory model (autodetected)")
+   parser.add_option("-n", "--number_processes",  action="store",
+                     type="int", dest="processes", default=4,
+                     help="Number of processes, used by server (4)")
    opts = parser.parse_args()[0]
    
    HOST_NAME = ''
@@ -510,30 +498,19 @@ if __name__ == '__main__':
    
    #pass Pcipywrap to to server handler
    global pcilib
-   pcilib = pcipywrap.Pcipywrap(DEVICE, MODEL)
-   #def handler(*args):
-   #   PcilibServerHandler(lib, *args)
+   lib = pcipywrap.Pcipywrap(DEVICE, MODEL)
+   def handler(*args):
+      PcilibServerHandler(lib, *args)
    
    #start server
-   httpd = MultiThreadedHTTPServer((HOST_NAME, PORT_NUMBER), PcilibServerHandler)
+   httpd = HTTPServer((HOST_NAME, PORT_NUMBER), handler)
+   runpool(httpd, opts.processes)
    
    print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)
-   try:
-      httpd.serve_forever()
-   except KeyboardInterrupt:
-      #unlocking global lock
-      if PcilibServerHandler.lock_global:
-         lib.unlock_global()
-         PcilibServerHandler.lock_global = False
-         
-      #delete created locks
-      for lock in PcilibServerHandler.locks:
-         lib.unlock(lock)
-      del PcilibServerHandler.locks[:]
-      pass
-      
-      
-      
+   #try:
+   #   httpd.serve_forever()
+   #except KeyboardInterrupt:
+   #   pass
       
    httpd.server_close()
    print time.asctime(), "Server Stops - %s:%s" % (HOST_NAME, PORT_NUMBER)
