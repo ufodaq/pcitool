@@ -1,5 +1,5 @@
 import threading
-import pcipywrap
+import pcilib
 import random
 import os
 import json
@@ -7,7 +7,7 @@ import requests
 import time
 from optparse import OptionParser, OptionGroup
 
-class test_pcipywrap():
+class test_pcilib():
    def __init__(self, 
                 device, 
                 model, 
@@ -35,7 +35,7 @@ class test_pcipywrap():
       #create pcilib_instance
       self.device = device
       self.model = model
-      self.pcilib = pcipywrap.Pcipywrap(device, model)
+      self.pcilib = pcilib.Pcilib(device, model)
       self.num_threads = num_threads
       self.write_percentage = write_percentage
       self.register = register
@@ -83,7 +83,7 @@ class test_pcipywrap():
       try:
          while(1):
             val = random.randint(0, 8096)
-            self.pcilib = pcipywrap.Pcipywrap(self.device, self.model)
+            self.pcilib = pcilib.Pcilib(self.device, self.model)
             print self.pcilib.get_property_list(self.branch)
             print self.pcilib.get_register_info(self.register)
             print self.pcilib.get_registers_list();
@@ -232,7 +232,7 @@ if __name__ == '__main__':
    opts = parser.parse_args()[0]
 
    #create pcilib test instance
-   lib = test_pcipywrap(opts.device,
+   lib = test_pcilib(opts.device,
                         opts.model,
                         num_threads = opts.threads,
                         write_percentage = opts.write_percentage,

@@ -5,22 +5,10 @@
 #include "error.h"
 #include <Python.h>
 
-#include "config.h"
-#include "py.h"
-
-#include "pci.h"
-#include "pcilib.h"
-
-
 typedef struct {
-    char** names;
-    int names_size;
-   
     void* ctx;
-    struct pcilib_py_s *py;
     int shared;
 } Pcipywrap;
-
 
 /*!
  * \brief Redirect pcilib standart log stream to exeption text.
@@ -73,55 +61,18 @@ PyObject* Pcipywrap_get_property(Pcipywrap *self, const char *prop);
  * \return 1, serialized to PyObject or NULL with exeption text, if failed.
  */
 PyObject* Pcipywrap_set_property(Pcipywrap *self, PyObject* val, const char *prop);
-
-
-/*!
- * \brief Wrap for pcilib_get_register_list function.
- * \param bank [in]	bank - if set, only register within the specified bank will be returned
- * \return list of registers, serialized to Python object
- */
 PyObject* Pcipywrap_get_registers_list(Pcipywrap *self, const char *bank);
-
-/*!
- * \brief Returns the information about the specified register. Wrap for pcilib_get_register_info
- * \param[in] reg the name of the register
- * \param[in] bank indicates the bank where to look for register, autodetected if NULL is passed
- * \return information about the specified register, serialized to Python object
- */
 PyObject* Pcipywrap_get_register_info(Pcipywrap *self, const char* reg,const char *bank);
-
-/*!
- * \brief Returns the list of properties available under the specified path. Wrap for pcilib_get_property_list
- * \param[in] branch path or NULL to return the top-level properties
- * \return the list of the properties, serialized to Python object
- */
 PyObject* Pcipywrap_get_property_list(Pcipywrap *self, const char* branch);
 
-/*!
- * \brief Reads data from DMA until timeout is hit, a full DMA packet is read, or the specified number of bytes are read.
- * Wrap for pcilib_read_dma.
- * \param dma ID of DMA engine
- * \param size specifies how many bytes should be read
- * \return DMA data, serialierd to Python bytearray
- * \warning This function has not been tested.
- * \todo Test this fucntion
- */
 PyObject* Pcipywrap_read_dma(Pcipywrap *self, unsigned char dma, size_t size);
 
-/*!
- * \brief Wrap for pcilib_lock_global
- * \return 1, serialized to PyObject or NULL with exeption text, if failed.
- */
 PyObject* Pcipywrap_lock_global(Pcipywrap *self);
-
-/*!
- * \brief Wrap for pcilib_unlock_global
- */
 void Pcipywrap_unlock_global(Pcipywrap *self);
 
 /*!
  * \brief Wrap for pcilib_lock
- * \param[in] lock_id lock identificator
+ * \param lock_id lock identificator
  * \warning This function should be called only under Python standart threading lock.
  * Otherwise it will stuck with more than 1 threads. See /xml/test/test_prop_mt.py
  * for example.
@@ -129,35 +80,7 @@ void Pcipywrap_unlock_global(Pcipywrap *self);
  */
 PyObject* Pcipywrap_lock(Pcipywrap *self, const char *lock_id);
 
-/*!
- * \brief This function will try to take a lock for the mutex pointed by
- * lockfunction to acquire a lock, but that returns immediatly if the lock can't be
- * acquired on first try. Wrap for pcilib_try_lock.
- * \param[in] lock_id lock id
- * \return 1, serialized to PyObject or NULL with exeption text, if failed.
- */
 PyObject* Pcipywrap_try_lock(Pcipywrap *self, const char *lock_id);
-
-/*!
- * \brief This function unlocks the lock with specified id. Wrap for pcilib_unlock.
- * \param[in] lock_id lock id
- * \return 1, serialized to PyObject or NULL with exeption text, if failed.
- */
 PyObject* Pcipywrap_unlock(Pcipywrap *self, const char *lock_id);
-
-/*!
- * \brief Returns list with information about aviable scripts
- * \return list with information about scripts, aviable in model
- */
-PyObject* Pcipywrap_get_scripts_list(Pcipywrap *self);
-
-/*!
- * \brief Runs script with specified name
- * \param script_name script name (with extension); name could be found by
- * Pcipywrap_get_scripts_list fucntion
- * \param[in] value input value
- * \return value returned by script
- */
-PyObject* Pcipywrap_run_script(Pcipywrap *self, const char* script_name, PyObject* value);
 
 #endif /* PCIPYWRAP_H */

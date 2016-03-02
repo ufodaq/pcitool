@@ -1,7 +1,7 @@
 import os
 import sys
 
-import pcipywrap
+import pcilib
 
 import time
 import json
@@ -471,7 +471,7 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
       
       '  command: run_script - Run specified script\n'
       '    required fields\n'
-      '      script_name: - script name (with extension)\n'
+      '      script_name: - script name (without extension)\n'
       '      value: - input value in json format\n'
       '\n'
       
@@ -503,9 +503,9 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
 class ApiServer(MultiThreadedHTTPServer):
    def __init__(self, device='/dev/fpga0', model=None, adress=('0.0.0.0', 9000)):
       #redirect logs to exeption
-      pcipywrap.redirect_logs_to_exeption()
+      pcilib.redirect_logs_to_exeption()
       #pass Pcipywrap to to server handler
-      self.lib = pcipywrap.Pcipywrap(device, model)
+      self.lib = pcilib.Pcilib(device, model)
       def handler(*args):
          PcilibServerHandler(self.lib, *args)
       MultiThreadedHTTPServer.__init__(self, adress, handler)

@@ -118,64 +118,6 @@ int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *va
  */
 int pcilib_py_eval_func(pcilib_t *ctx, const char *script, const char *func, pcilib_value_t *val);
 
-
-/** Clone pcilib_py_t content without scripts hash
- *  @param[in] in	- pcilib_py_t content to clone
- *  @param[out] err - error
- *  @return 		- NULL or cloned pcilib_py_t content pointer on success
- */
-pcilib_py_t* pcilib_init_py_ctx(pcilib_py_t* in, int *err);
-
-/**
- * @brief pcilib_t independent variant  pcilib_free_py
- * @param ctx_py[in,out] - pcilib_py_t context
- */
-void pcilib_free_py_ctx(pcilib_py_t *ctx_py);
-
-/** pcilib_t independent variant of pcilib_py_eval_func()
- * @param ctx_py[in,out] - pcilib_py_t context
- * @param name[in] - script name
- * @param name[in] - function name
- * @param pyval[in] - input value (will be decref in this fucntion)
- * @param err[out] - error
- * @return value returned by python function
- */
-pcilib_py_object* pcilib_py_ctx_eval_func(pcilib_py_t *ctx_py,
-                                          const char *name,
-                                          const char *func_name, 
-                                          pcilib_py_object *pyval, 
-                                          int *err);
-
-/**
- * @brief pcilib_t independent variant of pcilib_py_add_script_dir
- * @param ctx_py[in,out] - pcilib_py_t context
- * @param[in] location 	- NULL or path to additional scripts
- * @return
- */
-int pcilib_py_ctx_add_script_dir(pcilib_py_t *ctx_py, const char *location);
-
-/**
- * @brief pcilib_t independent variant of pcilib_py_load_script
- * @param ctx_py[in,out] - pcilib_py_t context
- * @param[in] name	- script name, the passed variable is referenced and, hence, should have static duration
- * @return
- */
-int pcilib_py_ctx_load_script(pcilib_py_t *ctx_py, const char *name);
-
-/**
- * @brief Returns information about scripts aviable in model
- * @param ctx_py[in,out] - pcilib_py_t context
- * @return List with information about scripts
- */
-pcilib_py_object *pcilib_py_ctx_get_scripts_info(pcilib_py_t *ctx_py);
-
-/** Wrap for PyDict_SetItem, with decrease reference counting after set.
- */
-void pcilib_pydict_set_item(pcilib_py_object* dict, pcilib_py_object* name, pcilib_py_object* value);
-
-/** Wrap for PyList_Append, with decrease reference counting after append.
- */
-void pcilib_pylist_append(pcilib_py_object* list, pcilib_py_object* value);
 #ifdef __cplusplus
 }
 #endif
