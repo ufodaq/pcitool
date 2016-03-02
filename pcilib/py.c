@@ -135,19 +135,19 @@ int pcilib_init_py(pcilib_t *ctx) {
 		
     ctx->py->main_module = PyImport_AddModule("__parser__");
     if (!ctx->py->main_module) {
-	pcilib_python_error("Error importing python parser");
+	pcilib_python_warning("Error importing python parser");
         return PCILIB_ERROR_FAILED;
     }
 
     ctx->py->global_dict = PyModule_GetDict(ctx->py->main_module);
     if (!ctx->py->global_dict) {
-	pcilib_python_error("Error locating global python dictionary");
+	pcilib_python_warning("Error locating global python dictionary");
         return PCILIB_ERROR_FAILED;
     }
 
     PyObject *pywrap = PyImport_ImportModule(PCILIB_PYTHON_WRAPPER);
     if (!pywrap) {
-	pcilib_python_error("Error importing pcilib python wrapper");
+	pcilib_python_warning("Error importing pcilib python wrapper");
 	return PCILIB_ERROR_FAILED;
     }
 	
@@ -158,7 +158,7 @@ int pcilib_init_py(pcilib_t *ctx) {
     Py_XDECREF(mod_name);
 	
     if (!ctx->py->pcilib_pywrap) {
-	pcilib_python_error("Error initializing python wrapper");
+	pcilib_python_warning("Error initializing python wrapper");
         return PCILIB_ERROR_FAILED;
     }
 #endif /* HAVE_PYTHON */
@@ -172,6 +172,8 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
     PyObject *pypath, *pynewdir;
     PyObject *pydict, *pystr, *pyret = NULL;
     char *script_dir;
+
+    if (!ctx->py) return 0;
 
     const char *model_dir = getenv("PCILIB_MODEL_DIR");
     if (!model_dir) model_dir = PCILIB_MODEL_DIR;
@@ -188,13 +190,13 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
 
     pypath = PySys_GetObject("path");
     if (!pypath) {
-	pcilib_python_error("Can't get python path");
+	pcilib_python_warning("Can't get python path");
 	return PCILIB_ERROR_FAILED;
     }
 
     pynewdir = PyUnicode_FromString(script_dir);
     if (!pynewdir) {
-	pcilib_python_error("Can't create python string");
+	pcilib_python_warning("Can't create python string");
 	return PCILIB_ERROR_MEMORY;
     }
     
@@ -224,7 +226,7 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
     Py_DECREF(pynewdir);
 
     if (err) {
-	pcilib_python_error("Can't add directory (%s) to python path", script_dir);
+	pcilib_python_warning("Can't add directory (%s) to python path", script_dir);
 	return err;
     }
 #endif /* HAVE_PYTHON */
@@ -267,6 +269,7 @@ int pcilib_py_load_script(pcilib_t *ctx, const char *script_name) {
     PyObject* pymodule;
     pcilib_script_t *module = NULL;
 
+    if (!ctx->py) return 0;
 
     char *module_name = strdupa(script_name);
     if (!module_name) return PCILIB_ERROR_MEMORY;
@@ -304,7 +307,12 @@ int pcilib_py_get_transform_script_properties(pcilib_t *ctx, const char *script_
     PyObject *dict;
     PyObject *pystr;
     pcilib_script_t *module;
-	
+
+    if (!ctx->py) {
+	if (mode_ret) *mode_ret = mode;
+	return 0;
+    }
+
     HASH_FIND_STR(ctx->py->script_hash, script_name, module);
 
     if(!module) {
@@ -343,7 +351,9 @@ pcilib_py_object *pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *va
 
     long ival;
     double fval;
-	
+
+    if (!ctx->py) return NULL;
+
     gstate = PyGILState_Ensure();
     switch(val->type) {
      case PCILIB_TYPE_LONG:
@@ -383,7 +393,9 @@ int pcilib_set_value_from_pyobject(pcilib_t* ctx, pcilib_value_t *val, pcilib_py
     int err = 0;
     PyObject *pyval = (PyObject*)pval;
     PyGILState_STATE gstate;
-	
+
+    if (!ctx->py) return PCILIB_ERROR_NOTINITIALIZED;
+
     gstate = PyGILState_Ensure();
     if (PyLong_Check(pyval)) {
         err = pcilib_set_value_from_int(ctx, val, PyLong_AsLong(pyval));
@@ -536,6 +548,8 @@ int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *va
     char *code;
     PyObject* obj;
 
+    if (!ctx->py) return PCILIB_ERROR_NOTINITIALIZED;
+
     code = pcilib_py_parse_string(ctx, codestr, value);
     if (!code) {
         pcilib_error("Failed to parse registers in the code: %s", codestr);
@@ -571,6 +585,8 @@ int pcilib_py_eval_func(pcilib_t *ctx, const char *script_name, const char *func
     PyObject *pyfunc;
     PyObject *pyval = NULL, *pyret;
     pcilib_script_t *module = NULL;
+
+    if (!ctx->py) return PCILIB_ERROR_NOTINITIALIZED;
 
     HASH_FIND_STR(ctx->py->script_hash, script_name, module);
 

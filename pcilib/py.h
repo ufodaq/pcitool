@@ -5,6 +5,7 @@
 #include <pcilib/error.h>
 
 #define pcilib_python_error(...)	pcilib_log_python_error(__FILE__, __LINE__, PCILIB_LOG_DEFAULT, PCILIB_LOG_ERROR, __VA_ARGS__)
+#define pcilib_python_warning(...)	pcilib_log_python_error(__FILE__, __LINE__, PCILIB_LOG_DEFAULT, PCILIB_LOG_WARNING, __VA_ARGS__)
 
 typedef struct pcilib_py_s pcilib_py_t;
 typedef void pcilib_py_object;

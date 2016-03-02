@@ -147,9 +147,8 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	
 	err = pcilib_init_py(ctx);
 	if (err) {
-	    pcilib_error("Error (%i) initializing python subsystem", err);
-	    pcilib_close(ctx);
-	    return NULL;
+	    pcilib_warning("Error (%i) initializing python subsystem", err);
+	    pcilib_free_py(ctx);
 	}
 
 	ctx->alloc_reg = PCILIB_DEFAULT_REGISTER_SPACE;
@@ -191,22 +190,22 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 
 	if (!ctx->model)
 	    ctx->model = strdup(model?model:"pci");
-	    
+
 	err = pcilib_py_add_script_dir(ctx, NULL);
 	if (err) {
-	    pcilib_error("Error (%i) add script path to python path", err);
-	    pcilib_close(ctx);
-	    return NULL;
+	    pcilib_warning("Error (%i) add script path to python path", err);
+	    pcilib_free_py(ctx);
+	    err = 0;
 	}
-	
-	
+
+
 	xmlerr = pcilib_init_xml(ctx, ctx->model);
 	if ((xmlerr)&&(xmlerr != PCILIB_ERROR_NOTFOUND)) {
 	    pcilib_error("Error (%i) initializing XML subsystem for model %s", xmlerr, ctx->model);
 	    pcilib_close(ctx);
 	    return NULL;
 	}
-	
+
 
 	    // We have found neither standard model nor XML
 	if ((err)&&(xmlerr)) {
