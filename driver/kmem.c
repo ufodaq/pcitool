@@ -137,7 +137,11 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	 */
 	switch (kmem_entry->type&PCILIB_KMEM_TYPE_MASK) {
 	 case PCILIB_KMEM_TYPE_CONSISTENT:
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	    retptr = kmalloc( kmem_handle->size, GFP_KERNEL);
+#else /* PCIDRIVER_DUMMY_DEVICE */
 	    retptr = pci_alloc_consistent( privdata->pdev, kmem_handle->size, &(kmem_entry->dma_handle) );
+#endif /* PCIDRIVER_DUMMY_DEVICE */
 	    break;
 	 case PCILIB_KMEM_TYPE_REGION:
 	    retptr = ioremap(kmem_handle->pa,  kmem_handle->size);
@@ -162,6 +166,7 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 	    kmem_entry->dma_handle = 0;
 
 	    if (retptr) {
+#ifndef PCIDRIVER_DUMMY_DEVICE
 	        if (kmem_entry->type == PCILIB_KMEM_TYPE_DMA_S2C_PAGE) {
 		    kmem_entry->direction = PCI_DMA_TODEVICE;
     		    kmem_entry->dma_handle = pci_map_single(privdata->pdev, retptr, kmem_handle->size, PCI_DMA_TODEVICE);
@@ -178,6 +183,7 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 		    
 		    }
 		}
+#endif /* ! PCIDRIVER_DUMMY_DEVICE */
 	    }
 	    
 	    break;
@@ -361,6 +367,7 @@ int pcidriver_kmem_sync_entry( pcidriver_privdata_t *privdata, pcidriver_kmem_en
 	if (kmem_entry->direction == PCI_DMA_NONE)
 		return -EINVAL;
 
+#ifndef PCIDRIVER_DUMMY_DEVICE
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,11)
 	switch (direction) {
 		case PCILIB_KMEM_SYNC_TODEVICE:
@@ -391,6 +398,7 @@ int pcidriver_kmem_sync_entry( pcidriver_privdata_t *privdata, pcidriver_kmem_en
 			return -EINVAL;				/* wrong direction parameter */
 	}
 #endif
+#endif /* ! PCIDRIVER_DUMMY_DEVICE */
 
 	return 0;	/* success */
 }
@@ -480,12 +488,17 @@ int pcidriver_kmem_free_entry(pcidriver_privdata_t *privdata, pcidriver_kmem_ent
 	/* Release DMA memory */
 	switch (kmem_entry->type&PCILIB_KMEM_TYPE_MASK) {
 	 case PCILIB_KMEM_TYPE_CONSISTENT:
+#ifdef PCIDRIVER_DUMMY_DEVICE
+	    kfree((void*)(kmem_entry->cpua));
+#else /* PCIDRIVER_DUMMY_DEVICE */
 	    pci_free_consistent( privdata->pdev, kmem_entry->size, (void *)(kmem_entry->cpua), kmem_entry->dma_handle );
+#endif /* PCIDRIVER_DUMMY_DEVICE */
 	    break;
 	 case PCILIB_KMEM_TYPE_REGION:
 	    iounmap((void *)(kmem_entry->cpua));
 	    break;
 	 case PCILIB_KMEM_TYPE_PAGE:
+#ifndef PCIDRIVER_DUMMY_DEVICE
 	    if (kmem_entry->dma_handle) {
 		if (kmem_entry->type == PCILIB_KMEM_TYPE_DMA_S2C_PAGE) {
 		    pci_unmap_single(privdata->pdev, kmem_entry->dma_handle, kmem_entry->size, PCI_DMA_TODEVICE);
@@ -493,6 +506,7 @@ int pcidriver_kmem_free_entry(pcidriver_privdata_t *privdata, pcidriver_kmem_ent
 		    pci_unmap_single(privdata->pdev, kmem_entry->dma_handle, kmem_entry->size, PCI_DMA_FROMDEVICE);
 		}
 	    }
+#endif /* ! PCIDRIVER_DUMMY_DEVICE */
 	    free_pages((unsigned long)kmem_entry->cpua, get_order(kmem_entry->size));
 	    break;
 	}

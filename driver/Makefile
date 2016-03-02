@@ -1,3 +1,4 @@
+CONFIG_MODULE_SIG=n
 
 obj-m := pciDriver.o
 pciDriver-objs := base.o int.o umem.o kmem.o sysfs.o ioctl.o compat.o
@@ -7,6 +8,12 @@ INSTALLDIR ?= /lib/modules/$(shell uname -r)/kernel/extra
 PWD := $(shell pwd)
 
 EXTRA_CFLAGS += -I$(M)/..
+
+ifdef DUMMY_DEVICE
+ifneq ($(DUMMY_DEVICE), 0)
+    EXTRA_CFLAGS += -DPCIDRIVER_DUMMY_DEVICE
+endif
+endif
 
 default:
 	@KERNEL_GCC_VERSION=`cat /proc/version | head -n1 | cut -d " " -f 7` ;\
@@ -39,7 +46,7 @@ default:
 	build_date=`date "+%Y/%m/%d %H:%M:%S"` ;\
 	build="Built at $$build_date by $$build_user" ;\
 	revision="Revision $$build_revision from $$build_branch by $$build_author at $$build_path, last modification from $$build_lastmod" ;\
-	echo -e "#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES \"$$build_changes\"\\n" > build.h ;\
+	/bin/echo -e "#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES \"$$build_changes\"\\n" > build.h ;\
 	$(MAKE) $(CFLAGS) -C $(KERNELDIR) M=$(PWD) CC=$$CC modules
 
 install:

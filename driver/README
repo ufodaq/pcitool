@@ -1,0 +1,4 @@
+make <OPTIONS>
+    V=1					verbose mode
+    RELAXED_GCC_CHECK=1			allow difference in micro version of gcc used to compile kernel and pcidriver module
+    DUMMY_DEVICE=1			build dummy device driver (does not require PCI device)
