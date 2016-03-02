@@ -69,6 +69,9 @@ static dev_t pcidriver_devt;
 /* Number of devices allocated */
 static atomic_t pcidriver_deviceCount;
 
+/* Private data for probed devices */
+static pcidriver_privdata_t* pcidriver_privdata[MAXDEVICES];
+
 /* Sysfs attributes */
 static DEVICE_ATTR(mmap_mode, 0664, pcidriver_show_mmap_mode, pcidriver_store_mmap_mode);
 static DEVICE_ATTR(mmap_area, 0664, pcidriver_show_mmap_area, pcidriver_store_mmap_area);

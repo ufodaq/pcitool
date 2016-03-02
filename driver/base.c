@@ -211,7 +211,7 @@ MODULE_LICENSE("GPL v2");
 static struct class_compat *pcidriver_class;
 
 #ifdef PCIDRIVER_DUMMY_DEVICE
-pcidriver_privdata_t *pcidriver_privdata = NULL;
+pcidriver_privdata_t *pcidriver_dummydata = NULL;
 #endif /* PCIDRIVER_DUMMY_DEVICE */
 
 /**
@@ -225,6 +225,8 @@ static int __init pcidriver_init(void)
 
 	/* Initialize the device count */
 	atomic_set(&pcidriver_deviceCount, 0);
+	
+	memset(pcidriver_privdata, 0, sizeof(pcidriver_privdata));
 
 	/* Allocate character device region dynamically */
 	if ((err = alloc_chrdev_region(&pcidriver_devt, MINORNR, MAXDEVICES, NODENAME)) != 0) {
@@ -377,6 +379,8 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 		err = -ENOMEM;
 		goto probe_nomem;
 	}
+	
+	privdata->devid = devid;
 
 	INIT_LIST_HEAD(&(privdata->kmem_list));
 	spin_lock_init(&(privdata->kmemlist_lock));
@@ -387,7 +391,7 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 	atomic_set(&privdata->umem_count, 0);
 
 #ifdef PCIDRIVER_DUMMY_DEVICE
-	pcidriver_privdata = privdata;
+	pcidriver_dummydata = privdata;
 #else /* PCIDRIVER_DUMMY_DEVICE */
 	pci_set_drvdata(pdev, privdata);
 	privdata->pdev = pdev;
@@ -443,6 +447,8 @@ static int __devinit pcidriver_probe(struct pci_dev *pdev, const struct pci_devi
 		goto probe_cdevadd_fail;
 	}
 
+        pcidriver_privdata[devid] = privdata;
+
 	return 0;
 
 probe_device_create_fail:
@@ -473,12 +479,15 @@ static void __devexit pcidriver_remove(struct pci_dev *pdev)
 	pcidriver_privdata_t *privdata;
 
 #ifdef PCIDRIVER_DUMMY_DEVICE
-	privdata = pcidriver_privdata;
-	pcidriver_privdata = NULL;
+	privdata = pcidriver_dummydata;
+	pcidriver_dummydata = NULL;
 #else /* PCIDRIVER_DUMMY_DEVICE */
 	/* Get private data from the device */
 	privdata = pci_get_drvdata(pdev);
 #endif /* PCIDRIVER_DUMMY_DEVICE */
+
+            // Theoretically we should lock here and when using...
+        pcidriver_privdata[privdata->devid] = NULL;
 
 	/* Removing sysfs attributes from class device */
 	#define sysfs_attr(name) do { \
@@ -728,4 +737,15 @@ int pcidriver_mmap_pci(pcidriver_privdata_t *privdata, struct vm_area_struct *vm
 
 	return 0;	/* success */
 #endif /* PCIDRIVER_DUMMY_DEVICE */
+}
+
+pcidriver_privdata_t *pcidriver_get_privdata(int devid) {
+    if (devid >= MAXDEVICES)
+        return NULL;
+
+    return pcidriver_privdata[devid];
+}
+
+void pcidriver_put_privdata(pcidriver_privdata_t *privdata) {
+
 }

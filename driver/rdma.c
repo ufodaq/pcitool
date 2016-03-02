@@ -7,7 +7,12 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/hugetlb.h>
+#include <linux/cdev.h>
 
+#include "config.h"
+#include "compat.h"
+#include "pciDriver.h"
+#include "common.h"
 #include "rdma.h"
 
 static unsigned long pcidriver_follow_pte(struct mm_struct *mm, unsigned long address)
@@ -42,12 +47,28 @@ static unsigned long pcidriver_follow_pte(struct mm_struct *mm, unsigned long ad
 }
 
 unsigned long pcidriver_resolve_bar(unsigned long address) {
+    int dev, bar;
     unsigned long pfn;
 
     address = (address >> PAGE_SHIFT) << PAGE_SHIFT;
     pfn = pcidriver_follow_pte(current->mm, address);
 
-    return pfn;
+    for (dev = 0; dev < MAXDEVICES; dev++)
+    {
+        pcidriver_privdata_t *privdata =  pcidriver_get_privdata(dev);
+        if (!privdata) continue;
+
+        for (bar = 0; bar < 6; bar++)
+        {
+            unsigned long start = pci_resource_start(privdata->pdev, bar);
+            unsigned long end = start + pci_resource_len(privdata->pdev, bar);
+            if ((pfn >= start)&&(pfn < end))
+                return pfn;
+        }
+        pcidriver_put_privdata(privdata);
+    }
+
+    return 0;
 }
 
 EXPORT_SYMBOL(pcidriver_resolve_bar);

@@ -36,30 +36,28 @@ typedef struct {
 	struct list_head list;
 	unsigned int nr_pages;		/* number of pages for this user memeory area */
 	struct page **pages;		/* list of pointers to the pages */
-	unsigned int nents;			/* actual entries in the scatter/gatter list (NOT nents for the map function, but the result) */
+	unsigned int nents;		/* actual entries in the scatter/gatter list (NOT nents for the map function, but the result) */
 	struct scatterlist *sg;		/* list of sg entries */
 	struct class_device_attribute sysfs_attr;	/* initialized when adding the entry */
 } pcidriver_umem_entry_t;
 
 /* Hold the driver private data */
 typedef struct  {
-	dev_t devno;						/* device number (major and minor) */
+        int devid;                                      /* the device id */
+	dev_t devno;					/* device number (major and minor) */
 	struct pci_dev *pdev;				/* PCI device */
-	struct class_device *class_dev;		/* Class device */
-	struct cdev cdev;					/* char device struct */
-	int mmap_mode;						/* current mmap mode */
-	int mmap_area;						/* current PCI mmap area */
+	struct class_device *class_dev;                 /* Class device */
+	struct cdev cdev;				/* char device struct */
+	int mmap_mode;					/* current mmap mode */
+	int mmap_area;					/* current PCI mmap area */
 
 #ifdef ENABLE_IRQ
-	int irq_enabled;					/* Non-zero if IRQ is enabled */
-	int irq_count;						/* Just an IRQ counter */
+	int irq_enabled;				/* Non-zero if IRQ is enabled */
+	int irq_count;					/* Just an IRQ counter */
 
-	wait_queue_head_t irq_queues[ PCIDRIVER_INT_MAXSOURCES ];
-										/* One queue per interrupt source */
-	atomic_t irq_outstanding[ PCIDRIVER_INT_MAXSOURCES ];
-										/* Outstanding interrupts per queue */
-	volatile unsigned int *bars_kmapped[6];		/* PCI BARs mmapped in kernel space */
-
+	wait_queue_head_t irq_queues[ PCIDRIVER_INT_MAXSOURCES ];       /* One queue per interrupt source */
+	atomic_t irq_outstanding[ PCIDRIVER_INT_MAXSOURCES ];           /* Outstanding interrupts per queue */
+	volatile unsigned int *bars_kmapped[6];		                /* PCI BARs mmapped in kernel space */
 #endif
 	
 	spinlock_t kmemlist_lock;			/* Spinlock to lock kmem list operations */
@@ -80,6 +78,10 @@ typedef struct  {
 
 void pcidriver_module_get(pcidriver_privdata_t *privdata);
 void pcidriver_module_put(pcidriver_privdata_t *privdata);
+
+pcidriver_privdata_t *pcidriver_get_privdata(int devid);
+void pcidriver_put_privdata(pcidriver_privdata_t *privdata);
+
 
 /*************************************************************************/
 /* Some nice defines that make code more readable */
