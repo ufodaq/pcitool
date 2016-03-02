@@ -17,12 +17,7 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 
-#include "config.h"			/* compile-time configuration */
-#include "compat.h"			/* compatibility definitions for older linux */
-#include "pciDriver.h"			/* external interface for the driver */
-#include "common.h"			/* internal definitions for all parts */
-#include "kmem.h"			/* prototypes for kernel memory */
-#include "sysfs.h"			/* prototypes for sysfs */
+#include "base.h"
 
 
 /**
@@ -628,9 +623,9 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
                  page_to_pfn(virt_to_page((void*)kmem_entry->cpua)));
 
     if ((kmem_entry->type&PCILIB_KMEM_TYPE_MASK) == PCILIB_KMEM_TYPE_REGION) {
-        ret = remap_pfn_range_compat(vma, vma->vm_start, kmem_entry->dma_handle, (vma_size < kmem_entry->size)?vma_size:kmem_entry->size, vma->vm_page_prot);
+        ret = remap_pfn_range(vma, vma->vm_start, (kmem_entry->dma_handle >> PAGE_SHIFT), (vma_size < kmem_entry->size)?vma_size:kmem_entry->size, vma->vm_page_prot);
     } else {
-        ret = remap_pfn_range_cpua_compat(vma, vma->vm_start, kmem_entry->cpua, (vma_size < kmem_entry->size)?vma_size:kmem_entry->size, vma->vm_page_prot);
+        ret = remap_pfn_range(vma, vma->vm_start, page_to_pfn(virt_to_page((void*)(kmem_entry->cpua))), (vma_size < kmem_entry->size)?vma_size:kmem_entry->size, vma->vm_page_prot);
     }
 
     if (ret) {

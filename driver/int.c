@@ -7,36 +7,6 @@
  *
  */
 
-/*
- * Change History:
- *
- * $Log: not supported by cvs2svn $
- * Revision 1.7  2008-01-11 10:18:28  marcus
- * Modified interrupt mechanism. Added atomic functions and queues, to address race conditions. Removed unused interrupt code.
- *
- * Revision 1.6  2007-11-04 20:58:22  marcus
- * Added interrupt generator acknowledge.
- * Fixed wrong operator.
- *
- * Revision 1.5  2007-10-31 15:42:21  marcus
- * Added IG ack for testing, may be removed later.
- *
- * Revision 1.4  2007-07-17 13:15:56  marcus
- * Removed Tasklets.
- * Using newest map for the ABB interrupts.
- *
- * Revision 1.3  2007-07-05 15:30:30  marcus
- * Added support for both register maps of the ABB.
- *
- * Revision 1.2  2007-05-29 07:50:18  marcus
- * Split code into 2 files. May get merged in the future again....
- *
- * Revision 1.1  2007/03/01 16:57:43  marcus
- * Divided driver file to ease the interrupt hooks for the user of the driver.
- * Modified Makefile accordingly.
- *
- */
-
 #include <linux/version.h>
 #include <linux/string.h>
 #include <linux/types.h>
@@ -48,41 +18,47 @@
 #include <linux/sched.h>
 #include <stdbool.h>
 
-#include "config.h"
+#include "base.h"
 
-#include "compat.h"
-
-#include "pciDriver.h"
-
-#include "common.h"
-
-#include "int.h"
-
-/*
- * The ID between IRQ_SOURCE in irq_outstanding and the actual source is arbitrary.
- * Therefore, be careful when communicating with multiple implementations.
+/**
+ *
+ * Acknowledges the receival of an interrupt to the card.
+ *
+ * @returns true if the card was acknowledget
+ * @returns false if the interrupt was not for one of our cards
+ *
+ * @see check_acknowlegde_channel
+ *
  */
+static bool pcidriver_irq_acknowledge(pcidriver_privdata_t *privdata)
+{
+    int channel = 0;
 
-/* IRQ_SOURCES */
-#define ABB_IRQ_CH0 	        0
-#define ABB_IRQ_CH1 	        1
-#define ABB_IRQ_IG 	        2
+    atomic_inc(&(privdata->irq_outstanding[channel]));
+    wake_up_interruptible(&(privdata->irq_queues[channel]));
 
-/* See ABB user’s guide, register definitions (3.1) */
-#define ABB_INT_ENABLE 	        (0x0010 >> 2)
-#define ABB_INT_STAT 	        (0x0008 >> 2)
+    return true;
+}
 
-#define ABB_INT_CH1_TIMEOUT     (1 << 4)
-#define ABB_INT_CH0_TIMEOUT     (1 << 5)
-#define ABB_INT_IG  	        (1 << 2)
-#define ABB_INT_CH0 	        (1 << 1) /* downstream */
-#define ABB_INT_CH1 	        (1)     /* upstream */
+/**
+ *
+ * Handles IRQs. At the moment, this acknowledges the card that this IRQ
+ * was received and then increases the driver's IRQ counter.
+ *
+ * @see pcidriver_irq_acknowledge
+ *
+ */
+static irqreturn_t pcidriver_irq_handler(int irq, void *dev_id)
+{
+    pcidriver_privdata_t *privdata = (pcidriver_privdata_t *)dev_id;
 
-#define ABB_CH0_CTRL  	        (108 >> 2)
-#define ABB_CH1_CTRL  	        (72 >> 2)
-#define ABB_CH_RESET 	        (0x0201000A)
-#define ABB_IG_CTRL 	        (0x0080 >> 2)
-#define ABB_IG_ACK 	        (0x00F0)
+    if (!pcidriver_irq_acknowledge(privdata))
+        return IRQ_NONE;
+
+    privdata->irq_count++;
+    return IRQ_HANDLED;
+}
+
 
 /**
  *
@@ -167,7 +143,7 @@ int pcidriver_probe_irq(pcidriver_privdata_t *privdata)
         privdata->msi_mode = 1;
 
     /* register interrupt handler */
-    if ((err = request_irq(privdata->pdev->irq, pcidriver_irq_handler, MODNAME, privdata)) != 0) {
+    if ((err = request_irq(privdata->pdev->irq, pcidriver_irq_handler, IRQF_SHARED, MODNAME, privdata)) != 0) {
         mod_info("Error registering the interrupt handler. Disabling interrupts for this device\n");
         return 0;
     }
@@ -215,44 +191,3 @@ void pcidriver_irq_unmap_bars(pcidriver_privdata_t *privdata)
     }
 }
 
-/**
- *
- * Acknowledges the receival of an interrupt to the card.
- *
- * @returns true if the card was acknowledget
- * @returns false if the interrupt was not for one of our cards
- *
- * @see check_acknowlegde_channel
- *
- */
-static bool pcidriver_irq_acknowledge(pcidriver_privdata_t *privdata)
-{
-    int channel = 0;
-//	volatile unsigned int *bar;
-//	bar = privdata->bars_kmapped[0];
-//	mod_info_dbg("interrupt registers. ISR: %x, IER: %x\n", bar[ABB_INT_STAT], bar[ABB_INT_ENABLE]);
-
-    atomic_inc(&(privdata->irq_outstanding[channel]));
-    wake_up_interruptible(&(privdata->irq_queues[channel]));
-
-    return true;
-}
-
-/**
- *
- * Handles IRQs. At the moment, this acknowledges the card that this IRQ
- * was received and then increases the driver's IRQ counter.
- *
- * @see pcidriver_irq_acknowledge
- *
- */
-IRQ_HANDLER_FUNC(pcidriver_irq_handler)
-{
-    pcidriver_privdata_t *privdata = (pcidriver_privdata_t *)dev_id;
-
-    if (!pcidriver_irq_acknowledge(privdata))
-        return IRQ_NONE;
-
-    privdata->irq_count++;
-    return IRQ_HANDLED;
-}

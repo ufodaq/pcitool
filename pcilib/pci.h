@@ -18,7 +18,7 @@
 #include <uthash.h>
 
 #include "linux-3.10.h"
-#include "driver/pciDriver.h"
+#include "driver/ioctl.h"
 
 #include "timing.h"
 #include "cpu.h"

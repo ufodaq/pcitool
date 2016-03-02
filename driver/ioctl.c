@@ -32,13 +32,7 @@
 
 #include "../pcilib/version.h"
 
-#include "config.h" 			/* Configuration for the driver */
-#include "compat.h" 			/* Compatibility functions/definitions */
-#include "pciDriver.h" 			/* External interface for the driver */
-#include "common.h" 			/* Internal definitions for all parts */
-#include "kmem.h" 			/* Internal definitions for kernel memory */
-#include "umem.h" 			/* Internal definitions for user space memory */
-#include "ioctl.h"			/* Internal definitions for the ioctl part */
+#include "base.h"
 
 /** Declares a variable of the given type with the given name and copies it from userspace */
 #define READ_FROM_USER(type, name) \
@@ -87,12 +81,7 @@ static int ioctl_mmap_area(pcidriver_privdata_t *privdata, unsigned long arg)
 }
 
 /**
- *
  * Reads/writes a byte/word/dword of the device's PCI config.
- *
- * @see pcidriver_pci_read
- * @see pcidriver_pci_write
- *
  */
 static int ioctl_pci_config_read_write(pcidriver_privdata_t *privdata, unsigned int cmd, unsigned long arg)
 {
@@ -103,7 +92,7 @@ static int ioctl_pci_config_read_write(pcidriver_privdata_t *privdata, unsigned 
     READ_FROM_USER(pci_cfg_cmd, pci_cmd);
 
     if (cmd == PCIDRIVER_IOC_PCI_CFG_RD) {
-        switch (pci_cmd.size) {
+      switch (pci_cmd.size) {
         case PCIDRIVER_PCI_CFG_SZ_BYTE:
             ret = pci_read_config_byte( privdata->pdev, pci_cmd.addr, &(pci_cmd.val.byte) );
             break;
@@ -115,9 +104,9 @@ static int ioctl_pci_config_read_write(pcidriver_privdata_t *privdata, unsigned 
             break;
         default:
             return -EINVAL;		/* Wrong size setting */
-        }
+      }
     } else {
-        switch (pci_cmd.size) {
+      switch (pci_cmd.size) {
         case PCIDRIVER_PCI_CFG_SZ_BYTE:
             ret = pci_write_config_byte( privdata->pdev, pci_cmd.addr, pci_cmd.val.byte );
             break;
@@ -130,7 +119,7 @@ static int ioctl_pci_config_read_write(pcidriver_privdata_t *privdata, unsigned 
         default:
             return -EINVAL;		/* Wrong size setting */
             break;
-        }
+      }
     }
 
     WRITE_TO_USER(pci_cfg_cmd, pci_cmd);
@@ -140,11 +129,7 @@ static int ioctl_pci_config_read_write(pcidriver_privdata_t *privdata, unsigned 
 }
 
 /**
- *
  * Gets the PCI information for the device.
- *
- * @see pcidriver_pci_info
- *
  */
 static int ioctl_pci_info(pcidriver_privdata_t *privdata, unsigned long arg)
 {

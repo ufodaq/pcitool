@@ -9,11 +9,7 @@
 #include <linux/hugetlb.h>
 #include <linux/cdev.h>
 
-#include "config.h"
-#include "compat.h"
-#include "pciDriver.h"
-#include "common.h"
-#include "rdma.h"
+#include "base.h"
 
 static unsigned long pcidriver_follow_pte(struct mm_struct *mm, unsigned long address)
 {

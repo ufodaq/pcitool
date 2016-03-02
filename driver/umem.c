@@ -18,12 +18,7 @@
 #include <linux/pagemap.h>
 #include <linux/sched.h>
 
-#include "config.h"			/* compile-time configuration */
-#include "compat.h"			/* compatibility definitions for older linux */
-#include "pciDriver.h"			/* external interface for the driver */
-#include "common.h"		/* internal definitions for all parts */
-#include "umem.h"		/* prototypes for kernel memory */
-#include "sysfs.h"		/* prototypes for sysfs */
+#include "base.h"
 
 /**
  *
@@ -109,7 +104,7 @@ int pcidriver_umem_sgmap(pcidriver_privdata_t *privdata, umem_handle_t *umem_han
     /* Lock the pages, then populate the SG list with the pages */
     /* page0 is different */
     if ( !PageReserved(pages[0]) )
-        compat_lock_page(pages[0]);
+        __set_page_locked(pages[0]);
 
     offset = (umem_handle->vma & ~PAGE_MASK);
     length = (umem_handle->size > (PAGE_SIZE-offset) ? (PAGE_SIZE-offset) : umem_handle->size);
@@ -120,7 +115,7 @@ int pcidriver_umem_sgmap(pcidriver_privdata_t *privdata, umem_handle_t *umem_han
     for(i=1; i<nr_pages; i++) {
         /* Lock page first */
         if ( !PageReserved(pages[i]) )
-            compat_lock_page(pages[i]);
+            __set_page_locked(pages[i]);
 
         /* Populate the list */
         sg_set_page(&sg[i], pages[i], ((count > PAGE_SIZE) ? PAGE_SIZE : count), 0);
@@ -169,7 +164,7 @@ umem_sgmap_unmap:
     if (nr_pages > 0) {
         for(i=0; i<nr_pages; i++) {
             if (PageLocked(pages[i]))
-                compat_unlock_page(pages[i]);
+                __clear_page_locked(pages[i]);
             if (!PageReserved(pages[i]))
                 set_page_dirty(pages[i]);
             page_cache_release(pages[i]);
@@ -201,7 +196,7 @@ int pcidriver_umem_sgunmap(pcidriver_privdata_t *privdata, pcidriver_umem_entry_
             /* Mark pages as Dirty and unlock it */
             if ( !PageReserved( umem_entry->pages[i] )) {
                 SetPageDirty( umem_entry->pages[i] );
-                compat_unlock_page(umem_entry->pages[i]);
+                __clear_page_locked(umem_entry->pages[i]);
             }
             /* and release it from the cache */
             page_cache_release( umem_entry->pages[i] );
