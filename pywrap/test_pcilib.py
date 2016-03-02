@@ -1,5 +1,5 @@
 import threading
-import pcipywrap
+import pcilib
 import random
 import os
 import json
@@ -7,7 +7,7 @@ import requests
 import time
 from optparse import OptionParser, OptionGroup
 
-class test_pcipywrap():
+class test_pcilib():
    def __init__(self, 
                 device, 
                 model, 
@@ -35,7 +35,7 @@ class test_pcipywrap():
       #create pcilib_instance
       self.device = device
       self.model = model
-      self.pcilib = pcipywrap.Pcipywrap(device, model)
+      self.pcilib = pcilib.pcilib(device, model)
       self.num_threads = num_threads
       self.write_percentage = write_percentage
       self.register = register
@@ -55,17 +55,17 @@ class test_pcipywrap():
                 {'command': 'unlock_global'},
                 {'command': 'help'}]  
       r = requests.get(url, data=json.dumps(payload[message]), headers=headers)
-      print json.dumps(r.json(), sort_keys=True, indent=3, separators=(',', ': '))
+      print(json.dumps(r.json(), sort_keys=True, indent=3, separators=(',', ': ')))
     
    def testThreadSafeReadWrite(self):
       def threadFunc():
          if random.randint(0, 100) >= (self.write_percentage * 100):
             ret = self.pcilib.get_property(self.prop)
-            print self.register, ':', ret
+            print(self.register, ':', ret)
             del ret
          else:
             val = random.randint(0, 65536)
-            print 'set value:', val
+            print('set value:', val)
             self.pcilib.set_property(val, self.prop)
       try:
          while(1):
@@ -74,25 +74,25 @@ class test_pcipywrap():
                thread_list[i].start()
             for i in range(0, self.num_threads):
                thread_list[i].join()
-            print 'cycle done'
+            print('cycle done')
       except KeyboardInterrupt:
-         print 'testing done'
+         print('testing done')
          pass
    
    def testMemoryLeak(self):
       try:
          while(1):
-            val = random.randint(0, 8096)
-            self.pcilib = pcipywrap.Pcipywrap(self.device, self.model)
-            print self.pcilib.get_property_list(self.branch)
-            print self.pcilib.get_register_info(self.register)
-            print self.pcilib.get_registers_list();
-            print self.pcilib.read_register(self.register)
-            print self.pcilib.write_register(val, self.register)
-            print self.pcilib.get_property(self.prop)
-            print self.pcilib.set_property(val, self.prop)
+            val = long(random.randint(0, 8096))
+            self.pcilib = pcilib.pcilib(self.device, self.model)
+            print(self.pcilib.get_property_list(self.branch))
+            print(self.pcilib.get_register_info(self.register))
+            print(self.pcilib.get_registers_list())
+            print(self.pcilib.write_register(val, self.register))
+            print(self.pcilib.read_register(self.register))
+            print(self.pcilib.set_property(val, self.prop))
+            print(self.pcilib.get_property(self.prop))
       except KeyboardInterrupt:
-         print 'testing done'
+         print('testing done')
          pass
 
    def testServer(self):
@@ -111,14 +111,19 @@ class test_pcipywrap():
       
       def sendRandomMessage():
          message_number = random.randint(1, len(payload) - 1)
-         print 'message number: ', message_number
+         print('message number: ', message_number)
          payload[message_number]['value'] =  random.randint(0, 8096)
          r = requests.get(url, data=json.dumps(payload[message_number]), headers=headers)
-         print json.dumps(r.json(), sort_keys=True, indent=4, separators=(',', ': '))
-      
+         if(r.headers['content-type'] == 'application/json'):
+            print(json.dumps(r.json(), sort_keys=True, indent=3, separators=(',', ': ')))
+         else:
+            print(r.content)      
       try:    
          r = requests.get(url, data=json.dumps(payload[1]), headers=headers)
-         print json.dumps(r.json(), sort_keys=True, indent=3, separators=(',', ': '))
+         if(r.headers['content-type'] == 'application/json'):
+            print(json.dumps(r.json(), sort_keys=True, indent=3, separators=(',', ': ')))
+         else:
+            print(r.content)
    
          while(1):
             time.sleep(self.server_message_delay)
@@ -127,10 +132,10 @@ class test_pcipywrap():
                thread_list[i].start()
             for i in range(0, self.num_threads):
                thread_list[i].join()
-            print 'cycle done'
+            print('cycle done')
             
       except KeyboardInterrupt:
-         print 'testing done'
+         print('testing done')
          pass
 
 if __name__ == '__main__':
@@ -140,7 +145,7 @@ if __name__ == '__main__':
                      type="string", dest="device", default=str('/dev/fpga0'),
                      help="FPGA device (/dev/fpga0)")                     
    parser.add_option("-m", "--model",  action="store",
-                     type="string", dest="model", default=None,
+                     type="string", dest="model", default=str('test'),
                      help="Memory model (autodetected)")
    parser.add_option("-t", "--threads",  action="store",
                      type="int", dest="threads", default=150,
@@ -232,7 +237,7 @@ if __name__ == '__main__':
    opts = parser.parse_args()[0]
 
    #create pcilib test instance
-   lib = test_pcipywrap(opts.device,
+   lib = test_pcilib(opts.device,
                         opts.model,
                         num_threads = opts.threads,
                         write_percentage = opts.write_percentage,

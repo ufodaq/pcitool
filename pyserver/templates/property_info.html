@@ -1,0 +1,91 @@
+{% block content %}
+
+{% if standalone %}
+<script src="{{ url_for('static', filename='codebase/dhtmlx.js') }}"></script>
+<script src="{{ url_for('static', filename='check_err.js') }}"></script>
+{% endif %}
+
+<script>
+   function updateProperty(prop) {
+      var pathToGetProperty = "{{ url_for('process_json_command', command = 'get_property') }}"
+      var completePath = pathToGetProperty + '?prop=' + prop
+      
+      $.getJSON(completePath, function(json){
+                  checkError(json)
+                  var valFieldId = "#set_val_" + prop.split('/').join("_")
+                  $(valFieldId).val(json.value)
+               })
+   }
+   
+   function setProperty(prop)
+   {
+      var value = document.getElementById("set_val_" + prop.split('/').join("_")).value;
+      if(value == "")
+         return
+      
+      var pathToGetProperty = "{{ url_for('process_json_command', command = 'set_property') }}"
+      var completePath = pathToGetProperty + '?prop=' + prop +
+                     '&value=' + value;
+                        
+      $.getJSON(completePath, 
+                function(json) {
+                   checkError(json)
+                   updateProperty(prop)
+                })
+   };
+</script>
+
+<table class="infoTable">
+   <tr class="infoTable">
+      <td class="infoTable">Name</td>
+      <td class="infoTable">Description</td>
+      <td class="infoTable">Value</td>
+      <td class="infoTable">Mode</td>
+      <td class="infoTable">Type</td>
+      <td class="infoTable">Unit</td>
+      <td class="infoTable">Path</td>
+   </tr>
+   {% for property in properties %}
+      <tr class="infoTable">
+         <td class="infoTable">{{ property.name }}</td>
+         <td class="infoTable">
+         {% if 'description' in property %}
+             {{ property.description }}
+         {% endif %}
+         </td>
+         <td class="infoTable">
+            <table>
+               {% if 'R' in property.mode %}
+                  <tr>
+                     <td> 
+                           <input type="text"
+                                  name="set_val_{{ property.path.replace('/', '_') }}"
+                                  id="set_val_{{ property.path.replace('/', '_') }}"
+                                  value="{{ value[property.path] }}" />
+                     </td>
+                     {% if 'W' in property.mode %}
+                     <td> 
+                           <input type="button" value="set" style="width:100%;height:100%" onclick="setProperty('{{ property.path }}')">
+                     </td>
+                     {% endif %}
+                     <td> 
+                        <input type="button" value="update" style="width:100%;height:100%" onclick="updateProperty('{{ property.path }}')">
+                     </td>
+                  </tr>
+               {% endif %}
+            </table>
+         </td>
+         <td class="infoTable">
+            <ul>
+            {% for m in property.mode %}
+               {{ m + ';  '}}
+            {% endfor %}
+            </ul>
+         </td>
+         <td class="infoTable"> {{ property.type }} </td>
+         <td class="infoTable"> {{ property.unit }} </td>
+         <td class="infoTable"> {{ property.path }} </td>
+      </tr>
+   {% endfor %}
+</table>
+{% endblock %}

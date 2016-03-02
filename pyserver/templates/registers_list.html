@@ -1,0 +1,12 @@
+{% block content %}
+{% include 'registers/table_scripts.html' %}
+
+<table class="infoTable">
+{% include 'registers/table_header.html' %}
+{% for register in registers %}
+   {% include 'registers/table_cell.html' %}
+{% endfor %}
+</table>
+{% endblock %}
+
+

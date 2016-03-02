@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <pthread.h>
-#include "pcilib.h"
 #include <stdlib.h>
+
+#include "pcilib.h"
+#include "pcilib/error.h"
 
 const char* prop = "/registers/fpga/reg1";
 char* reg;
@@ -18,14 +20,14 @@ void *get_prop(void *arg)
         err = pcilib_get_property(ctx, prop, &val);
         if(err)
         {
-            printf("err pcilib_read_register\n");
+            pcilib_error("Error in pcilib_read_register");
             return NULL;
         }
         long value = pcilib_get_value_as_int(ctx, &val, &err);
         pcilib_clean_value(ctx, &val);
         if(err)
         {
-            printf("err pcilib_get_value_as_int\n");
+            pcilib_error("Error in pcilib_get_value_as_int");
             return NULL;
         }
         printf("reg = %li\n", value);
@@ -47,20 +49,20 @@ void *read_reg(void *arg)
 
         if(err)
         {
-            printf("err pcilib_read_register\n");
+            pcilib_error("Error in pcilib_read_register");
             return NULL;
         }
         err = pcilib_set_value_from_register_value(ctx, &val, reg_val);
         if(err)
         {
-            printf("err pcilib_set_value_from_register_value\n");
+            pcilib_error("Error in pcilib_set_value_from_register_value");
             return NULL;
         }
         long value = pcilib_get_value_as_int(ctx, &val, &err);
         pcilib_clean_value(ctx, &val);
         if(err)
         {
-            printf("err pcilib_get_value_as_int\n");
+            pcilib_error("Error in pcilib_get_value_as_int");
             return NULL;
         }
         printf("reg = %li\n", value);

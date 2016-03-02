@@ -1,6 +1,6 @@
 project(pcitool)
 
-set(PCILIB_VERSION "0.2.6")
+set(PCILIB_VERSION "0.2.7")
 set(PCILIB_ABI_VERSION "2")
 
 cmake_minimum_required(VERSION 2.8)
@@ -38,8 +38,11 @@ find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
 if (NOT DISABLE_PYTHON)
-    find_package(PythonLibs 2.7 REQUIRED)
-    find_package(PythonInterp 2.7 REQUIRED)
+    set(PYTHON_VERSION 2.7 CACHE STRING "python version")
+
+    find_package(PythonInterp ${PYTHON_VERSION} REQUIRED)
+    find_package(PythonLibs ${PYTHON_VERSION_STRING} EXACT REQUIRED)
+
     find_package(SWIG REQUIRED)
     if (NOT PYTHON_VERSION_STRING VERSION_EQUAL PYTHONLIBS_VERSION_STRING)
 	message (FATAL_ERROR "Version mismatch between python interpreter and libraries")
@@ -128,6 +131,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in ${CMAKE_CURRENT_BINA
 
 if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     file(COPY ${CMAKE_SOURCE_DIR}/xml DESTINATION ${CMAKE_BINARY_DIR})
+    file(COPY ${CMAKE_SOURCE_DIR}/pyserver DESTINATION ${CMAKE_BINARY_DIR})
     file(COPY ${CMAKE_SOURCE_DIR}/pci
 	 DESTINATION ${CMAKE_BINARY_DIR}
 	 FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
