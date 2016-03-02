@@ -46,9 +46,11 @@ typedef struct {
 
 struct pcilib_s {
     int handle;										/**< file handle of device */
-    
-    uintptr_t page_mask;								/**< Selects bits which define offset within the page */
+
     pcilib_driver_version_t driver_version;						/**< Version reported by the driver */
+
+    uintptr_t page_mask;								/**< Selects bits which define offset within the page */
+    int board_info_ready;								/**< Flag indicating if board info is already requested and populated */
     pcilib_board_info_t board_info;							/**< The mandatory information about board as defined by PCI specification */
     pcilib_pcie_link_info_t link_info;							/**< Infomation about PCIe connection */
     char *bar_space[PCILIB_MAX_BARS];							/**< Pointers to the mapped BARs in virtual address space */

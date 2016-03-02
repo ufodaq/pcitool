@@ -566,7 +566,8 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
     if (ctx->version < 3) {
 	if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
 	else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
-	empty_detected_ptr = last_written_addr_ptr - 2;
+	empty_detected_ptr = NULL; // Not properly supported
+//	empty_detected_ptr = last_written_addr_ptr - 2;
     } else {
 	last_written_addr_ptr = desc_va + 2 * sizeof(uint32_t);
 	empty_detected_ptr = desc_va + sizeof(uint32_t);
@@ -589,10 +590,10 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
     do {
 	switch (ret&PCILIB_STREAMING_TIMEOUT_MASK) {
-	    case PCILIB_STREAMING_CONTINUE: 
+	    case PCILIB_STREAMING_CONTINUE:
 		    // Hardware indicates that there is no more data pending and we can safely stop if there is no data in the kernel buffers already
 #ifdef IPEDMA_SUPPORT_EMPTY_DETECTED
-		if (*empty_detected_ptr)
+		if ((empty_detected_ptr)&&(*empty_detected_ptr))
 		    wait = 0;
 		else
 #endif /* IPEDMA_SUPPORT_EMPTY_DETECTED */
@@ -618,7 +619,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	    }
 		
 #ifdef IPEDMA_SUPPORT_EMPTY_DETECTED
-	    if ((ret != PCILIB_STREAMING_REQ_PACKET)&&(*empty_detected_ptr)) break;
+	    if ((ret != PCILIB_STREAMING_REQ_PACKET)&&(empty_detected_ptr)&&(*empty_detected_ptr)) break;
 #endif /* IPEDMA_SUPPORT_EMPTY_DETECTED */
 	    gettimeofday(&cur, NULL);
 	}
@@ -627,7 +628,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	if ((ctx->last_read_addr == DEREF(last_written_addr_ptr))||(DEREF(last_written_addr_ptr) == 0)) {
 #ifdef IPEDMA_SUPPORT_EMPTY_DETECTED
 # ifdef PCILIB_DEBUG_DMA
-	    if ((wait)&&(DEREF(last_written_addr_ptr))&&(!*empty_detected_ptr))
+	    if ((wait)&&(empty_detected_ptr)&&(DEREF(last_written_addr_ptr))&&(!*empty_detected_ptr))
 		pcilib_debug(DMA, "The empty_detected flag is not set, but no data arrived within %lu us", wait);
 # endif /* PCILIB_DEBUG_DMA */
 #endif /* IPEDMA_SUPPORT_EMPTY_DETECTED */
@@ -644,7 +645,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	);
 
 #ifdef IPEDMA_DETECT_PACKETS
-	if ((*empty_detected_ptr)&&(pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, cur_read) == DEREF(last_written_addr_ptr))) packet_flags = PCILIB_DMA_FLAG_EOP;
+	if ((empty_detected_ptr)&&(*empty_detected_ptr)&&(pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, cur_read) == DEREF(last_written_addr_ptr))) packet_flags = PCILIB_DMA_FLAG_EOP;
 	else packet_flags = 0;
 #endif /* IPEDMA_DETECT_PACKETS */
 	
