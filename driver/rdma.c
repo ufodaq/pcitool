@@ -22,26 +22,26 @@ static unsigned long pcidriver_follow_pte(struct mm_struct *mm, unsigned long ad
     pmd_t *pmd;
     pte_t *pte;
 
-    spinlock_t *ptl; 
+    spinlock_t *ptl;
     unsigned long pfn = 0;
 
 
     pgd = pgd_offset(mm, address);
-    if (pgd_none(*pgd) || unlikely(pgd_bad(*pgd))) 
-	return 0;
-        
+    if (pgd_none(*pgd) || unlikely(pgd_bad(*pgd)))
+        return 0;
+
     pud = pud_offset(pgd, address);
-    if (pud_none(*pud) || unlikely(pud_bad(*pud)))     
-	return 0;
+    if (pud_none(*pud) || unlikely(pud_bad(*pud)))
+        return 0;
 
     pmd = pmd_offset(pud, address);
-    if (pmd_none(*pmd)) 
-	return 0;
+    if (pmd_none(*pmd))
+        return 0;
 
     pte = pte_offset_map_lock(mm, pmd, address, &ptl);
     if (!pte_none(*pte))
-	pfn = (pte_pfn(*pte) << PAGE_SHIFT);
-    pte_unmap_unlock(pte, ptl); 
+        pfn = (pte_pfn(*pte) << PAGE_SHIFT);
+    pte_unmap_unlock(pte, ptl);
 
     return pfn;
 }
