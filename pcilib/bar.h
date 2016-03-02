@@ -72,7 +72,21 @@ int pcilib_detect_address(pcilib_t *ctx, pcilib_bar_t *bar, uintptr_t *addr, siz
  */
 char *pcilib_resolve_data_space(pcilib_t *ctx, uintptr_t addr, size_t *size);
 
+/**
+ * Return information about the specified BAR or NULL if BAR is not present in hardware
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] bar	- the PCI BAR number (numbered from 0)
+ * @return		- pointer to structure describing the specified BAR or NULL in case of error
+ */
 const pcilib_bar_info_t *pcilib_get_bar_info(pcilib_t *ctx, pcilib_bar_t bar);
+
+/**
+ * Return a list of BAR memory regions available in the hardware. 
+ * The list is terminated by a dummy BAR description with 0 size.
+ *
+ * @param[in,out] ctx	- pcilib context
+ * @return		- pointer to structure describing the BARs or NULL in case of error
+ */
 const pcilib_bar_info_t *pcilib_get_bar_list(pcilib_t *ctx);
 
 

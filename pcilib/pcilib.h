@@ -1265,7 +1265,7 @@ int pcilib_set_value_from_static_string(pcilib_t *ctx, pcilib_value_t *val, cons
  * @param[in] str	- initializer
  * @return		- 0 on success or memory error
  */
-int pcilib_set_value_from_string(pcilib_t *ctx, pcilib_value_t *value, const char *str);
+int pcilib_set_value_from_string(pcilib_t *ctx, pcilib_value_t *val, const char *str);
 
 /**
  * Get the floating point value from the polymorphic type. May inmply impliced type conversion,

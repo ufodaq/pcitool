@@ -106,23 +106,23 @@ extern "C" {
  * This function either allocates new buffers in the kernel space or just re-uses existing buffers.
  *
  * Sometimes kernel memory is allocated for the specific use-case, for example to provide buffers for DMA engine.
- * It is possible to specify intended use using \a use parameter. 
- * The kernel memory with the specified use (i.e. \a use != 0) can be declared persistent (\a flags include 
- * PCILIB_KMEM_FLAG_PERSISTENT). Such memory will not be de-allocated on clean-up and will be maintained by 
+ * It is possible to specify intended use using \p use parameter. 
+ * The kernel memory with the specified use (i.e. \p use != 0) can be declared persistent (\p flags include 
+ * ::PCILIB_KMEM_FLAG_PERSISTENT). Such memory will not be de-allocated on clean-up and will be maintained by 
  * the kernel module across the runs of various pcilib applications. To re-use persistent kernel memory,
- * PCILIB_KMEM_FLAG_REUSE should be set. In this case, the pcilib will either allocate new kernel memory 
- * or re-use the already allocated kernel buffers with the specified \a use. If PCILIB_KMEM_FLAG_REUSE
+ * ::PCILIB_KMEM_FLAG_REUSE should be set. In this case, the pcilib will either allocate new kernel memory 
+ * or re-use the already allocated kernel buffers with the specified \p use. If ::PCILIB_KMEM_FLAG_REUSE
  * is not set, but the kernel memory with the specified use is already allocated, an error will be returned.
  *
  * It is also possible to allocate persistent kernel memory which can be execlusively used by a single process.
- * The PCILIB_KMEM_FLAG_EXCLUSIVE flag have to be provided to pcilib_alloc_kernel_memory() function in this
+ * The ::PCILIB_KMEM_FLAG_EXCLUSIVE flag have to be provided to pcilib_alloc_kernel_memory() function in this
  * case. Only a single process may call hold a reference to kernel memory. Before next process would be able
  * to obtain it, the process holding the reference should return it using pcilib_free_kernel_memory()
  * call. For example, DMA engine uses exclusive kernel memory to guarantee that exactly one process is 
  * controlling DMA operations.
  *
  * To clean up allocated persistent kernel memory, pcilib_free_kernel_memory() have to be called with
- * PCILIB_KMEM_FLAG_PERSISTENT flag set.
+ * ::PCILIB_KMEM_FLAG_PERSISTENT flag set.
  *
  * @param[in,out] ctx		- pcilib context
  * @param[in] type		- specifies type of allocation (simple pages, DMA pages, consistent memory, etc.)
@@ -138,16 +138,16 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 /**
  * This function either frees the allocated kernel memory or just releases some of the references.
  *
- * Only reference tracking is performed If the PCILIB_KMEM_FLAG_REUSE flag is passed to the 
+ * Only reference tracking is performed If the ::PCILIB_KMEM_FLAG_REUSE flag is passed to the 
  * function. Otherwise, non-persistent memory is released when pcilib_free_kernel_memory() called. 
- * The persistent memory is released if PCILIB_KMEM_FLAG_PERSISTENT is passed in \a flags parameter 
+ * The persistent memory is released if ::PCILIB_KMEM_FLAG_PERSISTENT is passed in \p flags parameter 
  * unless the hold references are preventing us from releasing this memory. The error is reported
- * in this case. The kernel memory can be freed irrespective of hold references if PCILIB_KMEM_FLAG_FORCE 
+ * in this case. The kernel memory can be freed irrespective of hold references if ::PCILIB_KMEM_FLAG_FORCE 
  * flag is specified.
  *
  * There are several types of references:
  * - The hardware reference - indicates that the memory may be used by DMA engine of the device. It is set
- * if pcilib_alloc_kernel_memory() is executed with PCILIB_KMEM_FLAG_HARDWARE flag. The reference can 
+ * if pcilib_alloc_kernel_memory() is executed with ::PCILIB_KMEM_FLAG_HARDWARE flag. The reference can 
  * be released if the same flag is passed to pcilib_free_kernel_memory()
  * - The software references - are obtained when the memory is reused with pcilib_alloc_kernel_memory(). 
  * They are released when corresponding pcilib_free_kernel_memory() is called. 
@@ -160,13 +160,13 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
  * used to keep track of non-persistent memory allocated and re-used within the same application (which is
  * actually discouraged). In this case the number of pcilib_alloc_kernel_memory() should be matched by 
  * number of pcilib_free_kernel_memory() calls and only on a last call the memory will be really released.
- * Normally, all but last calls have to be accompanied by PCILIB_KMEM_FLAG_REUSE flag or the error 
+ * Normally, all but last calls have to be accompanied by ::PCILIB_KMEM_FLAG_REUSE flag or the error 
  * is reported. But to keep code simpler, the pcilib will not complain until there are software references 
  * on hold. When the last software reference is released, we try actually clean up the memory and the
  * error is reported if other types of references are still present.
  * The software references may stuck if application crashes before calling pcilib_free_kernel_memory(). 
  * pcilib will prevent us from releasing the kernel memory with stuck references. Such memory can 
- * be cleaned only with PCILIB_KMEM_FLAG_FORCE flag or using  pcilib_clean_kernel_memory() call.
+ * be cleaned only with ::PCILIB_KMEM_FLAG_FORCE flag or using  pcilib_clean_kernel_memory() call.
  *
  * @param[in,out] ctx		- pcilib context
  * @param[in,out] k		- kernel memory handle returned from pcilib_alloc_kernel_memory() call
@@ -176,7 +176,7 @@ void pcilib_free_kernel_memory(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_km
 
 
 /**
- * Free / dereference all kernel memory buffers associated with the specified \a use
+ * Free / dereference all kernel memory buffers associated with the specified \p use
  *
  * @param[in,out] ctx		- pcilib context
  * @param[in] use		- use-number to clean

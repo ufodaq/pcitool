@@ -171,21 +171,135 @@ int pcilib_add_register_protocols(pcilib_t *ctx, pcilib_model_modification_flags
  */
 int pcilib_add_register_ranges(pcilib_t *ctx, pcilib_model_modification_flags_t flags, size_t n, const pcilib_register_range_t *ranges);
 
+/**
+ * Find the register bank id (offset in \a banks array) corresponding to the specified bank address 
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] bank	- the address of register bank
+ * @return 		- bank id or PCILIB_REGISTER_BANK_INVALID if bank is not found
+ */
 pcilib_register_bank_t pcilib_find_register_bank_by_addr(pcilib_t *ctx, pcilib_register_bank_addr_t bank);
+
+/**
+ * Find the register bank id (offset in \a banks array) corresponding to the specified bank name
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] bankname	- the name of register bank
+ * @return 		- bank id or PCILIB_REGISTER_BANK_INVALID if bank is not found
+ */
 pcilib_register_bank_t pcilib_find_register_bank_by_name(pcilib_t *ctx, const char *bankname);
+
+/**
+ * Find the register bank id (offset in \a banks array) corresponding to the specified bank name or address
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] bank	- either the name or the address of the required register bank
+ * @return 		- bank id or PCILIB_REGISTER_BANK_INVALID if bank is not found
+ */
 pcilib_register_bank_t pcilib_find_register_bank(pcilib_t *ctx, const char *bank);
 
+/**
+ * Find the register protocol id (offset in \a protocols array) corresponding to the specified protocol address 
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] protocol	- the address of register protocol
+ * @return 		- protocol id or PCILIB_REGISTER_PROTOCOL_INVALID if register protocol is not found
+ */
 pcilib_register_protocol_t pcilib_find_register_protocol_by_addr(pcilib_t *ctx, pcilib_register_protocol_addr_t protocol);
+
+/**
+ * Find the register protocol id (offset in \a protocols array) corresponding to the specified protocol name
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] name	- the name of register protocol
+ * @return 		- protocol id or PCILIB_REGISTER_PROTOCOL_INVALID if register protocol is not found
+ */
 pcilib_register_protocol_t pcilib_find_register_protocol_by_name(pcilib_t *ctx, const char *name);
+
+/**
+ * Find the register protocol id (offset in \a protocols array) corresponding to the specified protocol name or address
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] name	- either the name or the address of the required register protocol
+ * @return 		- protocol id or PCILIB_REGISTER_PROTOCOL_INVALID if register protocol is not found
+ */
 pcilib_register_protocol_t pcilib_find_register_protocol(pcilib_t *ctx, const char *name);
 
+/**
+ * Resolves the address of the specified register bank. The address of the register0 in the bank is returned.
+ *
+ * All address types (virtual address in process address space, physical address, or bus address) can be resolved.
+ * The caller has also to specify the requested access mode (read, write, read/write) and the error will be returned
+ * if the requested access type is not possible.
+ *
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] flags	- specifies the type of required address (virtual, physical, or bus) and the required access (ro/wo/rw)
+ * @param[in] bank	- the id of register bank
+ * @return 		- the resolved address or PCILIB_ADDRESS_INVALID on error
+ */
 uintptr_t pcilib_resolve_bank_address_by_id(pcilib_t *ctx, pcilib_address_resolution_flags_t flags, pcilib_register_bank_t bank);
+
+/**
+ * Resolves the address of the specified register bank. The address of the register0 in the bank is returned.
+ *
+ * All address types (virtual address in process address space, physical address, or bus address) can be resolved.
+ * The caller has also to specify the requested access mode (read, write, read/write) and the error will be returned
+ * if the requested access type is not possible.
+ *
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] flags	- specifies the type of required address (virtual, physical, or bus) and the required access (ro/wo/rw)
+ * @param[in] bank	- the name of register bank
+ * @return 		- the resolved address or PCILIB_ADDRESS_INVALID on error
+ */
 uintptr_t pcilib_resolve_bank_address(pcilib_t *ctx, pcilib_address_resolution_flags_t flags, const char *bank);
 
+/**
+ * Resolves the address of the specified register.
+ *
+ * All address types (virtual address in process address space, physical address, or bus address) can be resolved.
+ * The caller has also to specify the requested access mode (read, write, read/write) and the error will be returned
+ * if the requested access type is not possible.
+ *
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] flags	- specifies the type of required address (virtual, physical, or bus) and the required access (ro/wo/rw)
+ * @param[in] reg	- the id of register
+ * @return 		- the resolved address or PCILIB_ADDRESS_INVALID on error
+ */
 uintptr_t pcilib_resolve_register_address_by_id(pcilib_t *ctx, pcilib_address_resolution_flags_t flags, pcilib_register_t reg);
+
+/**
+ * Resolves the address of the specified register.
+ *
+ * All address types (virtual address in process address space, physical address, or bus address) can be resolved.
+ * The caller has also to specify the requested access mode (read, write, read/write) and the error will be returned
+ * if the requested access type is not possible.
+ *
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] flags	- specifies the type of required address (virtual, physical, or bus) and the required access (ro/wo/rw)
+ * @param[in] bank	- should specify the bank name if register with the same name may occur in multiple banks, NULL otherwise
+ * @param[in] regname	- the name of the register
+ * @return 		- the resolved address or PCILIB_ADDRESS_INVALID on error
+ */
 uintptr_t pcilib_resolve_register_address(pcilib_t *ctx, pcilib_address_resolution_flags_t flags, const char *bank, const char *regname);
 
+/**
+ * Extracts additional information about the specified register bank. The additional information
+ * is model-specific and are provided as extra XML attributes in XML-described register bank.
+ * The available attributes are only restricted by used XSD schema.
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] bank	- register bank id
+ * @param[in] attr	- requested attribute name
+ * @param[in,out] val	- the value of attribute is returned here (see \ref public_api_value),
+ *			pcilib_clean_value() will be executed if \a val contains data. Therefore it should be always initialized to 0 before first use
+ * @return		- error code or 0 on success
+ */ 
 int pcilib_get_register_bank_attr_by_id(pcilib_t *ctx, pcilib_register_bank_t bank, const char *attr, pcilib_value_t *val);
+
+/**
+ * Extracts additional information about the specified register bank. The additional information
+ * is model-specific and are provided as extra XML attributes in XML-described register bank.
+ * The available attributes are only restricted by used XSD schema.
+ * @param[in,out] ctx	- pcilib context
+ * @param[in] bankname	- the name of register bank
+ * @param[in] attr	- requested attribute name
+ * @param[in,out] val	- the value of attribute is returned here (see \ref public_api_value),
+ *			pcilib_clean_value() will be executed if \a val contains data. Therefore it should be always initialized to 0 before first use
+ * @return		- error code or 0 on success
+ */ 
 int pcilib_get_register_bank_attr(pcilib_t *ctx, const char *bankname, const char *attr, pcilib_value_t *val);
 
 #ifdef __cplusplus
