@@ -1,7 +1,7 @@
 CONFIG_MODULE_SIG=n
 
 obj-m := pciDriver.o
-pciDriver-objs := base.o int.o umem.o kmem.o sysfs.o ioctl.o compat.o
+pciDriver-objs := base.o int.o umem.o kmem.o sysfs.o ioctl.o compat.o rdma.o
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 INSTALLDIR ?= /lib/modules/$(shell uname -r)/kernel/extra
