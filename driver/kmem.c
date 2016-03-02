@@ -239,6 +239,9 @@ static int pcidriver_kmem_free_check(pcidriver_privdata_t *privdata, kmem_handle
         if (kmem_handle->flags&KMEM_FLAG_REUSE)
             return 0;
 
+        if (((kmem_entry->mode&KMEM_MODE_EXCLUSIVE)==0)&&(kmem_entry->mode&KMEM_MODE_COUNT)&&((kmem_handle->flags&KMEM_FLAG_EXCLUSIVE)==0))
+            return 0;
+
         if (kmem_entry->refs) {
             kmem_entry->mode += 1;
             mod_info("can't free referenced kmem_entry, refs = %lx\n", kmem_entry->refs);
@@ -251,8 +254,6 @@ static int pcidriver_kmem_free_check(pcidriver_privdata_t *privdata, kmem_handle
             return -EBUSY;
         }
 
-        if (((kmem_entry->mode&KMEM_MODE_EXCLUSIVE)==0)&&(kmem_entry->mode&KMEM_MODE_COUNT)&&((kmem_handle->flags&KMEM_FLAG_EXCLUSIVE)==0))
-            return 0;
     } else {
         if (kmem_entry->refs&KMEM_REF_HW)
             pcidriver_module_put(privdata);
