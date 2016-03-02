@@ -86,7 +86,8 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 		
 		
 		kmem_handle->handle_id = kmem_entry->id;
-		kmem_handle->pa = (unsigned long)(kmem_entry->dma_handle);
+		kmem_handle->ba = (unsigned long)(kmem_entry->dma_handle);
+		kmem_handle->pa = virt_to_phys((void*)kmem_entry->cpua);
 
 		kmem_handle->flags = KMEM_FLAG_REUSED;
 		if (kmem_entry->refs&KMEM_REF_HW) kmem_handle->flags |= KMEM_FLAG_REUSED_HW;
@@ -197,7 +198,8 @@ int pcidriver_kmem_alloc(pcidriver_privdata_t *privdata, kmem_handle_t *kmem_han
 
 	kmem_entry->size = kmem_handle->size;
 	kmem_entry->cpua = (unsigned long)retptr;
-	kmem_handle->pa = (unsigned long)(kmem_entry->dma_handle);
+	kmem_handle->ba = (unsigned long)(kmem_entry->dma_handle);
+	kmem_handle->pa = virt_to_phys(retptr);
 
 	kmem_entry->mode = 1;
 	if (kmem_handle->flags&KMEM_FLAG_REUSE) {

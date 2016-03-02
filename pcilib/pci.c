@@ -131,7 +131,7 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    return NULL;
 	}
 	
-	ctx->page_mask = (uintptr_t)-1;
+	ctx->page_mask = pcilib_get_page_mask();
 	
 	if ((model)&&(!strcasecmp(model, "maintenance"))) {
 	    ctx->model = strdup("maintenance");
@@ -271,14 +271,14 @@ const pcilib_driver_version_t *pcilib_get_driver_version(pcilib_t *ctx) {
 const pcilib_board_info_t *pcilib_get_board_info(pcilib_t *ctx) {
     int ret;
     
-    if (ctx->page_mask ==  (uintptr_t)-1) {
+    if (!ctx->board_info_ready) {
 	ret = ioctl( ctx->handle, PCIDRIVER_IOC_PCI_INFO, &ctx->board_info );
 	if (ret) {
 	    pcilib_error("PCIDRIVER_IOC_PCI_INFO ioctl have failed");
 	    return NULL;
 	}
 	
-	ctx->page_mask = pcilib_get_page_mask();
+	ctx->board_info_ready = 1;
     }
 
     return &ctx->board_info;

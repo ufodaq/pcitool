@@ -124,7 +124,7 @@ int dma_nwl_start_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
     
     	dma_nwl_acknowledge_irq((pcilib_dma_context_t*)ctx, PCILIB_DMA_IRQ, dma);
 
-	ring_pa = pcilib_kmem_get_pa(ctx->dmactx.pcilib, ectx->ring);
+	ring_pa = pcilib_kmem_get_ba(ctx->dmactx.pcilib, ectx->ring);
 	nwl_write_register(ring_pa, ctx, ectx->base_addr, REG_DMA_ENG_NEXT_BD);
 	nwl_write_register(ring_pa, ctx, ectx->base_addr, REG_SW_NEXT_BD);
 
@@ -188,7 +188,7 @@ int dma_nwl_stop_engine(nwl_dma_t *ctx, pcilib_dma_engine_t dma) {
 	} while ((val & (DMA_ENG_RUNNING))&&(((cur.tv_sec - start.tv_sec)*1000000 + (cur.tv_usec - start.tv_usec)) < PCILIB_NWL_REGISTER_TIMEOUT));
 
 	if (ectx->ring) {
-	    ring_pa = pcilib_kmem_get_pa(ctx->dmactx.pcilib, ectx->ring);
+	    ring_pa = pcilib_kmem_get_ba(ctx->dmactx.pcilib, ectx->ring);
 	    nwl_write_register(ring_pa, ctx, ectx->base_addr, REG_DMA_ENG_NEXT_BD);
 	    nwl_write_register(ring_pa, ctx, ectx->base_addr, REG_SW_NEXT_BD);
 	}

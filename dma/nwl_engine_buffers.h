@@ -121,7 +121,7 @@ static int dma_nwl_allocate_engine_buffers(nwl_dma_t *ctx, pcilib_nwl_engine_con
 
     
     unsigned char *data = (unsigned char*)pcilib_kmem_get_ua(ctx->dmactx.pcilib, ring);
-    uint32_t ring_pa = pcilib_kmem_get_pa(ctx->dmactx.pcilib, ring);
+    uint32_t ring_pa = pcilib_kmem_get_ba(ctx->dmactx.pcilib, ring);
 
     if (preserve) {
 	if (ectx->desc->direction == PCILIB_DMA_FROM_DEVICE) err = dma_nwl_compute_read_c2s_pointers(ctx, ectx, data, ring_pa);
@@ -251,7 +251,7 @@ static int dma_nwl_push_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_context_t *ectx
     
     uint32_t val;
     unsigned char *ring = pcilib_kmem_get_ua(ctx->dmactx.pcilib, ectx->ring);
-    uint32_t ring_pa = pcilib_kmem_get_pa(ctx->dmactx.pcilib, ectx->ring);
+    uint32_t ring_pa = pcilib_kmem_get_ba(ctx->dmactx.pcilib, ectx->ring);
 
     ring += ectx->head * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
 
@@ -338,7 +338,7 @@ static int dma_nwl_return_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_context_t *ec
     uint32_t val;
 
     unsigned char *ring = pcilib_kmem_get_ua(ctx->dmactx.pcilib, ectx->ring);
-    uint32_t ring_pa = pcilib_kmem_get_pa(ctx->dmactx.pcilib, ectx->ring);
+    uint32_t ring_pa = pcilib_kmem_get_ba(ctx->dmactx.pcilib, ectx->ring);
     size_t bufsz = pcilib_kmem_get_block_size(ctx->dmactx.pcilib, ectx->pages, ectx->tail);
 
     ring += ectx->tail * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;

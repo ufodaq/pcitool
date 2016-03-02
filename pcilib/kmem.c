@@ -157,6 +157,7 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	
 	kbuf->buf.blocks[i].handle_id = kh.handle_id;
 	kbuf->buf.blocks[i].pa = kh.pa;
+	kbuf->buf.blocks[i].ba = kh.ba;
 	kbuf->buf.blocks[i].size = kh.size;
 	
 	if (!i) reused = (kh.flags&KMEM_FLAG_REUSED)?PCILIB_TRISTATE_YES:PCILIB_TRISTATE_NO;
@@ -210,7 +211,12 @@ pcilib_kmem_handle_t *pcilib_alloc_kernel_memory(pcilib_t *ctx, pcilib_kmem_type
 	
 
         if ((kh.align)&&((kh.type&PCILIB_KMEM_TYPE_MASK) != PCILIB_KMEM_TYPE_PAGE)) {
-	    if (kh.pa % kh.align) kbuf->buf.blocks[i].alignment_offset = kh.align - kh.pa % kh.align;
+    		//  Physical or bus address here?
+    	    if (kh.ba) {
+	        if (kh.ba % kh.align) kbuf->buf.blocks[i].alignment_offset = kh.align - kh.ba % kh.align;
+    	    } else {
+	        if (kh.pa % kh.align) kbuf->buf.blocks[i].alignment_offset = kh.align - kh.pa % kh.align;
+	    }
 	    kbuf->buf.blocks[i].size -= kh.align;
 	}
 
@@ -355,7 +361,7 @@ int pcilib_kmem_sync_block(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kmem_s
     return 0;
 }
 
-void *pcilib_kmem_get_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
+void* volatile pcilib_kmem_get_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
     return kbuf->buf.addr.ua + kbuf->buf.addr.alignment_offset + kbuf->buf.addr.mmap_offset;
 }
@@ -367,10 +373,14 @@ uintptr_t pcilib_kmem_get_pa(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
 
 uintptr_t pcilib_kmem_get_ba(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
-    return kbuf->buf.addr.pa + kbuf->buf.addr.alignment_offset;
+
+    if (kbuf->buf.addr.ba)
+	return kbuf->buf.addr.ba + kbuf->buf.addr.alignment_offset;
+
+    return 0;
 }
 
-void *pcilib_kmem_get_block_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block) {
+void* volatile pcilib_kmem_get_block_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
     return kbuf->buf.blocks[block].ua + kbuf->buf.blocks[block].alignment_offset + kbuf->buf.blocks[block].mmap_offset;
 }
@@ -382,7 +392,11 @@ uintptr_t pcilib_kmem_get_block_pa(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_
 
 uintptr_t pcilib_kmem_get_block_ba(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
-    return kbuf->buf.blocks[block].pa + kbuf->buf.blocks[block].alignment_offset;
+
+    if (kbuf->buf.blocks[block].ba)
+	return kbuf->buf.blocks[block].ba + kbuf->buf.blocks[block].alignment_offset;
+
+    return 0;
 }
 
 size_t pcilib_kmem_get_block_size(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block) {

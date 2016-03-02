@@ -58,7 +58,7 @@
 
 #include <linux/ioctl.h>
 
-#define PCIDRIVER_INTERFACE_VERSION 1					/**< Driver API version, only the pcilib with the same driver interface version is allowed */
+#define PCIDRIVER_INTERFACE_VERSION 2					/**< Driver API version, only the pcilib with the same driver interface version is allowed */
 
 /* Identifies the PCI-E Xilinx ML605 */
 #define PCIE_XILINX_VENDOR_ID 0x10ee
@@ -154,6 +154,7 @@ typedef struct {
 typedef struct {
 	unsigned long type;
 	unsigned long pa;
+	unsigned long ba;
 	unsigned long size;
 	unsigned long align;
 	unsigned long use;
