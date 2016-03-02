@@ -128,12 +128,12 @@ void add_pcilib_value_to_dict(pcilib_t* ctx, PyObject* dict, pcilib_value_t* val
 
     if(py_val)
         pcilib_pydict_set_item(dict,
-                               PyString_FromString(name),
+                               PyUnicode_FromString(name),
                                py_val);
     else
         pcilib_pydict_set_item(dict,
-                               PyString_FromString("defvalue"),
-                               PyString_FromString("invalid"));
+                               PyUnicode_FromString("defvalue"),
+                               PyUnicode_FromString("invalid"));
 }
 
 PyObject * pcilib_convert_property_info_to_pyobject(pcilib_t* ctx, pcilib_property_info_t listItem)
@@ -142,18 +142,18 @@ PyObject * pcilib_convert_property_info_to_pyobject(pcilib_t* ctx, pcilib_proper
 
     if(listItem.name)
         pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("name"),
-                               PyString_FromString(listItem.name));
+                               PyUnicode_FromString("name"),
+                               PyUnicode_FromString(listItem.name));
 
     if(listItem.description)
         pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("description"),
-                               PyString_FromString(listItem.description));
+                               PyUnicode_FromString("description"),
+                               PyUnicode_FromString(listItem.description));
 
     if(listItem.path)
         pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("path"),
-                               PyString_FromString(listItem.path));
+                               PyUnicode_FromString("path"),
+                               PyUnicode_FromString(listItem.path));
 
     //serialize types
     const char* type = "invalid";
@@ -175,40 +175,40 @@ PyObject * pcilib_convert_property_info_to_pyobject(pcilib_t* ctx, pcilib_proper
         break;
     }
     pcilib_pydict_set_item(pylistItem,
-                           PyString_FromString("type"),
-                           PyString_FromString(type));
+                           PyUnicode_FromString("type"),
+                           PyUnicode_FromString(type));
 
 
     //serialize modes
     PyObject* modes = PyList_New(0);
 
     if((listItem.mode & PCILIB_ACCESS_R ) == PCILIB_REGISTER_R)
-        pcilib_pylist_append(modes, PyString_FromString("R"));
+        pcilib_pylist_append(modes, PyUnicode_FromString("R"));
     if((listItem.mode & PCILIB_ACCESS_W ) == PCILIB_REGISTER_W)
-        pcilib_pylist_append(modes, PyString_FromString("W"));
+        pcilib_pylist_append(modes, PyUnicode_FromString("W"));
     if((listItem.mode & PCILIB_ACCESS_RW ) == PCILIB_REGISTER_RW)
-        pcilib_pylist_append(modes, PyString_FromString("RW"));
+        pcilib_pylist_append(modes, PyUnicode_FromString("RW"));
     if((listItem.mode & PCILIB_REGISTER_INCONSISTENT) == PCILIB_REGISTER_INCONSISTENT)
-        pcilib_pylist_append(modes, PyString_FromString("NO_CHK"));
+        pcilib_pylist_append(modes, PyUnicode_FromString("NO_CHK"));
 
     pcilib_pydict_set_item(pylistItem,
-                           PyString_FromString("mode"),
+                           PyUnicode_FromString("mode"),
                            modes);
 
     //serialize flags
     PyObject* flags = PyList_New(0);
 
     if((listItem.flags & PCILIB_LIST_FLAG_CHILDS ) == PCILIB_LIST_FLAG_CHILDS)
-        pcilib_pylist_append(flags, PyString_FromString("childs"));
+        pcilib_pylist_append(flags, PyUnicode_FromString("childs"));
 
     pcilib_pydict_set_item(pylistItem,
-                           PyString_FromString("flags"),
+                           PyUnicode_FromString("flags"),
                            flags);
 
     if(listItem.unit)
         pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("unit"),
-                               PyString_FromString(listItem.unit));
+                               PyUnicode_FromString("unit"),
+                               PyUnicode_FromString(listItem.unit));
 
     return pylistItem;
 }
@@ -219,42 +219,42 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_t* ctx, pcilib_regist
 
     if(listItem.name)
         pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("name"),
-                               PyString_FromString(listItem.name));
+                               PyUnicode_FromString("name"),
+                               PyUnicode_FromString(listItem.name));
 
     if(listItem.description)
         pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("description"),
-                               PyString_FromString(listItem.description));
+                               PyUnicode_FromString("description"),
+                               PyUnicode_FromString(listItem.description));
 
     if(listItem.bank)
         pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("bank"),
-                               PyString_FromString(listItem.bank));
+                               PyUnicode_FromString("bank"),
+                               PyUnicode_FromString(listItem.bank));
 
 
     //serialize modes
     PyObject* modes = PyList_New(0);
 
     if((listItem.mode & PCILIB_REGISTER_R) == PCILIB_REGISTER_R)
-        pcilib_pylist_append(modes, PyString_FromString("R"));
+        pcilib_pylist_append(modes, PyUnicode_FromString("R"));
     if((listItem.mode & PCILIB_REGISTER_W) == PCILIB_REGISTER_W)
-        pcilib_pylist_append(modes, PyString_FromString("W"));
+        pcilib_pylist_append(modes, PyUnicode_FromString("W"));
     if((listItem.mode & PCILIB_REGISTER_RW) == PCILIB_REGISTER_RW)
-        pcilib_pylist_append(modes, PyString_FromString("RW"));
+        pcilib_pylist_append(modes, PyUnicode_FromString("RW"));
     if((listItem.mode & PCILIB_REGISTER_W1C) == PCILIB_REGISTER_W1C)
-        pcilib_pylist_append(modes, PyString_FromString("W1C"));
+        pcilib_pylist_append(modes, PyUnicode_FromString("W1C"));
     if((listItem.mode & PCILIB_REGISTER_RW1C) == PCILIB_REGISTER_RW1C)
-        pcilib_pylist_append(modes, PyString_FromString("RW1C"));
+        pcilib_pylist_append(modes, PyUnicode_FromString("RW1C"));
     if((listItem.mode & PCILIB_REGISTER_W1I) == PCILIB_REGISTER_W1I)
-        pcilib_pylist_append(modes, PyString_FromString("W1I"));
+        pcilib_pylist_append(modes, PyUnicode_FromString("W1I"));
     if((listItem.mode & PCILIB_REGISTER_RW1I) == PCILIB_REGISTER_RW1I)
-        pcilib_pylist_append(modes, PyString_FromString("RW1I"));
+        pcilib_pylist_append(modes, PyUnicode_FromString("RW1I"));
     if((listItem.mode & PCILIB_REGISTER_INCONSISTENT) == PCILIB_REGISTER_INCONSISTENT)
-        pcilib_pylist_append(modes, PyString_FromString("NO_CHK"));
+        pcilib_pylist_append(modes, PyUnicode_FromString("NO_CHK"));
 
     pcilib_pydict_set_item(pylistItem,
-                           PyString_FromString("mode"),
+                           PyUnicode_FromString("mode"),
                            modes);
 
     pcilib_value_t defval = {0};
@@ -273,7 +273,7 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_t* ctx, pcilib_regist
         add_pcilib_value_to_dict(ctx, range, &minval, "min");
         add_pcilib_value_to_dict(ctx, range, &maxval, "max");
         pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("range"),
+                               PyUnicode_FromString("range"),
                                range);
     }
 
@@ -301,20 +301,20 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_t* ctx, pcilib_regist
 
             if(listItem.values[j].name)
                 pcilib_pydict_set_item(valuesItem,
-                                       PyString_FromString("name"),
-                                       PyString_FromString(listItem.values[j].name));
+                                       PyUnicode_FromString("name"),
+                                       PyUnicode_FromString(listItem.values[j].name));
             if(listItem.values[j].description)
             {
                 pcilib_pydict_set_item(valuesItem,
-                                       PyString_FromString("description"),
-                                       PyString_FromString(listItem.values[j].description));
+                                       PyUnicode_FromString("description"),
+                                       PyUnicode_FromString(listItem.values[j].description));
 
             }
             pcilib_pylist_append(values, valuesItem);
         }
 
         pcilib_pydict_set_item(pylistItem,
-                               PyString_FromString("values"),
+                               PyUnicode_FromString("values"),
                                values);
     }
 
@@ -340,16 +340,17 @@ Pcipywrap *new_Pcipywrap(const char* fpga_device, const char* model)
 
 Pcipywrap *create_Pcipywrap(PyObject* ctx)
 {
-    if(!PyCObject_Check(ctx))
+    if(!PyCapsule_CheckExact(ctx))
     {
-        set_python_exception("Incorrect ctx type. Only PyCObject is allowed");
+        set_python_exception("Incorrect ctx type. Only PyCapsule is allowed");
         return NULL;
     }
 
     Pcipywrap *self;
     self = (Pcipywrap *) malloc(sizeof(Pcipywrap));
     self->shared = 1;
-    self->ctx = PyCObject_AsVoidPtr(ctx);
+    self->ctx = PyCapsule_GetPointer(ctx, PyCapsule_GetName(ctx));
+
     return self;
 }
 
@@ -415,7 +416,7 @@ PyObject* Pcipywrap_write_register(Pcipywrap *self, PyObject* val, const char *r
         return NULL;
     }
 
-    return PyInt_FromLong((long)1);
+    return PyLong_FromLong((long)1);
 }
 
 PyObject* Pcipywrap_get_property(Pcipywrap *self, const char *prop)
@@ -453,7 +454,7 @@ PyObject* Pcipywrap_set_property(Pcipywrap *self, PyObject* val, const char *pro
         return NULL;
     }
 
-    return PyInt_FromLong((long)1);
+    return PyLong_FromLong((long)1);
 }
 
 PyObject* Pcipywrap_get_registers_list(Pcipywrap *self, const char *bank)
@@ -542,7 +543,7 @@ PyObject* Pcipywrap_lock_global(Pcipywrap *self)
         return NULL;
     }
 
-    return PyInt_FromLong((long)1);
+    return PyLong_FromLong((long)1);
 }
 
 void Pcipywrap_unlock_global(Pcipywrap *self)
@@ -570,7 +571,7 @@ PyObject* Pcipywrap_lock(Pcipywrap *self, const char *lock_id)
         return NULL;
     }
 
-    return PyInt_FromLong((long)1);
+    return PyLong_FromLong((long)1);
 }
 
 PyObject* Pcipywrap_try_lock(Pcipywrap *self, const char *lock_id)
@@ -591,7 +592,7 @@ PyObject* Pcipywrap_try_lock(Pcipywrap *self, const char *lock_id)
         return NULL;
     }
 
-    return PyInt_FromLong((long)1);
+    return PyLong_FromLong((long)1);
 }
 
 PyObject* Pcipywrap_unlock(Pcipywrap *self, const char *lock_id)
@@ -606,7 +607,7 @@ PyObject* Pcipywrap_unlock(Pcipywrap *self, const char *lock_id)
     }
 
     pcilib_unlock(lock);
-    return PyInt_FromLong((long)1);
+    return PyLong_FromLong((long)1);
 }
 
 

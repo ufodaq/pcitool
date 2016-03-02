@@ -49,8 +49,21 @@ void pcilib_log_python_error(const char *file, int line, pcilib_log_flags_t flag
     gstate = PyGILState_Ensure();
     if (PyErr_Occurred()) {
       PyErr_Fetch(&pytype, &pyval, &pytraceback);
-      type = PyString_AsString(pytype);
-      val = PyString_AsString(pyval);
+      
+#if PY_MAJOR_VERSION >= 3
+    type = PyUnicode_AsUTF8(pytype);
+    val = PyUnicode_AsUTF8(pyval);
+#else /*PY_MAJOR_VERSION >= 3*/
+    PyObject *buf = PyUnicode_AsASCIIString(pytype);
+    type = PyString_AsString(buf);
+    Py_DecRef(buf);
+    
+    buf = PyUnicode_AsASCIIString(pyval);
+    val = PyString_AsString(buf);
+    Py_DecRef(buf);
+#endif /*PY_MAJOR_VERSION >= 3*/
+
+      
     }
     PyGILState_Release(gstate);
 #endif /* HAVE_PYTHON */
@@ -101,7 +114,7 @@ int pcilib_init_py(pcilib_t *ctx) {
     if(!Py_IsInitialized()) {
         Py_Initialize();
         
-    	    // Since python is being initializing from c programm, it needs to initialize threads to work properly with c threads
+        // Since python is being initializing from c programm, it needs to initialize threads to work properly with c threads
         PyEval_InitThreads();
         PyEval_ReleaseLock();
         ctx->py->finalyze = 1;
@@ -125,8 +138,9 @@ int pcilib_init_py(pcilib_t *ctx) {
       return PCILIB_ERROR_FAILED;
     }
 	
-    PyObject *mod_name = PyString_FromString("Pcilib");
-    PyObject *pyctx = PyCObject_FromVoidPtr(ctx, NULL);
+    PyObject *mod_name = PyUnicode_FromString("Pcilib");
+    PyObject *pyctx = PyCapsule_New(ctx, "pcilib", NULL);
+    
     ctx->py->pcilib_pywrap = PyObject_CallMethodObjArgs(pywrap, mod_name, pyctx, NULL);
     Py_XDECREF(pyctx);
     Py_XDECREF(mod_name);
@@ -166,7 +180,8 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
       return PCILIB_ERROR_FAILED;
     }
 
-    pynewdir = PyString_FromString(script_dir);
+    pynewdir = PyUnicode_FromString(script_dir);
+    
     if (!pynewdir) {
       pcilib_python_error("Can't create python string");
       return PCILIB_ERROR_MEMORY;
@@ -175,13 +190,13 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
 	// Checking if the directory already in the path
     pydict = PyDict_New();
     if (pydict) {
-	   pystr = PyString_FromString("cur");
+      pystr = PyUnicode_FromString("cur");
         if (pystr) {
           PyDict_SetItem(pydict, pystr, pynewdir);
           Py_DECREF(pystr);
       }
 
-      pystr = PyString_FromString("path");
+      pystr = PyUnicode_FromString("path");
       if (pystr) {
           PyDict_SetItem(pydict, pystr, pypath);
           Py_DECREF(pystr);
@@ -292,13 +307,13 @@ int pcilib_py_get_transform_script_properties(pcilib_t *ctx, const char *script_
       return PCILIB_ERROR_FAILED;
     }
     
-    pystr = PyString_FromString("read_from_register");
+    pystr = PyUnicode_FromString("read_from_register");
     if (pystr) {
       if (PyDict_Contains(dict, pystr)) mode |= PCILIB_ACCESS_R;
       Py_DECREF(pystr);
     }
 
-    pystr = PyString_FromString("write_to_register");
+    pystr = PyUnicode_FromString("write_to_register");
     if (pystr) {
       if (PyDict_Contains(dict, pystr)) mode |= PCILIB_ACCESS_W;
       Py_DECREF(pystr);
@@ -322,7 +337,7 @@ pcilib_py_object *pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *va
     switch(val->type) {
         case PCILIB_TYPE_LONG:
       ival = pcilib_get_value_as_int(ctx, val, &err);
-      if (!err) res = (PyObject*)PyInt_FromLong(ival);
+      if (!err) res = (PyObject*)PyLong_FromLong(ival);
       break;
         case PCILIB_TYPE_DOUBLE:
       fval = pcilib_get_value_as_float(ctx, val, &err);
@@ -359,12 +374,25 @@ int pcilib_set_value_from_pyobject(pcilib_t* ctx, pcilib_value_t *val, pcilib_py
     PyGILState_STATE gstate;
 	
     gstate = PyGILState_Ensure();
+#if PY_MAJOR_VERSION < 3
     if (PyInt_Check(pyval)) {
-        err = pcilib_set_value_from_int(ctx, val, PyInt_AsLong(pyval));
+      err = pcilib_set_value_from_int(ctx, val, PyInt_AsLong(pyval));
+    } else if (PyString_Check(pyval)) {
+      err = pcilib_set_value_from_string(ctx, val, PyString_AsString(pyval));
+    } else
+#endif /*PY_MAJOR_VERSION >= 3*/
+    if (PyLong_Check(pyval)) {
+        err = pcilib_set_value_from_int(ctx, val, PyLong_AsLong(pyval));
     } else if (PyFloat_Check(pyval)) {
         err = pcilib_set_value_from_float(ctx, val, PyFloat_AsDouble(pyval));
-    } else if (PyString_Check(pyval)) {
-        err = pcilib_set_value_from_string(ctx, val, PyString_AsString(pyval));
+    } else if (PyUnicode_Check(pyval)) {
+#if PY_MAJOR_VERSION >= 3
+        err = pcilib_set_value_from_string(ctx, val, PyUnicode_AsUTF8(pyval));
+#else /*PY_MAJOR_VERSION >= 3*/
+        PyObject *buf = PyUnicode_AsASCIIString(pyval);
+        err = pcilib_set_value_from_string(ctx, val, PyString_AsString(buf));
+        Py_DecRef(buf);
+#endif /*PY_MAJOR_VERSION >= 3*/
     } else {
         PyGILState_Release(gstate);
         pcilib_error("Can't convert PyObject to polymorphic pcilib value");

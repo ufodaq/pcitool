@@ -38,9 +38,10 @@ find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
 if (NOT DISABLE_PYTHON)
-
-    find_package(PythonLibs 2.7 REQUIRED)
-    find_package(PythonInterp 2 REQUIRED)
+    set(PYTHON_VERSION 2.7 CACHE PATH "python version")
+    
+    find_package(PythonLibs ${PYTHON_VERSION} REQUIRED)
+    find_package(PythonInterp ${PYTHON_VERSION} REQUIRED)
     
     find_package(SWIG REQUIRED)
     if (NOT PYTHON_VERSION_STRING VERSION_EQUAL PYTHONLIBS_VERSION_STRING)
@@ -49,9 +50,9 @@ if (NOT DISABLE_PYTHON)
 
 #    execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "from sysconfig import get_path; print get_path('platlib')" OUTPUT_VARIABLE PYTHON_INSTALL_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
     
-    execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "import site; print site.PREFIXES[-1]" OUTPUT_VARIABLE PYTHON_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "import site; print(site.PREFIXES[-1])" OUTPUT_VARIABLE PYTHON_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE)
     file (TO_CMAKE_PATH "${PYTHON_PREFIX}" PYTHON_PREFIX)
-    execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "import site; print site.getsitepackages()[0]" OUTPUT_VARIABLE PYTHON_SITE_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "import site; print(site.getsitepackages()[0])" OUTPUT_VARIABLE PYTHON_SITE_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
     file (TO_CMAKE_PATH "${PYTHON_SITE_DIR}" PYTHON_SITE_DIR)
 
     string (REGEX REPLACE "^${PYTHON_PREFIX}/" "${CMAKE_INSTALL_PREFIX}/" PYTHON_SITE_DIR "${PYTHON_SITE_DIR}")

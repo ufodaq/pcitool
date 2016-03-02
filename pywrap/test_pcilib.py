@@ -55,17 +55,17 @@ class test_pcilib():
                 {'command': 'unlock_global'},
                 {'command': 'help'}]  
       r = requests.get(url, data=json.dumps(payload[message]), headers=headers)
-      print json.dumps(r.json(), sort_keys=True, indent=3, separators=(',', ': '))
+      print(json.dumps(r.json(), sort_keys=True, indent=3, separators=(',', ': ')))
     
    def testThreadSafeReadWrite(self):
       def threadFunc():
          if random.randint(0, 100) >= (self.write_percentage * 100):
             ret = self.pcilib.get_property(self.prop)
-            print self.register, ':', ret
+            print(self.register, ':', ret)
             del ret
          else:
             val = random.randint(0, 65536)
-            print 'set value:', val
+            print('set value:', val)
             self.pcilib.set_property(val, self.prop)
       try:
          while(1):
@@ -74,25 +74,25 @@ class test_pcilib():
                thread_list[i].start()
             for i in range(0, self.num_threads):
                thread_list[i].join()
-            print 'cycle done'
+            print('cycle done')
       except KeyboardInterrupt:
-         print 'testing done'
+         print('testing done')
          pass
    
    def testMemoryLeak(self):
       try:
          while(1):
-            val = random.randint(0, 8096)
+            val = long(random.randint(0, 8096))
             self.pcilib = pcilib.Pcilib(self.device, self.model)
-            print self.pcilib.get_property_list(self.branch)
-            print self.pcilib.get_register_info(self.register)
-            print self.pcilib.get_registers_list();
-            print self.pcilib.write_register(val, self.register)
-            print self.pcilib.read_register(self.register)
-            print self.pcilib.set_property(val, self.prop)
-            print self.pcilib.get_property(self.prop)
+            print(self.pcilib.get_property_list(self.branch))
+            print(self.pcilib.get_register_info(self.register))
+            print(self.pcilib.get_registers_list())
+            print(self.pcilib.write_register(val, self.register))
+            print(self.pcilib.read_register(self.register))
+            print(self.pcilib.set_property(val, self.prop))
+            print(self.pcilib.get_property(self.prop))
       except KeyboardInterrupt:
-         print 'testing done'
+         print('testing done')
          pass
 
    def testServer(self):
@@ -111,14 +111,19 @@ class test_pcilib():
       
       def sendRandomMessage():
          message_number = random.randint(1, len(payload) - 1)
-         print 'message number: ', message_number
+         print('message number: ', message_number)
          payload[message_number]['value'] =  random.randint(0, 8096)
          r = requests.get(url, data=json.dumps(payload[message_number]), headers=headers)
-         print json.dumps(r.json(), sort_keys=True, indent=4, separators=(',', ': '))
-      
+         if(r.headers['content-type'] == 'application/json'):
+            print(json.dumps(r.json(), sort_keys=True, indent=3, separators=(',', ': ')))
+         else:
+            print(r.content)      
       try:    
          r = requests.get(url, data=json.dumps(payload[1]), headers=headers)
-         print json.dumps(r.json(), sort_keys=True, indent=3, separators=(',', ': '))
+         if(r.headers['content-type'] == 'application/json'):
+            print(json.dumps(r.json(), sort_keys=True, indent=3, separators=(',', ': ')))
+         else:
+            print(r.content)
    
          while(1):
             time.sleep(self.server_message_delay)
@@ -127,10 +132,10 @@ class test_pcilib():
                thread_list[i].start()
             for i in range(0, self.num_threads):
                thread_list[i].join()
-            print 'cycle done'
+            print('cycle done')
             
       except KeyboardInterrupt:
-         print 'testing done'
+         print('testing done')
          pass
 
 if __name__ == '__main__':

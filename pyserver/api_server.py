@@ -6,10 +6,14 @@ import pcilib
 import time
 import json
 from optparse import OptionParser
-
 from multiprocessing import Process
-from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
-from SocketServer import ThreadingMixIn
+
+if sys.version_info >= (3,0):
+   from http.server import HTTPServer, BaseHTTPRequestHandler
+   from socketserver import ThreadingMixIn
+else:
+   from SocketServer import ThreadingMixIn
+   from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 
 class MultiThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     pass
@@ -146,8 +150,8 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
             #parse command arguments and convert them to string
             reg = str(data.get('reg', None))
             bank = data.get('bank', None)
-            if not bank is None:
-				   bank = str(bank)
+            if(not bank is None):
+               bank = str(bank)
             
             value = 0
             try:
@@ -178,10 +182,10 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
                
             #parse command arguments and convert them to string
             reg = str(data.get('reg', None))
-            value = str(data.get('value', None))
+            value = data.get('value', None)
             bank = data.get('bank', None)
-            if not bank is None:
-				   bank = str(bank)
+            if(not bank is None):
+               bank = str(bank)
             
             try:
                s.pcilib.write_register(value, reg, bank)
@@ -230,10 +234,10 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
                s.error('message doesnt contains "value" field, '
                        'which is required for "set_property" command', data)
                return
-               
+            
             #parse command arguments and convert them to string
             prop = str(data.get('prop', None))
-            value = str(data.get('value', None))
+            value = data.get('value', None)
             
             try:
                s.pcilib.set_property(value, prop)
@@ -340,7 +344,7 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
                return
 
             #Success! Create and send reply
-            if(type(out) == bytearray):
+            if(type(out) == bytearray or type(out) == bytes):
                s.send_response(200)
                s.send_header('content-disposition', 'inline; filename=value')
                s.send_header('content-type', 'application/octet-stream')
@@ -374,13 +378,13 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
          #   #Success! Create and send reply
          #   s.wrapMessageAndSend({'status': 'ok'}, data)
          
-         
+      
          else:
-		    s.error('command "' + command + '" undefined', data)
-		    return
+            s.error('command "' + command + '" undefined', data)
+            return
       else:
-		  s.error('message doesnt contains "command" field, which is required', data)
-		  return
+         s.error('message doesnt contains "command" field, which is required', data)
+         return
         
         
       
@@ -481,7 +485,10 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
       s.send_response(200)
       s.send_header('content-type', 'text/plain')
       s.end_headers()
-      s.wfile.write(usage)
+      if sys.version_info >= (3,0):
+         s.wfile.write(bytes(usage, 'UTF-8'))
+      else:
+         s.wfile.write(usage)
 
    #Send error message with text description    
    def error(s, info, received_message = None):
@@ -498,8 +505,12 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
       s.end_headers()
       if not received_message is None:
          message['received_message'] = received_message
-      s.wfile.write(json.dumps(message))
-
+      if sys.version_info >= (3,0):
+         s.wfile.write(bytes(json.dumps(message), 'UTF-8'))
+      else:
+         s.wfile.write(json.dumps(message))
+      
+      
 class ApiServer(MultiThreadedHTTPServer):
    def __init__(self, device='/dev/fpga0', model=None, adress=('0.0.0.0', 9000)):
       #redirect logs to exeption
@@ -534,7 +545,7 @@ if __name__ == '__main__':
    #start server
    httpd = ApiServer(DEVICE, MODEL, (HOST_NAME, PORT_NUMBER))
    
-   print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)
+   print(time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER))
    
    try:
       httpd.serve_forever()
@@ -543,4 +554,4 @@ if __name__ == '__main__':
       
    httpd.server_close()
    
-   print time.asctime(), "Server Stops - %s:%s" % (HOST_NAME, PORT_NUMBER)
+   print(time.asctime(), "Server Stops - %s:%s" % (HOST_NAME, PORT_NUMBER))
