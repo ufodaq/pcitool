@@ -17,6 +17,8 @@
 #include "error.h"
 
 #ifdef HAVE_PYTHON
+#define PCILIB_PYTHON_WRAPPER "pcipywrap"
+
 typedef struct pcilib_script_s pcilib_script_t;
 
 struct pcilib_script_s {
@@ -43,59 +45,70 @@ void pcilib_log_python_error(const char *file, int line, pcilib_log_flags_t flag
     PyGILState_STATE gstate;
     PyObject *pytype = NULL;
     PyObject *pyval = NULL;
+    PyObject *pystr = NULL;
     PyObject *pytraceback = NULL;
 
 
     gstate = PyGILState_Ensure();
     if (PyErr_Occurred()) {
-      PyErr_Fetch(&pytype, &pyval, &pytraceback);
-      
-#if PY_MAJOR_VERSION >= 3
-    type = PyUnicode_AsUTF8(pytype);
-    val = PyUnicode_AsUTF8(pyval);
-#else /*PY_MAJOR_VERSION >= 3*/
-    PyObject *buf = PyUnicode_AsASCIIString(pytype);
-    type = PyString_AsString(buf);
-    Py_DecRef(buf);
-    
-    buf = PyUnicode_AsASCIIString(pyval);
-    val = PyString_AsString(buf);
-    Py_DecRef(buf);
-#endif /*PY_MAJOR_VERSION >= 3*/
+	PyErr_Fetch(&pytype, &pyval, &pytraceback);
+	PyErr_NormalizeException(&pytype, &pyval, &pytraceback);
+	if (pyval) pystr = PyObject_Str(pyval);
 
-      
+# if PY_MAJOR_VERSION >= 3
+	if (pytype) {
+	    if (PyUnicode_Check(pytype))
+		type = PyUnicode_AsUTF8(pytype);
+	    else
+		type = PyExceptionClass_Name(pytype);
+	}
+	if (pystr) {
+	    val = PyUnicode_AsUTF8(pystr);
+	}
+# else /* PY_MAJOR_VERSION >= 3 */
+	if (pytype) {
+	    if (PyString_Check(pytype))
+		type = PyString_AsString(pytype);
+	    else
+		type = PyExceptionClass_Name(pytype);
+	}
+	if (pystr) {
+	    val = PyString_AsString(pystr);
+	}
+# endif /*PY_MAJOR_VERSION >= 3*/
     }
     PyGILState_Release(gstate);
 #endif /* HAVE_PYTHON */
-    
+
     va_start(va, msg);
     if (type) {
-      char *str;
-      size_t len = 32;
+	char *str;
+	size_t len = 32;
 
-      if (msg) len += strlen(msg);
-      if (type) len += strlen(type);
-      if (val) len += strlen(val);
-          
-      str = alloca(len * sizeof(char));
-      if (str) {
-          if (msg&&val)
-         sprintf(str, "%s <%s: %s>", msg, type, val);
-          else if (msg)
-         sprintf(str, "%s <%s>", msg, type);
-          else if (val)
-         sprintf(str, "Python error %s: %s", type, val);
-          else
-         sprintf(str, "Python error %s", type);
-          
-          pcilib_log_vmessage(file, line, flags, prio, str, va);
-      }
+	if (msg) len += strlen(msg);
+	if (type) len += strlen(type);
+	if (val) len += strlen(val);
+	    
+	str = alloca(len * sizeof(char));
+	if (str) {
+	    if (msg&&val)
+		sprintf(str, "%s <%s: %s>", msg, type, val);
+	    else if (msg)
+		sprintf(str, "%s <%s>", msg, type);
+	    else if (val)
+		sprintf(str, "Python error %s: %s", type, val);
+	    else
+		sprintf(str, "Python error %s", type);
+	    
+	    pcilib_log_vmessage(file, line, flags, prio, str, va);
+	}
     } else  {
-	   pcilib_log_vmessage(file, line, flags, prio, msg, va);
+	pcilib_log_vmessage(file, line, flags, prio, msg, va);
     }
     va_end(va);
 
 #ifdef HAVE_PYTHON
+    if (pystr) Py_DECREF(pystr);
     if (pytype) Py_DECREF(pytype);
     if (pyval) Py_DECREF(pyval);
     if (pytraceback) Py_DECREF(pytraceback);
@@ -114,40 +127,39 @@ int pcilib_init_py(pcilib_t *ctx) {
     if(!Py_IsInitialized()) {
         Py_Initialize();
         
-        // Since python is being initializing from c programm, it needs to initialize threads to work properly with c threads
+    	    // Since python is being initializing from c programm, it needs to initialize threads to work properly with c threads
         PyEval_InitThreads();
         PyEval_ReleaseLock();
-        ctx->py->finalyze = 1;
+	ctx->py->finalyze = 1;
     }
 		
     ctx->py->main_module = PyImport_AddModule("__parser__");
     if (!ctx->py->main_module) {
-      pcilib_python_error("Error importing python parser");
-           return PCILIB_ERROR_FAILED;
+	pcilib_python_warning("Error importing python parser");
+        return PCILIB_ERROR_FAILED;
     }
 
     ctx->py->global_dict = PyModule_GetDict(ctx->py->main_module);
     if (!ctx->py->global_dict) {
-      pcilib_python_error("Error locating global python dictionary");
-           return PCILIB_ERROR_FAILED;
+	pcilib_python_warning("Error locating global python dictionary");
+        return PCILIB_ERROR_FAILED;
     }
 
-    PyObject *pywrap = PyImport_ImportModule("pcilib");
+    PyObject *pywrap = PyImport_ImportModule(PCILIB_PYTHON_WRAPPER);
     if (!pywrap) {
-      pcilib_python_error("Error importing pcilib python wrapper");
-      return PCILIB_ERROR_FAILED;
+	pcilib_python_warning("Error importing pcilib python wrapper");
+	return PCILIB_ERROR_FAILED;
     }
 	
-    PyObject *mod_name = PyUnicode_FromString("Pcilib");
+    PyObject *mod_name = PyUnicode_FromString(PCILIB_PYTHON_WRAPPER);
     PyObject *pyctx = PyCapsule_New(ctx, "pcilib", NULL);
-    
     ctx->py->pcilib_pywrap = PyObject_CallMethodObjArgs(pywrap, mod_name, pyctx, NULL);
     Py_XDECREF(pyctx);
     Py_XDECREF(mod_name);
 	
     if (!ctx->py->pcilib_pywrap) {
-      pcilib_python_error("Error initializing python wrapper");
-      return PCILIB_ERROR_FAILED;
+	pcilib_python_warning("Error initializing python wrapper");
+        return PCILIB_ERROR_FAILED;
     }
 #endif /* HAVE_PYTHON */
 
@@ -161,60 +173,61 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
     PyObject *pydict, *pystr, *pyret = NULL;
     char *script_dir;
 
+    if (!ctx->py) return 0;
+
     const char *model_dir = getenv("PCILIB_MODEL_DIR");
     if (!model_dir) model_dir = PCILIB_MODEL_DIR;
 
     if (!dir) dir = ctx->model;
 
     if (*dir == '/') {
-	   script_dir = (char*)dir;
+	script_dir = (char*)dir;
     } else {
-      script_dir = alloca(strlen(model_dir) + strlen(dir) + 2);
-      if (!script_dir) return PCILIB_ERROR_MEMORY;
-      sprintf(script_dir, "%s/%s", model_dir, dir);
+	script_dir = alloca(strlen(model_dir) + strlen(dir) + 2);
+	if (!script_dir) return PCILIB_ERROR_MEMORY;
+	sprintf(script_dir, "%s/%s", model_dir, dir);
     }
 
     pypath = PySys_GetObject("path");
     if (!pypath) {
-      pcilib_python_error("Can't get python path");
-      return PCILIB_ERROR_FAILED;
+	pcilib_python_warning("Can't get python path");
+	return PCILIB_ERROR_FAILED;
     }
 
     pynewdir = PyUnicode_FromString(script_dir);
-    
     if (!pynewdir) {
-      pcilib_python_error("Can't create python string");
-      return PCILIB_ERROR_MEMORY;
+	pcilib_python_warning("Can't create python string");
+	return PCILIB_ERROR_MEMORY;
     }
     
-	// Checking if the directory already in the path
+	// Checking if the directory already in the path?
     pydict = PyDict_New();
     if (pydict) {
-      pystr = PyUnicode_FromString("cur");
+	pystr = PyUnicode_FromString("cur");
         if (pystr) {
-          PyDict_SetItem(pydict, pystr, pynewdir);
-          Py_DECREF(pystr);
-      }
+	    PyDict_SetItem(pydict, pystr, pynewdir);
+	    Py_DECREF(pystr);
+	}
 
-      pystr = PyUnicode_FromString("path");
-      if (pystr) {
-          PyDict_SetItem(pydict, pystr, pypath);
-          Py_DECREF(pystr);
-      }
+	pystr = PyUnicode_FromString("path");
+	if (pystr) {
+	    PyDict_SetItem(pydict, pystr, pypath);
+	    Py_DECREF(pystr);
+	}
 
-      pyret = PyRun_String("cur in path", Py_eval_input, ctx->py->global_dict, pydict);
-      Py_DECREF(pydict);
+	pyret = PyRun_String("cur in path", Py_eval_input, ctx->py->global_dict, pydict);
+	Py_DECREF(pydict);
     } 
 
     if ((pyret == Py_False)&&(PyList_Append(pypath, pynewdir) == -1))
-	   err = PCILIB_ERROR_FAILED;
+	err = PCILIB_ERROR_FAILED;
 
     if (pyret) Py_DECREF(pyret);
     Py_DECREF(pynewdir);
 
     if (err) {
-      pcilib_python_error("Can't add directory (%s) to python path", script_dir);
-      return err;
+	pcilib_python_warning("Can't add directory (%s) to python path", script_dir);
+	return err;
     }
 #endif /* HAVE_PYTHON */
 
@@ -226,24 +239,24 @@ void pcilib_free_py(pcilib_t *ctx) {
     int finalyze = 0;
 	
     if (ctx->py) {		
-      if (ctx->py->finalyze) finalyze = 1;
+	if (ctx->py->finalyze) finalyze = 1;
 
-      if (ctx->py->script_hash) {
-          pcilib_script_t *script, *script_tmp;
+	if (ctx->py->script_hash) {
+	    pcilib_script_t *script, *script_tmp;
 
-          HASH_ITER(hh, ctx->py->script_hash, script, script_tmp) {
-         Py_DECREF(script->module);
-         HASH_DEL(ctx->py->script_hash, script);
-         free(script);
-          }
-          ctx->py->script_hash = NULL;
-      }
+	    HASH_ITER(hh, ctx->py->script_hash, script, script_tmp) {
+		Py_DECREF(script->module);
+		HASH_DEL(ctx->py->script_hash, script);
+		free(script);
+	    }
+	    ctx->py->script_hash = NULL;
+	}
 
-      if (ctx->py->pcilib_pywrap)
-          Py_DECREF(ctx->py->pcilib_pywrap);
-      
-           free(ctx->py);
-           ctx->py = NULL;
+	if (ctx->py->pcilib_pywrap)
+	    Py_DECREF(ctx->py->pcilib_pywrap);
+	
+        free(ctx->py);
+        ctx->py = NULL;
     }
     
     if (finalyze)
@@ -256,14 +269,15 @@ int pcilib_py_load_script(pcilib_t *ctx, const char *script_name) {
     PyObject* pymodule;
     pcilib_script_t *module = NULL;
 
+    if (!ctx->py) return 0;
 
     char *module_name = strdupa(script_name);
     if (!module_name) return PCILIB_ERROR_MEMORY;
 
     char *py = strrchr(module_name, '.');
     if ((!py)||(strcasecmp(py, ".py"))) {
-      pcilib_error("Invalid script name (%s) is specified", script_name);
-      return PCILIB_ERROR_INVALID_ARGUMENT;
+	pcilib_error("Invalid script name (%s) is specified", script_name);
+	return PCILIB_ERROR_INVALID_ARGUMENT;
     }
     *py = 0;
 
@@ -272,8 +286,8 @@ int pcilib_py_load_script(pcilib_t *ctx, const char *script_name) {
 
     pymodule = PyImport_ImportModule(module_name);
     if (!pymodule) {
-      pcilib_python_error("Error importing script (%s)", script_name);
-      return PCILIB_ERROR_FAILED;
+	pcilib_python_error("Error importing script (%s)", script_name);
+	return PCILIB_ERROR_FAILED;
     }
 
     module = (pcilib_script_t*)malloc(sizeof(pcilib_script_t));
@@ -293,30 +307,35 @@ int pcilib_py_get_transform_script_properties(pcilib_t *ctx, const char *script_
     PyObject *dict;
     PyObject *pystr;
     pcilib_script_t *module;
-	
+
+    if (!ctx->py) {
+	if (mode_ret) *mode_ret = mode;
+	return 0;
+    }
+
     HASH_FIND_STR(ctx->py->script_hash, script_name, module);
 
     if(!module) {
-      pcilib_error("Script (%s) is not loaded yet", script_name);
-      return PCILIB_ERROR_NOTFOUND;
+	pcilib_error("Script (%s) is not loaded yet", script_name);
+	return PCILIB_ERROR_NOTFOUND;
     }
 	
     dict = PyModule_GetDict(module->module);
     if (!dict) {
-      pcilib_python_error("Error getting dictionary for script (%s)", script_name);
-      return PCILIB_ERROR_FAILED;
+	pcilib_python_error("Error getting dictionary for script (%s)", script_name);
+	return PCILIB_ERROR_FAILED;
     }
     
     pystr = PyUnicode_FromString("read_from_register");
     if (pystr) {
-      if (PyDict_Contains(dict, pystr)) mode |= PCILIB_ACCESS_R;
-      Py_DECREF(pystr);
+	if (PyDict_Contains(dict, pystr)) mode |= PCILIB_ACCESS_R;
+	Py_DECREF(pystr);
     }
 
     pystr = PyUnicode_FromString("write_to_register");
     if (pystr) {
-      if (PyDict_Contains(dict, pystr)) mode |= PCILIB_ACCESS_W;
-      Py_DECREF(pystr);
+	if (PyDict_Contains(dict, pystr)) mode |= PCILIB_ACCESS_W;
+	Py_DECREF(pystr);
     }
 #endif /* HAVE_PYTHON */
 
@@ -332,31 +351,33 @@ pcilib_py_object *pcilib_get_value_as_pyobject(pcilib_t* ctx, pcilib_value_t *va
 
     long ival;
     double fval;
-	
+
+    if (!ctx->py) return NULL;
+
     gstate = PyGILState_Ensure();
     switch(val->type) {
-        case PCILIB_TYPE_LONG:
-      ival = pcilib_get_value_as_int(ctx, val, &err);
-      if (!err) res = (PyObject*)PyLong_FromLong(ival);
-      break;
-        case PCILIB_TYPE_DOUBLE:
-      fval = pcilib_get_value_as_float(ctx, val, &err);
-      if (!err) res = (PyObject*)PyFloat_FromDouble(fval);
-      break;	
-        default:
-      PyGILState_Release(gstate);
-      pcilib_error("Can't convert pcilib value of type (%lu) to PyObject", val->type);
-      if (ret) *ret = PCILIB_ERROR_NOTSUPPORTED;
-      return NULL;
+     case PCILIB_TYPE_LONG:
+	ival = pcilib_get_value_as_int(ctx, val, &err);
+	if (!err) res = (PyObject*)PyLong_FromLong(ival);
+	break;
+     case PCILIB_TYPE_DOUBLE:
+	fval = pcilib_get_value_as_float(ctx, val, &err);
+	if (!err) res = (PyObject*)PyFloat_FromDouble(fval);
+	break;	
+     default:
+	PyGILState_Release(gstate);
+	pcilib_error("Can't convert pcilib value of type (%lu) to PyObject", val->type);
+	if (ret) *ret = PCILIB_ERROR_NOTSUPPORTED;
+	return NULL;
     }
     PyGILState_Release(gstate);
 
     if (err) {
-      if (ret) *ret = err;
-      return NULL;
+	if (ret) *ret = err;
+	return NULL;
     } else if (!res) {
-      if (ret) *ret = PCILIB_ERROR_MEMORY;
-      return res;
+	if (ret) *ret = PCILIB_ERROR_MEMORY;
+	return res;
     } 
 
     if (ret) *ret = 0;
@@ -372,27 +393,31 @@ int pcilib_set_value_from_pyobject(pcilib_t* ctx, pcilib_value_t *val, pcilib_py
     int err = 0;
     PyObject *pyval = (PyObject*)pval;
     PyGILState_STATE gstate;
-	
+
+    if (!ctx->py) return PCILIB_ERROR_NOTINITIALIZED;
+
     gstate = PyGILState_Ensure();
-#if PY_MAJOR_VERSION < 3
-    if (PyInt_Check(pyval)) {
-      err = pcilib_set_value_from_int(ctx, val, PyInt_AsLong(pyval));
-    } else if (PyString_Check(pyval)) {
-      err = pcilib_set_value_from_string(ctx, val, PyString_AsString(pyval));
-    } else
-#endif /*PY_MAJOR_VERSION >= 3*/
     if (PyLong_Check(pyval)) {
         err = pcilib_set_value_from_int(ctx, val, PyLong_AsLong(pyval));
     } else if (PyFloat_Check(pyval)) {
         err = pcilib_set_value_from_float(ctx, val, PyFloat_AsDouble(pyval));
+#if PY_MAJOR_VERSION < 3
+    } else if (PyInt_Check(pyval)) {
+        err = pcilib_set_value_from_int(ctx, val, PyInt_AsLong(pyval));
+    } else if (PyString_Check(pyval)) {
+        err = pcilib_set_value_from_string(ctx, val, PyString_AsString(pyval));
     } else if (PyUnicode_Check(pyval)) {
-#if PY_MAJOR_VERSION >= 3
-        err = pcilib_set_value_from_string(ctx, val, PyUnicode_AsUTF8(pyval));
-#else /*PY_MAJOR_VERSION >= 3*/
         PyObject *buf = PyUnicode_AsASCIIString(pyval);
-        err = pcilib_set_value_from_string(ctx, val, PyString_AsString(buf));
-        Py_DecRef(buf);
-#endif /*PY_MAJOR_VERSION >= 3*/
+        if (buf) {
+    	    err = pcilib_set_value_from_string(ctx, val, PyString_AsString(buf));
+    	    Py_DecRef(buf);
+    	} else {
+    	    err = PCILIB_ERROR_FAILED;
+	}
+#else /* PY_MAJOR_VERSION < 3 */
+    } else if (PyUnicode_Check(pyval)) {
+        err = pcilib_set_value_from_string(ctx, val, PyUnicode_AsUTF8(pyval));
+#endif /* PY_MAJOR_VERSION < 3 */
     } else {
         PyGILState_Release(gstate);
         pcilib_error("Can't convert PyObject to polymorphic pcilib value");
@@ -453,7 +478,7 @@ static char *pcilib_py_parse_string(pcilib_t *ctx, const char *codestr, pcilib_v
         strcpy(dst + offset, cur);
         offset += reg - cur;
 
-        // find the end of the register name
+            // find the end of the register name
         reg++;
         if (*reg == '{') {
             reg++;
@@ -469,7 +494,7 @@ static char *pcilib_py_parse_string(pcilib_t *ctx, const char *codestr, pcilib_v
         save = reg[i];
         reg[i] = 0;
 
-        // determine replacement value
+            // determine replacement value
         if (!strcasecmp(reg, "value")) {
             if (!value) {
                 pcilib_error("Python formula (%s) relies on the value of register, but it is not provided", codestr);
@@ -497,7 +522,7 @@ static char *pcilib_py_parse_string(pcilib_t *ctx, const char *codestr, pcilib_v
         if (save == '}') i++;
         else reg[i] = save;
 
-        // Advance to the next register if any
+            // Advance to the next register if any
         cur = reg + i;
         reg = strchr(cur, '$');
     }
@@ -507,8 +532,8 @@ static char *pcilib_py_parse_string(pcilib_t *ctx, const char *codestr, pcilib_v
     free(src);
 
     if (err) {
-     free(dst);
-     return NULL;
+        free(dst);
+        return NULL;
     }
 
     return dst;
@@ -522,6 +547,8 @@ int pcilib_py_eval_string(pcilib_t *ctx, const char *codestr, pcilib_value_t *va
     PyGILState_STATE gstate;
     char *code;
     PyObject* obj;
+
+    if (!ctx->py) return PCILIB_ERROR_NOTINITIALIZED;
 
     code = pcilib_py_parse_string(ctx, codestr, value);
     if (!code) {
@@ -559,25 +586,27 @@ int pcilib_py_eval_func(pcilib_t *ctx, const char *script_name, const char *func
     PyObject *pyval = NULL, *pyret;
     pcilib_script_t *module = NULL;
 
+    if (!ctx->py) return PCILIB_ERROR_NOTINITIALIZED;
+
     HASH_FIND_STR(ctx->py->script_hash, script_name, module);
 
     if (!module) {
-      pcilib_error("Script (%s) is not loaded", script_name);
-      return PCILIB_ERROR_NOTFOUND;
+	pcilib_error("Script (%s) is not loaded", script_name);
+	return PCILIB_ERROR_NOTFOUND;
     }
 
     if (val) {
-      pyval = pcilib_get_value_as_pyobject(ctx, val, &err);
-      if (err) return err;
+	pyval = pcilib_get_value_as_pyobject(ctx, val, &err);
+	if (err) return err;
     }
 
     PyGILState_STATE gstate = PyGILState_Ensure();
 
     pyfunc = PyUnicode_FromString(func_name);
     if (!pyfunc) {
-      if (pyval) Py_DECREF(pyval);
-      PyGILState_Release(gstate);
-      return PCILIB_ERROR_MEMORY;
+	if (pyval) Py_DECREF(pyval);
+	PyGILState_Release(gstate);
+	return PCILIB_ERROR_MEMORY;
     }
 
     pyret = PyObject_CallMethodObjArgs(module->module, pyfunc, ctx->py->pcilib_pywrap, pyval, NULL);
@@ -586,13 +615,13 @@ int pcilib_py_eval_func(pcilib_t *ctx, const char *script_name, const char *func
     Py_DECREF(pyval);
 	
     if (!pyret) {
-      PyGILState_Release(gstate);
-      pcilib_python_error("Error executing function (%s) of python script (%s)", func_name, script_name);
-      return PCILIB_ERROR_FAILED;
+	PyGILState_Release(gstate);
+	pcilib_python_error("Error executing function (%s) of python script (%s)", func_name, script_name);
+	return PCILIB_ERROR_FAILED;
     }
 
     if ((val)&&(pyret != Py_None))
-	   err = pcilib_set_value_from_pyobject(ctx, val, pyret);
+	err = pcilib_set_value_from_pyobject(ctx, val, pyret);
 
     Py_DECREF(pyret);
     PyGILState_Release(gstate);

@@ -18,7 +18,7 @@ static pcilib_view_context_t * pcilib_transform_view_init(pcilib_t *ctx, pcilib_
     pcilib_view_context_t *view_ctx;
     pcilib_transform_view_description_t *v = (pcilib_transform_view_description_t*)(ctx->views[view]);
 
-    if(v->script) {	
+    if (v->script) {
 	pcilib_access_mode_t mode = 0;
 		
 	err = pcilib_py_load_script(ctx, v->script);
@@ -39,11 +39,13 @@ static pcilib_view_context_t * pcilib_transform_view_init(pcilib_t *ctx, pcilib_
 
 	if (!v->read_from_reg) v->read_from_reg = "read_from_register";
 	if (!v->write_to_reg) v->write_to_reg = "write_to_register";
+    } else if (!ctx->py) {
+	v->base.mode &= (~PCILIB_REGISTER_RW);
     }
-	
+
     view_ctx = (pcilib_view_context_t*)malloc(sizeof(pcilib_view_context_t));
     if (view_ctx) memset(view_ctx, 0, sizeof(pcilib_view_context_t));
-    
+
     return view_ctx;
 }
 

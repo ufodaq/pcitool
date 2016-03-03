@@ -322,7 +322,7 @@ PyObject * pcilib_convert_register_info_to_pyobject(pcilib_t* ctx, pcilib_regist
 
 }
 
-Pcipywrap *new_Pcipywrap(const char* fpga_device, const char* model)
+pcipywrap *new_pcipywrap(const char* fpga_device, const char* model)
 {
     //opening device
     pcilib_t* ctx = pcilib_open(fpga_device, model);
@@ -331,14 +331,14 @@ Pcipywrap *new_Pcipywrap(const char* fpga_device, const char* model)
         set_python_exception("Failed pcilib_open(%s, %s)", fpga_device, model);
         return NULL;
     }
-    Pcipywrap *self;
-    self = (Pcipywrap *) malloc(sizeof(Pcipywrap));
+    pcipywrap *self;
+    self = (pcipywrap *) malloc(sizeof(pcipywrap));
     self->shared = 0;
     self->ctx = ctx;
     return self;
 }
 
-Pcipywrap *create_Pcipywrap(PyObject* ctx)
+pcipywrap *create_pcipywrap(PyObject* ctx)
 {
     if(!PyCapsule_CheckExact(ctx))
     {
@@ -346,22 +346,22 @@ Pcipywrap *create_Pcipywrap(PyObject* ctx)
         return NULL;
     }
 
-    Pcipywrap *self;
-    self = (Pcipywrap *) malloc(sizeof(Pcipywrap));
+    pcipywrap *self;
+    self = (pcipywrap *) malloc(sizeof(pcipywrap));
     self->shared = 1;
     self->ctx = PyCapsule_GetPointer(ctx, PyCapsule_GetName(ctx));
 
     return self;
 }
 
-void delete_Pcipywrap(Pcipywrap *self) {
+void delete_pcipywrap(pcipywrap *self) {
     if(!self->shared)
         pcilib_close(self->ctx);
 
     free(self);
 }
 
-PyObject* Pcipywrap_read_register(Pcipywrap *self, const char *regname, const char *bank)
+PyObject* pcipywrap_read_register(pcipywrap *self, const char *regname, const char *bank)
 {
     pcilib_value_t val = {0};
     pcilib_register_value_t reg_value;
@@ -385,7 +385,7 @@ PyObject* Pcipywrap_read_register(Pcipywrap *self, const char *regname, const ch
     return pcilib_get_value_as_pyobject(self->ctx, &val, NULL);
 }
 
-PyObject* Pcipywrap_write_register(Pcipywrap *self, PyObject* val, const char *regname, const char *bank)
+PyObject* pcipywrap_write_register(pcipywrap *self, PyObject* val, const char *regname, const char *bank)
 {
     pcilib_value_t val_internal = {0};
     pcilib_register_value_t reg_value;
@@ -419,7 +419,7 @@ PyObject* Pcipywrap_write_register(Pcipywrap *self, PyObject* val, const char *r
     return PyLong_FromLong((long)1);
 }
 
-PyObject* Pcipywrap_get_property(Pcipywrap *self, const char *prop)
+PyObject* pcipywrap_get_property(pcipywrap *self, const char *prop)
 {
     int err;
     pcilib_value_t val = {0};
@@ -435,7 +435,7 @@ PyObject* Pcipywrap_get_property(Pcipywrap *self, const char *prop)
     return pcilib_get_value_as_pyobject(self->ctx, &val, NULL);
 }
 
-PyObject* Pcipywrap_set_property(Pcipywrap *self, PyObject* val, const char *prop)
+PyObject* pcipywrap_set_property(pcipywrap *self, PyObject* val, const char *prop)
 {
     int err;
 
@@ -457,7 +457,7 @@ PyObject* Pcipywrap_set_property(Pcipywrap *self, PyObject* val, const char *pro
     return PyLong_FromLong((long)1);
 }
 
-PyObject* Pcipywrap_get_registers_list(Pcipywrap *self, const char *bank)
+PyObject* pcipywrap_get_registers_list(pcipywrap *self, const char *bank)
 {
    pcilib_register_info_t *list = pcilib_get_register_list(self->ctx, bank, PCILIB_LIST_FLAGS_DEFAULT);
 
@@ -477,7 +477,7 @@ PyObject* Pcipywrap_get_registers_list(Pcipywrap *self, const char *bank)
    return pyList;
 }
 
-PyObject* Pcipywrap_get_register_info(Pcipywrap *self, const char* reg,const char *bank)
+PyObject* pcipywrap_get_register_info(pcipywrap *self, const char* reg,const char *bank)
 {
     pcilib_register_info_t *info = pcilib_get_register_info(self->ctx, bank, reg, PCILIB_LIST_FLAGS_DEFAULT);
 
@@ -493,7 +493,7 @@ PyObject* Pcipywrap_get_register_info(Pcipywrap *self, const char* reg,const cha
     return py_info;
 }
 
-PyObject* Pcipywrap_get_property_list(Pcipywrap *self, const char* branch)
+PyObject* pcipywrap_get_property_list(pcipywrap *self, const char* branch)
 {
     pcilib_property_info_t *list = pcilib_get_property_list(self->ctx, branch, PCILIB_LIST_FLAGS_DEFAULT);
 
@@ -511,7 +511,7 @@ PyObject* Pcipywrap_get_property_list(Pcipywrap *self, const char* branch)
     return pyList;
 }
 
-PyObject* Pcipywrap_read_dma(Pcipywrap *self, unsigned char dma, size_t size)
+PyObject* pcipywrap_read_dma(pcipywrap *self, unsigned char dma, size_t size)
 {
     int err;
     void* buf = NULL;
@@ -532,7 +532,7 @@ PyObject* Pcipywrap_read_dma(Pcipywrap *self, unsigned char dma, size_t size)
     return py_buf;
 }
 
-PyObject* Pcipywrap_lock_global(Pcipywrap *self)
+PyObject* pcipywrap_lock_global(pcipywrap *self)
 {
     int err;
 
@@ -546,13 +546,13 @@ PyObject* Pcipywrap_lock_global(Pcipywrap *self)
     return PyLong_FromLong((long)1);
 }
 
-void Pcipywrap_unlock_global(Pcipywrap *self)
+void pcipywrap_unlock_global(pcipywrap *self)
 {
     pcilib_unlock_global(self->ctx);
     return;
 }
 
-PyObject* Pcipywrap_lock(Pcipywrap *self, const char *lock_id)
+PyObject* pcipywrap_lock(pcipywrap *self, const char *lock_id)
 {
     pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
                                           PCILIB_LOCK_FLAG_PERSISTENT,
@@ -574,7 +574,7 @@ PyObject* Pcipywrap_lock(Pcipywrap *self, const char *lock_id)
     return PyLong_FromLong((long)1);
 }
 
-PyObject* Pcipywrap_try_lock(Pcipywrap *self, const char *lock_id)
+PyObject* pcipywrap_try_lock(pcipywrap *self, const char *lock_id)
 {
     pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
                                           PCILIB_LOCK_FLAG_PERSISTENT,
@@ -595,7 +595,7 @@ PyObject* Pcipywrap_try_lock(Pcipywrap *self, const char *lock_id)
     return PyLong_FromLong((long)1);
 }
 
-PyObject* Pcipywrap_unlock(Pcipywrap *self, const char *lock_id)
+PyObject* pcipywrap_unlock(pcipywrap *self, const char *lock_id)
 {
     pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
                                           PCILIB_LOCK_FLAG_PERSISTENT,

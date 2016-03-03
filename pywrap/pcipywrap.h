@@ -8,7 +8,7 @@
 typedef struct {
     void* ctx;
     int shared;
-} Pcipywrap;
+} pcipywrap;
 
 /*!
  * \brief Redirect pcilib standart log stream to exeption text.
@@ -26,9 +26,9 @@ void redirect_logs_to_exeption();
  */
 PyObject* create_pcilib_instance(const char *fpga_device, const char *model);
 
-Pcipywrap *new_Pcipywrap(const char* fpga_device, const char* model);
-Pcipywrap *create_Pcipywrap(PyObject* ctx);
-void delete_Pcipywrap(Pcipywrap *self);
+pcipywrap *new_pcipywrap(const char* fpga_device, const char* model);
+pcipywrap *create_pcipywrap(PyObject* ctx);
+void delete_pcipywrap(pcipywrap *self);
 
 /*!
  * \brief Reads register value. Wrap for pcilib_read_register function.
@@ -36,7 +36,7 @@ void delete_Pcipywrap(Pcipywrap *self);
  * \param[in] bank should specify the bank name if register with the same name may occur in multiple banks, NULL otherwise
  * \return register value, can be integer or float type; NULL with exeption text, if failed.
  */
-PyObject* Pcipywrap_read_register(Pcipywrap *self, const char *regname, const char *bank);
+PyObject* pcipywrap_read_register(pcipywrap *self, const char *regname, const char *bank);
 
 /*!
  * \brief Writes value to register. Wrap for pcilib_write_register function.
@@ -45,14 +45,14 @@ PyObject* Pcipywrap_read_register(Pcipywrap *self, const char *regname, const ch
  * \param[in] bank should specify the bank name if register with the same name may occur in multiple banks, NULL otherwise
  * \return 1, serialized to PyObject or NULL with exeption text, if failed.
  */
-PyObject* Pcipywrap_write_register(Pcipywrap *self, PyObject* val, const char *regname, const char *bank);
+PyObject* pcipywrap_write_register(pcipywrap *self, PyObject* val, const char *regname, const char *bank);
 
 /*!
  * \brief Reads propety value. Wrap for pcilib_get_property function.
  * \param[in] prop property name (full name including path)
  * \return property value, can be integer or float type; NULL with exeption text, if failed.
  */
-PyObject* Pcipywrap_get_property(Pcipywrap *self, const char *prop);
+PyObject* pcipywrap_get_property(pcipywrap *self, const char *prop);
 
 /*!
  * \brief Writes value to property. Wrap for pcilib_set_property function.
@@ -60,27 +60,27 @@ PyObject* Pcipywrap_get_property(Pcipywrap *self, const char *prop);
  * \param[in] val Property value, that needs to be set. Can be int, float or string.
  * \return 1, serialized to PyObject or NULL with exeption text, if failed.
  */
-PyObject* Pcipywrap_set_property(Pcipywrap *self, PyObject* val, const char *prop);
-PyObject* Pcipywrap_get_registers_list(Pcipywrap *self, const char *bank);
-PyObject* Pcipywrap_get_register_info(Pcipywrap *self, const char* reg,const char *bank);
-PyObject* Pcipywrap_get_property_list(Pcipywrap *self, const char* branch);
+PyObject* pcipywrap_set_property(pcipywrap *self, PyObject* val, const char *prop);
+PyObject* pcipywrap_get_registers_list(pcipywrap *self, const char *bank);
+PyObject* pcipywrap_get_register_info(pcipywrap *self, const char* reg,const char *bank);
+PyObject* pcipywrap_get_property_list(pcipywrap *self, const char* branch);
 
-PyObject* Pcipywrap_read_dma(Pcipywrap *self, unsigned char dma, size_t size);
+PyObject* pcipywrap_read_dma(pcipywrap *self, unsigned char dma, size_t size);
 
-PyObject* Pcipywrap_lock_global(Pcipywrap *self);
-void Pcipywrap_unlock_global(Pcipywrap *self);
+PyObject* pcipywrap_lock_global(pcipywrap *self);
+void pcipywrap_unlock_global(pcipywrap *self);
 
 /*!
  * \brief Wrap for pcilib_lock
  * \param lock_id lock identificator
  * \warning This function should be called only under Python standart threading lock.
- * Otherwise it will stuck with more than 1 threads. See /xml/test/test_prop_mt.py
+ * Otherwise it will stuck with more than 1 threads. See /xml/test/test_prop4.py
  * for example.
  * \return 1, serialized to PyObject or NULL with exeption text, if failed.
  */
-PyObject* Pcipywrap_lock(Pcipywrap *self, const char *lock_id);
+PyObject* pcipywrap_lock(pcipywrap *self, const char *lock_id);
 
-PyObject* Pcipywrap_try_lock(Pcipywrap *self, const char *lock_id);
-PyObject* Pcipywrap_unlock(Pcipywrap *self, const char *lock_id);
+PyObject* pcipywrap_try_lock(pcipywrap *self, const char *lock_id);
+PyObject* pcipywrap_unlock(pcipywrap *self, const char *lock_id);
 
 #endif /* PCIPYWRAP_H */

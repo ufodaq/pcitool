@@ -2,9 +2,9 @@ from pcipywrap import *
 import os
 import sys
 
-class Pcilib(Pcipywrap):
+class pcilib(pcipywrap):
    def __init__(s, *args):
-      Pcipywrap.__init__(s, *args)
+      pcipywrap.__init__(s, *args)
       
       #load scripts
       scripts_dir = os.environ.get('PCILIB_SCRIPTS_DIR')

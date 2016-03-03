@@ -1,5 +1,5 @@
-#ifndef _PCITOOL_PCILIB_H
-#define _PCITOOL_PCILIB_H
+#ifndef _PCILIB_H
+#define _PCILIB_H
 
 #include <sys/time.h>
 #include <stddef.h>
@@ -1331,4 +1331,4 @@ int pcilib_convert_value_type(pcilib_t *ctx, pcilib_value_t *val, pcilib_value_t
 }
 #endif
 
-#endif /* _PCITOOL_PCILIB_H */
+#endif /* _PCILIB_H */

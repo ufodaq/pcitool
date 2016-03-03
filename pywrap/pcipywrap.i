@@ -8,9 +8,9 @@ extern void redirect_logs_to_exeption();
 
 typedef struct {
 	%extend {
-		Pcipywrap(const char* fpga_device = "/dev/fpga0", const char* model = NULL);
-		Pcipywrap(PyObject* ctx){return create_Pcipywrap(ctx);}
-		~Pcipywrap();
+		pcipywrap(const char* fpga_device = "/dev/fpga0", const char* model = NULL);
+		pcipywrap(PyObject* ctx){return create_pcipywrap(ctx);}
+		~pcipywrap();
 	
 		PyObject* read_register(const char *regname = NULL, const char *bank = NULL);
 		PyObject* write_register(PyObject* val, const char *regname, const char *bank = NULL);
@@ -30,4 +30,4 @@ typedef struct {
 		PyObject* try_lock(const char *lock_id);
 		PyObject* unlock(const char *lock_id);
 	}
-} Pcipywrap;
+} pcipywrap;

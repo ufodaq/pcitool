@@ -516,7 +516,7 @@ class ApiServer(MultiThreadedHTTPServer):
       #redirect logs to exeption
       pcilib.redirect_logs_to_exeption()
       #pass Pcipywrap to to server handler
-      self.lib = pcilib.Pcilib(device, model)
+      self.lib = pcilib.pcilib(device, model)
       def handler(*args):
          PcilibServerHandler(self.lib, *args)
       MultiThreadedHTTPServer.__init__(self, adress, handler)

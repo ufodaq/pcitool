@@ -35,7 +35,7 @@ class test_pcilib():
       #create pcilib_instance
       self.device = device
       self.model = model
-      self.pcilib = pcilib.Pcilib(device, model)
+      self.pcilib = pcilib.pcilib(device, model)
       self.num_threads = num_threads
       self.write_percentage = write_percentage
       self.register = register
@@ -83,7 +83,7 @@ class test_pcilib():
       try:
          while(1):
             val = long(random.randint(0, 8096))
-            self.pcilib = pcilib.Pcilib(self.device, self.model)
+            self.pcilib = pcilib.pcilib(self.device, self.model)
             print(self.pcilib.get_property_list(self.branch))
             print(self.pcilib.get_register_info(self.register))
             print(self.pcilib.get_registers_list())
@@ -145,7 +145,7 @@ if __name__ == '__main__':
                      type="string", dest="device", default=str('/dev/fpga0'),
                      help="FPGA device (/dev/fpga0)")                     
    parser.add_option("-m", "--model",  action="store",
-                     type="string", dest="model", default=None,
+                     type="string", dest="model", default=str('test'),
                      help="Memory model (autodetected)")
    parser.add_option("-t", "--threads",  action="store",
                      type="int", dest="threads", default=150,

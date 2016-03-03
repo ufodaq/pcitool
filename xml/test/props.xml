@@ -3,9 +3,5 @@
   <transform path="/test/prop1" register="test_prop1" unit="C" read_from_register="(503975./1024000)*${/registers/fpga/sensor_temperature:C} - 27315./100" description="formula to get real fpga temperature from the fpga_temperature register in decimal"/>
   <transform path="/test/prop2" register="test_prop2" unit="C" script="test_prop2.py" description="test python script #1" write_verification="0" />
   <transform path="/test/prop3" register="test_prop3" unit="C" script="test_prop3.py" description="test python script #2" />
-  <transform path="/test/prop_mt"
-	  register="test_prop_mt"
-	  unit="C"
-	  script="test_prop_mt.py"
-	  description="Example of thread safe python property"/>
+  <transform path="/test/prop4" register="test_prop4" unit="C" script="test_prop4.py" description="Example of thread safe python property"/>
 </model>

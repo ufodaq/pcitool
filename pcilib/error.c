@@ -12,8 +12,17 @@
 #define PCILIB_LOGGER_HISTORY 16
 
 void pcilib_print_error(void *arg, const char *file, int line, pcilib_log_priority_t prio, const char *msg, va_list va) {
-    vprintf(msg, va);
-    printf(" [%s:%d]\n", file, line);
+    size_t size = strlen(msg) + strlen(file) + 64;
+    char *stmp = alloca(size * sizeof(char*));
+
+    if (stmp) {
+	sprintf(stmp, "%s [%s:%d]\n", msg, file, line);
+	vprintf(stmp, va);
+    } else {
+	    // Bad for multithreading...
+	vprintf(msg, va);
+	printf(" [%s:%d]\n", file, line);
+    }
 }
 
 static void *pcilib_logger_argument = NULL;
