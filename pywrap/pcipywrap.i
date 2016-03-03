@@ -27,7 +27,10 @@ typedef struct {
 		void unlock_global();
 		
 		PyObject* lock(const char *lock_id);
+		PyObject* lock_persistent(const char *lock_id);
 		PyObject* try_lock(const char *lock_id);
+		PyObject* try_lock_persistent(const char *lock_id);
 		PyObject* unlock(const char *lock_id);
+		PyObject* unlock_persistent(const char *lock_id);
 	}
 } pcipywrap;

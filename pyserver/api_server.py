@@ -261,7 +261,7 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
             lock_id = str(data.get('lock_id'))
             
             try:
-               s.pcilib.lock(lock_id)
+               s.pcilib.lock_persistent(lock_id)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -280,9 +280,13 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
                
             #parse command arguments and convert them to string
             lock_id = str(data.get('lock_id'))
+            persistent = bool(data.get('persistent', False))
             
             try:
-               s.pcilib.try_lock(lock_id)
+               if persistent:
+                  s.pcilib.try_lock_persistent(lock_id)
+               else:
+                  s.pcilib.try_lock(lock_id)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -301,9 +305,13 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
                
             #parse command arguments and convert them to string
             lock_id = str(data.get('lock_id'))
+            persistent = bool(data.get('persistent', False))
             
             try:
-               s.pcilib.unlock(lock_id)
+               if persistent:
+                  s.pcilib.unlock_persistent(lock_id)
+               else:
+                  s.pcilib.unlock(lock_id)
             except Exception as e:
                s.error(str(e), data) 
                return
@@ -398,18 +406,21 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
       '  Server receive commands via http GET with json packet.\n'
       '  content-type should have value "application/json"\n'
       '  Server could handle only commands. to set command, you\n'
-      '  should specify field "command" in packet with command name\n'
+      '  should specify field "command" in packet with command name\n\n'
+      '  If you use html server, you should call commands via GET request\n'
+      '  like http://<server_host>:<port>/json/<command>?<arg1>=<arg_val1>&... \n'
+      '\n'
       '  List of commands:\n'
       '\n'
       '  command: help - Get help. This will return usage\n'
       '\n'
       
-      '  command: open - Opens context of device. It will be reopened if already open.\n'
-      '    required fields\n'
-      '      device:       - path to the device file [/dev/fpga0]\n'
-      '    optional fields\n'
-      '      model:       - specifies the model of hardware, autodetected if doesnt exists\n'
-      '\n'
+      #'  command: open - Opens context of device. It will be reopened if already open.\n'
+      #'    required fields\n'
+      #'      device:       - path to the device file [/dev/fpga0]\n'
+      #'    optional fields\n'
+      #'      model:       - specifies the model of hardware, autodetected if doesnt exists\n'
+      #'\n'
       
       '  command: get_registers_list - Returns the list of registers provided by the hardware model.\n'
       '    optional fields\n'
@@ -462,12 +473,17 @@ class PcilibServerHandler(BaseHTTPRequestHandler):
       '  command: try_lock - this function will try to take a lock for the mutex pointed by \n'
       '                    lockfunction to acquire a lock, but that returns immediatly if the\n'
       '                    lock can\'t be acquired on first try\n'
+      '    required fields\n'
       '      lock_id: - lock id\n'
+      '    optional fields\n'
+      '      persistent: - 1 - lock is persistent, 0 othervise (default: 0)\n'
       '\n'
       
       '  command: unlock - this function unlocks the lock.\n'
       '    required fields\n'
       '      lock_id: - lock id\n'
+      '    optional fields\n'
+      '      persistent: - 1 - lock is persistent, 0 othervise (default: 0)\n'
       '\n'
       
       '  command: get_scripts_list - Get aviable scripts with description\n'

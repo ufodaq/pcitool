@@ -160,8 +160,28 @@ def get_property_list():
    return render_template('property_info.html',
                           value = value,
                           branch = branch,
-                          properties = prop_info,
-                          json = json
+                          properties = prop_info
+                         )
+                         
+@app.route("/scripts_info")
+def get_scripts_list():
+   #get properties info
+   prop_info = 0  
+   try:
+      r = requests.get(url_for('process_json_command', 
+                               command = 'get_scripts_list', 
+                               _external = True))
+                               
+      if(r.json().get('status') == 'error'):
+         return 'Error: ' + r.json()['description']
+         
+      scripts_info = r.json()['scripts']
+      
+   except Exception as e:
+      return str(e)
+
+   return render_template('scripts_info.html',
+                          scripts = scripts_info
                          )
                          
 @app.route("/")

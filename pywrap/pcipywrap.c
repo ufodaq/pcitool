@@ -552,10 +552,10 @@ void pcipywrap_unlock_global(pcipywrap *self)
     return;
 }
 
-PyObject* pcipywrap_lock(pcipywrap *self, const char *lock_id)
+PyObject* lock(pcipywrap *self, const char *lock_id, pcilib_lock_flags_t flags)
 {
     pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
-                                          PCILIB_LOCK_FLAG_PERSISTENT,
+                                          flags,
                                           lock_id);
     if(!lock)
     {
@@ -574,10 +574,21 @@ PyObject* pcipywrap_lock(pcipywrap *self, const char *lock_id)
     return PyLong_FromLong((long)1);
 }
 
-PyObject* pcipywrap_try_lock(pcipywrap *self, const char *lock_id)
+PyObject* pcipywrap_lock(pcipywrap *self, const char *lock_id)
+{
+   return lock(self, lock_id, PCILIB_LOCK_FLAGS_DEFAULT);
+}
+
+PyObject* pcipywrap_lock_persistent(pcipywrap *self, const char *lock_id)
+{
+   return lock(self, lock_id, PCILIB_LOCK_FLAG_PERSISTENT);
+}
+
+
+PyObject* try_lock(pcipywrap *self, const char *lock_id, pcilib_lock_flags_t flags)
 {
     pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
-                                          PCILIB_LOCK_FLAG_PERSISTENT,
+                                          flags,
                                           lock_id);
     if(!lock)
     {
@@ -595,10 +606,20 @@ PyObject* pcipywrap_try_lock(pcipywrap *self, const char *lock_id)
     return PyLong_FromLong((long)1);
 }
 
-PyObject* pcipywrap_unlock(pcipywrap *self, const char *lock_id)
+PyObject* pcipywrap_try_lock(pcipywrap *self, const char *lock_id)
+{
+   return try_lock(self, lock_id, PCILIB_LOCK_FLAGS_DEFAULT);
+}
+
+PyObject* pcipywrap_try_lock_persistent(pcipywrap *self, const char *lock_id)
+{
+   return try_lock(self, lock_id, PCILIB_LOCK_FLAG_PERSISTENT);
+}
+
+PyObject* unlock(pcipywrap *self, const char *lock_id, pcilib_lock_flags_t flags)
 {
     pcilib_lock_t* lock = pcilib_get_lock(self->ctx,
-                                          PCILIB_LOCK_FLAG_PERSISTENT,
+                                          flags,
                                           lock_id);
     if(!lock)
     {
@@ -608,6 +629,16 @@ PyObject* pcipywrap_unlock(pcipywrap *self, const char *lock_id)
 
     pcilib_unlock(lock);
     return PyLong_FromLong((long)1);
+}
+
+PyObject* pcipywrap_unlock(pcipywrap *self, const char *lock_id)
+{
+   return unlock(self, lock_id, PCILIB_LOCK_FLAGS_DEFAULT);
+}
+
+PyObject* pcipywrap_unlock_persistent(pcipywrap *self, const char *lock_id)
+{
+   return unlock(self, lock_id, PCILIB_LOCK_FLAG_PERSISTENT);
 }
 
 

@@ -130,7 +130,7 @@ int pcilib_init_py(pcilib_t *ctx) {
     	    // Since python is being initializing from c programm, it needs to initialize threads to work properly with c threads
         PyEval_InitThreads();
         PyEval_ReleaseLock();
-	ctx->py->finalyze = 1;
+	     ctx->py->finalyze = 1;
     }
 		
     ctx->py->main_module = PyImport_AddModule("__parser__");

@@ -28,6 +28,8 @@ class pcilib(pcipywrap):
          curr_script['name'] = script
          if 'description' in dir(s.__scipts[script]):
             curr_script['description'] = s.__scipts[script].description
+         if 'run' in dir(s.__scipts[script]):
+            curr_script['valid'] = True
          scripts.append(curr_script)
       return scripts
       
