@@ -1,0 +1,9 @@
+POST_INSTALL="make -C driver/ install_symvers KERNELVER=$kernelver KERNELDIR=$kernel_source_dir"
+MAKE="make -C driver/ KERNELDIR=/lib/modules/${kernelver}/build"
+CLEAN="make -C driver/ clean"
+BUILT_MODULE_NAME=pciDriver
+BUILT_MODULE_LOCATION=driver/
+PACKAGE_NAME=${PACKAGE_NAME}
+PACKAGE_VERSION=${CPACK_PACKAGE_VERSION}
+REMAKE_INITRD=no
+AUTOINSTALL=yes

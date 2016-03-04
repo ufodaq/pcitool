@@ -237,7 +237,7 @@ int dma_nwl_write_fragment(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, 
 		return PCILIB_ERROR_TIMEOUT;
 	    }
 	
-    	    void *buf = pcilib_kmem_get_block_ua(ctx->dmactx.pcilib, ectx->pages, bufnum);
+    	    void *buf = (void*)pcilib_kmem_get_block_ua(ctx->dmactx.pcilib, ectx->pages, bufnum);
 
 	    pcilib_kmem_sync_block(ctx->dmactx.pcilib, ectx->pages, PCILIB_KMEM_SYNC_FROMDEVICE, bufnum);
 	    memcpy(buf, data, block_size);
@@ -293,7 +293,7 @@ int dma_nwl_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	if (ctx->ignore_eop) eop = 1;
 	
 	pcilib_kmem_sync_block(ctx->dmactx.pcilib, ectx->pages, PCILIB_KMEM_SYNC_FROMDEVICE, bufnum);
-        void *buf = pcilib_kmem_get_block_ua(ctx->dmactx.pcilib, ectx->pages, bufnum);
+        void *buf = (void*)pcilib_kmem_get_block_ua(ctx->dmactx.pcilib, ectx->pages, bufnum);
 	ret = cb(cbattr, (eop?PCILIB_DMA_FLAG_EOP:0), bufsize, buf);
 	if (ret < 0) return -ret;
 //	DS: Fixme, it looks like we can avoid calling this for the sake of performance

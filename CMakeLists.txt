@@ -1,5 +1,6 @@
-project(pcitool)
+project(pcitool C)
 
+set(RELEASE "0")
 set(PCILIB_VERSION "0.2.7")
 set(PCILIB_ABI_VERSION "2")
 
@@ -12,12 +13,20 @@ set(DISABLE_PYTHON FALSE CACHE BOOL "Disable python scripting support")
 
 #list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
+if(NOT DEFINED LIB_SUFFIX)
+ if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(LIB_SUFFIX "64")
+ else (CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(LIB_SUFFIX "")
+ endif (CMAKE_SIZEOF_VOID_P EQUAL 8)
+endif(NOT DEFINED LIB_SUFFIX)
+
 if(NOT DEFINED BIN_INSTALL_DIR)
     set(BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")
 endif(NOT DEFINED BIN_INSTALL_DIR)
 
 if(NOT DEFINED LIB_INSTALL_DIR)
-    set(LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+    set(LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}")
 endif(NOT DEFINED LIB_INSTALL_DIR)
 
 if(NOT DEFINED INCLUDE_INSTALL_DIR)
@@ -32,10 +41,31 @@ if(NOT DEFINED LOCALE_INSTALL_DIR)
     set(LOCALE_INSTALL_DIR "${DATA_INSTALL_DIR}/locale")
 endif(NOT DEFINED LOCALE_INSTALL_DIR)
 
+if (NOT DEFINED PCILIB_PLUGIN_DIR)
+    set(PCILIB_PLUGIN_DIR "${LIB_INSTALL_DIR}/pcilib" CACHE PATH "Directory to install plugins")
+endif (NOT DEFINED PCILIB_PLUGIN_DIR)
+
+if (NOT DEFINED PCILIB_DATA_DIR)
+    set(PCILIB_DATA_DIR "${DATA_INSTALL_DIR}/pcilib" CACHE PATH "Directory to install data files")
+endif (NOT DEFINED PCILIB_DATA_DIR)
+
+if (NOT DEFINED PCILIB_MODEL_DIR)
+    set(PCILIB_MODEL_DIR "${PCILIB_DATA_DIR}/models" CACHE PATH "Directory to install XML models")
+endif (NOT DEFINED PCILIB_MODEL_DIR)
+
+if (NOT DEFINED PCILIB_DOC_DIR)
+    set(PCILIB_DOC_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs/" CACHE PATH "Directory to install documentation")
+endif (NOT DEFINED PCILIB_DOC_DIR)
+    
+if (NOT DEFINED PCILIB_DEBUG_DIR)
+    set(PCILIB_DEBUG_DIR "." CACHE PATH "Directory to write debug information")
+endif (NOT DEFINED PCILIB_DEBUG_DIR)
+
 SET(ENV{PKG_CONFIG_PATH} "${LIB_INSTALL_DIR}/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
+find_package(Doxygen)
 
 if (NOT DISABLE_PYTHON)
     set(PYTHON_VERSION 2.7 CACHE STRING "python version")
@@ -50,13 +80,15 @@ if (NOT DISABLE_PYTHON)
 
 #    execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "from sysconfig import get_path; print get_path('platlib')" OUTPUT_VARIABLE PYTHON_INSTALL_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
     
-    execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "import site; print (site.PREFIXES[-1])" OUTPUT_VARIABLE PYTHON_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE)
-    file (TO_CMAKE_PATH "${PYTHON_PREFIX}" PYTHON_PREFIX)
-    execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "import site; print (site.getsitepackages()[0])" OUTPUT_VARIABLE PYTHON_SITE_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
-    file (TO_CMAKE_PATH "${PYTHON_SITE_DIR}" PYTHON_SITE_DIR)
+    if (NOT DEFINED PYTHON_INSTALL_DIR)
+	execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "import site; print (site.PREFIXES[-1])" OUTPUT_VARIABLE PYTHON_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE)
+	file (TO_CMAKE_PATH "${PYTHON_PREFIX}" PYTHON_PREFIX)
+	execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "import site; print (site.getsitepackages()[0])" OUTPUT_VARIABLE PYTHON_SITE_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+	file (TO_CMAKE_PATH "${PYTHON_SITE_DIR}" PYTHON_SITE_DIR)
 
-    string (REGEX REPLACE "^${PYTHON_PREFIX}/" "${CMAKE_INSTALL_PREFIX}/" PYTHON_SITE_DIR "${PYTHON_SITE_DIR}")
-    set(PYTHON_INSTALL_DIR ${PYTHON_SITE_DIR} CACHE PATH "path to install python module")
+	string (REGEX REPLACE "^${PYTHON_PREFIX}/" "${CMAKE_INSTALL_PREFIX}/" PYTHON_SITE_DIR "${PYTHON_SITE_DIR}")
+	set(PYTHON_INSTALL_DIR ${PYTHON_SITE_DIR} CACHE PATH "path to install python module")
+    endif (NOT DEFINED PYTHON_INSTALL_DIR)
 
     set(HAVE_PYTHON TRUE)
 endif (NOT DISABLE_PYTHON)
@@ -93,7 +125,6 @@ add_custom_command(TARGET build
 )
 set_source_files_properties(${CMAKE_BINARY_DIR}/pcilib/build.h PROPERTIES GENERATED TRUE)
 
-
 set(TARNAME "pcitool")
 set(PACKAGE_VERSION ${PCILIB_VERSION})
 set(PACKAGE_NAME "${TARNAME}")
@@ -101,11 +132,20 @@ set(PACKAGE_TARNAME "${TARNAME}")
 set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 set(PACKAGE_BUGREPORT "http://ufo.kit.edu/ufo/newticket")
 
-set(PCILIB_PLUGIN_DIR "${LIB_INSTALL_DIR}/pcilib" CACHE PATH "Directory to install plugins")
-set(PCILIB_DATA_DIR "${DATA_INSTALL_DIR}/pcilib" CACHE PATH "Directory to install data files")
-set(PCILIB_MODEL_DIR "${PCILIB_DATA_DIR}/models" CACHE PATH "Directory to install XML models")
-set(PCILIB_DOC_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs/" CACHE PATH "Directory to install documentation")
-set(PCILIB_DEBUG_DIR "." CACHE PATH "Directory to write debug information")
+set(CPACK_SOURCE_GENERATOR "TBZ2")
+set(CPACK_PACKAGE_CONTACT "Suren A. Chilingaryan <csa@suren.me>")
+if (${RELEASE} GREATER 0)
+    set(CPACK_PACKAGE_VERSION "${PACKAGE_VERSION}.${RELEASE}")
+else (${RELEASE} GREATER 0)
+    set(CPACK_PACKAGE_VERSION "${PACKAGE_VERSION}")
+endif (${RELEASE} GREATER 0)
+set(CPACK_SOURCE_IGNORE_FILES "/.bzr/;CMakeFiles;_CPack_Packages;cmake_install.cmake;CPack.*.cmake;CMakeCache.txt;install_manifest.txt;config.h$;.pc$;Makefile;.tar.bz2$;~$;${CPACK_SOURCE_IGNORE_FILES}")
+set(CPACK_SOURCE_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CPACK_PACKAGE_VERSION}")
+include(CPack)
+
+add_custom_target(dist_clean COMMAND ${CMAKE_MAKE_PROGRAM} clean WORKING_DIRECTORY ${CMAKE_CURRENT_DIR})
+add_custom_target(dist DEPENDS dist_clean COMMAND ${CMAKE_MAKE_PROGRAM} package_source)
+
 
 add_subdirectory(dma)
 add_subdirectory(protocols)
@@ -124,6 +164,16 @@ set_target_properties(pcilib PROPERTIES
     SOVERSION ${PCILIB_ABI_VERSION}
 )
 
+add_custom_target(docs
+    COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/docs/Doxyfile 
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/docs
+    COMMENT "Generating API documentation with Doxygen" VERBATIM
+)
+set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "docs/html")
+
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcitool.spec.in ${CMAKE_CURRENT_BINARY_DIR}/pcitool.spec)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/dkms.conf.in ${CMAKE_CURRENT_BINARY_DIR}/misc/dkms.conf)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcitool.pc.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/config.h)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/version.h)

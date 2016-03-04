@@ -2614,7 +2614,7 @@ int DetailKMEM(pcilib_t *handle, const char *device, const char *use, size_t blo
     printf("Buffer         Address          Hardware Address          Bus Address\n");
     printf("--------------------------------------------------------------------------------\n");
     for (; i < n; i++) {
-	void *data = pcilib_kmem_get_block_ua(handle, kbuf, i);
+	volatile void *data = pcilib_kmem_get_block_ua(handle, kbuf, i);
 	uintptr_t pa = pcilib_kmem_get_block_pa(handle, kbuf, i);
 	uintptr_t ba = pcilib_kmem_get_block_ba(handle, kbuf, i);
 	printf("%6lu     %16p     %16lx       %16lx\n", i, data, pa, ba);
@@ -2648,7 +2648,7 @@ int ReadKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t useid, size
 	return 0;
     }
 
-    data = pcilib_kmem_get_block_ua(handle, kbuf, block);
+    data = (void*)pcilib_kmem_get_block_ua(handle, kbuf, block);
     if (data) {
 	size = pcilib_kmem_get_block_size(handle, kbuf, block);
 	if ((max_size)&&(size > max_size)) size = max_size;

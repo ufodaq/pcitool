@@ -37,3 +37,8 @@ build
 pcipywrap.py
 pcipywrapPYTHON_wrap.c
 apps/test_multithread
+pcitool.spec
+misc/dkms.conf
+CPackConfig.cmake
+CPackSourceConfig.cmake
+_CPack_Packages

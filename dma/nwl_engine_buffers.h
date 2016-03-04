@@ -173,7 +173,7 @@ static size_t dma_nwl_clean_buffers(nwl_dma_t * ctx, pcilib_nwl_engine_context_t
     size_t res = 0;
     uint32_t status;
 
-    unsigned char *ring = pcilib_kmem_get_ua(ctx->dmactx.pcilib, ectx->ring);
+    volatile unsigned char *ring = pcilib_kmem_get_ua(ctx->dmactx.pcilib, ectx->ring);
     ring += ectx->tail * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
 
 next_buffer:
@@ -250,7 +250,7 @@ static int dma_nwl_push_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_context_t *ectx
     int flags = 0;
     
     uint32_t val;
-    unsigned char *ring = pcilib_kmem_get_ua(ctx->dmactx.pcilib, ectx->ring);
+    volatile unsigned char *ring = pcilib_kmem_get_ua(ctx->dmactx.pcilib, ectx->ring);
     uint32_t ring_pa = pcilib_kmem_get_ba(ctx->dmactx.pcilib, ectx->ring);
 
     ring += ectx->head * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
@@ -282,7 +282,7 @@ static size_t dma_nwl_wait_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_context_t *e
     struct timeval start, cur;
     uint32_t status_size, status;
 
-    unsigned char *ring = pcilib_kmem_get_ua(ctx->dmactx.pcilib, ectx->ring);
+    volatile unsigned char *ring = pcilib_kmem_get_ua(ctx->dmactx.pcilib, ectx->ring);
     
     ring += ectx->tail * PCILIB_NWL_DMA_DESCRIPTOR_SIZE;
 
@@ -337,7 +337,7 @@ static int dma_nwl_is_overflown(nwl_dma_t *ctx, pcilib_nwl_engine_context_t *ect
 static int dma_nwl_return_buffer(nwl_dma_t *ctx, pcilib_nwl_engine_context_t *ectx) {
     uint32_t val;
 
-    unsigned char *ring = pcilib_kmem_get_ua(ctx->dmactx.pcilib, ectx->ring);
+    volatile unsigned char *ring = pcilib_kmem_get_ua(ctx->dmactx.pcilib, ectx->ring);
     uint32_t ring_pa = pcilib_kmem_get_ba(ctx->dmactx.pcilib, ectx->ring);
     size_t bufsz = pcilib_kmem_get_block_size(ctx->dmactx.pcilib, ectx->pages, ectx->tail);
 

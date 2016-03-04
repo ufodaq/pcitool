@@ -68,7 +68,7 @@ typedef struct {
 
     uintptr_t pa;					/**< physical address of buffer */
     uintptr_t ba;					/**< bus address of buffer (if it is mapped for DMA operations) */
-    void* volatile ua;					/**< pointer to buffer in the process address space */
+    volatile void *ua;					/**< pointer to buffer in the process address space */
     size_t size;					/**< size of the buffer in bytes */
 
     size_t alignment_offset;				/**< we may request alignment of allocated buffers. To enusre proper alignment the larger buffer will be allocated and the offset will specify the first position in the buffer fullfilling alignment request */
@@ -205,7 +205,7 @@ int pcilib_kmem_sync_block(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kmem_s
  * @param[in] k			- kernel memory handle returned from pcilib_alloc_kernel_memory() call
  * @return 			- user-space pointer
  */
-void* volatile pcilib_kmem_get_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k);
+volatile void *pcilib_kmem_get_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k);
 
 /**
  * Get a physical address of a single-buffer kernel memory
@@ -233,7 +233,7 @@ uintptr_t pcilib_kmem_get_ba(pcilib_t *ctx, pcilib_kmem_handle_t *k);
  * @param[in] block		- specifies the buffer within the kernel memory (buffers are numbered from 0)
  * @return 			- user-space pointer
  */
-void* volatile pcilib_kmem_get_block_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block);
+volatile void *pcilib_kmem_get_block_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block);
 
 /**
  * Get a physical address of the specified kernel memory buffer

@@ -43,7 +43,7 @@ int pcilib_init_locking(pcilib_t* ctx) {
 
     if ((reused & PCILIB_KMEM_REUSE_REUSED) == 0) {
         for (i = 0; i < PCILIB_LOCK_PAGES; i++) {
-	    void *addr = pcilib_kmem_get_block_ua(ctx, ctx->locks.kmem, i);
+	    void *addr = (void*)pcilib_kmem_get_block_ua(ctx, ctx->locks.kmem, i);
 	    memset(addr, 0, PCILIB_KMEM_PAGE_SIZE);
         }
     }
@@ -95,7 +95,7 @@ void pcilib_unlock_global(pcilib_t *ctx) {
 pcilib_lock_t *pcilib_get_lock_by_id(pcilib_t *ctx, pcilib_lock_id_t id) {
     int page = id / PCILIB_LOCKS_PER_PAGE;
     int offset = id - page * PCILIB_LOCKS_PER_PAGE;
-    void *addr = pcilib_kmem_get_block_ua(ctx, ctx->locks.kmem, page);
+    volatile void *addr = pcilib_kmem_get_block_ua(ctx, ctx->locks.kmem, page);
     pcilib_lock_t *lock = (pcilib_lock_t*)(addr + offset * PCILIB_LOCK_SIZE);
 
     return lock;
@@ -308,7 +308,7 @@ int pcilib_destroy_all_locks(pcilib_t *ctx, int force) {
     }
 
     for (i = 0; i < PCILIB_LOCK_PAGES; i++) {
-	void *addr = pcilib_kmem_get_block_ua(ctx, ctx->locks.kmem, i);
+	void *addr = (void*)pcilib_kmem_get_block_ua(ctx, ctx->locks.kmem, i);
 	memset(addr, 0, PCILIB_KMEM_PAGE_SIZE);
     }
 

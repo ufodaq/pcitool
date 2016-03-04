@@ -1,0 +1,8 @@
+addFilter("devel-file-in-non-devel-package.*/usr/src/pciDriver")
+addFilter("no-manual-page-for-binary")
+addFilter("files-duplicate /usr/share/doc/packages/libpcilib-devel/html/")
+addFilter("files-duplicate /usr/share/pcilib.*/pyserver/static/codebase/imgs/dhxtree_skyblue/")
+addFilter("suse-filelist-forbidden-fhs23 /usr/src/pciDriver")
+
+# uthash
+addFilter("libpcilib.* shared-lib-calls-exit /usr/lib.*/libpcilib")

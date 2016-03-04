@@ -21,7 +21,7 @@ typedef struct pcilib_software_register_bank_context_s pcilib_software_register_
 struct pcilib_software_register_bank_context_s {
     pcilib_register_bank_context_t bank_ctx;	/**< the bank context associated with the software registers */
     pcilib_kmem_handle_t *kmem;			/**< the kernel memory for software registers */
-    void *addr;					/**< the virtual adress of the allocated kernel memory*/
+    volatile void *addr;			/**< the virtual adress of the allocated kernel memory*/
 };
 
 void pcilib_software_registers_close(pcilib_t *ctx, pcilib_register_bank_context_t *bank_ctx) {
@@ -131,7 +131,7 @@ int pcilib_software_registers_read(pcilib_t *ctx, pcilib_register_bank_context_t
 	return PCILIB_ERROR_INVALID_ADDRESS;
     }
 
-    pcilib_datacpy(&val, ((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr, access, 1, b->raw_endianess);
+    pcilib_datacpy(&val, (void*)((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr, access, 1, b->raw_endianess);
     *value = val;
 
     return 0;
@@ -147,7 +147,7 @@ int pcilib_software_registers_write(pcilib_t *ctx, pcilib_register_bank_context_
     }
 
     // we consider this atomic operation and, therefore, do no locking
-    pcilib_datacpy(((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr, &value, access, 1, b->raw_endianess);
+    pcilib_datacpy((void*)((pcilib_software_register_bank_context_t*)bank_ctx)->addr + addr, &value, access, 1, b->raw_endianess);
 
     return 0;
 }

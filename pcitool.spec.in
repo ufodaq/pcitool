@@ -1,0 +1,204 @@
+%define	modname pciDriver
+
+%{!?__python2: %global __python2 /usr/bin/python2}
+%{!?python2_sitelib: %global python2_sitelib %(%{__python2} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
+%{!?python2_sitearch: %global python2_sitearch %(%{__python2} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(1))")}
+
+Summary: Universal PCI driver
+Name: pcitool
+Version: ${CPACK_PACKAGE_VERSION}
+Release: csa
+License: GPL-3.0
+Group: Development/Libraries
+Source: ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2
+BuildRoot: %{_tmppath}/%{name}-%{version}-root
+URL: http://darksoft.org
+Prefix: %{_prefix}
+Docdir: %{_docdir}
+BuildRequires: libfastwriter-devel libxml2-devel uthash
+BuildRequires: python python-devel swig 
+BuildRequires: kernel-devel dkms
+BuildRequires: doxygen
+BuildRequires: pkg-config libtool cmake
+Vendor: Institute for Data Processing and Electronics, KIT
+Packager: Suren A. Chilingaryan <csa@suren.me>
+
+%description 
+pcitool is a command line tool to manipulate PCI hardware. It provides ability
+to get/set registers, read/write data using DMA engine, and debug hardware 
+operation. 
+
+%package -n libpcilib${PCILIB_ABI_VERSION}
+Summary: User-space PCI library
+Group: Development/Libraries
+Requires: pcilib-python >= %{version}
+Requires: pcilib-dkms >= %{version}
+
+%description -n libpcilib${PCILIB_ABI_VERSION}
+pcilib is a user-space library providing structured access to the PCI hardware.
+API exposes 4 API layers.
+ - PCI memory access - allows to map PCI bar memory into the address space of 
+ user application and manipulate it directly.
+ - Register access - allows to read and write device registers. The register
+ model is defined using XML. Besides the direct hardware access, the register
+ values can be filtered using Python scripts. This allows to convert hardware
+ reading to standard units, make consistency checking, and create meta registers
+ setting multiple registers from a single parameter.
+ - DMA engine - allows high-speed reading and writting using DMA. The DMA 
+ engines are implemented in user-space as plugins.
+ - Event engine - allows polling for hardware events and grabbing the data
+ associated with the event in multiple supported formats. The event engines
+ are implemented as plugins and are not part of this package.
+ 
+%package -n libpcilib-devel
+Summary: Development files for pcilib
+Group: Development/Libraries 
+Requires: libpcilib${PCILIB_ABI_VERSION} = %{version}
+
+%description -n libpcilib-devel
+Development files for user-space PCI library
+
+%package -n pcilib-test
+Summary: Testing files for pcilib
+Group: Development/Libraries 
+Requires: libpcilib${PCILIB_ABI_VERSION} = %{version}
+
+%description -n pcilib-test
+Sample XML register model and a few applications for testing pcilib
+
+%package -n pcilib-python
+Summary: Python wrapper for pcilib
+Group: Development/Libraries 
+Requires: libpcilib${PCILIB_ABI_VERSION} = %{version}
+
+%description -n pcilib-python
+Python wrapper for pcilib. The python wrapper is used 
+ - By register scripts which are used to convert hardware reading to standard
+ units, make consistency checking, and create meta registers setting multiple 
+ registers from a single parameter.
+ - pcilib web api which used to provide register and dma access from remote
+ applications.
+
+%package -n pcilib-dkms
+Summary: Kernel module providing low-level PCI access
+Group: Development/Libraries 
+Requires: dkms bash gcc make
+
+%description -n pcilib-dkms
+Minimalistic driver used by pcilib to 
+ - Handle interrupts
+ - Map PCI regions into the user space
+ - Allocate persistent page-locked memory for DMA operations
+ and map it into the user-space
+ - Ensure access syncrhonization between multiple applications
+ 
+%package -n pcilib-server
+Summary: Pcilib Web API
+Group: Development/Libraries 
+Requires: pcilib-python = %{version}
+Requires: python
+
+%description -n pcilib-server
+Pcilib Web API and small demo web server.
+
+%prep
+%setup -q -n pcitool-%{version}
+
+%build
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+	-DPCILIB_PLUGIN_DIR=%{_libdir}/pcilib${PCILIB_ABI_VERSION}/ -DPCILIB_DATA_DIR=%{_datadir}/pcilib${PCILIB_ABI_VERSION}/ \
+	-DLIB_INSTALL_DIR=%{_libdir} -DBIN_INSTALL_DIR=%{_bindir} -DDATA_INSTALL_DIR=%{_datadir} -DINCLUDE_INSTALL_DIR=%{_includedir} -DPYTHON_INSTALL_DIR=%{python2_sitearch} .
+make
+make docs
+
+%install
+rm -rf $RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT
+mkdir -p $RPM_BUILD_ROOT/%{_libdir}/pcilib${PCILIB_ABI_VERSION}/
+
+# scripts
+install -m 755 tests/reload.sh $RPM_BUILD_ROOT/%{_bindir}/pci-reload
+
+# udev
+mkdir -p $RPM_BUILD_ROOT/usr/lib/udev/rules.d
+install -m 644 misc/50-pcidriver.rules $RPM_BUILD_ROOT/%{_udevrulesdir}
+
+# DKMS
+mkdir -p $RPM_BUILD_ROOT/%{_includedir}/linux/
+install -m 644 driver/ioctl.h $RPM_BUILD_ROOT/%{_includedir}/linux/pcidriver.h
+mkdir -p $RPM_BUILD_ROOT/usr/src/%{modname}-%{version}/pcilib/
+install -m 644 misc/dkms.conf $RPM_BUILD_ROOT/%{_prefix}/src/%{modname}-%{version}/
+install -m 644 pcilib/*.h $RPM_BUILD_ROOT/%{_prefix}/src/%{modname}-%{version}/pcilib/
+cp -r driver $RPM_BUILD_ROOT/usr/src/%{modname}-%{version}/
+
+# Sample model
+cp -r xml/test $RPM_BUILD_ROOT/%{_datadir}/pcilib${PCILIB_ABI_VERSION}/models/
+
+# Servers
+cp -r pyserver $RPM_BUILD_ROOT/%{_datadir}/pcilib${PCILIB_ABI_VERSION}/
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%post -n libpcilib${PCILIB_ABI_VERSION} -p /sbin/ldconfig
+
+%postun -n libpcilib${PCILIB_ABI_VERSION} -p /sbin/ldconfig
+
+%post -n pcilib-dkms
+if [ -z "`dkms status -m %{modname} -v %{version}`" ]; then
+	echo "Add module source to dkms"
+	dkms add -m %{modname} -v %{version} --rpm_safe_upgrade
+
+	echo "Build module with dkms"
+	dkms build -m %{modname} -v %{version}
+	dkms install -m %{modname} -v %{version}
+fi
+exit 0
+
+%preun -n pcilib-dkms
+/usr/sbin/dkms remove -m %{modname} -v %{version} --all --rpm_safe_upgrade
+exit 0
+
+%files
+%defattr(-, root, root)
+%{_bindir}/pci
+%{_bindir}/pci-reload
+
+%files -n libpcilib${PCILIB_ABI_VERSION}
+%defattr(-, root, root)
+%doc docs/README 
+%doc docs/HARDWARE
+%dir %{_libdir}/pcilib${PCILIB_ABI_VERSION}/
+%dir %{_datadir}/pcilib${PCILIB_ABI_VERSION}/models/
+%{_datadir}/pcilib${PCILIB_ABI_VERSION}/models/*.xsd
+%{_libdir}/libpcilib.so.*
+
+%files -n libpcilib-devel
+%defattr(-, root, root)  
+%doc docs/html
+%{_includedir}/linux/pcidriver.h
+%{_includedir}/pcilib.h
+%{_includedir}/pcilib/
+%{_libdir}/lib*.so
+%{_libdir}/pkgconfig/*.pc
+
+%files -n pcilib-test
+%defattr(-, root, root)  
+%{_datadir}/pcilib${PCILIB_ABI_VERSION}/models/test
+
+%files -n pcilib-dkms
+%defattr(-, root, root)  
+%{_udevrulesdir}
+%{_prefix}/src/%{modname}-%{version}/
+
+%files -n pcilib-python
+%defattr(-, root, root)
+%{python2_sitearch}/*
+
+%files -n pcilib-server
+%defattr(-, root, root)  
+%{_datadir}/pcilib${PCILIB_ABI_VERSION}/pyserver
+
+%changelog
+* Fri Mar  4 2016 Suren A. Chilingaryan <csa@suren.me> - ${CPACK_PACKAGE_VERSION}
+- Added spec file to the sources

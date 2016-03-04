@@ -1,5 +1,0 @@
-IPECamera Hardware Bugs
-=======================
- 1. Strange sequence writting CMOSIS registers
- 2. Sometimes during DMA streaming register accesses fail
- 3. The lower 12-bit of bus address are ignored by all hardware

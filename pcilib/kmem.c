@@ -29,7 +29,7 @@ int pcilib_clean_kernel_memory(pcilib_t *ctx, pcilib_kmem_use_t use, pcilib_kmem
 static int pcilib_free_kernel_buffer(pcilib_t *ctx, pcilib_kmem_list_t *kbuf, size_t i, pcilib_kmem_flags_t flags) {
     kmem_handle_t kh = {0};
 
-    if (kbuf->buf.blocks[i].ua) munmap(kbuf->buf.blocks[i].ua, kbuf->buf.blocks[i].size + kbuf->buf.blocks[i].alignment_offset);
+    if (kbuf->buf.blocks[i].ua) munmap((void*)kbuf->buf.blocks[i].ua, kbuf->buf.blocks[i].size + kbuf->buf.blocks[i].alignment_offset);
     kh.handle_id = kbuf->buf.blocks[i].handle_id;
     kh.pa = kbuf->buf.blocks[i].pa;
     kh.flags = flags;
@@ -361,7 +361,7 @@ int pcilib_kmem_sync_block(pcilib_t *ctx, pcilib_kmem_handle_t *k, pcilib_kmem_s
     return 0;
 }
 
-void* volatile pcilib_kmem_get_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
+volatile void *pcilib_kmem_get_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
     return kbuf->buf.addr.ua + kbuf->buf.addr.alignment_offset + kbuf->buf.addr.mmap_offset;
 }
@@ -380,7 +380,7 @@ uintptr_t pcilib_kmem_get_ba(pcilib_t *ctx, pcilib_kmem_handle_t *k) {
     return 0;
 }
 
-void* volatile pcilib_kmem_get_block_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block) {
+volatile void *pcilib_kmem_get_block_ua(pcilib_t *ctx, pcilib_kmem_handle_t *k, size_t block) {
     pcilib_kmem_list_t *kbuf = (pcilib_kmem_list_t*)k;
     return kbuf->buf.blocks[block].ua + kbuf->buf.blocks[block].alignment_offset + kbuf->buf.blocks[block].mmap_offset;
 }

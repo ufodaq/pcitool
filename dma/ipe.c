@@ -651,7 +651,7 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	
 	if ((ctx->dma_flags&IPEDMA_FLAG_NOSYNC) == 0)
 	    pcilib_kmem_sync_block(ctx->dmactx.pcilib, ctx->pages, PCILIB_KMEM_SYNC_FROMDEVICE, cur_read);
-        void *buf = pcilib_kmem_get_block_ua(ctx->dmactx.pcilib, ctx->pages, cur_read);
+        void *buf = (void*)pcilib_kmem_get_block_ua(ctx->dmactx.pcilib, ctx->pages, cur_read);
 	ret = cb(cbattr, packet_flags, ctx->page_size, buf);
 	if (ret < 0) return -ret;
 	

@@ -3,10 +3,11 @@ CONFIG_MODULE_SIG=n
 obj-m := pciDriver.o
 pciDriver-objs := base.o dev.o int.o umem.o kmem.o sysfs.o ioctl.o pcibus.o rdma.o
 
-KERNELDIR ?= /lib/modules/$(shell uname -r)/build
-INSTALLDIR ?= /lib/modules/$(shell uname -r)/extra
-MAININSTALLDIR ?= /lib/modules/$(shell uname -r)/kernel/extra
-HEADERDIR ?= /lib/modules/$(shell uname -r)/source/include
+KERNELVER ?= $(shell uname -r)
+KERNELDIR ?= /lib/modules/$(KERNELVER)/build
+INSTALLDIR ?= /lib/modules/$(KERNELVER)/extra
+MAININSTALLDIR ?= /lib/modules/$(KERNELVER)/kernel/extra
+HEADERDIR ?= /lib/modules/$(KERNELVER)/source/include
 PWD := $(shell pwd)
 
 EXTRA_CFLAGS += -I$(M)/..
@@ -62,6 +63,14 @@ install:
 	@echo "INSTALL /usr/include/linux/pcidriver.h"
 	@mkdir -p /usr/include/linux
 	@install -m 644 ioctl.h /usr/include/linux/pcidriver.h
+
+install_symvers:
+	@mkdir -p $(INSTALLDIR)
+	@echo "INSTALL $(INSTALLDIR)/pciDriver.symvers"
+	@install -m 644 Module.symvers $(INSTALLDIR)/pciDriver.symvers
+	@echo "INSTALL $(HEADERDIR)/linux/pcidriver.h"
+	@install -m 644 pcidriver.h $(HEADERDIR)/linux/
+
 
 uninstall:
 	@echo "UNINSTALL $(INSTALLDIR)/pciDriver.ko"
