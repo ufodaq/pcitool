@@ -1,0 +1,14 @@
+[Unit]
+Description=Pcilib Python html server
+Wants=network.target nss-lookup.target
+After=network.target nss-lookup.target
+Requires=pcilib_api.service
+After=pcilib_api.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/sysconfig/pcilib
+ExecStart=${PYTHON_EXECUTABLE} ${PCILIB_PY_SERVER_INSTALL_DIR}/pcilib_html_server.py -p $HTML_SERVER_PORT -e
+
+[Install]
+WantedBy=multi-user.target

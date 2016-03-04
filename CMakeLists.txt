@@ -32,6 +32,7 @@ if(NOT DEFINED LOCALE_INSTALL_DIR)
     set(LOCALE_INSTALL_DIR "${DATA_INSTALL_DIR}/locale")
 endif(NOT DEFINED LOCALE_INSTALL_DIR)
 
+
 SET(ENV{PKG_CONFIG_PATH} "${LIB_INSTALL_DIR}/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 
 find_package(PkgConfig REQUIRED)
@@ -103,6 +104,7 @@ set(PACKAGE_BUGREPORT "http://ufo.kit.edu/ufo/newticket")
 
 set(PCILIB_PLUGIN_DIR "${LIB_INSTALL_DIR}/pcilib" CACHE PATH "Directory to install plugins")
 set(PCILIB_DATA_DIR "${DATA_INSTALL_DIR}/pcilib" CACHE PATH "Directory to install data files")
+set(PCILIB_PY_SERVER_INSTALL_DIR "${PCILIB_DATA_DIR}/pyserver" CACHE PATH "Directory to install python server")
 set(PCILIB_MODEL_DIR "${PCILIB_DATA_DIR}/models" CACHE PATH "Directory to install XML models")
 set(PCILIB_DOC_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs/" CACHE PATH "Directory to install documentation")
 set(PCILIB_DEBUG_DIR "." CACHE PATH "Directory to write debug information")
@@ -128,6 +130,14 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcitool.pc.in ${CMAKE_CURRENT_BI
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/config.h)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/version.h)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/docs/Doxyfile)
+if (HAVE_PYTHON)
+   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib_api.service.in
+                  ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib_api.service)
+   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib_html.service.in
+                  ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib_html.service)
+   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib.in
+                  ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib)
+endif (HAVE_PYTHON)
 
 if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     file(COPY ${CMAKE_SOURCE_DIR}/xml DESTINATION ${CMAKE_BINARY_DIR})
@@ -146,5 +156,19 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc
     DESTINATION ${LIB_INSTALL_DIR}/pkgconfig
 )
+
+if (HAVE_PYTHON)
+   #install Python servers
+   file(GLOB DEPLOY_FILES_AND_DIRS "${CMAKE_SOURCE_DIR}/pyserver/*")
+   foreach(ITEM ${DEPLOY_FILES_AND_DIRS})
+      IF( IS_DIRECTORY "${ITEM}" )
+         LIST( APPEND DIRS_TO_DEPLOY "${ITEM}" )
+      ELSE()
+         LIST( APPEND FILES_TO_DEPLOY "${ITEM}" )
+      ENDIF()
+   endforeach()
+   INSTALL( FILES ${FILES_TO_DEPLOY} DESTINATION ${PCILIB_PY_SERVER_INSTALL_DIR} )
+   INSTALL( DIRECTORY ${DIRS_TO_DEPLOY} DESTINATION ${PCILIB_PY_SERVER_INSTALL_DIR} )
+endif (HAVE_PYTHON)
 
 message("-- Configured pcitool ${PCILIB_VERSION_MAJOR}.${PCILIB_VERSION_MINOR}.${PCILIB_VERSION_MICRO} with public ABI ${PCILIB_ABI_VERSION}")

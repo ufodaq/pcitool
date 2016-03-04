@@ -1,0 +1,9 @@
+# API server parameters
+API_SERVER_DEVICE="/dev/fpga0"
+API_SERVER_MODEL="test"
+
+# HTML server parameters
+HTML_SERVER_PORT=5000
+
+#Scripts directory
+PCILIB_SCRIPTS_DIR="${PCILIB_PY_SERVER_INSTALL_DIR}/scripts"
