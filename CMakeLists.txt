@@ -95,6 +95,7 @@ endif (NOT DISABLE_PYTHON)
 
 set(EXTRA_SYSTEM_LIBS -lrt)
 
+include(CheckIncludeFiles)
 check_include_files(stdatomic.h HAVE_STDATOMIC_H)
 
 find_path(UTHASH_INCLUDE_DIRS uthash.h PATH_SUFFIXES uthash)
