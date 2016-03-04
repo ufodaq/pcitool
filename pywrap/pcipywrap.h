@@ -79,8 +79,10 @@ void pcipywrap_unlock_global(pcipywrap *self);
  * \return 1, serialized to PyObject or NULL with exeption text, if failed.
  */
 PyObject* pcipywrap_lock(pcipywrap *self, const char *lock_id);
-
+PyObject* pcipywrap_lock_persistent(pcipywrap *self, const char *lock_id);
 PyObject* pcipywrap_try_lock(pcipywrap *self, const char *lock_id);
+PyObject* pcipywrap_try_lock_persistent(pcipywrap *self, const char *lock_id);
 PyObject* pcipywrap_unlock(pcipywrap *self, const char *lock_id);
+PyObject* pcipywrap_unlock_persistent(pcipywrap *self, const char *lock_id);
 
 #endif /* PCIPYWRAP_H */

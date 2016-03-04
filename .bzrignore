@@ -42,3 +42,7 @@ misc/dkms.conf
 CPackConfig.cmake
 CPackSourceConfig.cmake
 _CPack_Packages
+pcilib_api.service
+pcilib_html.service
+pcilib.conf
+pcilib.sysconfig

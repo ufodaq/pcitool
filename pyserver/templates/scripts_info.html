@@ -1,0 +1,49 @@
+{% block content %}
+
+<script>
+   function runScript(name){
+      var pathToGetProperty = "{{ url_for('process_json_command', command = 'run_script') }}"
+      var completePath = pathToGetProperty + '?script_name=' + name +
+                        '&value=' + $("#input_" + name).val()
+      
+      $.get(completePath, function(data, status){
+         var stringData = ""
+         if(typeof(data) === "object") {
+            stringData = JSON.stringify(data)
+         }
+         else
+            stringData = String(data)
+         
+         var blob = new Blob([stringData], {type: "text/plain;charset=utf-8"});
+         saveAs(blob, "output_" + name);
+      });
+   }
+</script>
+
+<input type="file" id="file-input" />
+
+<table class="infoTable">
+   <tr class="infoTable">
+      <td class="infoTable">Name</td>
+      <td class="infoTable">Description</td>
+   </tr>
+   {% for script in scripts %}
+      <tr class="infoTable">
+         <td class="infoTable">{{ script.name }}</td>
+         <td class="infoTable">
+         {% if 'description' in script %}
+             {{ script.description }}
+         {% endif %}
+         </td>
+         <td class="infoTable" style="overflow: visible">
+         {% if 'valid' in script and script['valid'] %}
+                                    <input type='text' id="input_{{ script.name }}"/>
+                  <input type="button" value="run"
+                         onclick="runScript('{{ script.name }}')">
+         {% endif %}
+         </td>
+      </tr>
+   {% endfor %}
+</table>
+{% endblock %}
+

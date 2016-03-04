@@ -10,6 +10,7 @@ cmake_minimum_required(VERSION 2.8)
 
 set(DISABLE_PCITOOL FALSE CACHE BOOL "Build only the library")
 set(DISABLE_PYTHON FALSE CACHE BOOL "Disable python scripting support") 
+set(DISABLE_SERVERS FALSE CACHE BOOL "Disable Web API support") 
 
 #list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -53,6 +54,10 @@ if (NOT DEFINED PCILIB_MODEL_DIR)
     set(PCILIB_MODEL_DIR "${PCILIB_DATA_DIR}/models" CACHE PATH "Directory to install XML models")
 endif (NOT DEFINED PCILIB_MODEL_DIR)
 
+if (NOT DEFINED PCILIB_SERVER_DIR)
+    set(PCILIB_SERVER_DIR "${PCILIB_DATA_DIR}/pyserver" CACHE PATH "Directory to install python server")
+endif (NOT DEFINED PCILIB_SERVER_DIR)
+
 if (NOT DEFINED PCILIB_DOC_DIR)
     set(PCILIB_DOC_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs/" CACHE PATH "Directory to install documentation")
 endif (NOT DEFINED PCILIB_DOC_DIR)
@@ -92,6 +97,10 @@ if (NOT DISABLE_PYTHON)
 
     set(HAVE_PYTHON TRUE)
 endif (NOT DISABLE_PYTHON)
+
+if (NOT HAVE_PYTHON)
+    set(DISABLE_SERVERS TRUE)
+endif (NOT HAVE_PYTHON)
 
 set(EXTRA_SYSTEM_LIBS -lrt)
 
@@ -179,6 +188,11 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcitool.pc.in ${CMAKE_CURRENT_BI
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/config.h)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/version.h)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/docs/Doxyfile)
+if (NOT DISABLE_SERVERS)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib_api.service.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib_api.service)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib_html.service.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib_html.service)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib.sysconfig.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib.sysconfig)
+endif (NOT DISABLE_SERVERS)
 
 if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     file(COPY ${CMAKE_SOURCE_DIR}/xml DESTINATION ${CMAKE_BINARY_DIR})
@@ -197,5 +211,19 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc
     DESTINATION ${LIB_INSTALL_DIR}/pkgconfig
 )
+
+if (NOT DISABLE_SERVERS)
+   #install Python servers
+   file(GLOB DEPLOY_FILES_AND_DIRS "${CMAKE_SOURCE_DIR}/pyserver/*")
+   foreach(ITEM ${DEPLOY_FILES_AND_DIRS})
+	if( IS_DIRECTORY "${ITEM}" )
+	    list(APPEND DIRS_TO_DEPLOY "${ITEM}")
+        else()
+    	    list(APPEND FILES_TO_DEPLOY "${ITEM}")
+        endif()
+    endforeach()
+    install(FILES ${FILES_TO_DEPLOY} DESTINATION ${PCILIB_SERVER_DIR})
+    install(DIRECTORY ${DIRS_TO_DEPLOY} DESTINATION ${PCILIB_SERVER_DIR})
+endif (NOT DISABLE_SERVERS)
 
 message("-- Configured pcitool ${PCILIB_VERSION_MAJOR}.${PCILIB_VERSION_MINOR}.${PCILIB_VERSION_MICRO} with public ABI ${PCILIB_ABI_VERSION}")

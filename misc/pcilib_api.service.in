@@ -1,0 +1,15 @@
+[Unit]
+Description=Pcilib Python api server
+Wants=network.target nss-lookup.target
+After=network.target nss-lookup.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/sysconfig/pcilib
+ExecStart=${PYTHON_EXECUTABLE} ${PCILIB_SERVER_DIR}/pcilib_api_server.py -d SERVER_DEVICE -m $SERVER_MODEL -p $API_SERVER_PORT
+
+[Install]
+WantedBy=multi-user.target
+
+
+

@@ -6,8 +6,12 @@
 	<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
 	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='codebase/dhtmlx.css') }}"/>
    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='base.css') }}"/>
-   <script type=text/javascript src="{{ url_for('static', filename='jquery-2.2.1.js') }}"></script>
-	<script src="{{ url_for('static', filename='codebase/dhtmlx.js') }}"></script>
+   <script type="text/javascript" src="{{ url_for('static', filename='FileSaver.js') }}"></script>
+   <script type="text/javascript" src="{{ url_for('static', filename='jquery-2.2.1.js') }}"></script>
+   <script type="text/javascript" src="{{ url_for('static', filename='jquery-ui.js') }}"></script>
+	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='jquery-ui.css') }}"/>
+	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='theme.css') }}"/>
+   <script src="{{ url_for('static', filename='codebase/dhtmlx.js') }}"></script>
    <script src="{{ url_for('static', filename='check_err.js') }}"></script>
 	<script>
       var propsTree
@@ -75,8 +79,10 @@
                var pathToGetRegister = "{{ url_for('get_register_info') }}"
                var completePath = pathToGetRegister + '?bank=' + bank +
                               '&name=' + name
-
-               $("#reg_info_place").load(completePath)
+                              
+               $("#reg_info_place").load(completePath, 0, function() { 
+                  $('.infoTable').DataTable()
+                  alert("aaa")})
             }
 
             function setRegisterField(id, bank, name) {
@@ -151,6 +157,13 @@
          createRegistersList()
 		}
 	</script>
+   <script>
+      $(function() {
+         $( "#tabs" ).tabs();
+         
+         $("#script_info_place").load("{{ url_for('get_scripts_list') }}")
+      });
+   </script>
 </head>
 <body onload="doOnLoad()">
 	{% block info %}
@@ -159,36 +172,47 @@
       </div>
    {% endblock %}
    
-   <div class="tabs">
-      <input type="radio" name="current" checked="checked" id="props_id"/>
-      <label for="props_id">Properties</label>
-      <input type="radio" name="current" id="labels_id"/>
-      <label for="labels_id">Registers</label>
-      <div>
+   <div id="tabs" style="overflow:auto">
+      <ul>
+         <li><a href="#fragment-1">Properties</a></li>
+         <li><a href="#fragment-2">Registers</a></li>
+         <li><a href="#fragment-3">Scripts</a></li>
+      </ul>
+      <div id="fragment-1">
          <table>
             <tr>
                <td valign="top">
                   <div id="treeboxbox_tree" class = "tree"></div>
                </td>
-               <td valign="top" id="prop_info_place" />
+               <td valign="top" id="prop_info_place"/>
             </tr>
-         </table>         
+         </table>   
       </div>
-      <div>
+      <div id="fragment-2">
+         <div>
+            <table>
+               <tr>
+                  <td valign="top">
+                     <div id="treeboxbox_tree2" class="tree"></div>
+                  </td>
+                  <td valign="top" id="reg_info_place"/>
+               </tr>
+            </table>
+         </div>
+      </div>
+      <div id="fragment-3">
          <table>
             <tr>
-               <td valign="top">
-                  <div id="treeboxbox_tree2" class="tree"></div>
-               </td>
-               <td valign="top" id="reg_info_place" />
+               <td valign="top" id="script_info_place">
             </tr>
          </table>
       </div>
    </div>
+
    {% block content %}
    {% endblock %}
-    <div class="block1" >
+   <div class="block1" >
       <a href="{{ url_for('process_json_command', command='help') }}">Json API usage</a>
-    </div>
+   </div>
 </body>
 </html>

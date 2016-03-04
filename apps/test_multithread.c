@@ -9,6 +9,7 @@ const char* prop = "/registers/fpga/reg1";
 char* reg;
 int stop = 0;
 
+/*
 void *get_prop(void *arg)
 {
     pcilib_t *ctx = (pcilib_t*)arg;
@@ -34,6 +35,7 @@ void *get_prop(void *arg)
     }
     return NULL;
 }
+*/
 
 void *read_reg(void *arg)
 {
