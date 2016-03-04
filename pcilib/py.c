@@ -2,6 +2,11 @@
 
 #ifdef HAVE_PYTHON
 # include <Python.h>
+
+#if PY_MAJOR_VERSION >= 3
+#include <pthread.h>
+#endif /* PY_MAJOR_VERSION >= 3 */
+
 #endif /* HAVE_PYTHON */
 
 #include <stdio.h>
@@ -27,12 +32,24 @@ struct pcilib_script_s {
     UT_hash_handle hh;			/**< hash */
 };
 
+#if PY_MAJOR_VERSION >= 3
+typedef struct pcilib_py_s_thread_control {
+   pthread_t pth;
+   pthread_cond_t cond_finished;
+   pthread_mutex_t cond_finished_lock;
+} pcilib_py_s_thread_control; 
+#endif /* PY_MAJOR_VERSION < 3 */
+
 struct pcilib_py_s {
     int finalyze; 			/**< Indicates, that we are initialized from wrapper and should not destroy Python resources in destructor */
     PyObject *main_module;		/**< Main interpreter */
     PyObject *global_dict;		/**< Dictionary of main interpreter */
     PyObject *pcilib_pywrap;		/**< pcilib wrapper module */
     pcilib_script_t *script_hash;	/**< Hash with loaded scripts */
+    
+#if PY_MAJOR_VERSION >= 3
+    pcilib_py_s_thread_control *thr_ctl; /**< Controller for Python main loop thread for Python 3 */
+#endif /* PY_MAJOR_VERSION < 3 */
 };
 #endif /* HAVE_PYTHON */
 
@@ -55,7 +72,7 @@ void pcilib_log_python_error(const char *file, int line, pcilib_log_flags_t flag
 	PyErr_NormalizeException(&pytype, &pyval, &pytraceback);
 	if (pyval) pystr = PyObject_Str(pyval);
 
-# if PY_MAJOR_VERSION >= 3
+#if PY_MAJOR_VERSION >= 3
 	if (pytype) {
 	    if (PyUnicode_Check(pytype))
 		type = PyUnicode_AsUTF8(pytype);
@@ -65,7 +82,7 @@ void pcilib_log_python_error(const char *file, int line, pcilib_log_flags_t flag
 	if (pystr) {
 	    val = PyUnicode_AsUTF8(pystr);
 	}
-# else /* PY_MAJOR_VERSION >= 3 */
+#else /* PY_MAJOR_VERSION >= 3 */
 	if (pytype) {
 	    if (PyString_Check(pytype))
 		type = PyString_AsString(pytype);
@@ -75,7 +92,7 @@ void pcilib_log_python_error(const char *file, int line, pcilib_log_flags_t flag
 	if (pystr) {
 	    val = PyString_AsString(pystr);
 	}
-# endif /*PY_MAJOR_VERSION >= 3*/
+#endif /*PY_MAJOR_VERSION >= 3*/
     }
     PyGILState_Release(gstate);
 #endif /* HAVE_PYTHON */
@@ -115,39 +132,80 @@ void pcilib_log_python_error(const char *file, int line, pcilib_log_flags_t flag
 #endif /* HAVE_PYTHON */
 }
 
+#ifdef HAVE_PYTHON
+#if PY_MAJOR_VERSION >= 3
+void *pcilib_py_run_side_thread(void *arg) {
+   pcilib_t *ctx = (pcilib_t*)(arg);
+   //Initializing python
+   Py_Initialize();
+   PyEval_InitThreads();
+   PyEval_ReleaseLock();
+   
+   //send initialization finish signal
+   pthread_cond_signal(&(ctx->py->thr_ctl->cond_finished));
+   pthread_mutex_unlock(&(ctx->py->thr_ctl->cond_finished_lock));
+   pthread_mutex_destroy(&(ctx->py->thr_ctl->cond_finished_lock));
 
+   //wait untill finish signal
+   pthread_mutex_lock(&(ctx->py->thr_ctl->cond_finished_lock));
+   pthread_cond_wait(&(ctx->py->thr_ctl->cond_finished), 
+		     &(ctx->py->thr_ctl->cond_finished_lock));
+   return NULL;
+}
+#endif /* PY_MAJOR_VERSION < 3 */
+#endif /* HAVE_PYTHON */
 
 int pcilib_init_py(pcilib_t *ctx) {
 #ifdef HAVE_PYTHON
     ctx->py = (pcilib_py_t*)malloc(sizeof(pcilib_py_t));
     if (!ctx->py) return PCILIB_ERROR_MEMORY;
-
     memset(ctx->py, 0, sizeof(pcilib_py_t));
 
     if(!Py_IsInitialized()) {
-        Py_Initialize();
-        
-    	    // Since python is being initializing from c programm, it needs to initialize threads to work properly with c threads
-        PyEval_InitThreads();
-        PyEval_ReleaseLock();
-	     ctx->py->finalyze = 1;
+#if PY_MAJOR_VERSION >= 3
+      //create thread controller
+      ctx->py->thr_ctl = malloc(sizeof(pcilib_py_s_thread_control));
+      if(!ctx->py->thr_ctl) return PCILIB_ERROR_MEMORY;
+      memset(ctx->py->thr_ctl, 0, sizeof(pcilib_py_s_thread_control));
+      
+      //create side thread with python main loop
+      pthread_create(&(ctx->py->thr_ctl->pth), NULL, pcilib_py_run_side_thread, ctx);
+      pthread_mutex_lock(&(ctx->py->thr_ctl->cond_finished_lock));
+      
+      //wait until Python initializes
+      pthread_cond_wait(&(ctx->py->thr_ctl->cond_finished),
+			&(ctx->py->thr_ctl->cond_finished_lock));
+			
+#else /* PY_MAJOR_VERSION < 3 */
+      Py_Initialize();
+      // Since python is being initializing from c programm, it needs to initialize threads to work properly with c threads
+      PyEval_InitThreads();
+      PyEval_ReleaseLock();
+#endif /* PY_MAJOR_VERSION < 3 */
+      ctx->py->finalyze = 1;
     }
-		
+
+	
+    PyGILState_STATE gstate = PyGILState_Ensure();
+
     ctx->py->main_module = PyImport_AddModule("__parser__");
     if (!ctx->py->main_module) {
 	pcilib_python_warning("Error importing python parser");
+	PyGILState_Release(gstate);
         return PCILIB_ERROR_FAILED;
     }
 
     ctx->py->global_dict = PyModule_GetDict(ctx->py->main_module);
     if (!ctx->py->global_dict) {
 	pcilib_python_warning("Error locating global python dictionary");
+	PyGILState_Release(gstate);
         return PCILIB_ERROR_FAILED;
     }
 
     PyObject *pywrap = PyImport_ImportModule(PCILIB_PYTHON_WRAPPER);
     if (!pywrap) {
 	pcilib_python_warning("Error importing pcilib python wrapper");
+	PyGILState_Release(gstate);
 	return PCILIB_ERROR_FAILED;
     }
 	
@@ -159,8 +217,11 @@ int pcilib_init_py(pcilib_t *ctx) {
 	
     if (!ctx->py->pcilib_pywrap) {
 	pcilib_python_warning("Error initializing python wrapper");
+	PyGILState_Release(gstate);
         return PCILIB_ERROR_FAILED;
     }
+    
+    PyGILState_Release(gstate);
 #endif /* HAVE_PYTHON */
 
     return 0;
@@ -187,20 +248,24 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
 	if (!script_dir) return PCILIB_ERROR_MEMORY;
 	sprintf(script_dir, "%s/%s", model_dir, dir);
     }
+    
+    PyGILState_STATE gstate = PyGILState_Ensure();
 
     pypath = PySys_GetObject("path");
     if (!pypath) {
 	pcilib_python_warning("Can't get python path");
+	PyGILState_Release(gstate);
 	return PCILIB_ERROR_FAILED;
     }
 
     pynewdir = PyUnicode_FromString(script_dir);
     if (!pynewdir) {
 	pcilib_python_warning("Can't create python string");
+	PyGILState_Release(gstate);
 	return PCILIB_ERROR_MEMORY;
     }
     
-	// Checking if the directory already in the path?
+    // Checking if the directory already in the path?
     pydict = PyDict_New();
     if (pydict) {
 	pystr = PyUnicode_FromString("cur");
@@ -227,8 +292,11 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
 
     if (err) {
 	pcilib_python_warning("Can't add directory (%s) to python path", script_dir);
+	PyGILState_Release(gstate);
 	return err;
     }
+    
+    PyGILState_Release(gstate);
 #endif /* HAVE_PYTHON */
 
     return 0;
@@ -237,7 +305,12 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
 void pcilib_free_py(pcilib_t *ctx) {
 #ifdef HAVE_PYTHON
     int finalyze = 0;
-	
+    PyGILState_STATE gstate;
+    
+#if PY_MAJOR_VERSION >= 3
+    pcilib_py_s_thread_control *thr_ctl = ctx->py->thr_ctl;
+#endif /* PY_MAJOR_VERSION < 3 */
+   
     if (ctx->py) {		
 	if (ctx->py->finalyze) finalyze = 1;
 
@@ -252,15 +325,44 @@ void pcilib_free_py(pcilib_t *ctx) {
 	    ctx->py->script_hash = NULL;
 	}
 
-	if (ctx->py->pcilib_pywrap)
+	if (ctx->py->pcilib_pywrap) {
+	    gstate = PyGILState_Ensure();
 	    Py_DECREF(ctx->py->pcilib_pywrap);
+	    PyGILState_Release(gstate);
+	 }
+	    
 	
         free(ctx->py);
         ctx->py = NULL;
     }
     
-    if (finalyze)
-	Py_Finalize();
+    
+    if (finalyze) {
+#if PY_MAJOR_VERSION >= 3
+
+       //stop python side thread
+       pthread_cond_signal(&(thr_ctl->cond_finished));
+       pthread_mutex_unlock(&(thr_ctl->cond_finished_lock));
+       pthread_join(thr_ctl->pth, NULL);
+       
+       //free python
+       //must be finalized in main thread to correctly stop python threading
+       PyGILState_Ensure();
+       Py_Finalize();
+       
+       //destroy thread controllers
+       pthread_mutex_destroy(&(thr_ctl->cond_finished_lock));
+       pthread_cond_destroy(&(thr_ctl->cond_finished));
+       free(thr_ctl);
+       
+#else /* PY_MAJOR_VERSION < 3 */
+
+       Py_Finalize();
+       
+#endif /* PY_MAJOR_VERSION < 3 */
+    }
+    
+
 #endif /* HAVE_PYTHON */
 }
 
@@ -268,6 +370,7 @@ int pcilib_py_load_script(pcilib_t *ctx, const char *script_name) {
 #ifdef HAVE_PYTHON
     PyObject* pymodule;
     pcilib_script_t *module = NULL;
+    PyGILState_STATE gstate;
 
     if (!ctx->py) return 0;
 
@@ -284,11 +387,16 @@ int pcilib_py_load_script(pcilib_t *ctx, const char *script_name) {
     HASH_FIND_STR(ctx->py->script_hash, script_name, module);
     if (module) return 0;
 
+    gstate = PyGILState_Ensure();
+
     pymodule = PyImport_ImportModule(module_name);
     if (!pymodule) {
 	pcilib_python_error("Error importing script (%s)", script_name);
+	PyGILState_Release(gstate);
 	return PCILIB_ERROR_FAILED;
     }
+    
+    PyGILState_Release(gstate);
 
     module = (pcilib_script_t*)malloc(sizeof(pcilib_script_t));
     if (!module) return PCILIB_ERROR_MEMORY;
@@ -307,6 +415,7 @@ int pcilib_py_get_transform_script_properties(pcilib_t *ctx, const char *script_
     PyObject *dict;
     PyObject *pystr;
     pcilib_script_t *module;
+    PyGILState_STATE gstate;
 
     if (!ctx->py) {
 	if (mode_ret) *mode_ret = mode;
@@ -319,10 +428,13 @@ int pcilib_py_get_transform_script_properties(pcilib_t *ctx, const char *script_
 	pcilib_error("Script (%s) is not loaded yet", script_name);
 	return PCILIB_ERROR_NOTFOUND;
     }
+    
+    gstate = PyGILState_Ensure();
 	
     dict = PyModule_GetDict(module->module);
     if (!dict) {
 	pcilib_python_error("Error getting dictionary for script (%s)", script_name);
+	PyGILState_Release(gstate);
 	return PCILIB_ERROR_FAILED;
     }
     
@@ -337,6 +449,8 @@ int pcilib_py_get_transform_script_properties(pcilib_t *ctx, const char *script_
 	if (PyDict_Contains(dict, pystr)) mode |= PCILIB_ACCESS_W;
 	Py_DECREF(pystr);
     }
+    
+    PyGILState_Release(gstate);
 #endif /* HAVE_PYTHON */
 
     if (mode_ret) *mode_ret = mode;

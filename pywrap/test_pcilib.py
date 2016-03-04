@@ -82,7 +82,7 @@ class test_pcilib():
    def testMemoryLeak(self):
       try:
          while(1):
-            val = long(random.randint(0, 8096))
+            val = random.randint(0, 8096)
             self.pcilib = pcilib.pcilib(self.device, self.model)
             print(self.pcilib.get_property_list(self.branch))
             print(self.pcilib.get_register_info(self.register))
