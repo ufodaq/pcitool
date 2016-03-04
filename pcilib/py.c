@@ -153,14 +153,14 @@ static void *pcilib_py_run_init_thread(void *arg) {
     PyEval_ReleaseLock();
 
 	// Ensure that main thread waiting for our signal
-    pthread_lock(&(py->lock));
+    pthread_mutex_lock(&(py->lock));
    
 	// Inform the parent thread that initialization is finished
     pthread_cond_signal(&(py->cond));
 
 	// Wait untill cleanup is requested
     pthread_cond_wait(&(py->cond), &(py->lock));
-    pthread_unlock(&(py->lock)));
+    pthread_mutex_unlock(&(py->lock));
     
     Py_Finalize();
     
@@ -182,33 +182,33 @@ int pcilib_init_py(pcilib_t *ctx) {
         PyEval_InitThreads();
         PyEval_ReleaseLock();
 # else /* PY_MAJOR_VERSION < 3 */
-	err = pthread_mutex_init(&(ctx->py.lock));
+	int err = pthread_mutex_init(&(ctx->py->lock), NULL);
 	if (err) return PCILIB_ERROR_FAILED;
 
-	err = pthread_cond_init(&(ctx->py.cond));
+	err = pthread_cond_init(&(ctx->py->cond), NULL);
 	if (err) {
-	    pthread_mutex_destroy(&(ctx->py.lock));
+	    pthread_mutex_destroy(&(ctx->py->lock));
 	    return PCILIB_ERROR_FAILED;
 	}
 
-	err = pthread_mutex_lock(&(ctx->py.lock));
+	err = pthread_mutex_lock(&(ctx->py->lock));
 	if (err) {
-	    pthread_cond_destroy(&(ctx->py.lock));
-	    pthread_mutex_destroy(&(ctx->py.lock));
+	    pthread_cond_destroy(&(ctx->py->cond));
+	    pthread_mutex_destroy(&(ctx->py->lock));
 	    return PCILIB_ERROR_FAILED;
 	}
 
 	    // Create initalizer thread and wait until it releases the Lock
-        err = pthread_create(&(ctx->py.pth), NULL, pcilib_py_run_init_thread, &(ctx->py));
+        err = pthread_create(&(ctx->py->pth), NULL, pcilib_py_run_init_thread, ctx->py);
 	if (err) {
-	    pthread_mutex_unlock(&(ctx->py.lock));
-	    pthread_cond_destroy(&(ctx->py.cond));
-	    pthread_mutex_destroy(&(ctx->py.lock));
+	    pthread_mutex_unlock(&(ctx->py->lock));
+	    pthread_cond_destroy(&(ctx->py->cond));
+	    pthread_mutex_destroy(&(ctx->py->lock));
 	    return PCILIB_ERROR_FAILED;
 	}
 
     	    // Wait until initialized and keep the lock afterwards until free executed
-	pthread_cond_wait(&(ctx->py.cond), (ctx->py.lock));
+	pthread_cond_wait(&(ctx->py->cond), &(ctx->py->lock));
 # endif /* PY_MAJOR_VERSION < 3 */
 	ctx->py->finalyze = 1;
     }
@@ -363,21 +363,19 @@ void pcilib_free_py(pcilib_t *ctx) {
     
     
     if (finalyze) {
-#if PY_MAJOR_VERSION >= 3
-          // singal python init thread to stop and wait it to finish
-       pthread_cond_signal(&(ctx->py.cond));
-       pthread_mutex_unlock(&(ctx->py.lock));
-       pthread_join(ctx->py.pth, NULL);
-       
-          // destroy synchronization primitives
-       pthread_cond_destroy(&(ctx->py.cond));
-       pthread_mutex_destroy(&(ctx->py.lock));
-#else /* PY_MAJOR_VERSION < 3 */
+#if PY_MAJOR_VERSION < 3
        Py_Finalize();
+#else /* PY_MAJOR_VERSION < 3 */
+          // singal python init thread to stop and wait it to finish
+       pthread_cond_signal(&(ctx->py->cond));
+       pthread_mutex_unlock(&(ctx->py->lock));
+       pthread_join(ctx->py->pth, NULL);
+  
+          // destroy synchronization primitives
+       pthread_cond_destroy(&(ctx->py->cond));
+       pthread_mutex_destroy(&(ctx->py->lock));
 #endif /* PY_MAJOR_VERSION < 3 */
     }
-    
-
 #endif /* HAVE_PYTHON */
 }
 
