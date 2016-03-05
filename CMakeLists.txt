@@ -68,6 +68,13 @@ endif (NOT DEFINED PCILIB_DEBUG_DIR)
 
 SET(ENV{PKG_CONFIG_PATH} "${LIB_INSTALL_DIR}/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 
+set(EXTRA_SYSTEM_LIBS -lrt)
+add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -fno-omit-frame-pointer")
+#add_definitions("-fPIC --std=c99 -Wall -O2")
+
+include(cmake/version.cmake)
+VERSION_TO_VARS(${PCILIB_VERSION} PCILIB_VERSION_MAJOR PCILIB_VERSION_MINOR PCILIB_VERSION_MICRO)
+
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Doxygen)
@@ -102,8 +109,6 @@ if (NOT HAVE_PYTHON)
     set(DISABLE_SERVERS TRUE)
 endif (NOT HAVE_PYTHON)
 
-set(EXTRA_SYSTEM_LIBS -lrt)
-
 include(CheckIncludeFiles)
 check_include_files(stdatomic.h HAVE_STDATOMIC_H)
 
@@ -121,41 +126,6 @@ if (NOT DISABLE_PCITOOL)
     pkg_check_modules(FASTWRITER fastwriter REQUIRED)
 endif (NOT DISABLE_PCITOOL)
 
-add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -fno-omit-frame-pointer")
-#add_definitions("-fPIC --std=c99 -Wall -O2")
-
-include(cmake/version.cmake)
-
-VERSION_TO_VARS(${PCILIB_VERSION} PCILIB_VERSION_MAJOR PCILIB_VERSION_MINOR PCILIB_VERSION_MICRO)
-
-add_custom_target(build)
-add_custom_command(TARGET build
-    COMMAND ${CMAKE_COMMAND} -DPCILIB_SOURCE_DIR=${CMAKE_SOURCE_DIR} -DPCILIB_BINARY_DIR=${CMAKE_BINARY_DIR} -P ${CMAKE_SOURCE_DIR}/cmake/build.cmake
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-)
-set_source_files_properties(${CMAKE_BINARY_DIR}/pcilib/build.h PROPERTIES GENERATED TRUE)
-
-set(TARNAME "pcitool")
-set(PACKAGE_VERSION ${PCILIB_VERSION})
-set(PACKAGE_NAME "${TARNAME}")
-set(PACKAGE_TARNAME "${TARNAME}")
-set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
-set(PACKAGE_BUGREPORT "http://ufo.kit.edu/ufo/newticket")
-
-set(CPACK_SOURCE_GENERATOR "TBZ2")
-set(CPACK_PACKAGE_CONTACT "Suren A. Chilingaryan <csa@suren.me>")
-if (${RELEASE} GREATER 0)
-    set(CPACK_PACKAGE_VERSION "${PACKAGE_VERSION}.${RELEASE}")
-else (${RELEASE} GREATER 0)
-    set(CPACK_PACKAGE_VERSION "${PACKAGE_VERSION}")
-endif (${RELEASE} GREATER 0)
-set(CPACK_SOURCE_IGNORE_FILES "/.bzr/;CMakeFiles;_CPack_Packages;cmake_install.cmake;CPack.*.cmake;CMakeCache.txt;install_manifest.txt;config.h$;.pc$;Makefile;.tar.bz2$;~$;${CPACK_SOURCE_IGNORE_FILES}")
-set(CPACK_SOURCE_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CPACK_PACKAGE_VERSION}")
-include(CPack)
-
-add_custom_target(dist_clean COMMAND ${CMAKE_MAKE_PROGRAM} clean WORKING_DIRECTORY ${CMAKE_CURRENT_DIR})
-add_custom_target(dist DEPENDS dist_clean COMMAND ${CMAKE_MAKE_PROGRAM} package_source)
-
 
 add_subdirectory(dma)
 add_subdirectory(protocols)
@@ -169,43 +139,13 @@ if (HAVE_PYTHON)
     add_subdirectory(pywrap)
 endif (HAVE_PYTHON)
 
-set_target_properties(pcilib PROPERTIES
-    VERSION ${PCILIB_VERSION}
-    SOVERSION ${PCILIB_ABI_VERSION}
-)
-
+set_target_properties(pcilib PROPERTIES VERSION ${PCILIB_VERSION} SOVERSION ${PCILIB_ABI_VERSION})
 add_custom_target(docs
     COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/docs/Doxyfile 
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/docs
     COMMENT "Generating API documentation with Doxygen" VERBATIM
 )
 set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "docs/html")
-
-
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcitool.spec.in ${CMAKE_CURRENT_BINARY_DIR}/pcitool.spec)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/dkms.conf.in ${CMAKE_CURRENT_BINARY_DIR}/misc/dkms.conf)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcitool.pc.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/config.h)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/version.h)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/docs/Doxyfile)
-if (NOT DISABLE_SERVERS)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib_api.service.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib_api.service)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib_html.service.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib_html.service)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib.sysconfig.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib.sysconfig)
-endif (NOT DISABLE_SERVERS)
-
-if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
-    file(COPY ${CMAKE_SOURCE_DIR}/xml DESTINATION ${CMAKE_BINARY_DIR})
-    file(COPY ${CMAKE_SOURCE_DIR}/pyserver DESTINATION ${CMAKE_BINARY_DIR})
-    file(COPY ${CMAKE_SOURCE_DIR}/pci
-	 DESTINATION ${CMAKE_BINARY_DIR}
-	 FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-    )
-    file(COPY ${CMAKE_SOURCE_DIR}/run
-	 DESTINATION ${CMAKE_BINARY_DIR}
-	 FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-    )
-endif(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
 
 install(FILES 
     ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc
@@ -225,5 +165,72 @@ if (NOT DISABLE_SERVERS)
     install(FILES ${FILES_TO_DEPLOY} DESTINATION ${PCILIB_SERVER_DIR})
     install(DIRECTORY ${DIRS_TO_DEPLOY} DESTINATION ${PCILIB_SERVER_DIR})
 endif (NOT DISABLE_SERVERS)
+
+
+
+set(TARNAME "pcitool")
+set(PACKAGE_VERSION ${PCILIB_VERSION})
+set(PACKAGE_NAME "${TARNAME}")
+set(PACKAGE_TARNAME "${TARNAME}")
+set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
+set(PACKAGE_BUGREPORT "http://ufo.kit.edu/ufo/newticket")
+
+set(CPACK_SOURCE_GENERATOR "TBZ2")
+set(CPACK_PACKAGE_CONTACT "Suren A. Chilingaryan <csa@suren.me>")
+if (${RELEASE} GREATER 0)
+    set(CPACK_PACKAGE_VERSION "${PACKAGE_VERSION}.${RELEASE}")
+else (${RELEASE} GREATER 0)
+    set(CPACK_PACKAGE_VERSION "${PACKAGE_VERSION}")
+endif (${RELEASE} GREATER 0)
+set(CPACK_SOURCE_IGNORE_FILES "/build/;/.bzr/;CMakeFiles;_CPack_Packages;cmake_install.cmake;CPack.*.cmake;CMakeCache.txt;install_manifest.txt;config.h$;.pc$;Makefile;.tar.bz2$;~$;${CPACK_SOURCE_IGNORE_FILES}")
+set(CPACK_SOURCE_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CPACK_PACKAGE_VERSION}")
+include(CPack)
+
+# In releases, we just keep the pre-generated build.h 
+if(EXISTS ${CMAKE_SOURCE_DIR}/.bzr/)
+    add_custom_target(build
+	COMMAND ${CMAKE_COMMAND} -DPCILIB_SOURCE_DIR=${CMAKE_SOURCE_DIR} -DPCILIB_BINARY_DIR=${CMAKE_BINARY_DIR} -P ${CMAKE_SOURCE_DIR}/cmake/build.cmake
+	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_dependencies(pcilib build)
+    add_dependencies(pci build)
+
+	# We need to generate build.h for source releases
+    add_custom_target(dist_clean COMMAND ${CMAKE_MAKE_PROGRAM} clean WORKING_DIRECTORY ${CMAKE_CURRENT_DIR})
+    add_custom_target(dist_prepare DEPENDS dist_clean
+	COMMAND ${CMAKE_COMMAND} -DPCILIB_SOURCE_DIR=${CMAKE_SOURCE_DIR} -DPCILIB_BINARY_DIR=${CMAKE_SOURCE_DIR} -DPCILIB_RELEASE=${CPACK_PACKAGE_VERSION} -P ${CMAKE_SOURCE_DIR}/cmake/build.cmake
+	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    add_custom_target(dist DEPENDS dist_prepare COMMAND ${CMAKE_MAKE_PROGRAM} package_source)
+
+    set_source_files_properties(${CMAKE_BINARY_DIR}/pcilib/build.h PROPERTIES GENERATED TRUE)
+    set_source_files_properties(${CMAKE_SOURCE_DIR}/pcilib/build.h PROPERTIES GENERATED TRUE)
+endif(EXISTS ${CMAKE_SOURCE_DIR}/.bzr/)
+
+if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    file(COPY ${CMAKE_SOURCE_DIR}/xml DESTINATION ${CMAKE_BINARY_DIR})
+    file(COPY ${CMAKE_SOURCE_DIR}/pyserver DESTINATION ${CMAKE_BINARY_DIR})
+    file(COPY ${CMAKE_SOURCE_DIR}/pci
+	 DESTINATION ${CMAKE_BINARY_DIR}
+	 FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+    )
+    file(COPY ${CMAKE_SOURCE_DIR}/run
+	 DESTINATION ${CMAKE_BINARY_DIR}
+	 FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+    )
+endif(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcitool.spec.in ${CMAKE_CURRENT_BINARY_DIR}/pcitool.spec)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/dkms.conf.in ${CMAKE_CURRENT_BINARY_DIR}/misc/dkms.conf)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcitool.pc.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcitool.pc)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/config.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pcilib/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/pcilib/version.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/docs/Doxyfile)
+if (NOT DISABLE_SERVERS)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib_api.service.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib_api.service)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib_html.service.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib_html.service)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib.sysconfig.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib.sysconfig)
+endif (NOT DISABLE_SERVERS)
+
 
 message("-- Configured pcitool ${PCILIB_VERSION_MAJOR}.${PCILIB_VERSION_MINOR}.${PCILIB_VERSION_MICRO} with public ABI ${PCILIB_ABI_VERSION}")

@@ -459,22 +459,22 @@ PyObject* pcipywrap_set_property(pcipywrap *self, PyObject* val, const char *pro
 
 PyObject* pcipywrap_get_registers_list(pcipywrap *self, const char *bank)
 {
-   pcilib_register_info_t *list = pcilib_get_register_list(self->ctx, bank, PCILIB_LIST_FLAGS_DEFAULT);
+    pcilib_register_info_t *list = pcilib_get_register_list(self->ctx, bank, PCILIB_LIST_FLAGS_DEFAULT);
 
-   if(!list) {
-      set_python_exception("pcilib_get_register_list return NULL");
-      return NULL;
-   }
+    if(!list) {
+        set_python_exception("pcilib_get_register_list return NULL");
+        return NULL;
+    }
 
-   PyObject* pyList = PyList_New(0);
-   for(int i = 0; list[i].name; i++)
-   {
-      //serialize item attributes
-      PyObject* pylistItem = pcilib_convert_register_info_to_pyobject(self->ctx, list[i]);
-      pcilib_pylist_append(pyList, pylistItem);
-   }
-   pcilib_free_register_info(self->ctx, list);
-   return pyList;
+    PyObject* pyList = PyList_New(0);
+    for(int i = 0; list[i].name; i++)
+    {
+        //serialize item attributes
+        PyObject* pylistItem = pcilib_convert_register_info_to_pyobject(self->ctx, list[i]);
+        pcilib_pylist_append(pyList, pylistItem);
+    }
+    pcilib_free_register_info(self->ctx, list);
+    return pyList;
 }
 
 PyObject* pcipywrap_get_register_info(pcipywrap *self, const char* reg,const char *bank)

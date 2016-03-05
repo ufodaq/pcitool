@@ -4,24 +4,28 @@
 %{!?python2_sitelib: %global python2_sitelib %(%{__python2} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
 %{!?python2_sitearch: %global python2_sitearch %(%{__python2} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(1))")}
 
+%{?!_udevrulesdir: %global _udevrulesdir %{_prefix}/lib/udev/rules.d/ }
+%{?!_unitdir: %global _unitdir %{_prefix}/lib/systemd/system/ }
+%{?!_dkmsdir: %global _dkmsdir /var/lib/dkms }
+
 Summary: Universal PCI driver
 Name: pcitool
 Version: ${CPACK_PACKAGE_VERSION}
 Release: csa
 License: GPL-3.0
 Group: Development/Libraries
-Source: ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2
-BuildRoot: %{_tmppath}/%{name}-%{version}-root
-URL: http://darksoft.org
-Prefix: %{_prefix}
-Docdir: %{_docdir}
-BuildRequires: libfastwriter-devel libxml2-devel uthash
-BuildRequires: python python-devel swig 
-BuildRequires: kernel-devel dkms
-BuildRequires: doxygen
-BuildRequires: pkg-config libtool cmake
 Vendor: Institute for Data Processing and Electronics, KIT
 Packager: Suren A. Chilingaryan <csa@suren.me>
+Source: ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2
+URL: http://darksoft.org
+BuildRequires: libfastwriter-devel libxml2-devel uthash
+BuildRequires: python python-devel swig 
+BuildRequires: dkms
+BuildRequires: doxygen
+BuildRequires: pkg-config libtool cmake
+BuildRoot: %{_tmppath}/%{name}-%{version}-root
+Prefix: %{_prefix}
+Docdir: %{_docdir}
 
 %description 
 pcitool is a command line tool to manipulate PCI hardware. It provides ability
@@ -96,7 +100,13 @@ Minimalistic driver used by pcilib to
 Summary: Pcilib Web API
 Group: Development/Libraries 
 Requires: pcilib-python = %{version}
+Requires: pcilib-test = %{version}
 Requires: python
+
+%if %{defined suse_version}
+Prereq: %fillup_prereq
+%endif
+
 
 %description -n pcilib-server
 Pcilib Web API and small demo web server.
@@ -120,7 +130,7 @@ mkdir -p $RPM_BUILD_ROOT/%{_libdir}/pcilib${PCILIB_ABI_VERSION}/
 install -m 755 tests/reload.sh $RPM_BUILD_ROOT/%{_bindir}/pci-reload
 
 # udev
-mkdir -p $RPM_BUILD_ROOT/usr/lib/udev/rules.d
+mkdir -p $RPM_BUILD_ROOT/%{_udevrulesdir}
 install -m 644 misc/50-pcidriver.rules $RPM_BUILD_ROOT/%{_udevrulesdir}
 
 # DKMS
@@ -135,7 +145,20 @@ cp -r driver $RPM_BUILD_ROOT/usr/src/%{modname}-%{version}/
 cp -r xml/test $RPM_BUILD_ROOT/%{_datadir}/pcilib${PCILIB_ABI_VERSION}/models/
 
 # Servers
+mkdir -p $RPM_BUILD_ROOT/%{_unitdir}
+install -m 644 misc/pcilib_api.service $RPM_BUILD_ROOT/%{_unitdir}
+install -m 644 misc/pcilib_html.service $RPM_BUILD_ROOT/%{_unitdir}
+
+%if %{defined suse_version}
+    mkdir -p $RPM_BUILD_ROOT/var/adm/fillup-templates/
+    install -m 644 misc/pcilib.sysconfig $RPM_BUILD_ROOT/var/adm/fillup-templates/sysconfig.pcilib
+%else
+    mkdir -p $RPM_BUILD_ROOT/%{_sysconfdir}/sysconfig
+    install -m 644 misc/pcilib.sysconfig $RPM_BUILD_ROOT/%{_sysconfdir}/sysconfig/pcilib
+%endif
+
 cp -r pyserver $RPM_BUILD_ROOT/%{_datadir}/pcilib${PCILIB_ABI_VERSION}/
+
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -159,6 +182,13 @@ exit 0
 /usr/sbin/dkms remove -m %{modname} -v %{version} --all --rpm_safe_upgrade
 exit 0
 
+%post -n pcilib-server
+
+%if %{defined suse_version}
+    %fillup_and_insserv -i
+%endif
+
+
 %files
 %defattr(-, root, root)
 %{_bindir}/pci
@@ -169,6 +199,7 @@ exit 0
 %doc docs/README 
 %doc docs/HARDWARE
 %dir %{_libdir}/pcilib${PCILIB_ABI_VERSION}/
+%dir %{_datadir}/pcilib${PCILIB_ABI_VERSION}/
 %dir %{_datadir}/pcilib${PCILIB_ABI_VERSION}/models/
 %{_datadir}/pcilib${PCILIB_ABI_VERSION}/models/*.xsd
 %{_libdir}/libpcilib.so.*
@@ -197,6 +228,12 @@ exit 0
 
 %files -n pcilib-server
 %defattr(-, root, root)  
+%if %{defined suse_version}
+/var/adm/fillup-templates/sysconfig.*
+%else
+%{_sysconfdir}/sysconfig/*
+%endif
+%{_unitdir}/*
 %{_datadir}/pcilib${PCILIB_ABI_VERSION}/pyserver
 
 %changelog
