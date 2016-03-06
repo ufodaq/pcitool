@@ -5,7 +5,7 @@
 void BuildInfo() {
     printf("\n");
 #ifdef PCILIB_RELEASE
-    printf("Release: %s (revision: %s built on %s in %s)\n", PCILIB_RELEASE, PCILIB_REVISION, PCILIB_BUILD_DATE, PCILIB_BUILD_DIR);
+    printf("Release: %s (r%s packaged on %s in %s)\n", PCILIB_RELEASE, PCILIB_REVISION, PCILIB_BUILD_DATE, PCILIB_BUILD_DIR);
 #else /* PCILIB_RELEASE */
     printf("Revision: %s built on %s in %s\n", PCILIB_REVISION, PCILIB_BUILD_DATE, PCILIB_BUILD_DIR);
 #endif /* PCILIB_RELEASE */
