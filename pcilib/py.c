@@ -34,14 +34,20 @@ struct pcilib_script_s {
 struct pcilib_py_s {
     int finalyze; 			/**< Indicates, that we are initialized from wrapper and should not destroy Python resources in destructor */
     PyObject *main_module;		/**< Main interpreter */
+    PyObject *pywrap_module;		/**< Pcilib python wrapper */
+    PyObject *threading_module;		/**< Threading module */
     PyObject *global_dict;		/**< Dictionary of main interpreter */
-    PyObject *pcilib_pywrap;		/**< pcilib wrapper module */
+    PyObject *pcilib_pywrap;		/**< pcilib wrapper context */
     pcilib_script_t *script_hash;	/**< Hash with loaded scripts */
     
 # if PY_MAJOR_VERSION >= 3
-    pthread_t pth;
-    pthread_cond_t cond;
-    pthread_mutex_t lock;
+    int status;				/**< Indicates if python was initialized successfuly (0) or error have occured */
+    pthread_t pth;			/**< Helper thread for Python initialization */
+    pthread_cond_t cond;		/**< Condition informing about initialization success and request for clean-up */
+    pthread_mutex_t lock;		/**< Condition lock */
+
+//    PyInterpreterState *istate;
+//    PyThreadState *tstate;
 # endif /* PY_MAJOR_VERSION > 3 */
 };
 #endif /* HAVE_PYTHON */
@@ -126,6 +132,77 @@ void pcilib_log_python_error(const char *file, int line, pcilib_log_flags_t flag
 }
 
 #ifdef HAVE_PYTHON
+static int pcilib_py_load_default_modules(pcilib_t *ctx) {
+    PyGILState_STATE gstate = PyGILState_Ensure();
+
+    ctx->py->main_module = PyImport_AddModule("__parser__");
+    if (!ctx->py->main_module) {
+	PyGILState_Release(gstate);
+	pcilib_python_warning("Error importing python parser");
+        return PCILIB_ERROR_FAILED;
+    }
+
+    ctx->py->global_dict = PyModule_GetDict(ctx->py->main_module);
+    if (!ctx->py->global_dict) {
+	PyGILState_Release(gstate);
+	pcilib_python_warning("Error locating global python dictionary");
+        return PCILIB_ERROR_FAILED;
+    }
+
+    ctx->py->pywrap_module = PyImport_ImportModule(PCILIB_PYTHON_WRAPPER);
+    if (!ctx->py->pywrap_module) {
+	PyGILState_Release(gstate);
+	pcilib_python_warning("Error importing pcilib python wrapper");
+	return PCILIB_ERROR_FAILED;
+    }
+
+    /**
+     * We need to load threading module here, otherwise if any of the scripts
+     * will use threading, on cleanup Python3 will complain:
+     * Exception KeyError: KeyError(140702199305984,) in <module 'threading' from '/usr/lib64/python3.3/threading.py'> ignored
+     * The idea to load threading module is inspired by
+     * http://stackoverflow.com/questions/8774958/keyerror-in-module-threading-after-a-successful-py-test-run
+     */
+    ctx->py->threading_module = PyImport_ImportModule("threading");
+    if (!ctx->py->threading_module) {
+	PyGILState_Release(gstate);
+	pcilib_python_warning("Error importing threading python module");
+	return PCILIB_ERROR_FAILED;
+    }
+	
+    PyObject *mod_name = PyUnicode_FromString(PCILIB_PYTHON_WRAPPER);
+    PyObject *pyctx = PyCapsule_New(ctx, "pcilib", NULL);
+    ctx->py->pcilib_pywrap = PyObject_CallMethodObjArgs(ctx->py->pywrap_module, mod_name, pyctx, NULL);
+    Py_XDECREF(pyctx);
+    Py_XDECREF(mod_name);
+	
+    if (!ctx->py->pcilib_pywrap) {
+	PyGILState_Release(gstate);
+	pcilib_python_warning("Error initializing python wrapper");
+        return PCILIB_ERROR_FAILED;
+    }
+
+    PyGILState_Release(gstate);
+    return 0;
+}
+
+static void pcilib_py_clean_default_modules(pcilib_t *ctx) {
+    PyGILState_STATE gstate;
+
+    gstate = PyGILState_Ensure();
+
+    if (ctx->py->pcilib_pywrap) Py_DECREF(ctx->py->pcilib_pywrap);
+
+    if (ctx->py->threading_module) Py_DECREF(ctx->py->threading_module);
+    if (ctx->py->pywrap_module) Py_DECREF(ctx->py->pywrap_module);
+
+	// Crashes Python2
+//    if (ctx->py->main_module) Py_DECREF(ctx->py->main_module);
+
+    PyGILState_Release(gstate);
+}
+
+
 # if PY_MAJOR_VERSION >= 3
 /**
  * Python3 specially treats the main thread intializing Python. It crashes if
@@ -146,24 +223,35 @@ void pcilib_log_python_error(const char *file, int line, pcilib_log_flags_t flag
  * http://stackoverflow.com/questions/15470367/pyeval-initthreads-in-python-3-how-when-to-call-it-the-saga-continues-ad-naus
  */
 static void *pcilib_py_run_init_thread(void *arg) {
-    pcilib_py_t *py = (pcilib_py_t*)(arg);
+    PyThreadState *state;
+    pcilib_t *ctx = (pcilib_t*)arg;
+    pcilib_py_t *py = ctx->py;
 
     Py_Initialize();
+
     PyEval_InitThreads();
-    PyEval_ReleaseLock();
+
+//    state = PyThreadState_Get();
+//    py->istate = state->interp;
+
+    py->status = pcilib_py_load_default_modules(ctx);
+
+    state = PyEval_SaveThread();
 
 	// Ensure that main thread waiting for our signal
     pthread_mutex_lock(&(py->lock));
-   
+
 	// Inform the parent thread that initialization is finished
     pthread_cond_signal(&(py->cond));
 
 	// Wait untill cleanup is requested
     pthread_cond_wait(&(py->cond), &(py->lock));
     pthread_mutex_unlock(&(py->lock));
-    
+
+    PyEval_RestoreThread(state);
+    pcilib_py_clean_default_modules(ctx);
     Py_Finalize();
-    
+
     return NULL;
 }
 # endif /* PY_MAJOR_VERSION < 3 */
@@ -171,6 +259,8 @@ static void *pcilib_py_run_init_thread(void *arg) {
 
 int pcilib_init_py(pcilib_t *ctx) {
 #ifdef HAVE_PYTHON
+    int err = 0;
+
     ctx->py = (pcilib_py_t*)malloc(sizeof(pcilib_py_t));
     if (!ctx->py) return PCILIB_ERROR_MEMORY;
     memset(ctx->py, 0, sizeof(pcilib_py_t));
@@ -181,6 +271,8 @@ int pcilib_init_py(pcilib_t *ctx) {
     	    // Since python is being initializing from c programm, it needs to initialize threads to work properly with c threads
         PyEval_InitThreads();
         PyEval_ReleaseLock();
+
+	err = pcilib_py_load_default_modules(ctx);
 # else /* PY_MAJOR_VERSION < 3 */
 	int err = pthread_mutex_init(&(ctx->py->lock), NULL);
 	if (err) return PCILIB_ERROR_FAILED;
@@ -199,7 +291,7 @@ int pcilib_init_py(pcilib_t *ctx) {
 	}
 
 	    // Create initalizer thread and wait until it releases the Lock
-        err = pthread_create(&(ctx->py->pth), NULL, pcilib_py_run_init_thread, ctx->py);
+        err = pthread_create(&(ctx->py->pth), NULL, pcilib_py_run_init_thread, (void*)ctx);
 	if (err) {
 	    pthread_mutex_unlock(&(ctx->py->lock));
 	    pthread_cond_destroy(&(ctx->py->cond));
@@ -209,50 +301,66 @@ int pcilib_init_py(pcilib_t *ctx) {
 
     	    // Wait until initialized and keep the lock afterwards until free executed
 	pthread_cond_wait(&(ctx->py->cond), &(ctx->py->lock));
+	err = ctx->py->status;
+
+//	ctx->py->tstate =  PyThreadState_New(ctx->py->istate);
 # endif /* PY_MAJOR_VERSION < 3 */
 	ctx->py->finalyze = 1;
+    } else {
+	err = pcilib_py_load_default_modules(ctx);
     }
 
-	
-    PyGILState_STATE gstate = PyGILState_Ensure();
-
-    ctx->py->main_module = PyImport_AddModule("__parser__");
-    if (!ctx->py->main_module) {
-	PyGILState_Release(gstate);
-	pcilib_python_warning("Error importing python parser");
-        return PCILIB_ERROR_FAILED;
+    if (err) {
+	pcilib_free_py(ctx);
+	return err;
     }
-
-    ctx->py->global_dict = PyModule_GetDict(ctx->py->main_module);
-    if (!ctx->py->global_dict) {
-	PyGILState_Release(gstate);
-	pcilib_python_warning("Error locating global python dictionary");
-        return PCILIB_ERROR_FAILED;
-    }
-
-    PyObject *pywrap = PyImport_ImportModule(PCILIB_PYTHON_WRAPPER);
-    if (!pywrap) {
-	PyGILState_Release(gstate);
-	pcilib_python_warning("Error importing pcilib python wrapper");
-	return PCILIB_ERROR_FAILED;
-    }
-	
-    PyObject *mod_name = PyUnicode_FromString(PCILIB_PYTHON_WRAPPER);
-    PyObject *pyctx = PyCapsule_New(ctx, "pcilib", NULL);
-    ctx->py->pcilib_pywrap = PyObject_CallMethodObjArgs(pywrap, mod_name, pyctx, NULL);
-    Py_XDECREF(pyctx);
-    Py_XDECREF(mod_name);
-	
-    if (!ctx->py->pcilib_pywrap) {
-	PyGILState_Release(gstate);
-	pcilib_python_warning("Error initializing python wrapper");
-        return PCILIB_ERROR_FAILED;
-    }
-    
-    PyGILState_Release(gstate);
 #endif /* HAVE_PYTHON */
 
     return 0;
+}
+
+void pcilib_free_py(pcilib_t *ctx) {
+#ifdef HAVE_PYTHON
+    if (ctx->py) {
+	PyGILState_STATE gstate;
+
+	gstate = PyGILState_Ensure();
+	if (ctx->py->script_hash) {
+	    pcilib_script_t *script, *script_tmp;
+
+	    HASH_ITER(hh, ctx->py->script_hash, script, script_tmp) {
+		Py_DECREF(script->module);
+		HASH_DEL(ctx->py->script_hash, script);
+		free(script);
+	    }
+	    ctx->py->script_hash = NULL;
+	}
+	PyGILState_Release(gstate);
+
+#if PY_MAJOR_VERSION < 3
+	pcilib_py_clean_default_modules(ctx);
+#endif /* PY_MAJOR_VERSION < 3 */
+
+	if (ctx->py->finalyze) {
+#if PY_MAJOR_VERSION < 3
+	    Py_Finalize();
+#else /* PY_MAJOR_VERSION < 3 */
+//	    PyThreadState_Delete(ctx->py->tstate);
+
+		// singal python init thread to stop and wait it to finish
+	    pthread_cond_signal(&(ctx->py->cond));
+	    pthread_mutex_unlock(&(ctx->py->lock));
+	    pthread_join(ctx->py->pth, NULL);
+
+		// destroy synchronization primitives
+	    pthread_cond_destroy(&(ctx->py->cond));
+	    pthread_mutex_destroy(&(ctx->py->lock));
+#endif /* PY_MAJOR_VERSION < 3 */
+	}
+        free(ctx->py);
+        ctx->py = NULL;
+    }
+#endif /* HAVE_PYTHON */
 }
 
 int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
@@ -276,7 +384,7 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
 	if (!script_dir) return PCILIB_ERROR_MEMORY;
 	sprintf(script_dir, "%s/%s", model_dir, dir);
     }
-    
+
     PyGILState_STATE gstate = PyGILState_Ensure();
 
     pypath = PySys_GetObject("path");
@@ -292,7 +400,7 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
 	pcilib_python_warning("Can't create python string");
 	return PCILIB_ERROR_MEMORY;
     }
-    
+
     // Checking if the directory already in the path?
     pydict = PyDict_New();
     if (pydict) {
@@ -329,55 +437,6 @@ int pcilib_py_add_script_dir(pcilib_t *ctx, const char *dir) {
     return 0;
 }
 
-void pcilib_free_py(pcilib_t *ctx) {
-#ifdef HAVE_PYTHON
-    int finalyze = 0;
-    
-    if (ctx->py) {		
-	PyGILState_STATE gstate;
-
-	if (ctx->py->finalyze) finalyze = 1;
-	
-	gstate = PyGILState_Ensure();
-
-	if (ctx->py->script_hash) {
-	    pcilib_script_t *script, *script_tmp;
-
-	    HASH_ITER(hh, ctx->py->script_hash, script, script_tmp) {
-		Py_DECREF(script->module);
-		HASH_DEL(ctx->py->script_hash, script);
-		free(script);
-	    }
-	    ctx->py->script_hash = NULL;
-	}
-
-	if (ctx->py->pcilib_pywrap)
-	    Py_DECREF(ctx->py->pcilib_pywrap);
-
-	PyGILState_Release(gstate);
-    
-	
-        free(ctx->py);
-        ctx->py = NULL;
-    }
-    
-    
-    if (finalyze) {
-#if PY_MAJOR_VERSION < 3
-       Py_Finalize();
-#else /* PY_MAJOR_VERSION < 3 */
-          // singal python init thread to stop and wait it to finish
-       pthread_cond_signal(&(ctx->py->cond));
-       pthread_mutex_unlock(&(ctx->py->lock));
-       pthread_join(ctx->py->pth, NULL);
-  
-          // destroy synchronization primitives
-       pthread_cond_destroy(&(ctx->py->cond));
-       pthread_mutex_destroy(&(ctx->py->lock));
-#endif /* PY_MAJOR_VERSION < 3 */
-    }
-#endif /* HAVE_PYTHON */
-}
 
 int pcilib_py_load_script(pcilib_t *ctx, const char *script_name) {
 #ifdef HAVE_PYTHON
@@ -407,10 +466,15 @@ int pcilib_py_load_script(pcilib_t *ctx, const char *script_name) {
 	pcilib_python_error("Error importing script (%s)", script_name);
 	return PCILIB_ERROR_FAILED;
     }
-    PyGILState_Release(gstate);
 
     module = (pcilib_script_t*)malloc(sizeof(pcilib_script_t));
-    if (!module) return PCILIB_ERROR_MEMORY;
+    if (!module) {
+	Py_DECREF(pymodule);
+	PyGILState_Release(gstate);
+	return PCILIB_ERROR_MEMORY;
+    }
+
+    PyGILState_Release(gstate);
 
     module->module = pymodule;
     module->name = script_name;
@@ -463,6 +527,8 @@ int pcilib_py_get_transform_script_properties(pcilib_t *ctx, const char *script_
     
     PyGILState_Release(gstate);
 #endif /* HAVE_PYTHON */
+
+//    pcilib_py_load_default_modules(py->ctx);
 
     if (mode_ret) *mode_ret = mode;
     return 0;
