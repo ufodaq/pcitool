@@ -72,6 +72,7 @@ set(EXTRA_SYSTEM_LIBS -lrt)
 add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -fno-omit-frame-pointer")
 #add_definitions("-fPIC --std=c99 -Wall -O2")
 
+include(cmake/tools.cmake)
 include(cmake/version.cmake)
 VERSION_TO_VARS(${PCILIB_VERSION} PCILIB_VERSION_MAJOR PCILIB_VERSION_MINOR PCILIB_VERSION_MICRO)
 
@@ -182,7 +183,7 @@ if (${RELEASE} GREATER 0)
 else (${RELEASE} GREATER 0)
     set(CPACK_PACKAGE_VERSION "${PACKAGE_VERSION}")
 endif (${RELEASE} GREATER 0)
-set(CPACK_SOURCE_IGNORE_FILES "/build/;/.bzr/;CMakeFiles;_CPack_Packages;cmake_install.cmake;CPack.*.cmake;CMakeCache.txt;install_manifest.txt;config.h$;.pc$;Makefile;.tar.bz2$;~$;${CPACK_SOURCE_IGNORE_FILES}")
+set(CPACK_SOURCE_IGNORE_FILES "/build/;/.bzr/;CMakeFiles;_CPack_Packages;cmake_install.cmake;CPack.*.cmake;CMakeCache.txt;install_manifest.txt;common.mk;config.h$;.pc$;/([^d]|d[^r])[^/]*/Makefile;__pycache__;.pyc$;.tar.bz2$;~$;${CPACK_SOURCE_IGNORE_FILES}")
 set(CPACK_SOURCE_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CPACK_PACKAGE_VERSION}")
 include(CPack)
 
@@ -196,7 +197,10 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/.bzr/)
     add_dependencies(pci build)
 
 	# We need to generate build.h for source releases
-    add_custom_target(dist_clean COMMAND ${CMAKE_MAKE_PROGRAM} clean WORKING_DIRECTORY ${CMAKE_CURRENT_DIR})
+    add_custom_target(dist_clean
+	COMMAND make clean WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/driver
+	COMMAND ${CMAKE_MAKE_PROGRAM} clean WORKING_DIRECTORY ${CMAKE_CURRENT_DIR}
+	)
     add_custom_target(dist_prepare DEPENDS dist_clean
 	COMMAND ${CMAKE_COMMAND} -DPCILIB_SOURCE_DIR=${CMAKE_SOURCE_DIR} -DPCILIB_BINARY_DIR=${CMAKE_SOURCE_DIR} -DPCILIB_RELEASE=${CPACK_PACKAGE_VERSION} -P ${CMAKE_SOURCE_DIR}/cmake/build.cmake
 	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
@@ -232,5 +236,8 @@ if (NOT DISABLE_SERVERS)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/misc/pcilib.sysconfig.in ${CMAKE_CURRENT_BINARY_DIR}/misc/pcilib.sysconfig)
 endif (NOT DISABLE_SERVERS)
 
+PYTHON_CLEAN_LIST("${CMAKE_BINARY_DIR}/xml" XML_PY_FILES)
+PYTHON_CLEAN_LIST("${CMAKE_BINARY_DIR}/pyserver" SERVER_PY_FILES)
+set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${XML_PY_FILES};${SERVER_PY_FILES}")
 
 message("-- Configured pcitool ${PCILIB_VERSION_MAJOR}.${PCILIB_VERSION_MINOR}.${PCILIB_VERSION_MICRO} with public ABI ${PCILIB_ABI_VERSION}")
