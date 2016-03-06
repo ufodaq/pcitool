@@ -39,17 +39,22 @@ default:
 	else \
 	    CC=$(CC) ;\
 	fi ;\
-	build_revision=`bzr revno` ;\
-	build_author=`bzr log -r$$build_revision | grep committer | cut -c 12-` ;\
 	build_path=`pwd` ;\
-	build_branch=`bzr nick` ;\
 	build_lastmod=`find . -type f -name '*.[ch]' -printf '%TY/%Tm/%Td %TH:%TM:%TS  %p\n' | grep -E -v 'build.h|mod.c' | sort -n  | tail -n 1 | cut -d ' ' -f 1-2 | cut -d '.' -f 1` ;\
-	build_changes=`bzr status -SV | cut -c 5- | tr \\\n " "` ;\
 	build_user=`whoami` ;\
 	build_date=`date "+%Y/%m/%d %H:%M:%S"` ;\
 	build="Built at $$build_date by $$build_user" ;\
-	revision="Revision $$build_revision from $$build_branch by $$build_author at $$build_path, last modification from $$build_lastmod" ;\
-	/bin/echo -e "#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES \"$$build_changes\"\\n" > build.h ;\
+	if [ -d ../.bzr ]; then \
+	    build_revision=`bzr revno` ;\
+	    build_author=`bzr log -r$$build_revision | grep committer | cut -c 12-` ;\
+	    build_branch=`bzr nick` ;\
+	    build_changes=`bzr status -SV | cut -c 5- | tr \\\n " "` ;\
+	    revision="Revision $$build_revision from $$build_branch by $$build_author at $$build_path, last modification from $$build_lastmod" ;\
+	    /bin/echo -e "#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES \"$$build_changes\"\\n" > build.h ;\
+	else \
+	    revision="Release \" PCILIB_RELEASE \" (r\" PCILIB_REVISION \") from \" PCILIB_REVISION_BRANCH \" by \" PCILIB_REVISION_AUTHOR \" at $$build_path, last modification from $$build_lastmod" ;\
+	    /bin/echo -e "#include \"../pcilib/build.h\"\\n #define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES PCILIB_REVISION_MODIFICATIONS\n" > build.h ;\
+	fi ;\
 	$(MAKE) $(CFLAGS) -C $(KERNELDIR) M=$(PWD) CC=$$CC modules
 
 install:
