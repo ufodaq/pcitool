@@ -27,7 +27,7 @@
 
 pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const void *arg) {
     int err = 0;
-    pcilib_register_value_t value;
+    pcilib_register_value_t version_value;
 
 //    const pcilib_model_description_t *model_info = pcilib_get_model_description(pcilib);
 
@@ -51,50 +51,51 @@ pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const vo
 	ctx->base_addr[2] = (void*)pcilib_resolve_bank_address_by_id(pcilib, 0, dma_bankc);
 
 
+	RD(IPEDMA_REG_VERSION, version_value);
+	ctx->version = IPEDMA_VERSION(version_value);
+	
 	if ((model)&&(!strcasecmp(model, "ipecamera"))) {
-	    ctx->version = 2;
+	    ctx->gen = 2;
 	} else {
-	    RD(IPEDMA_REG_VERSION, value);
-
-	    if (value >= 0xa7) {
-		ctx->version = 3;
+            if (IPEDMA_GENERATION(version_value) > 2) {
+		ctx->gen = 3;
 	    } else {
-		ctx->version = 2;
+		ctx->gen = 2;
 	    }
 
 	    err = pcilib_add_registers(pcilib, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, ipe_dma_app_registers, NULL);
 	}
-	
-	if (ctx->version >= 3) {
-	    ctx->reg_last_read = IPEDMA_REG3_LAST_READ;
 
+        if (ctx->gen > 2) {
+            ctx->mode64 = 1;
+            ctx->addr64 = 1;
+#ifdef IPEDMA_STREAMING_MODE
+	    if (IPEDMA_STREAMING(version_value)) ctx->streaming = 1;
+#endif /* IPEDMA_STREAMING_MODE */
+
+	    ctx->reg_last_read = IPEDMA_REG3_LAST_READ;
 	    if (!err) 
 		err = pcilib_add_registers(pcilib, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, ipe_dma_v3_registers, NULL);
-	} else {
+        } else {
+#ifdef IPEDMA_ENFORCE_64BIT_MODE
+	    // According to Lorenzo, some gen2 boards have problems with 64-bit addressing. Therefore, we only enable it for gen3 boards unless enforced
+	    ctx->mode64 = 1;
+#endif /* IPEDMA_ENFORCE_64BIT_MODE */
+            ctx->addr64 = 0;
+            ctx->streaming = 0;
+
 	    ctx->reg_last_read = IPEDMA_REG2_LAST_READ;
-	    
 	    if (!err)
 	        err = pcilib_add_registers(pcilib, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, ipe_dma_v2_registers, NULL);
-	}
-	
+        }
+
+        pcilib_info("IPEDMA gen%lu version %lu (64-bit mode: %u, 64-bit addressing: %u, streaming: %u)", ctx->gen, ctx->version, ctx->mode64, ctx->addr64, ctx->streaming);
+
 	if (err) {
 	    free(ctx);
 	    pcilib_error("Error (%i) registering firmware-dependent IPEDMA registers", err);
 	    return NULL;
 	}
-
-	RD(IPEDMA_REG_PCIE_GEN, value);
-
-#ifdef IPEDMA_ENFORCE_64BIT_MODE
-	ctx->mode64 = 1;
-#else /* IPEDMA_ENFORCE_64BIT_MODE */
-	    // According to Lorenzo, some gen2 boards have problems with 64-bit addressing. Therefore, we only enable it for gen3 boards unless enforced
-	if ((value&IPEDMA_MASK_PCIE_GEN) > 2) ctx->mode64 = 1;
-#endif /* IPEDMA_ENFORCE_64BIT_MODE */
-
-#ifdef IPEDMA_STREAMING_MODE
-	if (value&IPEDMA_MASK_STREAMING_MODE) ctx->streaming = 1;
-#endif /* IPEDMA_STREAMING_MODE */
     }
 
     return (pcilib_dma_context_t*)ctx;
@@ -122,7 +123,7 @@ static void dma_ipe_disable(ipe_dma_t *ctx) {
     usleep(IPEDMA_RESET_DELAY);
 
         // Reseting configured DMA pages
-    if (ctx->version < 3) {
+    if (ctx->gen < 3) {
 	WR(IPEDMA_REG2_PAGE_COUNT, 0);
     }
     usleep(IPEDMA_RESET_DELAY);
@@ -210,7 +211,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	ctx->dma_flags = 0;
 
 #ifdef IPEDMA_CONFIGURE_DMA_MASK
-    if (ctx->version >= 3) mask = 64;
+    if (ctx->addr64) mask = 64;
 
     err = pcilib_set_dma_mask(ctx->dmactx.pcilib, mask);
     if (err) {
@@ -276,12 +277,9 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
     }
 
     desc_va = pcilib_kmem_get_ua(ctx->dmactx.pcilib, desc);
-    if (ctx->version < 3) {
-	if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
-	else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
-    }  else {
-	last_written_addr_ptr = desc_va + 2 * sizeof(uint32_t);
-    }
+    if (ctx->addr64) last_written_addr_ptr = desc_va + 2 * sizeof(uint32_t);
+    else if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
+    else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
 
 	// get page size if default size was used
     if (!ctx->page_size) {
@@ -324,7 +322,7 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	WR(IPEDMA_REG_UPDATE_THRESHOLD, IPEDMA_DMA_PROGRESS_THRESHOLD);
 
 	    // Reseting configured DMA pages
-	if (ctx->version < 3) {
+	if (ctx->gen < 3) {
 	    WR(IPEDMA_REG2_PAGE_COUNT, 0);
 	}
 
@@ -335,17 +333,14 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	WR(ctx->reg_last_read, ctx->ring_size);
 #endif /* IPEDMA_BUG_LAST_READ */
 
-	if (ctx->version < 3) {
-	    WR(IPEDMA_REG2_UPDATE_ADDR, pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, desc, 0));
-	} else {
-	    WR64(IPEDMA_REG3_UPDATE_ADDR, pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, desc, 0));
-	}
-
 	    // Instructing DMA engine that writting should start from the first DMA page
-	if (ctx->version < 3)
-	    *(uint32_t*)last_written_addr_ptr = 0;
-	else
+	if (ctx->addr64) {
+	    WR64(IPEDMA_REG3_UPDATE_ADDR, pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, desc, 0));
 	    *(uint64_t*)last_written_addr_ptr = 0;
+	} else {
+	    WR(IPEDMA_REG2_UPDATE_ADDR, pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, desc, 0));
+	    *(uint32_t*)last_written_addr_ptr = 0;
+	}
 	
 	    // In ring buffer mode, the hardware taking care to preserve an empty buffer to help distinguish between
 	    // completely empty and completely full cases. In streaming mode, it is our responsibility to track this
@@ -355,15 +350,15 @@ int dma_ipe_start(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcilib_dm
 	
 	for (i = 0; i < num_pages; i++) {
 	    uintptr_t bus_addr_check, bus_addr = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, pages, i);
-	    if (ctx->version < 3) {
-		WR(IPEDMA_REG2_PAGE_ADDR, bus_addr);
-	    } else {
+	    if (ctx->addr64) {
 		WR64(IPEDMA_REG3_PAGE_ADDR, bus_addr);
+	    } else {
+		WR(IPEDMA_REG2_PAGE_ADDR, bus_addr);
 	    }
 
 	    if (bus_addr%4096) printf("Bad address %lu: %lx\n", i, bus_addr);
 
-	    if (ctx->version < 3) {
+	    if ((!ctx->addr64)&&(!ctx->streaming)) {
 	        RD(IPEDMA_REG2_PAGE_ADDR, bus_addr_check);
 		if (bus_addr_check != bus_addr) {
 		    pcilib_error("Written (%x) and read (%x) bus addresses does not match\n", bus_addr, bus_addr_check);
@@ -449,13 +444,13 @@ int dma_ipe_get_status(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, pcil
 
     if (!status) return -1;
 
-    if (ctx->version < 3) {
+    if (ctx->addr64) {
+	last_written_addr_ptr = desc_va + 2 * sizeof(uint32_t);
+	last_written_addr = *(uint64_t*)last_written_addr_ptr;
+    } else {
 	if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
 	else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
 	last_written_addr = *(uint32_t*)last_written_addr_ptr;
-    } else {
-	last_written_addr_ptr = desc_va + 2 * sizeof(uint32_t);
-	last_written_addr = *(uint64_t*)last_written_addr_ptr;
     }
 
     pcilib_debug(DMA, "Current DMA status      - last read: %4u, last_read_addr: %4u (0x%x), last_written: %4lu (0x%lx)", ctx->last_read, 
@@ -563,17 +558,16 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 
     desc_va = (void*)pcilib_kmem_get_ua(ctx->dmactx.pcilib, ctx->desc);
 
-    if (ctx->version < 3) {
+    if (ctx->addr64) {
+	last_written_addr_ptr = desc_va + 2 * sizeof(uint32_t);
+	empty_detected_ptr = desc_va + sizeof(uint32_t);
+//	empty_detected_ptr = &empty_detected_dummy;
+    } else {
 	if (ctx->mode64) last_written_addr_ptr = desc_va + 3 * sizeof(uint32_t);
 	else last_written_addr_ptr = desc_va + 4 * sizeof(uint32_t);
 	empty_detected_ptr = NULL; // Not properly supported
 //	empty_detected_ptr = last_written_addr_ptr - 2;
-    } else {
-	last_written_addr_ptr = desc_va + 2 * sizeof(uint32_t);
-	empty_detected_ptr = desc_va + sizeof(uint32_t);
-//	empty_detected_ptr = &empty_detected_dummy;
     }
-
 
     switch (sched_getscheduler(0)) {
      case SCHED_FIFO:
@@ -666,10 +660,10 @@ int dma_ipe_stream_read(pcilib_dma_context_t *vctx, pcilib_dma_engine_t dma, uin
 	    else last_free = ctx->ring_size - 1;
 
 	    uintptr_t buf_ba = pcilib_kmem_get_block_ba(ctx->dmactx.pcilib, ctx->pages, last_free);
-	    if (ctx->version < 3) {
-		WR(IPEDMA_REG2_PAGE_ADDR, buf_ba);
-	    } else {
+	    if (ctx->addr64) {
 		WR64(IPEDMA_REG3_PAGE_ADDR, buf_ba);
+	    } else {
+		WR(IPEDMA_REG2_PAGE_ADDR, buf_ba);
 	    }
 # ifdef IPEDMA_STREAMING_CHECKS
 	    pcilib_register_value_t streaming_status;

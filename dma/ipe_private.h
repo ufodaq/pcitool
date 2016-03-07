@@ -28,13 +28,16 @@
 #define REG(bank, addr) ((bank<<IPEDMA_REG_BANK_SHIFT)|addr)
 #define CONFREG(addr) REG(2, addr)
 
-#define IPEDMA_REG_VERSION		REG(1, 0x20)
+#define IPEDMA_REG_VERSION		0x18
+#define IPEDMA_REG_APPVERSION		REG(1, 0x20)
+#define IPEDMA_GENERATION(ver)          (ver&0xF)
+#define IPEDMA_STREAMING(ver)           ((ver>>4)&0x1)
+#define IPEDMA_VERSION(ver)             ((ver>>16)&0xFFFF)
 
 #define IPEDMA_REG_RESET		0x00
 #define IPEDMA_REG_CONTROL		0x04
 #define IPEDMA_REG_TLP_SIZE		0x0C
 #define IPEDMA_REG_TLP_COUNT		0x10
-#define IPEDMA_REG_PCIE_GEN		0x18
 #define IPEDMA_REG_UPDATE_THRESHOLD	0x60
 #define IPEDMA_REG_STREAMING_STATUS	0x68
 
@@ -54,8 +57,8 @@
 #define IPEDMA_FLAG_NOSYNC		0x01		/**< Do not call kernel space for page synchronization */
 #define IPEDMA_FLAG_NOSLEEP		0x02		/**< Do not sleep in the loop while waiting for the data */
 
-#define IPEDMA_MASK_PCIE_GEN		0xF
-#define IPEDMA_MASK_STREAMING_MODE	0x10
+//#define IPEDMA_MASK_PCIE_GEN		0xF
+//#define IPEDMA_MASK_STREAMING_MODE	0x10
 
 #define IPEDMA_RESET_DELAY		10000		/**< Sleep between accessing DMA control and reset registers */
 #define IPEDMA_ADD_PAGE_DELAY		1000		/**< Delay between submitting successive DMA pages into IPEDMA_REG_PAGE_ADDR register */
@@ -84,13 +87,16 @@ struct ipe_dma_s {
     pcilib_irq_type_t irq_preserve;	/**< indicates that IRQs should not be disabled during clean-up */
     int irq_started;			/**< indicates that IRQ subsystem is initialized (detecting which types should be preserverd) */    
 
-    uint32_t version;			/**< hardware version */
+    uint32_t gen;                       /**< hardware generation, currently corresponds to PCIe generation 2/3 */
+    uint32_t version;			/**< hardware revision */
+    int mode64;				/**< indicates 64-bit operation mode (for gen2, gen3 always operates in 64-bit mode) */
+    int addr64;                         /**< indicates that 64-bit addressing mode is used (gen3 only) */
+    int streaming;			/**< indicates if DMA is operating in streaming or ring-buffer mode (gen3 only) */
+
     int started;			/**< indicates that DMA buffers are initialized and reading is allowed */
     int writting;			/**< indicates that we are in middle of writting packet */
     int reused;				/**< indicates that DMA was found intialized, buffers were reused, and no additional initialization is needed */
     int preserve;			/**< indicates that DMA should not be stopped during clean-up */
-    int mode64;				/**< indicates 64-bit operation mode */
-    int streaming;			/**< indicates if DMA is operating in streaming or ring-buffer mode */
 
     uint32_t dma_flags;			/**< Various operation flags, see IPEDMA_FLAG_* */
     size_t dma_timeout;			/**< DMA timeout,IPEDMA_DMA_TIMEOUT is used by default */
