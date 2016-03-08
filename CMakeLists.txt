@@ -197,10 +197,10 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/.bzr/)
     add_dependencies(pci build)
 
 	# We need to generate build.h for source releases
-    add_custom_target(dist_clean
-	COMMAND make clean WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/driver
-	COMMAND ${CMAKE_MAKE_PROGRAM} clean WORKING_DIRECTORY ${CMAKE_CURRENT_DIR}
-	)
+    add_custom_target(dist_clean make clean -C driver
+	COMMAND ${CMAKE_MAKE_PROGRAM} clean 
+	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
     add_custom_target(dist_prepare DEPENDS dist_clean
 	COMMAND ${CMAKE_COMMAND} -DPCILIB_SOURCE_DIR=${CMAKE_SOURCE_DIR} -DPCILIB_BINARY_DIR=${CMAKE_SOURCE_DIR} -DPCILIB_RELEASE=${CPACK_PACKAGE_VERSION} -P ${CMAKE_SOURCE_DIR}/cmake/build.cmake
 	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
