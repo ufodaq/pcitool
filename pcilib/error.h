@@ -9,7 +9,7 @@ typedef enum {
     PCILIB_LOG_ONCE = 1
 } pcilib_log_flags_t; 
 
-enum {
+typedef enum {
     PCILIB_ERROR_SUCCESS = 0,
     PCILIB_ERROR_MEMORY = ENOMEM,
     PCILIB_ERROR_INVALID_REQUEST = EBADR,
