@@ -183,7 +183,7 @@ if (${RELEASE} GREATER 0)
 else (${RELEASE} GREATER 0)
     set(CPACK_PACKAGE_VERSION "${PACKAGE_VERSION}")
 endif (${RELEASE} GREATER 0)
-set(CPACK_SOURCE_IGNORE_FILES "/build/;/.bzr/;CMakeFiles;_CPack_Packages;cmake_install.cmake;CPack.*.cmake;CMakeCache.txt;install_manifest.txt;common.mk;config.h$;.pc$;/([^d]|d[^r])[^/]*/Makefile;__pycache__;.pyc$;.tar.bz2$;~$;${CPACK_SOURCE_IGNORE_FILES}")
+set(CPACK_SOURCE_IGNORE_FILES "/build/;/.bzr/;CMakeFiles;_CPack_Packages;cmake_install.cmake;CPack.*.cmake;CMakeCache.txt;install_manifest.txt;common.mk;pcilib/config.h$;.pc$;/([^d]|d[^r])[^/]*/Makefile;__pycache__;.pyc$;.tar.bz2$;~$;${CPACK_SOURCE_IGNORE_FILES}")
 set(CPACK_SOURCE_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CPACK_PACKAGE_VERSION}")
 include(CPack)
 

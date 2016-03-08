@@ -1,5 +1,5 @@
-POST_INSTALL="make -C driver/ install_symvers KERNELVER=$kernelver KERNELDIR=$kernel_source_dir"
-MAKE="make -C driver/ KERNELDIR=/lib/modules/${kernelver}/build"
+POST_BUILD="dkms-postbuild.sh"
+MAKE="make -C driver/ KERNELDIR=/lib/modules/$kernelver/build"
 CLEAN="make -C driver/ clean"
 BUILT_MODULE_NAME=pciDriver
 BUILT_MODULE_LOCATION=driver/

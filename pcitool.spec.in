@@ -35,6 +35,7 @@ operation.
 %package -n libpcilib${PCILIB_ABI_VERSION}
 Summary: User-space PCI library
 Group: Development/Libraries
+Provides: pcilib = %{version}
 Requires: pcilib-python >= %{version}
 Requires: pcilib-dkms >= %{version}
 
@@ -58,6 +59,7 @@ API exposes 4 API layers.
 Summary: Development files for pcilib
 Group: Development/Libraries 
 Requires: libpcilib${PCILIB_ABI_VERSION} = %{version}
+Requires: uthash
 
 %description -n libpcilib-devel
 Development files for user-space PCI library
@@ -138,6 +140,7 @@ mkdir -p $RPM_BUILD_ROOT/%{_includedir}/linux/
 install -m 644 driver/ioctl.h $RPM_BUILD_ROOT/%{_includedir}/linux/pcidriver.h
 mkdir -p $RPM_BUILD_ROOT/usr/src/%{modname}-%{version}/pcilib/
 install -m 644 misc/dkms.conf $RPM_BUILD_ROOT/%{_prefix}/src/%{modname}-%{version}/
+install -m 755 misc/dkms-postbuild.sh $RPM_BUILD_ROOT/%{_prefix}/src/%{modname}-%{version}/
 install -m 644 pcilib/*.h $RPM_BUILD_ROOT/%{_prefix}/src/%{modname}-%{version}/pcilib/
 cp -r driver $RPM_BUILD_ROOT/usr/src/%{modname}-%{version}/
 
@@ -239,7 +242,7 @@ exit 0
 %if %{defined suse_version}
 /var/adm/fillup-templates/sysconfig.*
 %else
-%{_sysconfdir}/sysconfig/*
+%config %{_sysconfdir}/sysconfig/*
 %endif
 %{_unitdir}/*
 %{_datadir}/pcilib${PCILIB_ABI_VERSION}/pyserver
