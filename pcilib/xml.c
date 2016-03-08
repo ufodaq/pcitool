@@ -1294,7 +1294,7 @@ char *pcilib_detect_xml_model(pcilib_t *ctx, unsigned int vendor_id, unsigned in
     xmlXPathObjectPtr nodes;
     xmlChar xpath_query[64];
 
-    xmlStrPrintf(xpath_query, sizeof(xpath_query), (xmlChar*)"/devices/device[@vendor=%x and @device=%x]/@model", vendor_id, device_id);
+    xmlStrPrintf(xpath_query, sizeof(xpath_query), (xmlChar*)"/devices/device[@vendor=\"%04x\" and @device=\"%04x\"]/@model", vendor_id, device_id);
 
     data_dir = getenv("PCILIB_DATA_DIR");
     if (!data_dir) data_dir = PCILIB_DATA_DIR;
