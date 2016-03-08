@@ -1,4 +1,4 @@
 <?xml version="1.0"?>
 <model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <bank bar="0" size="0x0200" protocol="software_registers" read_address="0x0" write_address="0x0" word_size="32" endianess="little" format="0x%lx" name="dma" description="DMA Registers"/>
+  <bank size="0x0200" protocol="software_registers" read_address="0x0" write_address="0x0" word_size="32" endianess="little" format="0x%lx" name="dma" description="DMA Registers"/>
 </model>

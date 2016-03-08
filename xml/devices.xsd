@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <xsd:include schemaLocation="types.xsd"/>
+
+  <xsd:simpleType name="hex16_t">
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="([a-fA-F0-9]){1,4}"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:complexType name="device_t">
+    <xsd:attribute name="vendor" type="hex16_t" />
+    <xsd:attribute name="device" type="hex16_t" />
+    <xsd:attribute name="model" type="xsd:string" />
+  </xsd:complexType>
+
+  <xsd:element name="devices">
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element name="device" type="device_t" minOccurs="0" maxOccurs="unbounded" />
+      </xsd:sequence>
+    </xsd:complexType>
+  </xsd:element>
+</xsd:schema>

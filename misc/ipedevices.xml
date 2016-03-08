@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<devices xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <device vendor="10ee" device="0" model="ipecamera"/>
+  <device vendor="10ee" device="1" model="ipecamera"/>
+  <device vendor="10ee" device="2" model="ipedma"/>
+  <device vendor="10ee" device="3" model="ipedma"/>
+</devices>

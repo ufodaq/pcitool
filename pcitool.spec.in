@@ -143,6 +143,10 @@ cp -r driver $RPM_BUILD_ROOT/usr/src/%{modname}-%{version}/
 
 # Sample model
 cp -r xml/test $RPM_BUILD_ROOT/%{_datadir}/pcilib${PCILIB_ABI_VERSION}/models/
+cp -r xml/devices $RPM_BUILD_ROOT/%{_datadir}/pcilib${PCILIB_ABI_VERSION}/
+
+# Default configuration
+install -m 644 misc/ipedevices.xml $RPM_BUILD_ROOT/%{_datadir}/pcilib${PCILIB_ABI_VERSION}/devices/
 
 # Servers
 mkdir -p $RPM_BUILD_ROOT/%{_unitdir}
@@ -200,8 +204,11 @@ exit 0
 %doc docs/HARDWARE
 %dir %{_libdir}/pcilib${PCILIB_ABI_VERSION}/
 %dir %{_datadir}/pcilib${PCILIB_ABI_VERSION}/
+%dir %{_datadir}/pcilib${PCILIB_ABI_VERSION}/devices/
 %dir %{_datadir}/pcilib${PCILIB_ABI_VERSION}/models/
+%{_datadir}/pcilib${PCILIB_ABI_VERSION}/*.xsd
 %{_datadir}/pcilib${PCILIB_ABI_VERSION}/models/*.xsd
+%{_datadir}/pcilib${PCILIB_ABI_VERSION}/devices/ipedevices.xml
 %{_libdir}/libpcilib.so.*
 
 %files -n libpcilib-devel
@@ -216,6 +223,7 @@ exit 0
 %files -n pcilib-test
 %defattr(-, root, root)  
 %{_datadir}/pcilib${PCILIB_ABI_VERSION}/models/test
+%{_datadir}/pcilib${PCILIB_ABI_VERSION}/devices/testdevice.xml
 
 %files -n pcilib-dkms
 %defattr(-, root, root)  

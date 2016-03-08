@@ -86,13 +86,6 @@ static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
 	    pcilib_add_register_ranges(ctx, PCILIB_MODEL_MODIFICATON_FLAGS_DEFAULT, 0, model_info->ranges);
     }
 
-    // Load XML registers
-
-    // Check for all installed models
-    // memcpy(&ctx->model_info, model, sizeof(pcilib_model_description_t));
-    // how we reconcile the banks from event model and dma description? The banks specified in the DMA description should override corresponding banks of events...
-
-
     if (!model_info) {
 	if ((model)&&(strcasecmp(model, "pci"))/*&&(no xml)*/)
 	    return PCILIB_ERROR_NOTFOUND;
@@ -108,6 +101,7 @@ static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
 pcilib_t *pcilib_open(const char *device, const char *model) {
     int err, xmlerr;
     pcilib_t *ctx = malloc(sizeof(pcilib_t));
+    const pcilib_board_info_t *board_info;
     const pcilib_driver_version_t *drv_version;
 	
     if (!model)
@@ -138,6 +132,17 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    return ctx;
 	}
 
+	board_info = pcilib_get_board_info(ctx);
+	if (!board_info) {
+	    pcilib_error("Failed to enumerate PCI device");
+	    pcilib_close(ctx);
+	    return NULL;
+	}
+
+	    // Check if model is specified in the XML configuration
+	if (!model)
+	    model = pcilib_detect_xml_model(ctx, board_info->vendor_id, board_info->device_id);
+
 	err = pcilib_init_locking(ctx);
 	if (err) {
 	    pcilib_error("Error (%i) initializing locking subsystem", err);
@@ -150,6 +155,7 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 	    pcilib_warning("Error (%i) initializing python subsystem", err);
 	    pcilib_free_py(ctx);
 	}
+
 
 	ctx->alloc_reg = PCILIB_DEFAULT_REGISTER_SPACE;
 	ctx->alloc_views = PCILIB_DEFAULT_VIEW_SPACE;
@@ -179,11 +185,7 @@ pcilib_t *pcilib_open(const char *device, const char *model) {
 
 	err = pcilib_detect_model(ctx, model);
 	if ((err)&&(err != PCILIB_ERROR_NOTFOUND)) {
-	    const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
-	    if (board_info)
-	        pcilib_error("Error (%i) configuring model %s (%x:%x)", err, (model?model:""), board_info->vendor_id, board_info->device_id);
-	    else
-	        pcilib_error("Error (%i) configuring model %s", err, (model?model:""));
+	    pcilib_error("Error (%i) configuring model %s (%x:%x)", err, (model?model:""), board_info->vendor_id, board_info->device_id);
 	    pcilib_close(ctx);
 	    return NULL;
 	}

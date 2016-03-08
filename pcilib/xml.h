@@ -40,6 +40,16 @@ struct pcilib_xml_s {
 extern "C" {
 #endif
 
+/**
+ * Resolves device model from vendor and device ids using XML configuration
+ * The association of vendor/device id pairs with model are provided devices.xml under PCILIB_MODEL_DIR
+ * @param[in,out] ctx 	- pcilib context
+ * @param[in] vendor_id	- the vendor id
+ * @param[in] device_id	- the device id
+ * @return 		- the name of model or NULL on an error and unknown device. It is caller responsibility to free returned string.
+ */
+char *pcilib_detect_xml_model(pcilib_t *ctx, unsigned int vendor_id, unsigned int device_id);
+
 /** Initializes XML stack and loads a default set of XML files. 
  * The default location for XML files is /usr/local/share/pcilib/models/@b{model}.
  * This can be altered using CMake PCILIB_MODEL_DIR variable while building or using 
