@@ -24,11 +24,19 @@ default:
 	if [ $$KERNEL_GCC_VERSION != $$GCC_VERSION ]; then \
 	    echo "Kernel is compiled with gcc $$KERNEL_GCC_VERSION, but you are now using $$GCC_VERSION" ;\
 	    GCC_MAJOR=`echo $$KERNEL_GCC_VERSION | cut -d "." -f 1-2` ;\
-	    newCC=gcc-$$GCC_MAJOR ;\
+	    newCC=gcc-$$KERNEL_GCC_VERSION ;\
 	    CC=`which $$newCC 2>/dev/null` ;\
 	    if [ $$? -ne 0 ]; then \
-		echo "No compiler of $$GCC_MAJOR series is installed" ;\
-		exit 1 ;\
+		newCC=gcc-$$GCC_MAJOR ;\
+		CC=`which $$newCC 2>/dev/null` ;\
+		if [ $$? -ne 0 ]; then \
+		    newCC=`compgen -ac | grep -E ^gcc-4.6 | head -n 1` ;\
+		    CC=`which $$newCC 2>/dev/null` ;\
+		    if [ $$? -ne 0 ]; then \
+			echo "No compiler of $$GCC_MAJOR series is installed" ;\
+			exit 1 ;\
+		    fi ; \
+		fi ;\
 	    fi ;\
 	    GCC_VERSION=`$$CC --version | head -n 1 | tr ' ' '\n' | grep -e "[0-9]\+\.[0-9]" | tail -n 1` ;\
 	    if [ $$KERNEL_GCC_VERSION != $$GCC_VERSION -a -z "$$RELAXED_GCC_CHECK" ]; then \
