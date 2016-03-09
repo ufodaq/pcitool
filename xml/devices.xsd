@@ -4,7 +4,7 @@
 
   <xsd:simpleType name="hex16_t">
     <xsd:restriction base="xsd:string">
-      <xsd:pattern value="([a-fA-F0-9]){1,4}"/>
+      <xsd:pattern value="([a-fA-F0-9]){4}"/>
     </xsd:restriction>
   </xsd:simpleType>
 
