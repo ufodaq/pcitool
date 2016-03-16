@@ -14,32 +14,40 @@ set(DISABLE_SERVERS FALSE CACHE BOOL "Disable Web API support")
 
 #list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-if(NOT DEFINED LIB_SUFFIX)
- if (CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(LIB_SUFFIX "64")
- else (CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(LIB_SUFFIX "")
- endif (CMAKE_SIZEOF_VOID_P EQUAL 8)
-endif(NOT DEFINED LIB_SUFFIX)
+
+include(GNUInstallDirs)
+include(CheckIncludeFiles)
+
+include(cmake/tools.cmake)
+include(cmake/version.cmake)
+VERSION_TO_VARS(${PCILIB_VERSION} PCILIB_VERSION_MAJOR PCILIB_VERSION_MINOR PCILIB_VERSION_MICRO)
+
+set(EXTRA_SYSTEM_LIBS -lrt)
+add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -fno-omit-frame-pointer")
+#add_definitions("-fPIC --std=c99 -Wall -O2")
+
+find_package(PkgConfig REQUIRED)
+find_package(Threads REQUIRED)
+find_package(Doxygen)
 
 if(NOT DEFINED BIN_INSTALL_DIR)
-    set(BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")
+    set(BIN_INSTALL_DIR "${CMAKE_INSTALL_FULL_BINDIR}")
 endif(NOT DEFINED BIN_INSTALL_DIR)
 
 if(NOT DEFINED LIB_INSTALL_DIR)
-    set(LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}")
+    set(LIB_INSTALL_DIR "${CMAKE_INSTALL_FULL_LIBDIR}")
 endif(NOT DEFINED LIB_INSTALL_DIR)
 
 if(NOT DEFINED INCLUDE_INSTALL_DIR)
-    set(INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/include")
+    set(INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_FULL_LIBDIR}")
 endif(NOT DEFINED INCLUDE_INSTALL_DIR)
 
 if(NOT DEFINED DATA_INSTALL_DIR)
-    set(DATA_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/share")
+    set(DATA_INSTALL_DIR "${CMAKE_INSTALL_FULL_DATAROOTDIR}")
 endif(NOT DEFINED DATA_INSTALL_DIR)
 
 if(NOT DEFINED LOCALE_INSTALL_DIR)
-    set(LOCALE_INSTALL_DIR "${DATA_INSTALL_DIR}/locale")
+    set(LOCALE_INSTALL_DIR "${DATA_INSTALL_DIR}/${CMAKE_INSTALL_LOCALEDIR}")
 endif(NOT DEFINED LOCALE_INSTALL_DIR)
 
 if (NOT DEFINED PCILIB_PLUGIN_DIR)
@@ -67,18 +75,6 @@ if (NOT DEFINED PCILIB_DEBUG_DIR)
 endif (NOT DEFINED PCILIB_DEBUG_DIR)
 
 SET(ENV{PKG_CONFIG_PATH} "${LIB_INSTALL_DIR}/pkgconfig:$ENV{PKG_CONFIG_PATH}")
-
-set(EXTRA_SYSTEM_LIBS -lrt)
-add_definitions("-fPIC --std=c99 -Wall -O2 -gdwarf-2 -g3 -fno-omit-frame-pointer")
-#add_definitions("-fPIC --std=c99 -Wall -O2")
-
-include(cmake/tools.cmake)
-include(cmake/version.cmake)
-VERSION_TO_VARS(${PCILIB_VERSION} PCILIB_VERSION_MAJOR PCILIB_VERSION_MINOR PCILIB_VERSION_MICRO)
-
-find_package(PkgConfig REQUIRED)
-find_package(Threads REQUIRED)
-find_package(Doxygen)
 
 if (NOT DISABLE_PYTHON)
     set(PYTHON_VERSION 2.7 CACHE STRING "python version")
@@ -110,7 +106,6 @@ if (NOT HAVE_PYTHON)
     set(DISABLE_SERVERS TRUE)
 endif (NOT HAVE_PYTHON)
 
-include(CheckIncludeFiles)
 check_include_files(stdatomic.h HAVE_STDATOMIC_H)
 
 find_path(UTHASH_INCLUDE_DIRS uthash.h PATH_SUFFIXES uthash)
