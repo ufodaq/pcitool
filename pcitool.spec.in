@@ -119,7 +119,9 @@ Pcilib Web API and small demo web server.
 %build
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
 	-DPCILIB_PLUGIN_DIR=%{_libdir}/pcilib${PCILIB_ABI_VERSION}/ -DPCILIB_DATA_DIR=%{_datadir}/pcilib${PCILIB_ABI_VERSION}/ \
-	-DLIB_INSTALL_DIR=%{_libdir} -DBIN_INSTALL_DIR=%{_bindir} -DDATA_INSTALL_DIR=%{_datadir} -DINCLUDE_INSTALL_DIR=%{_includedir} -DPYTHON_INSTALL_DIR=%{python2_sitearch} .
+	-DPCILIB_PYTHON_SITEDIR=%{python2_sitearch} \
+	-DCMAKE_INSTALL_LIBDIR=%{_libdir} -DCMAKE_INSTALL_BINDIR=%{_bindir} -DCMAKE_INSTALL_DATADIR=%{_datadir} -DCMAKE_INSTALL_DATAROOTDIR=%{_datadir} -DCMAKE_INSTALL_INCLUDEDIR=%{_includedir} .
+
 make
 make docs
 

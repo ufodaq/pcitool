@@ -14,7 +14,7 @@ target_link_libraries(pcilib dma protocols views ${CMAKE_THREAD_LIBS_INIT} ${UFO
 add_dependencies(pcilib dma protocols views)
 
 install(TARGETS pcilib
-    LIBRARY DESTINATION lib${LIB_SUFFIX}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 install(FILES pcilib.h

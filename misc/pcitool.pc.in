@@ -1,12 +1,12 @@
 prefix=${CMAKE_INSTALL_PREFIX}
-exec_prefix=${BIN_INSTALL_DIR}
-libdir=${LIB_INSTALL_DIR}
-includedir=${INCLUDE_INSTALL_DIR}
+exec_prefix=${CMAKE_INSTALL_BINDIR}
+libdir=${CMAKE_INSTALL_LIBDIR}
+includedir=${CMAKE_INSTALL_INCLUDEDIR}
 plugindir=${PCILIB_PLUGIN_DIR}
 modeldir=${PCILIB_MODEL_DIR}
 
 Name: ${TARNAME}
 Description: User-space library to handle PCIe-devices
 Version: ${PACKAGE_VERSION}
-Libs: -L${LIB_INSTALL_DIR} -lpcilib
-Cflags: -I${INCLUDE_INSTALL_DIR}
+Libs: -L${CMAKE_INSTALL_LIBDIR} -lpcilib
+Cflags: -I${CMAKE_INSTALL_INCLUDEDIR}
