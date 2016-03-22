@@ -71,7 +71,7 @@
 #define WR64(addr, value) { *(uint64_t*)(REG2VIRT(addr)) = value; }
 #define RD64(addr, value) { value = *(uint64_t*)(REG2VIRT(addr)); }
 
-#define DEREF(ptr) ((ctx->version<3)?(*(uint32_t*)ptr):(*(uint64_t*)ptr))
+#define DEREF(ptr) ((ctx->addr64)?(*(uint64_t*)ptr):(*(uint32_t*)ptr))
 
 typedef uint32_t reg_t;
 typedef struct ipe_dma_s ipe_dma_t;
