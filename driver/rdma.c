@@ -42,11 +42,13 @@ static unsigned long pcidriver_follow_pte(struct mm_struct *mm, unsigned long ad
     return pfn;
 }
 
-unsigned long pcidriver_resolve_bar(unsigned long address) {
+unsigned long pcidriver_resolve_bar(unsigned long bar_address) {
     int dev, bar;
     unsigned long pfn;
+    unsigned long address;
 
-    address = (address >> PAGE_SHIFT) << PAGE_SHIFT;
+    address = (bar_address >> PAGE_SHIFT) << PAGE_SHIFT;
+    offset = bar_address - address;
     pfn = pcidriver_follow_pte(current->mm, address);
 
     for (dev = 0; dev < MAXDEVICES; dev++)
@@ -59,7 +61,7 @@ unsigned long pcidriver_resolve_bar(unsigned long address) {
             unsigned long start = pci_resource_start(privdata->pdev, bar);
             unsigned long end = start + pci_resource_len(privdata->pdev, bar);
             if ((pfn >= start)&&(pfn < end))
-                return pfn;
+                return pfn + offset;
         }
         pcidriver_put_privdata(privdata);
     }
