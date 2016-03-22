@@ -1798,14 +1798,8 @@ int GrabCallback(pcilib_event_id_t event_id, const pcilib_event_info_t *info, vo
 	ctx->incomplete_count++;
 	return PCILIB_STREAMING_CONTINUE;
     }
-    
-    switch (ctx->format) {
-     case FORMAT_DEFAULT:
-	data = pcilib_get_data(handle, event_id, PCILIB_EVENT_DATA, &size);
-	break;
-     default:
-	data = pcilib_get_data(handle, event_id, PCILIB_EVENT_RAW_DATA, &size);
-    }
+
+    data = pcilib_get_data(handle, event_id, ctx->data, &size);
 
     if (!data) {
 	int err = (int)size;
@@ -2176,11 +2170,17 @@ int TriggerAndGrab(pcilib_t *handle, GRAB_MODE grab_mode, const char *evname, co
 	if (data == PCILIB_EVENT_DATA_TYPE_INVALID)
 	    Error("Can't find data type (%s)", data_type);
     } else {
-	data = PCILIB_EVENT_DATA;
+	switch (format) {
+          case FORMAT_DEFAULT:
+	    data = PCILIB_EVENT_DATA;
+	    break;
+	  default:
+	    data = PCILIB_EVENT_RAW_DATA;
+	}
     }
-    
+
     memset(&ctx, 0, sizeof(GRABContext));
-    
+
     ctx.handle = handle;
     ctx.event = event;
     ctx.data = data;
