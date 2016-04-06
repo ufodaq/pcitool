@@ -1,6 +1,6 @@
 project(pcitool C)
 
-set(RELEASE "0")
+set(RELEASE "3")
 set(PCILIB_VERSION "0.2.7")
 set(PCILIB_ABI_VERSION "2")
 
@@ -168,7 +168,7 @@ set(CPACK_SOURCE_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CPACK_PACKAGE_VERSIO
 include(CPack)
 
 # In releases, we just keep the pre-generated build.h 
-if(EXISTS ${CMAKE_SOURCE_DIR}/.bzr/)
+if(EXISTS ${CMAKE_SOURCE_DIR}/.bzr/ OR NOT EXISTS ${CMAKE_SOURCE_DIR}/pcilib/build.h)
     add_custom_target(build
 	COMMAND ${CMAKE_COMMAND} -DPCILIB_SOURCE_DIR=${CMAKE_SOURCE_DIR} -DPCILIB_BINARY_DIR=${CMAKE_BINARY_DIR} -P ${CMAKE_SOURCE_DIR}/cmake/build.cmake
 	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
@@ -189,7 +189,7 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/.bzr/)
 
     set_source_files_properties(${CMAKE_BINARY_DIR}/pcilib/build.h PROPERTIES GENERATED TRUE)
     set_source_files_properties(${CMAKE_SOURCE_DIR}/pcilib/build.h PROPERTIES GENERATED TRUE)
-endif(EXISTS ${CMAKE_SOURCE_DIR}/.bzr/)
+endif(EXISTS ${CMAKE_SOURCE_DIR}/.bzr/ OR NOT EXISTS ${CMAKE_SOURCE_DIR}/pcilib/build.h)
 
 if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     file(COPY ${CMAKE_SOURCE_DIR}/xml DESTINATION ${CMAKE_BINARY_DIR})
