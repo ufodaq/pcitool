@@ -10,8 +10,7 @@ MAININSTALLDIR ?= /lib/modules/$(KERNELVER)/kernel/extra
 HEADERDIR ?= /lib/modules/$(KERNELVER)/source/include
 PWD := $(shell pwd)
 
-#EXTRA_CFLAGS += -I$(M)/..
-EXTRA_CFLAGS += -I${CMAKE_BINARY_DIR}/driver
+EXTRA_CFLAGS += -I$(M)/.. ${PCILIB_DYNAMIC_HEADERS_INC}
 
 ifdef DUMMY_DEVICE
 ifneq ($(DUMMY_DEVICE), 0)
@@ -19,6 +18,7 @@ ifneq ($(DUMMY_DEVICE), 0)
 endif
 endif
 
+# Grepping in '../pcilib/build.h' is correct as we will always have this file in the releases...
 default:
 	@KERNEL_GCC_VERSION=`cat /proc/version | head -n1 | cut -d " " -f 7` ;\
 	GCC_VERSION=`$(CC) --version | head -n 1 | tr ' ' '\n' | grep -e "[0-9]\+\.[0-9]" | tail -n 1` ;\
@@ -65,10 +65,10 @@ default:
 	    grep "#define PCILIB_RELEASE" ../pcilib/build.h &> /dev/null ;\
 	    if [ $$? -eq 0 ]; then \
 		revision="Release \" PCILIB_RELEASE \" (r\" PCILIB_REVISION \") from \" PCILIB_REVISION_BRANCH \" by \" PCILIB_REVISION_AUTHOR \" at $$build_path, last modification from $$build_lastmod" ;\
-		/bin/echo -e "#include \"../pcilib/build.h\"\\n#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES PCILIB_REVISION_MODIFICATIONS\n" > build.h ;\
+		/bin/echo -e "#include \"pcilib/build.h\"\\n#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES PCILIB_REVISION_MODIFICATIONS\n" > build.h ;\
 	    else \
 		revision="Revision r\" PCILIB_REVISION \" from \" PCILIB_REVISION_BRANCH \" by \" PCILIB_REVISION_AUTHOR \" at $$build_path, last modification from $$build_lastmod" ;\
-		/bin/echo -e "#include \"../pcilib/build.h\"\\n#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES PCILIB_REVISION_MODIFICATIONS\n" > build.h ;\
+		/bin/echo -e "#include \"pcilib/build.h\"\\n#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES PCILIB_REVISION_MODIFICATIONS\n" > build.h ;\
 	    fi ;\
 	fi ;\
 	$(MAKE) $(CFLAGS) -C $(KERNELDIR) M=$(PWD) CC=$$CC modules

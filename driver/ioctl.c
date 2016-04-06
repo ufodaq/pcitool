@@ -30,7 +30,7 @@
 #include <linux/sched.h>
 #include <linux/iommu.h>
 
-#include "../pcilib/version.h"
+#include "pcilib/version.h"
 
 #include "base.h"
 

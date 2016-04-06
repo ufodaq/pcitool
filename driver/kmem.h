@@ -3,7 +3,7 @@
 
 #include <linux/sysfs.h>
 
-#include "../pcilib/kmem.h"
+#include "pcilib/kmem.h"
 #include "ioctl.h"
 
 /* Define an entry in the kmem list (this list is per device) */

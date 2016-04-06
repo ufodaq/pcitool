@@ -117,7 +117,7 @@ Pcilib Web API and small demo web server.
 %setup -q -n pcitool-%{version}
 
 %build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DPCILIB_DYNAMIC_HEADERS_INC="" \
 	-DPCILIB_PLUGIN_DIR=%{_libdir}/pcilib${PCILIB_ABI_VERSION}/ -DPCILIB_DATA_DIR=%{_datadir}/pcilib${PCILIB_ABI_VERSION}/ \
 	-DPCILIB_PYTHON_SITEDIR=%{python2_sitearch} \
 	-DCMAKE_INSTALL_LIBDIR=%{_libdir} -DCMAKE_INSTALL_BINDIR=%{_bindir} -DCMAKE_INSTALL_DATADIR=%{_datadir} -DCMAKE_INSTALL_DATAROOTDIR=%{_datadir} -DCMAKE_INSTALL_INCLUDEDIR=%{_includedir} .

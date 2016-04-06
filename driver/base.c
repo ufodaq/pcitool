@@ -19,7 +19,7 @@
 #include <linux/interrupt.h>
 #include <linux/wait.h>
 
-#include "../pcilib/version.h"
+#include "pcilib/version.h"
 #include "build.h"
 #include "base.h"
 
