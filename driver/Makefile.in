@@ -10,7 +10,8 @@ MAININSTALLDIR ?= /lib/modules/$(KERNELVER)/kernel/extra
 HEADERDIR ?= /lib/modules/$(KERNELVER)/source/include
 PWD := $(shell pwd)
 
-EXTRA_CFLAGS += -I$(M)/..
+#EXTRA_CFLAGS += -I$(M)/..
+EXTRA_CFLAGS += -I${CMAKE_BINARY_DIR}/driver
 
 ifdef DUMMY_DEVICE
 ifneq ($(DUMMY_DEVICE), 0)
