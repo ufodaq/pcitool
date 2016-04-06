@@ -46,6 +46,7 @@ unsigned long pcidriver_resolve_bar(unsigned long bar_address) {
     int dev, bar;
     unsigned long pfn;
     unsigned long address;
+    unsigned long offset;
 
     address = (bar_address >> PAGE_SHIFT) << PAGE_SHIFT;
     offset = bar_address - address;
