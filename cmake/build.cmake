@@ -38,7 +38,7 @@ if (${_retcode} EQUAL 0)
     set(PCILIB_LAST_MODIFICATION ${_output})
 endif (${_retcode} EQUAL 0)
 
-if (BAZAAR_FOUND)
+if (BAZAAR_FOUND AND EXISTS ${PCILIB_SOURCE_DIR}/.bzr)
     execute_process(
 	COMMAND ${BAZAAR_EXECUTABLE} revno --tree ${PCILIB_SOURCE_DIR}
 	RESULT_VARIABLE _retcode
@@ -77,6 +77,6 @@ if (BAZAAR_FOUND)
 	string(REGEX REPLACE "\n+" ";" PCILIB_REVISION_MODIFICATIONS "${_output}")
 #	set(PCILIB_REVISION_MODIFICATIONS ${_output})
     endif (${_retcode} EQUAL 0)
-endif(BAZAAR_FOUND)
+endif(BAZAAR_FOUND AND EXISTS ${PCILIB_SOURCE_DIR}/.bzr)
 
 configure_file(${PCILIB_SOURCE_DIR}/pcilib/build.h.in ${PCILIB_BINARY_DIR}/pcilib/build.h)

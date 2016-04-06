@@ -60,12 +60,15 @@ default:
 	    build_changes=`bzr status -SV | cut -c 5- | tr \\\n " "` ;\
 	    revision="Revision $$build_revision from $$build_branch by $$build_author at $$build_path, last modification from $$build_lastmod" ;\
 	    /bin/echo -e "#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES \"$$build_changes\"\\n" > build.h ;\
-	elif [ -d ../.bzr ]; then \
-	    revision="Revision r\" PCILIB_REVISION \" from \" PCILIB_REVISION_BRANCH \" by \" PCILIB_REVISION_AUTHOR \" at $$build_path, last modification from $$build_lastmod" ;\
-	    /bin/echo -e "#include \"../pcilib/build.h\"\\n#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES PCILIB_REVISION_MODIFICATIONS\n" > build.h ;\
 	else \
-	    revision="Release \" PCILIB_RELEASE \" (r\" PCILIB_REVISION \") from \" PCILIB_REVISION_BRANCH \" by \" PCILIB_REVISION_AUTHOR \" at $$build_path, last modification from $$build_lastmod" ;\
-	    /bin/echo -e "#include \"../pcilib/build.h\"\\n#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES PCILIB_REVISION_MODIFICATIONS\n" > build.h ;\
+	    grep "#define PCILIB_RELEASE" ../pcilib/build.h &> /dev/null ;\
+	    if [ $$? -eq 0 ]; then \
+		revision="Release \" PCILIB_RELEASE \" (r\" PCILIB_REVISION \") from \" PCILIB_REVISION_BRANCH \" by \" PCILIB_REVISION_AUTHOR \" at $$build_path, last modification from $$build_lastmod" ;\
+		/bin/echo -e "#include \"../pcilib/build.h\"\\n#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES PCILIB_REVISION_MODIFICATIONS\n" > build.h ;\
+	    else \
+		revision="Revision r\" PCILIB_REVISION \" from \" PCILIB_REVISION_BRANCH \" by \" PCILIB_REVISION_AUTHOR \" at $$build_path, last modification from $$build_lastmod" ;\
+		/bin/echo -e "#include \"../pcilib/build.h\"\\n#define PCIDRIVER_BUILD \"$$build\"\\n#define PCIDRIVER_REVISION \"$$revision\"\\n#define PCIDRIVER_CHANGES PCILIB_REVISION_MODIFICATIONS\n" > build.h ;\
+	    fi ;\
 	fi ;\
 	$(MAKE) $(CFLAGS) -C $(KERNELDIR) M=$(PWD) CC=$$CC modules
 
