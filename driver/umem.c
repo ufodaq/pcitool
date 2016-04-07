@@ -17,6 +17,8 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/sched.h>
+#include <linux/vmalloc.h>
+
 
 #include "base.h"
 
