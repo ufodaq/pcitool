@@ -7,7 +7,14 @@ KERNELVER ?= $(shell uname -r)
 KERNELDIR ?= /lib/modules/$(KERNELVER)/build
 INSTALLDIR ?= /lib/modules/$(KERNELVER)/extra
 MAININSTALLDIR ?= /lib/modules/$(KERNELVER)/kernel/extra
+ifneq ("$(wildcard /lib/modules/$(KERNELVER)/build/include/linux)","")
+HEADERDIR ?= /lib/modules/$(KERNELVER)/build/include
+else ifneq ("$(wildcard /lib/modules/$(KERNELVER)/source/include/linux)","")
 HEADERDIR ?= /lib/modules/$(KERNELVER)/source/include
+else
+HEADERDIR ?= ""
+endif
+
 PWD := $(shell pwd)
 
 EXTRA_CFLAGS += -I$(M)/.. ${PCILIB_DYNAMIC_HEADERS_INC}
@@ -84,8 +91,10 @@ install:
 	@install -m 755 pciDriver.ko $(INSTALLDIR)
 	@echo "INSTALL $(INSTALLDIR)/pciDriver.symvers"
 	@install -m 644 Module.symvers $(INSTALLDIR)/pciDriver.symvers
-	@echo "INSTALL $(HEADERDIR)/linux/pcidriver.h"
-	@install -m 644 pcidriver.h $(HEADERDIR)/linux/
+	@if [ "$(HEADERDIR)" != "" ]; then \
+	    echo "INSTALL $(HEADERDIR)/linux/pcidriver.h" ;\
+	    install -m 644 pcidriver.h $(HEADERDIR)/linux/ ;\
+	fi
 	@echo "INSTALL /usr/include/linux/pcidriver.h"
 	@mkdir -p /usr/include/linux
 	@install -m 644 ioctl.h /usr/include/linux/pcidriver.h
@@ -99,16 +108,34 @@ install_symvers:
 
 
 uninstall:
-	@echo "UNINSTALL $(INSTALLDIR)/pciDriver.ko"
-	@rm -f $(INSTALLDIR)/pciDriver.ko
-	@rm -f $(MAININSTALLDIR)/pciDriver.ko
-	@rm -f $(INSTALLDIR)/pciDriver.symvers
-	@rm -f $(MAININSTALLDIR)/pciDriver.symvers
-	@echo "UNINSTALL /usr/include/linux/pcidriver.h"
-	@rm -rf /usr/include/pciDriver/
-	@rm -rf /usr/include/linux/pcidriver.h
-	@echo "UNINSTALL $(HEADERDIR)/linux/pcidriver.h"
-	@rm -rf $(HEADERDIR)/linux/pcidriver.h
+	@if [ -f $(INSTALLDIR)/pciDriver.ko ]; then \
+	    echo "UNINSTALL $(INSTALLDIR)/pciDriver.ko" ;\
+	    rm -f $(INSTALLDIR)/pciDriver.ko ;\
+	fi
+	@if [ -f $(MAININSTALLDIR)/pciDriver.ko ]; then \
+	    echo "UNINSTALL $(MAININSTALLDIR)/pciDriver.ko" ;\
+	    rm -f $(MAININSTALLDIR)/pciDriver.ko ;\
+	fi
+	@if [ -f $(INSTALLDIR)/pciDriver.symvers ]; then \
+	    echo "UNINSTALL $(INSTALLDIR)/pciDriver.symvers" ;\
+	    rm -f $(INSTALLDIR)/pciDriver.symvers ;\
+	fi
+	@if [ -f $(MAININSTALLDIR)/pciDriver.symvers ]; then \
+	    echo "UNINSTALL $(MAININSTALLDIR)/pciDriver.symvers" ;\
+	    rm -f $(MAININSTALLDIR)/pciDriver.symvers ;\
+	fi
+	@if [ -f /usr/include/linux/pcidriver.h ]; then \
+	    echo "UNINSTALL /usr/include/linux/pcidriver.h" ;\
+	    rm -rf /usr/include/linux/pcidriver.h ;\
+	fi
+	@if [ -d /usr/include/pciDriver/ ]; then \
+	    echo "UNINSTALL /usr/include/pciDriver/" ;\
+	    rm -rf /usr/include/pciDriver/ ;\
+	fi
+	@if [ "$(HEADERDIR)" != "" -a -f $(HEADERDIR)/linux/pcidriver.h ]; then \
+	    echo "UNINSTALL $(HEADERDIR)/linux/pcidriver.h" ;\
+	    rm -rf $(HEADERDIR)/linux/pcidriver.h ;\
+	fi
 
 clean:
 	rm -rf *.o *.ko *.mod.c .*.o.cmd .*.o.tmp .*.ko.cmd  .*.o *.symvers modules.order .tmp_versions
