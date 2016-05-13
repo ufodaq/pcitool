@@ -18,6 +18,7 @@
 /* mmap mode of the device */
 #define PCIDRIVER_MMAP_PCI		0
 #define PCIDRIVER_MMAP_KMEM 		1
+#define PCIDRIVER_MMAP_AREA		2
 
 /* Direction of a DMA operation */
 #define PCIDRIVER_DMA_BIDIRECTIONAL	0

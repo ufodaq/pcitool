@@ -54,7 +54,7 @@
  */
 static int ioctl_mmap_mode(pcidriver_privdata_t *privdata, unsigned long arg)
 {
-    if ((arg != PCIDRIVER_MMAP_PCI) && (arg != PCIDRIVER_MMAP_KMEM))
+    if ((arg != PCIDRIVER_MMAP_PCI) && (arg != PCIDRIVER_MMAP_KMEM) && (arg != PCIDRIVER_MMAP_AREA))
         return -EINVAL;
 
     /* change the mode */

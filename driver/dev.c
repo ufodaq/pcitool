@@ -127,6 +127,35 @@ static int pcidriver_mmap_bar(pcidriver_privdata_t *privdata, struct vm_area_str
 #endif /* PCIDRIVER_DUMMY_DEVICE */
 }
 
+
+static int pcidriver_mmap_area(pcidriver_privdata_t *privdata, struct vm_area_struct *vmap)
+{
+    int ret = 0;
+
+    unsigned long vma_size;
+    unsigned long addr = vmap->vm_pgoff;
+
+    mod_info_dbg("Entering mmap_addr\n");
+
+    /* Check sizes */
+    vma_size = (vmap->vm_end - vmap->vm_start);
+
+    if (addr % PAGE_SIZE) {
+	mod_info("mmap addr (0x%lx) is not aligned to page boundary\n", addr);
+        return -EINVAL;
+    }
+
+    ret = remap_pfn_range(vmap, vmap->vm_start, (addr >> PAGE_SHIFT), vma_size, vmap->vm_page_prot);
+
+    if (ret) {
+        mod_info("remap_pfn_range failed\n");
+        return -EAGAIN;
+    }
+
+    return 0;	/* success */
+}
+
+
 /**
  *
  * This function is the entry point for mmap() and calls either pcidriver_mmap_bar
@@ -156,6 +185,9 @@ static int pcidriver_mmap(struct file *filp, struct vm_area_struct *vma)
         }
         ret = pcidriver_mmap_bar(privdata, vma, bar);
         break;
+    case PCIDRIVER_MMAP_AREA:
+	ret = pcidriver_mmap_area(privdata, vma);
+	break;
     case PCIDRIVER_MMAP_KMEM:
         ret = pcidriver_mmap_kmem(privdata, vma);
         break;
