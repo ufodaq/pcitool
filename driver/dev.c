@@ -133,19 +133,13 @@ static int pcidriver_mmap_area(pcidriver_privdata_t *privdata, struct vm_area_st
     int ret = 0;
 
     unsigned long vma_size;
-    unsigned long addr = vmap->vm_pgoff;
 
     mod_info_dbg("Entering mmap_addr\n");
 
     /* Check sizes */
     vma_size = (vmap->vm_end - vmap->vm_start);
 
-    if (addr % PAGE_SIZE) {
-	mod_info("mmap addr (0x%lx) is not aligned to page boundary\n", addr);
-        return -EINVAL;
-    }
-
-    ret = remap_pfn_range(vmap, vmap->vm_start, (addr >> PAGE_SHIFT), vma_size, vmap->vm_page_prot);
+    ret = remap_pfn_range(vmap, vmap->vm_start, vmap->vm_pgoff, vma_size, vmap->vm_page_prot);
 
     if (ret) {
         mod_info("remap_pfn_range failed\n");
