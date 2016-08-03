@@ -179,7 +179,9 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/.bzr/ OR NOT EXISTS ${CMAKE_SOURCE_DIR}/pcilib/bui
 	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
     add_dependencies(pcilib build)
-    add_dependencies(pci build)
+    if (NOT DISABLE_PCITOOL)
+       add_dependencies(pci build)
+    endif (NOT DISABLE_PCITOOL)
 
 	# We need to generate build.h for source releases
     add_custom_target(dist_clean make clean -C driver
