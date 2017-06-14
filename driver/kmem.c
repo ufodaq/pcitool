@@ -616,8 +616,10 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
 
     vma->vm_flags |= (VM_RESERVED);
 
+    if ((kmem_entry->type&&PCILIB_KMEM_TYPE_MASK) == PCILIB_KMEM_TYPE_CONSISTENT) {
     // This is coherent memory, so it must not be cached.
-    vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+    }
 
     mod_info_dbg("Mapping address %08lx / PFN %08lx\n",
                  virt_to_phys((void*)kmem_entry->cpua),
