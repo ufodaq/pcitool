@@ -37,4 +37,13 @@
 # define __devinitdata
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,9,0)
+# define get_user_pages_compat(vma, nr, pages) get_user_pages(vma, nr, FOLL_WRITE, pages, NULL)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
+# define get_user_pages_compat(vma, nr, pages) get_user_pages(vma, nr, 1, 0, pages, NULL)
+#else
+# define get_user_pages_compat(vma, nr, pages) get_user_pages(current, current->mm, vma, nr, 1, 0, pages, NULL)
+#endif
+
+
 #endif
