@@ -55,7 +55,11 @@ pcilib_dma_context_t *dma_ipe_init(pcilib_t *pcilib, const char *model, const vo
 	ctx->version = IPEDMA_VERSION(version_value);
 	
 	if ((model)&&(!strcasecmp(model, "ipecamera"))) {
-	    ctx->gen = 2;
+            if (IPEDMA_GENERATION(version_value) > 2) {
+		ctx->gen = 3;
+	    } else {
+		ctx->gen = 2;
+	    }
 	} else {
             if (IPEDMA_GENERATION(version_value) > 2) {
 		ctx->gen = 3;
