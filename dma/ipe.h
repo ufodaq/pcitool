@@ -6,7 +6,7 @@
 #include "version.h"
 
 #define IPEDMA_PAGE_SIZE		4096l		/**< page size */
-#define IPEDMA_DMA_PAGES		1024l		/**< number of DMA pages in the ring buffer to allocate */
+#define IPEDMA_DMA_PAGES		512l		/**< number of DMA pages in the ring buffer to allocate */
 
 #define IPEDMA_DMA_TIMEOUT 		100000l		/**< us, overrides PCILIB_DMA_TIMEOUT (actual hardware timeout is 50ms according to Lorenzo) */
 

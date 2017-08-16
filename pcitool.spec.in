@@ -18,7 +18,7 @@ Vendor: Institute for Data Processing and Electronics, KIT
 Packager: Suren A. Chilingaryan <csa@suren.me>
 Source: ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.bz2
 URL: http://darksoft.org
-BuildRequires: libfastwriter-devel libxml2-devel uthash
+BuildRequires: libfastwriter-devel libxml2-devel uthash-devel
 BuildRequires: python python-devel swig 
 BuildRequires: dkms
 BuildRequires: doxygen
@@ -59,7 +59,7 @@ API exposes 4 API layers.
 Summary: Development files for pcilib
 Group: Development/Libraries 
 Requires: libpcilib${PCILIB_ABI_VERSION} = %{version}
-Requires: uthash
+Requires: uthash-devel
 
 %description -n libpcilib-devel
 Development files for user-space PCI library

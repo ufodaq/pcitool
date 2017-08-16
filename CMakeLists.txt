@@ -1,8 +1,8 @@
 project(pcitool C)
 
-set(RELEASE "3")
+set(RELEASE "0")
 set(PCILIB_VERSION "0.2.8")
-set(PCILIB_ABI_VERSION "0")
+set(PCILIB_ABI_VERSION "2")
 
 cmake_minimum_required(VERSION 2.8)
 #set(PKG_CONFIG_USE_CMAKE_PREFIX_PATH true)
