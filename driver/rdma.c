@@ -8,6 +8,7 @@
 #include <linux/pagemap.h>
 #include <linux/hugetlb.h>
 #include <linux/cdev.h>
+#include <linux/version.h>
 
 #include "base.h"
 
@@ -18,6 +19,7 @@ static unsigned long pcidriver_follow_pte(struct mm_struct *mm, unsigned long ad
     pmd_t *pmd;
     pte_t *pte;
 
+
     spinlock_t *ptl;
     unsigned long pfn = 0;
 
@@ -26,7 +28,15 @@ static unsigned long pcidriver_follow_pte(struct mm_struct *mm, unsigned long ad
     if (pgd_none(*pgd) || unlikely(pgd_bad(*pgd)))
         return 0;
 
+        // pud_offset compatibility with pgd_t* broken from Kernel Version 4.12 onwards. See: https://github.com/torvalds/linux/commit/048456dcf2c56ad6f6248e2899dda92fb6a613f6
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,12,0)
+    p4d_t *p4d;
+    p4d = p4d_offset(pgd, address);
+    pud = pud_offset(p4d, address);
+#elif
     pud = pud_offset(pgd, address);
+#endif
+
     if (pud_none(*pud) || unlikely(pud_bad(*pud)))
         return 0;
 
