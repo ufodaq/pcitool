@@ -33,7 +33,7 @@ static unsigned long pcidriver_follow_pte(struct mm_struct *mm, unsigned long ad
     p4d_t *p4d;
     p4d = p4d_offset(pgd, address);
     pud = pud_offset(p4d, address);
-#elif
+#else
     pud = pud_offset(pgd, address);
 #endif
 
