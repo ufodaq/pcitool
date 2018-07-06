@@ -1,0 +1,275 @@
+Index: pcitool-kmemwrite/cli.c
+===================================================================
+--- pcitool-kmemwrite/cli.c	(revision pcitool-kmemwrite,197)
++++ pcitool-kmemwrite/cli.c	(revision pcitool-kmemwrite,222)
+@@ -78,4 +78,5 @@
+     MODE_LIST_DMA_BUFFERS,
+     MODE_READ_DMA_BUFFER,
++    MODE_WRITE_DMA_BUFFER,
+     MODE_ENABLE_IRQ,
+     MODE_DISABLE_IRQ,
+@@ -85,4 +86,5 @@
+     MODE_LIST_KMEM,
+     MODE_READ_KMEM,
++    MODE_WRITE_KMEM,
+     MODE_FREE_KMEM
+ } MODE;
+@@ -145,4 +147,5 @@
+     OPT_LIST_DMA_BUFFERS,
+     OPT_READ_DMA_BUFFER,
++    OPT_WRITE_DMA_BUFFER,
+     OPT_START_DMA,
+     OPT_STOP_DMA,
+@@ -156,4 +159,5 @@
+     OPT_FREE_KMEM,
+     OPT_READ_KMEM,
++    OPT_WRITE_KMEM,
+     OPT_BLOCK_SIZE,
+     OPT_ALIGNMENT,
+@@ -197,4 +201,5 @@
+     {"list-dma-buffers",	required_argument, 0, OPT_LIST_DMA_BUFFERS },
+     {"read-dma-buffer",		required_argument, 0, OPT_READ_DMA_BUFFER },
++    {"write-dma-buffer",	required_argument, 0, OPT_WRITE_DMA_BUFFER },
+     {"enable-irq",		optional_argument, 0, OPT_ENABLE_IRQ },
+     {"disable-irq",		optional_argument, 0, OPT_DISABLE_IRQ },
+@@ -203,4 +208,5 @@
+     {"list-kernel-memory",	optional_argument, 0, OPT_LIST_KMEM },
+     {"read-kernel-memory",	required_argument, 0, OPT_READ_KMEM },
++    {"write-kernel-memory",	required_argument, 0, OPT_WRITE_KMEM },
+     {"alloc-kernel-memory",	required_argument, 0, OPT_ALLOC_KMEM },
+     {"free-kernel-memory",	required_argument, 0, OPT_FREE_KMEM },
+@@ -261,4 +267,5 @@
+ "   --list-dma-buffers <dma>	- List buffers for specified DMA engine\n"
+ "   --read-dma-buffer <dma:buf>	- Read the specified buffer\n"
++"   --write-dma-buffer <dma:buf>- Write the specified buffer\n"
+ "\n"
+ "  Kernel Modes:\n"
+@@ -266,4 +273,5 @@
+ "   --read-kernel-memory <blk>	- Read the specified block of the kernel memory\n"
+ "				  block is specified as: use:block_number\n"
++"   --write-kernel-memory <blk>	- Write the specified block of the kernel memory\n"
+ "   --alloc-kernel-memory <use>	- Allocate kernel buffers (DANGEROUS)\n"
+ "   --free-kernel-memory <use>	- Cleans lost kernel space buffers (DANGEROUS)\n"
+@@ -2061,8 +2069,79 @@
+     }
+ 
++    err = pcilib_kmem_sync_block(handle, kbuf, PCILIB_KMEM_SYNC_TODEVICE, block);
++    if (err) {
++	pcilib_free_kernel_memory(handle, kbuf, KMEM_FLAG_REUSE);
++	Error("The synchronization of kernel buffer has failed\n");
++	return 0;
++    }
++
+     pcilib_free_kernel_memory(handle, kbuf, KMEM_FLAG_REUSE);
+ 
+     return 0;
+ }
++
++
++int WriteKMEM(pcilib_t *handle, const char *device, pcilib_kmem_use_t useid, size_t block, size_t max_size, access_t access, int endianess, char **src) {
++    int err;
++    void *data;
++    void *buf;
++    char *src_value;
++    int res = 0, i;
++    size_t n, size;
++    pcilib_kmem_handle_t *kbuf;
++
++    if (block == (size_t)-1) block = 0;
++
++    kbuf = pcilib_alloc_kernel_memory(handle, 0, block + 1, 0, 0, useid, PCILIB_KMEM_FLAG_REUSE|PCILIB_KMEM_FLAG_TRY);
++    if (!kbuf) {
++	Error("The specified kernel buffer is not allocated\n");
++	return 0;
++    }
++
++    err = pcilib_kmem_sync_block(handle, kbuf, PCILIB_KMEM_SYNC_FROMDEVICE, block);
++    if (err) {
++	pcilib_free_kernel_memory(handle, kbuf, KMEM_FLAG_REUSE);
++	Error("The synchronization of kernel buffer has failed\n");
++	return 0;
++    }
++
++    data = pcilib_kmem_get_block_ua(handle, kbuf, block);
++    if (data) {
++	size = pcilib_kmem_get_block_size(handle, kbuf, block);
++	if ((max_size)&&(size > max_size)) size = max_size;
++	
++	err = posix_memalign( (void**)&buf, 256, size);
++	if ((err)||(!buf)) Error("Allocation of %i bytes of memory have failed", size);
++
++	n = size / access;
++
++        for (i = 0; i < n; i++) {
++    	    src_value = max_size?src[i]:src[0];
++    	    
++	    switch (access) {
++		case 1: res = sscanf(src_value, "%hhx", ((uint8_t*)buf)+i); break;
++		case 2: res = sscanf(src_value, "%hx", ((uint16_t*)buf)+i); break;
++	    	case 4: res = sscanf(src_value, "%x", ((uint32_t*)buf)+i); break;
++		case 8: res = sscanf(src_value, "%lx", ((uint64_t*)buf)+i); break;
++	    	default: Error("Unexpected data size (%lu)", access);
++	    }
++	    if ((res != 1)||(!isxnumber(src_value))) Error("Can't parse data value at poition %i, (%s) is not valid hex number", i, src_value);
++	}
++	if (endianess) pcilib_swap(buf, buf, abs(access), n);
++
++	printf("%x %x %i %i\n", *((uint32_t*)buf), *((uint32_t*)data), n * access, access);
++	memcpy(data, buf, n * access);
++	printf("%x %x %i %i\n", *((uint32_t*)buf), *((uint32_t*)data), n * access, access);
++    } else {
++	pcilib_free_kernel_memory(handle, kbuf, KMEM_FLAG_REUSE);
++	Error("The specified block is not existing\n");
++	return 0;
++    }
++
++    pcilib_free_kernel_memory(handle, kbuf, KMEM_FLAG_REUSE);
++
++    return 0;
++}
++
+ 
+ int AllocKMEM(pcilib_t *handle, const char *device, const char *use, const char *type, size_t size, size_t block_size, size_t alignment) {
+@@ -2301,4 +2380,47 @@
+ 
+     return ReadKMEM(handle, device, ((dma&0x7F)|((dma_direction == PCILIB_DMA_TO_DEVICE)?0x80:0x00))|(PCILIB_KMEM_USE_DMA_PAGES<<16), block, size, o);
++}
++
++int WriteBuffer(pcilib_t *handle, const char *device, pcilib_model_description_t *model_info, pcilib_dma_engine_addr_t dma, pcilib_dma_direction_t dma_direction, size_t block, size_t size, access_t access, int endianess, char **src) {
++    int err;
++    pcilib_dma_engine_t dmaid;
++    pcilib_dma_engine_status_t status;
++    pcilib_dma_buffer_status_t *buffer;
++
++    dmaid = pcilib_find_dma_by_addr(handle, dma_direction, dma);
++    if (dmaid == PCILIB_DMA_ENGINE_INVALID) Error("The specified DMA engine is not found");
++
++    err = pcilib_start_dma(handle, dmaid, 0);
++    if (err) Error("Error starting the specified DMA engine");
++    
++    err = pcilib_get_dma_status(handle, dmaid, &status, 0, NULL);
++    if (err) Error("Failed to obtain status of the specified DMA engine");
++    
++    buffer = (pcilib_dma_buffer_status_t*)malloc(status.ring_size*sizeof(pcilib_dma_buffer_status_t));
++    if (!buffer) Error("Failed to allocate memory for status buffer");
++
++    err = pcilib_get_dma_status(handle, dmaid, &status, status.ring_size, buffer);
++    if (err) Error("Failed to obtain extended status of the specified DMA engine");
++
++    if (block == (size_t)-1) {
++	// get current 
++    }
++
++    if (size) {
++        if (size > buffer[block].size)
++	    size = buffer[block].size;
++    } 
++/*
++    // We don't care if extra space will be overwritten    
++    else {
++	size = buffer[block].size;
++    }
++*/
++
++    free(buffer);
++
++    pcilib_stop_dma(handle, dmaid, 0);
++
++    return WriteKMEM(handle, device, ((dma&0x7F)|((dma_direction == PCILIB_DMA_TO_DEVICE)?0x80:0x00))|(PCILIB_KMEM_USE_DMA_PAGES<<16), block, size, access, endianess, src);
+ }
+ 
+@@ -2513,4 +2635,20 @@
+ 		dma_channel = optarg;
+ 	    break;
++	    case OPT_WRITE_DMA_BUFFER:
++		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
++		
++		mode = MODE_WRITE_DMA_BUFFER;
++
++		num_offset = strchr(optarg, ':');
++
++		if (num_offset) {
++		    if (sscanf(num_offset + 1, "%zu", &block) != 1)
++			Usage(argc, argv, "Invalid buffer is specified (%s)", num_offset + 1);
++
++		    *(char*)num_offset = 0;
++		} else block = (size_t)-1;
++		
++		dma_channel = optarg;
++	    break;
+ 	    case OPT_START_DMA:
+ 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+@@ -2609,4 +2747,20 @@
+ 		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
+ 		mode = MODE_READ_KMEM;
++
++		num_offset = strchr(optarg, ':');
++
++		if (num_offset) {
++		    if (sscanf(num_offset + 1, "%zu", &block) != 1)
++			Usage(argc, argv, "Invalid block number is specified (%s)", num_offset + 1);
++
++		    *(char*)num_offset = 0;
++		}
++		
++		use = optarg;
++		useid = ParseUse(use);
++    	    break;
++	    case OPT_WRITE_KMEM:
++		if (mode != MODE_INVALID) Usage(argc, argv, "Multiple operations are not supported");
++		mode = MODE_WRITE_KMEM;
+ 
+ 		num_offset = strchr(optarg, ':');
+@@ -2842,4 +2996,6 @@
+ 
+     switch (mode) {
++     case MODE_WRITE_DMA_BUFFER:
++     case MODE_WRITE_KMEM:
+      case MODE_WRITE:
+         if (((argc - optind) == 1)&&(*argv[optind] == '*')) {
+@@ -2864,4 +3020,6 @@
+         } else if ((argc - optind) == size) data = argv + optind;
+         else Usage(argc, argv, "The %i data values is specified, but %i required", argc - optind, size);
++        
++        if (mode != MODE_WRITE) break;
+      case MODE_READ:
+         if (!addr) {
+@@ -2872,8 +3030,15 @@
+ 	}
+      break;
++     default:
++        if (argc > optind) Usage(argc, argv, "Invalid non-option parameters are supplied");
++    }
++
++
++    switch (mode) {
+      case MODE_START_DMA:
+      case MODE_STOP_DMA:
+      case MODE_LIST_DMA_BUFFERS:
+      case MODE_READ_DMA_BUFFER:
++     case MODE_WRITE_DMA_BUFFER:
+         if ((dma_channel)&&(*dma_channel)) {
+ 	    itmp = strlen(dma_channel) - 1;
+@@ -2900,5 +3065,5 @@
+      break;
+      default:
+-        if (argc > optind) Usage(argc, argv, "Invalid non-option parameters are supplied");
++        ;
+     }
+ 
+@@ -3057,4 +3222,7 @@
+         ReadBuffer(handle, fpga_device, model_info, dma, dma_direction, block, ofile);
+      break;
++     case MODE_WRITE_DMA_BUFFER:
++        WriteBuffer(handle, fpga_device, model_info, dma, dma_direction, block, size_set?size:0, access, endianess, data);
++     break;
+      case MODE_START_DMA:
+         StartStopDMA(handle, model_info, dma, dma_direction, 1);
+@@ -3082,4 +3250,7 @@
+         ReadKMEM(handle, fpga_device, useid, block, 0, ofile);
+      break;
++     case MODE_WRITE_KMEM:
++        WriteKMEM(handle, fpga_device, useid, block, size_set?size:0, access, endianess, data);
++     break;
+      case MODE_ALLOC_KMEM:
+         AllocKMEM(handle, fpga_device, use, type, size, block_size, alignment);
