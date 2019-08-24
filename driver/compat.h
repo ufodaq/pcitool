@@ -41,6 +41,9 @@
 # define get_user_pages_compat(vma, nr, pages) get_user_pages(vma, nr, FOLL_WRITE, pages, NULL)
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
 # define get_user_pages_compat(vma, nr, pages) get_user_pages(vma, nr, 1, 0, pages, NULL)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,159))
+    // Looks like some updates from 4.9 were backported to 4.4 LTS kernel. On Ubuntu, at least 4.4.159 needs this variant
+# define get_user_pages_compat(vma, nr, pages) get_user_pages(current, current->mm, vma, nr, FOLL_WRITE, pages, NULL)
 #else
 # define get_user_pages_compat(vma, nr, pages) get_user_pages(current, current->mm, vma, nr, 1, 0, pages, NULL)
 #endif
