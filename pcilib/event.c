@@ -19,12 +19,22 @@
 #include "tools.h"
 #include "error.h"
 
-#ifndef __timespec_defined
+/* Newer versions of glibc guard timespec with a different definition guard, compliant to linux/time.h
+ * We need to check for both definition guards to prevent accidental redifinitions of struct timespec
+ */
+#if (defined(__timespec_defined) && __timespec_defined) || \
+    (defined(_STRUCT_TIMESPEC) && _STRUCT_TIMESPEC)
+#define PCILIB_DEFINE_TIMESPEC 0
+#else
+#define PCILIB_DEFINE_TIMESPEC 1
+#endif
+
+#if (defined(PCILIB_DEFINE_TIMESPEC) && PCILIB_DEFINE_TIMESPEC)
 struct timespec {
     time_t tv_sec;
     long tv_nsec;
 };
-#endif /* __timespec_defined */
+#endif /* PCILIB_DEFINE_TIMESPEC */
 
 
 pcilib_event_t pcilib_find_event(pcilib_t *ctx, const char *event) {
