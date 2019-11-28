@@ -81,7 +81,7 @@ if (NOT DISABLE_PYTHON)
 #	file (TO_CMAKE_PATH "${PYTHON_SITE_DIR}" PYTHON_SITE_DIR)
 #	string (REGEX REPLACE "^${PYTHON_PREFIX}/" "${CMAKE_INSTALL_PREFIX}/" PYTHON_SITE_DIR "${PYTHON_SITE_DIR}")
 
-	execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "import site; list = [dir for dir in site.getsitepackages() if dir.startswith('${CMAKE_INSTALL_PREFIX}')]; liblist = [dir for dir in list if dir.startswith('${CMAKE_INSTALL_PREFIX}/lib')]; print liblist[0] if liblist else list[0] if list else site.getsitepackages()[0]" OUTPUT_VARIABLE PYTHON_SITE_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process (COMMAND ${PYTHON_EXECUTABLE} -c "import site; list = [dir for dir in site.getsitepackages() if dir.startswith('${CMAKE_INSTALL_PREFIX}')]; liblist = [dir for dir in list if dir.startswith('${CMAKE_INSTALL_PREFIX}/lib')]; print (liblist[0] if liblist else list[0] if list else site.getsitepackages()[0])" OUTPUT_VARIABLE PYTHON_SITE_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 	message(${PYTHON_SITE_DIR})
 	file (TO_CMAKE_PATH "${PYTHON_SITE_DIR}" PYTHON_SITE_DIR)
 
