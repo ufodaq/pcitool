@@ -48,5 +48,11 @@
 # define get_user_pages_compat(vma, nr, pages) get_user_pages(current, current->mm, vma, nr, 1, 0, pages, NULL)
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,5,0)
+# define ioremap_nocache ioremap
+// ioremap_nocache and ioremap are now platform independent and identical, as of
+// Kernel Version 5.5
+// https://lore.kernel.org/linux-mips/20191209194819.GA28157@lst.de/T/ 
+#endif
 
 #endif
