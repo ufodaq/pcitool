@@ -80,9 +80,20 @@ int pcidriver_umem_sgmap(pcidriver_privdata_t *privdata, umem_handle_t *umem_han
     mod_info_dbg("allocated space for the SG list.\n");
 
     /* Get the page information */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,8,0)
+    /*As of Kernel 5.8.0, the mmap_sem member of the MM struct has been
+     * renamed to mmap_lock
+     * See:
+     * https://github.com/torvalds/linux/commit/da1c55f1b272f4bd54671d459b39ea7b54944ef9
+     */
+    down_read(&current->mm->mmap_lock);
+    res = get_user_pages_compat(umem_handle->vma, nr_pages, pages);
+    up_read(&current->mm->mmap_lock);
+#else
     down_read(&current->mm->mmap_sem);
     res = get_user_pages_compat(umem_handle->vma, nr_pages, pages);
     up_read(&current->mm->mmap_sem);
+#endif
 
     /* Error, not all pages mapped */
     if (res < (int)nr_pages) {
