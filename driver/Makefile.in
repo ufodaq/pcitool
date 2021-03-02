@@ -27,8 +27,11 @@ endif
 
 # Grepping in '../pcilib/build.h' is correct as we will always have this file in the releases...
 default:
-	@KERNEL_GCC_VERSION=`cat /proc/version | head -n1 | cut -d " " -f 7` ;\
-	GCC_VERSION=`$(CC) --version | head -n 1 | tr ' ' '\n' | grep -e "[0-9]\+\.[0-9]" | tail -n 1` ;\
+	@KERNEL_GCC_STRING=`cat /proc/version | head -n 1 | cut -d " " -f 7 | tr '-' '\n' | head -n 1` ;\
+	KERNEL_GCC_VERSION=`echo $$KERNEL_GCC_STRING | grep -oe "[0-9]\+\.[0-9.]\+" | tail -n 1` ; \
+	echo "Detected Kernel build GCC Version: $$KERNEL_GCC_VERSION" ;\
+	GCC_VERSION=`$(CC) --version | head -n 1 | tr ' ' '\n' | grep -e "[0-9]\+\.[0-9.]\+" | tail -n 1` ;\
+	echo "Detected installed GCC Version: $$GCC_VERSION" ;\
 	if [ $$KERNEL_GCC_VERSION != $$GCC_VERSION ]; then \
 	    echo "Kernel is compiled with gcc $$KERNEL_GCC_VERSION, but you are now using $$GCC_VERSION" ;\
 	    GCC_MAJOR=`echo $$KERNEL_GCC_VERSION | cut -d "." -f 1-2` ;\
