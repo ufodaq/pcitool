@@ -3,6 +3,7 @@ exec_prefix=${CMAKE_INSTALL_BINDIR}
 libdir=${CMAKE_INSTALL_LIBDIR}
 includedir=${CMAKE_INSTALL_INCLUDEDIR}
 plugindir=${PCILIB_PLUGIN_DIR}
+datadir=${PCILIB_DATA_DIR}
 modeldir=${PCILIB_MODEL_DIR}
 
 Name: ${TARNAME}

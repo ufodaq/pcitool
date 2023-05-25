@@ -175,7 +175,7 @@ include(CPack)
 # In releases, we just keep the pre-generated build.h 
 if(EXISTS ${CMAKE_SOURCE_DIR}/.bzr/ OR NOT EXISTS ${CMAKE_SOURCE_DIR}/pcilib/build.h)
     add_custom_target(build
-	COMMAND ${CMAKE_COMMAND} -DPCILIB_SOURCE_DIR=${CMAKE_SOURCE_DIR} -DPCILIB_BINARY_DIR=${CMAKE_BINARY_DIR} -P ${CMAKE_SOURCE_DIR}/cmake/build.cmake
+	COMMAND ${CMAKE_COMMAND} -DPCILIB_SOURCE_DIR=${CMAKE_SOURCE_DIR} -DPCILIB_BINARY_DIR=${CMAKE_BINARY_DIR} -DPCILIB_RELEASE=${CPACK_PACKAGE_VERSION} -P ${CMAKE_SOURCE_DIR}/cmake/build.cmake
 	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
     add_dependencies(pcilib build)

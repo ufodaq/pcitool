@@ -18,6 +18,10 @@ CMakeFiles
 cmake_install.cmake
 Makefile
 *.so.*
+*.so
+*.a
+*.o
+*.mod
 install_manifest.txt
 apps/xilinx
 apps/pio_test
