@@ -35,6 +35,8 @@ config.h
 pcitool/pci
 version.h
 #Doxyfile
+CMakeDoxyfile.in
+CMakeDoxygenDefaults.cmake
 html
 pcilib/build.h
 build.h
