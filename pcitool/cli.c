@@ -980,7 +980,7 @@ void Info(pcilib_t *handle, const pcilib_model_description_t *model_info, const 
 		if (info) {
 		    printf(" %s\n", entry->d_name);
 		    for (j = 0; info[j].name; j++) {
-			pcilib_version_t version = info[j].api->version;
+			pcilib_version_t version = info[j].api?info[j].api->version:0;
 			printf("   %-12s %u.%u.%u - %s\n", info[j].name, 
 				PCILIB_VERSION_GET_MAJOR(version), 
 				PCILIB_VERSION_GET_MINOR(version),

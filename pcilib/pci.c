@@ -36,10 +36,10 @@ static int pcilib_detect_model(pcilib_t *ctx, const char *model) {
     const pcilib_board_info_t *board_info = pcilib_get_board_info(ctx);
 
     model_info = pcilib_find_plugin_model(ctx, board_info->vendor_id, board_info->device_id, model);
-    if (model_info) {
-	memcpy(&ctx->model_info, model_info, sizeof(pcilib_model_description_t));
-	memcpy(&ctx->dma, model_info->dma, sizeof(pcilib_dma_description_t));
+    if ((model_info)&&(model_info->name)) {
 	ctx->model = strdup(model_info->name);
+	memcpy(&ctx->model_info, model_info, sizeof(pcilib_model_description_t));
+	if (model_info->dma) memcpy(&ctx->dma, model_info->dma, sizeof(pcilib_dma_description_t));
     } else if (model) {
 	    // If not found, check for DMA models
 	for (i = 0; pcilib_dma[i].name; i++) {
