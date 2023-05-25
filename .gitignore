@@ -34,7 +34,7 @@ pcitool.pc
 config.h
 pcitool/pci
 version.h
-Doxyfile
+#Doxyfile
 html
 pcilib/build.h
 build.h
