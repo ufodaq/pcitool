@@ -1,7 +1,7 @@
 CONFIG_MODULE_SIG=n
 
 obj-m := pciDriver.o
-pciDriver-objs := base.o dev.o int.o umem.o kmem.o sysfs.o ioctl.o pcibus.o rdma.o
+pciDriver-objs := base.o dev.o int.o umem.o kmem.o sysfs.o ioctl.o pcibus.o
 
 KERNELVER ?= $(shell uname -r)
 KERNELDIR ?= /lib/modules/$(KERNELVER)/build
