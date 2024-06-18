@@ -290,7 +290,7 @@ static int __init pcidriver_init(void)
     mod_info("Major %d allocated to nodename '%s'\n", MAJOR(pcidriver_devt), NODENAME);
 
     /* Register driver class */
-    pcidriver_class = class_create(THIS_MODULE, NODENAME);
+    pcidriver_class = class_create_compat(THIS_MODULE, NODENAME);
 
     if (IS_ERR(pcidriver_class)) {
         mod_info("No sysfs support. Module not loaded.\n");

@@ -613,8 +613,9 @@ int pcidriver_mmap_kmem(pcidriver_privdata_t *privdata, struct vm_area_struct *v
     }
 
     kmem_entry->refs += vma_size / PAGE_SIZE;
+    vma_flags_set_compat(vma, VM_RESERVED); // VM_DONTEXPAND | VM_DONTDUMP | VM_LOCKED;
 
-    vma->vm_flags |= (VM_RESERVED);
+
 
     if ((kmem_entry->type&&PCILIB_KMEM_TYPE_MASK) == PCILIB_KMEM_TYPE_CONSISTENT) {
     // This is coherent memory, so it must not be cached.

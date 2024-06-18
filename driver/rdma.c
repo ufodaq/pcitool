@@ -44,6 +44,7 @@ static unsigned long pcidriver_follow_pte(struct mm_struct *mm, unsigned long ad
     if (pmd_none(*pmd))
         return 0;
 
+	// Seems not available out of kernel tree. See: https://lkml.indiana.edu/hypermail/linux/kernel/2307.3/08004.html
     pte = pte_offset_map_lock(mm, pmd, address, &ptl);
     if (!pte_none(*pte))
         pfn = (pte_pfn(*pte) << PAGE_SHIFT);
